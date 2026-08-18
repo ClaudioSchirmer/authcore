@@ -1,0 +1,10 @@
+# CLAUDE.md
+
+## Non-negotiable rules
+
+> 1. **Every change to this module needs explicit maintainer approval first.** Describe the change + motivation + impact, wait for approval, then edit. No exception for "obvious", "small", "cosmetic", or "a consumer needs it". If a consumer is urgent, work around it in the consumer — never patch the framework "for now".
+> 2. **Never remove functionality without explicit confirmation.** "Appears redundant" / "new API covers it" / "looks like dead code" is not authorization. When a new feature impacts an old one, stop, describe the overlap, and offer via `AskUserQuestion`: *Remove / Deprecate / Keep both / Adapt to delegate*. Applies to any public surface (functions, endpoints, yaml fields, flags, defaults, struct fields, options).
+> 3. **English everywhere** — code, comments, docs, identifiers, tests, logs, error strings. The only non-English text allowed is the seven translation catalogs in `application/translation/` (`ptbr`/`eng`/`esp`/`fra`/`deu`/`ita`/`nld`); the surrounding Go stays English. Chat may be any language.
+> 4. **Verify, never guess.** Every claim about the code (signatures, behavior, defaults, existence) must be backed by a `Read`/`grep`, including while planning. A plan built on a guessed contract has no value. Say "I'm guessing — let me verify" and verify, rather than present inference as fact.
+> 5. **The AI never writes git history.** No `commit`/`push`/`tag`/PR/release. At task start, get onto a coherent branch (`feature|fix|docs|refactor/<kebab-outcome>`): off `main` via `git checkout -b`, or rename an in-flight unmerged branch via `git branch -m` (never re-stack). Apply edits, then deliver one English commit-message suggestion as chat text. `git checkout -b` / `git branch -m` are the only git-writes allowed.
+> 6. **95% is the minimum test coverage.** No production changes to enable testability without maintainer approval. `_test.go` files may cross DDD layers only if production imports already allow it.
