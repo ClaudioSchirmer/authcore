@@ -3,7 +3,7 @@
 Status: APPROVED
 Approved: maintainer (Cláudio Schirmer Guedes), 2026-08-19 — every ⚠️ OPEN slot answered (§B Q1–Q10) and the remaining `(proposed)` picks accepted in one go
 Language: English (all artifacts) · Portuguese (chat) — per `CLAUDE.md` rule 3 and the maintainer's invocation
-Generation: omnicore-gen — chosen by the maintainer at the 1d gateway, 2026-08-19
+Generation: <pending>
 
 The tenant is the isolation partition every other aggregate of this service will hang off.
 It carries **three identifiers, and each has exactly one job** — the single most important
