@@ -1,6 +1,8 @@
 package main
 
 import (
+	apptrans "github.com/ClaudioSchirmer/authcore/internal/application/translations"
+	"github.com/ClaudioSchirmer/omnicore/application/translation"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/web/openapi"
 )
@@ -14,6 +16,17 @@ import (
 // mandatory as soon as the first feature exists.
 func Wire(d bootstrap.Deps) bootstrap.Wiring {
 	return bootstrap.Wiring{
+		// The seven catalogs. The framework requires them as soon as a
+		// feature exists, so they arrive with the first entity.
+		Translations: []translation.Module{
+			apptrans.PTBR(), apptrans.ENG(), apptrans.ESP(), apptrans.FRA(),
+			apptrans.DEU(), apptrans.ITA(), apptrans.NLD(),
+		},
+
+		Features: []bootstrap.Feature{
+			NewTenantsFeature(d),
+		},
+
 		OpenAPI: &openapi.Config{
 			Title:       "authcore API",
 			Version:     "0.1.0",

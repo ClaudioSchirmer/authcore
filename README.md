@@ -28,7 +28,7 @@ Honest scope, so nobody reads intent as delivery:
 
 | Capability | State |
 |---|---|
-| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — generated from `omnicore-gen/tenant.omnicore.yaml`, boot-proven against a real Postgres |
+| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — generated from `specs/omnicore-gen/tenant.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** — `/omnicore:run` boots it, `/omnicore:qa` proves the endpoints |
 | User entity | not started |
 | User ↔ tenant association | not started |
 | Group, Role, Permission entities | not started — target model agreed, see below |
@@ -146,7 +146,7 @@ exception anywhere.
 ### Tenant
 
 An isolation partition. Flat aggregate, table `tenants`. Its approved model, with the
-alternatives that were rejected and why, is in `scaffold-entity/tenant/spec.md`.
+alternatives that were rejected and why, is in `specs/scaffold-entity/tenant/spec.md`.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -189,13 +189,13 @@ every issued token and orphaning every foreign key pointing at one.
   for billing while being blocked in the product. Using archive to suspend a delinquent
   customer would hide them from the very reports collections needs.
 
-Business rules enforced by the domain (`scaffold-entity/tenant/spec.md` §7 is the full
+Business rules enforced by the domain (`specs/scaffold-entity/tenant/spec.md` §7 is the full
 table):
 
 | Field | Rules |
 |---|---|
 | `name` | 2–120 characters · at least one letter · at least min(3, length) distinct characters · no run of 4 or more identical characters · no leading/trailing whitespace and no double space |
-| `workspace` | 3–63 characters · `^[a-z0-9]+(-[a-z0-9]+)*$` · at least 3 distinct characters · no run of 4 or more identical · not on the 50-entry reserved list · unique across all rows · immutable · **no input normalization** — `" Acme "` and `"ACME-CORP"` are refused, never silently repaired |
+| `workspace` | 3–63 characters · `^[a-z0-9]+(-[a-z0-9]+)*$` · at least 3 distinct characters · no run of 4 or more identical · not on the 51-entry reserved list · unique across all rows · immutable · **no input normalization** — `" Acme "` and `"ACME-CORP"` are refused, never silently repaired |
 | `tenant_id` | must equal `workspace.DeriveTenantID()` · immutable |
 | `description` | 15–500 characters · at least two words · at least 5 distinct characters · no run of 4 or more identical · at least one vowel · must differ from the name and the workspace under a normalized comparison |
 | `status` | a declared member · transitions `trial→active`, `trial→suspended`, `active→suspended`, `suspended→active` and no-ops only — `active→trial` and `suspended→trial` are refused |
@@ -204,7 +204,7 @@ Every bound counts **runes, not bytes**, and "letter", "word" and "vowel" are Un
 ASCII: this service ships seven translation catalogs, and a byte-based bound is wrong by
 two characters for a name like "Acme Comércio e Serviços Ltda" while an ASCII vowel test
 would reject a description written in Japanese or Arabic as keyboard junk. The predicates
-live in `internal/domain/vos/textrules.go` and are shared with every future entity.
+live in `internal/domain/vos/text_predicates.go` and are shared with every future entity.
 
 **Known limitation**, found by testing those predicates against all seven languages and
 left in deliberately: the two-word rule on `description` is unsatisfiable in languages
@@ -254,6 +254,16 @@ Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?field
 `?onlyTotal`, `?includeArchived`. A control that is not declared is answered with a typed
 400 — that is a contract, not an omission.
 
+Filters served, per field: `tenantId` (eq, in) · `name` (eq, in, prefix, contains, and the
+case-insensitive twins) · `workspace` (eq, in, prefix, iprefix) · `description` (contains,
+icontains) · `status` (eq, in).
+
+Two narrower-than-intended edges, both recorded in `specs/scaffold-entity/tenant/spec.md`:
+**`createdAt` and `updatedAt` are not filterable** (the generator declares filters only over
+declared entity fields, and the framework-managed timestamps are not among them), and
+**`?orderBy` is not restricted to a field allowlist** — the model named four sortable
+fields, and what the generator can express is orderBy on or off for the whole view.
+
 `{id}` is the row id, not the public key. That is a deliberate trade: the management API
 is operator-only and already behind a permission, and keeping the row id out of the URLs
 too would mean abandoning the framework's automatic by-id handlers for hand-written ones.
@@ -275,14 +285,24 @@ Two of those — the stale-write `409` and the archive `404` — arrived with om
 that changes a field while archiving now reaches the row instead of only the audit trail.
 That last one is what lets archiving force a tenant to `suspended`.
 
-**`tenantID` is accepted in the create and patch bodies and does nothing.** It is computed
-from the workspace, and a value sent by a caller is overwritten on create and refused on
-patch. It is in the request schema only because the generator has no way to declare a
-server-computed field; the gap is written up in `omnicore-gen/upstream-findings.md`. Do
-not send it.
+**`tenantID` is not in any write body at all.** It is declared `assignedFrom: derived`,
+which takes it out of the create and patch request schemas, out of the commands and out of
+the OpenAPI request documentation — so there is no shape in which a caller can propose one,
+and nothing has to ignore a value that was sent. It is fully present on the READ side:
+every response carries it and it is filterable, which is how a consuming service resolves a
+token claim back to a tenant.
+
+(An earlier run of this service could not say that: the generator had no way to declare a
+server-computed field, so `tenantID` sat in the write schema being silently overwritten.
+That gap was reported upstream and is closed — the key exists as of omnicore plugin
+`0.22.0`, and this entity uses it.)
 
 Every message ships in seven languages (pt-BR, English, Spanish, French, German, Italian,
-Dutch); the OpenAPI page carries a language selector.
+Dutch); the OpenAPI page carries a language selector. **Field labels are translated;
+`status` VALUES are not** — a response carries the raw token (`trial`, `active`,
+`suspended`), because the generator accepted the seven member translations and emitted no
+catalog entry for them. The texts are already written in the spec, so they will land the
+moment that emitter exists.
 
 ## Layout
 
@@ -302,21 +322,24 @@ devops/             the local bench (Postgres)
 This service is generated and evolved through the omnicore tooling, and the reasoning is
 kept in the repository rather than in chat history:
 
-- `scaffold-service/spec.md` — the approved service-level model: posture, surfaces, why
+- `specs/scaffold-service/spec.md` — the approved service-level model: posture, surfaces, why
   there is no Mongo.
-- `scaffold-entity/<entity>/spec.md` — the approved domain model per entity, with the
+- `specs/scaffold-entity/<entity>/spec.md` — the approved domain model per entity, with the
   alternatives that were rejected and why.
-- `scaffold-entity/<entity>/tasks.md` — what each layer had to contain, plus the
+- `specs/scaffold-entity/<entity>/tasks.md` — what each layer had to contain, plus the
   **deviations** between what was specified and what was actually generated.
-- `omnicore-gen/<entity>.omnicore.yaml` — the generator's input; the code regenerates from
+- `specs/omnicore-gen/<entity>.omnicore.yaml` — the generator's input; the code regenerates from
   it, the database never does.
-- `omnicore-gen/<entity>.gen-report.md` — what was generated, what was refused, and what
+- `specs/omnicore-gen/<entity>.gen-report.md` — what was generated, what was refused, and what
   had to be written by hand.
-- `omnicore-gen/upstream-findings.md` — defects and gaps found in the tooling while
-  generating, with reproduction. Two are open against the generator and one of them is
-  visible in this service's API; the note above about `tenantID` in the request body is
-  that one.
-- `upgrade/rollback/` — the `go.mod`/`go.sum` pair from before the framework upgrade this
+- tooling gaps found while generating are recorded in each entity's `spec.md`, under
+  *Deviations recorded at generation time* — that keeps them next to the model decision
+  they affect instead of in a file that outlives them. Of the two found on the first pass
+  at Tenant, both are now closed upstream (server-derived fields, and field labels being
+  seeded from the field's description); one new one is open, and it is visible in this
+  service: the status enum's per-locale member labels are accepted by the generator's
+  validator and emitted by nothing.
+- `specs/upgrade/rollback/` — the `go.mod`/`go.sum` pair from before the framework upgrade this
   entity needed, kept as an exact restore point.
 
 Read those before changing an entity. They exist so a reviewer can see what was decided

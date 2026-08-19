@@ -6,7 +6,7 @@ exists and passes.
 
 ## Why this task exists
 
-`README.md` predates this run and describes a tenant registry as **built** when no code
+`../../../README.md` predates this run and describes a tenant registry as **built** when no code
 existed at all. `spec.md` §0 records that contradiction in full. Left alone, the README would
 now be wrong in a second, worse way: wrong about a service that does exist.
 
@@ -14,7 +14,7 @@ now be wrong in a second, worse way: wrong about a service that does exist.
 
 Against `spec.md`, which is the approved model, and against the code as generated:
 
-- the framework pin — the README names a version two releases behind what `go.mod` now
+- the framework pin — the README names a version two releases behind what `../../../go.mod` now
   carries;
 - the tenant field table — the handle's name, its bounds, its regex, the public key derived
   from it, the commercial status field, and the fact that the display name is not unique;

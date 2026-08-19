@@ -52,11 +52,11 @@ What the posture buys and what it costs, recorded so it is not rediscovered late
 
 | Slot | Value |
 |---|---|
-| `devops/docker-compose.yml` | generated — a single Postgres container, healthchecked |
+| `../../devops/docker-compose.yml` | generated — a single Postgres container, healthchecked |
 | Compose project | `authcore-dev` |
 | Container | `authcore-dev-postgres` |
 | Mongo / broker / Debezium | not generated (posture) |
-| Start wrappers | `start.sh` (host-native, darwin) + `start.cmd` + `start.ps1` |
+| Start wrappers | `../../start.sh` (host-native, darwin) + `start.cmd` + `start.ps1` |
 
 ## Low-risk slots (decided, not asked)
 
@@ -97,7 +97,7 @@ No entities. The shell boots empty by design; the first aggregate is
 | Bench healthy | `authcore-dev-postgres` Up (healthy), `5432` published |
 | `gofmt -l .` | clean |
 | `go vet -tags postgres ./...` | clean |
-| `go build -tags postgres ./bootstrap` | OK (`go.mod` + `go.sum` both shipped) |
+| `go build -tags postgres ./bootstrap` | OK (`../../go.mod` + `go.sum` both shipped) |
 | Boot (`APP_PROFILE=dev`, via `./start.sh`) | `GET /livez` 200 · `GET /readyz` 200 |
 | OpenAPI surface | `GET /docs` 200 · `GET /openapi.json` 200 · `GET /` 302 → `/docs` |
 | GraphQL surface | block present; `/graphql/ui` 404 — the surface stays unmounted until a feature implements `bootstrap.GraphQLFeature` (expected on an empty shell) |

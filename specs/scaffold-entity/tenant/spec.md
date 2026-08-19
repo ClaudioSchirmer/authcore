@@ -2,8 +2,8 @@
 
 Status: APPROVED
 Approved: maintainer (Cláudio Schirmer Guedes), 2026-08-19 — every ⚠️ OPEN slot answered (§B Q1–Q10) and the remaining `(proposed)` picks accepted in one go
-Language: English (all artifacts) · Portuguese (chat) — per `CLAUDE.md` rule 3 and the maintainer's invocation
-Generation: <pending>
+Language: English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md` rule 3 and the maintainer's invocation
+Generation: omnicore-gen
 
 The tenant is the isolation partition every other aggregate of this service will hang off.
 It carries **three identifiers, and each has exactly one job** — the single most important
@@ -27,17 +27,17 @@ values answering to that name, which is a defect that ships silently.
 |---|---|
 | Maintainer invocation | three fields (name, workspace identifier, description); "name ≥ 2 words"; "description ≥ 2 words, no keyboard junk"; "identifier per large-company practice" |
 | Maintainer decisions at the model gate | §B — ten decisions, including the derived `tenant_id`, what the PK may be used for, the shared-vs-specific VO scope, the commercial status field, and the framework upgrade the archive rule required |
-| `scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI wired, GraphQL block present but inert |
-| `README.md` | a **prior, already-reasoned Tenant model** from an earlier iteration — see the contradiction note below |
+| `../../scaffold-serviceervice/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI wired, GraphQL block present but inert |
+| `../../../README.md` | a **prior, already-reasoned Tenant model** from an earlier iteration — see the contradiction note below |
 | Industry survey (Auth0, Microsoft Entra ID, Atlassian Cloud, Slack) | the workspace handle's shape and its mutability doctrine — §A |
 | omnicore `v0.54.0` `/docs` **and source** | value objects, table schema, relational view capability, the `Loader.Exists` probe — plus the verified id-minting facts in §C |
 
 ### ⚠️ Discovery contradiction — surfaced, not resolved silently
 
-`README.md` states the tenant registry is **built** (CRUD, archive/unarchive, REST +
+`../../../README.md` states the tenant registry is **built** (CRUD, archive/unarchive, REST +
 GraphQL, permissions already gated) and documents a full field/rule model. **No such code
-exists**: `internal/` is absent entirely and the service is the empty shell
-`scaffold-service` produced. The README also pins omnicore `v0.51.0`; `go.mod` pinned
+exists**: `../../../internal` is absent entirely and the service is the empty shell
+`scaffold-service` produced. The README also pins omnicore `v0.51.0`; `../../../go.mod` pinned
 `v0.53.0` when this run started and `v0.54.0` after the upgrade taken mid-run (§C).
 
 Reading: the README is a **stale forward-declaration** from an earlier attempt, not a
@@ -165,7 +165,7 @@ this is recorded as the constraint that entity must honor.
 | # | Question | Answer |
 |---|---|---|
 | Q1 | Is `name` the legal name or the display name? | **Display name** — anti-junk heuristics, **no word count** |
-| Q2 | What is the handle called on the wire? | **`workspace`**. Rejected: `identity`, which `README.md` already reserves for the future person-credential aggregate — one word, two concepts is the defect being avoided |
+| Q2 | What is the handle called on the wire? | **`workspace`**. Rejected: `identity`, which `../../../README.md` already reserves for the future person-credential aggregate — one word, two concepts is the defect being avoided |
 | Q3 | Which surfaces? | **REST + OpenAPI and GraphQL.** No CSV/XLSX exports |
 | Q4 | Data-access (Layer 2/3)? | **Anyone holding the permission sees and edits every row** — no ctx row filter |
 | Q5 | What does the JWT carry? | **`tenant_id`, a UUID derived from `workspace`** — not the PK. §A.6 |
@@ -251,7 +251,7 @@ Written because the maintainer asked whether anything looks odd when the model i
 against how large companies actually work. Two of the findings changed the spec (§B Q8 and
 Q9). The four below did **not** — they are recorded so the wall is a known location rather
 than a surprise, in the same spirit as the `Identity`/`User` escape hatch already in
-`README.md`.
+`../../../README.md`.
 
 ### D.1 — One level, where the market has two
 
@@ -456,7 +456,7 @@ cultural norms, and a change made for it must not silently move the tenant's bou
 
 **N/A — no collections.** `User`, `Group` and `Role` will each be their own root aggregate
 holding a `tenant_id` reference (to `tenants.tenant_id` — see §B), per the target model
-recorded in `README.md`. Modeling them as children of `Tenant` would mean a user could only
+recorded in `../../../README.md`. Modeling them as children of `Tenant` would mean a user could only
 ever be loaded through its tenant and could not be archived on its own — the "restorable
 alone ⇒ own aggregate" test answers this in one line.
 
@@ -685,7 +685,7 @@ so there is no surface on which a caller proposes it (§9).
 - **Exports (CSV/XLSX): no.**
 - **gRPC: no** — additive later via `/omnicore:implement`, no rework.
 - **Integration events: not available on this posture** (publishing rides the CDC relay,
-  which does not exist here — `scaffold-service/spec.md`). Noted so it is not lost.
+  which does not exist here — `../../scaffold-serviceervice/spec.md`). Noted so it is not lost.
 
 - **Optimistic concurrency — every write can answer 409.** New at v0.54.0 and part of this
   entity's contract, not an implementation detail: every root update pins the revision it
@@ -716,7 +716,7 @@ so there is no surface on which a caller proposes it (§9).
   the permission gate; nothing here is a secret — and per §A.6, `tenant_id` must never be
   treated as one.
 - **View backing: relational (`.RelationalSource(repo.Loader)`)** — the project posture on
-  record in `scaffold-service/spec.md`, not re-asked. Read-your-writes: a created tenant is
+  record in `../../scaffold-serviceervice/spec.md`, not re-asked. Read-your-writes: a created tenant is
   visible to the very next read, no CDC wait. The view reuses the aggregate's existing
   `repo.Loader`; a second loader on the same table boots fine and is pure waste.
 - **Archive regime: kept-but-hidden, revealed by `?includeArchived`.** Not a choice on this
@@ -740,7 +740,7 @@ so there is no surface on which a caller proposes it (§9).
 
 ## 10. Authorization                          [required — both slots]
 
-- **Permission gate (Layer 1)** (proposed — adopted from the taxonomy `README.md` already
+- **Permission gate (Layer 1)** (proposed — adopted from the taxonomy `../../../README.md` already
   records, so the deployment is not asked to grant synonyms for one thing). The same strings
   apply to REST routes and to GraphQL fields — authorization is not surface-specific:
 
@@ -787,4 +787,88 @@ so there is no surface on which a caller proposes it (§9).
 
 ## Deviations recorded at generation time
 
-<filled by the run>
+Generated on 2026-08-19 via `omnicore-gen` (the 1d gateway choice), from
+`../../omnicore-genre-gen/tenant.omnicore.yaml`. Everything below is a place where the shipped code
+and this document do not match, or where a low-risk detail was decided during generation.
+
+### A. Promises of §9 the generator could not express — the read side is narrower
+
+1. **No per-field sort allowlist.** §9 marked `name`, `workspace`, `createdAt` and
+   `updatedAt` sortable and the rest not. `read.byParams.sort` is REFUSED by this
+   generator build ("declared sort allowlists are not generated; controls.orderBy decides
+   whether `?orderBy=` is served at all"), so `?orderBy=` is served view-wide rather than
+   restricted to those four. Nothing is *missing* — the restriction is.
+2. **No filters on `createdAt` / `updatedAt`.** §9 asked for equality + range on both.
+   Filters are declarable only over declared ENTITY fields, and the framework-managed
+   timestamps are not among them — refused under both the Go name and the column name.
+   `?createdAt=` is therefore a typed 400. The seven business-field filters of §9 are all
+   served as specified.
+
+Both are read-side reach, not correctness, and both are additive later. Neither is worked
+around by hand: doing so would mean adopting a generated file, which stops it tracking the
+spec forever.
+
+### B. Promise of §2 the generator accepted and did not emit — enum labels
+
+§2 states the status members render per-locale through `domain.EnumDescriptionKey` →
+`TenantStatus.trial`, "registered in all seven catalogs". The seven translations were
+written into the spec YAML under `valueObjects[].members[].text`, `check` accepted them,
+and **no emitter consumed them**: no `TenantStatus.*` key exists in any catalog and the
+member texts appear nowhere in the tree. The sibling key `descriptionKeys` IS refused by
+name for this reason; `members[].text` is not, so this one passes silently.
+
+Consequence: a caller reading a status renders the raw token (`trial`), never a localized
+label. Nothing else is affected — membership, validation, persistence and the wire
+contract are all correct. **Reported upstream** (see the hand-back); the texts stay in the
+spec so they are already there when the emitter arrives.
+
+### C. Low-risk details decided during generation
+
+4. **Case-insensitive filter twins added.** §9 said prefix/contains; `icontains` and
+   `istartswith` were declared alongside them for `name`, `workspace` and `description`. A
+   case-sensitive-only `contains` over a display name is close to unusable, and declaring
+   an operator is additive.
+5. **View `maxLimit` = 200.** §9 did not state one.
+6. **The Latin vowel set is wider than §7 lists.** §7 pins `a e i o u á é í ó ú ã õ â ê ô
+   à ü`; the implementation also accepts `ä ë ï ö å ø æ ñ ý ÿ` and their uppercase. `ü` is
+   already in the spec's list, so umlauts were plainly intended and the omission of `ä`/`ö`
+   reads as an oversight rather than a decision. The change is strictly more permissive and
+   cannot reject anything the spec's list accepts.
+
+### D. Two places where §7 as written is not implementable, and what shipped
+
+7. **`3m` is cited as a legitimate handle but cannot be one.** §A.1 and §7 rule 3 set the
+   floor at 3 runes (Auth0 is exactly 3–63) and then cite `3m` — two runes — as the reason
+   RFC 1123's relaxation matters. Both cannot hold. The substantive rule is the ALPHABET
+   (a handle may LEAD with a digit), and that is what shipped and is tested: `3m9` and
+   `3m-brasil` are accepted, `3m` is refused by the length floor. **This is a wording fix
+   this document still owes**, not a behavior question.
+8. **The description's two-word rule refuses scriptio-continua languages.** "At least two
+   words" counts runs of letters separated by a non-letter, so Japanese, Chinese and Thai
+   — which do not space their words — read as ONE word and are refused as junk. That is
+   the exact failure mode §7's vowel clause was written to prevent, in a different
+   predicate. **Shipped as approved**, because all seven catalogs this service serves are
+   space-separated Latin scripts, so it only bites an operator describing a tenant IN such
+   a language. It is pinned by a test that names the limit, so changing it is deliberate:
+   `TestDescriptionWordRuleRefusesScriptioContinua`.
+
+### E. Test coverage — 85.0%, and where the rest is
+
+Every function in the entity's tree is at **100%** except three files, which are at 0%:
+
+| File | Statements | Why no unit test |
+|---|---|---|
+| `../../../internal/infra/tenant_repository.go` | 45 | constructing it needs a live `core.RelationalEngine` |
+| `../../../internal/infra/tenant_service.go` | 144 | `WorkspaceTaken` probes through `repo.Loader.Exists` |
+| `../../../internal/web/tenant_routes.go` | 180 | mounting needs a running Fiber app and the OpenAPI registry |
+
+369 of 2225 statements, which is exactly the 15% gap. This is the framework's own division
+— the generated tests cover the mappers, rules, schemas, catalogs and criteria and
+explicitly do not cover the repository, the domain service or the routes; a boot proves
+those. Reaching them by unit test would need a fake engine wired into production
+constructors, which `../../../CLAUDE.md` rule 6 forbids without approval.
+
+**This misses the 95% floor of `../../../CLAUDE.md` rule 6 and is recorded as an open deviation for
+the maintainer to accept or direct.** The route to close it without touching production
+code is `/omnicore:qa`, which generates the executable contract suite that exercises those
+three files end to end.
