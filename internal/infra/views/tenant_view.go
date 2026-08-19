@@ -3,10 +3,10 @@
 // The tenants view (relational-backed).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:a39fb80b9a8474cdcd5e5c62323fe209d09267593732a6a639e0d39772561463
+// checksum:   sha256:fe1692afed182471e15bd3c8915edb80f3d7f22ca697a44ca1015e21ad404f34
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

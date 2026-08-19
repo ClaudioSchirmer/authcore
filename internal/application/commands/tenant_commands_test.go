@@ -3,10 +3,10 @@
 // Tests for the command mappers.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:25447b9a5839541cbcc4475cd1ac88de08018e618b8d41ff2ceb84c4effc23fd
+// checksum:   sha256:1f4c9db2efdcc4dc5de2d5db93f8ff207ee4021a025c943b5018d44dcbc3c251
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,12 +17,12 @@
 package commands
 
 import (
+	"testing"
+
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"testing"
-	"time"
 )
 
 // The insert mapper must carry every field through.
@@ -166,8 +166,6 @@ func TestPatchTenantCommandResultCarriesWhatWasApplied(t *testing.T) {
 		t.Errorf("Status was applied and did not reach the result")
 	}
 }
-
-var _ = time.Time{}
 
 // ArchiveTenantCommand must apply cleanly to a well-formed entity.
 //

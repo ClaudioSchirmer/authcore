@@ -3,10 +3,10 @@
 // The request mapper tests.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:5959c3386b275e2adc8fb7644f3ec4ab503f377b7caa6a737a836699bbd9996a
+// checksum:   sha256:5215605067a99aa2267b6adacc37b1018c511e61d7f66ab49ae6354c393c3137
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -18,14 +18,11 @@ package requests
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 )
-
-var _ = time.Now
 
 // InsertTenantRequest must carry every field into the command.
 //

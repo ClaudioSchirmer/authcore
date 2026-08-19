@@ -3,10 +3,10 @@
 // The archive command and result.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:2da6f625ef25d38e9d490c8cc95bbc5bfbef9cc7b5502f49526035985157e88a
+// checksum:   sha256:679fa8c7b21141c9d6252131271c7d423c16895d01cd06abbe706aebcfcc293d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

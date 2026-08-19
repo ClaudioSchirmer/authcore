@@ -3,10 +3,10 @@
 // The listing query and its result.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:94356980a8dd2e02519890a75b9305cd72227986dd967ec0ea4f351567f4e255
+// checksum:   sha256:a3dd5b773b8eb8c28c65341d6d6be8423977e096909f4a223130bb7931b0c43d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -34,7 +34,6 @@ type FindTenantsByParamsQuery struct {
 }
 
 func (q FindTenantsByParamsQuery) ToCriteria(ctx *configuration.AppContext) (fwqueries.ReadCriteria, error) {
-	_ = ctx
 	return q.Criteria, nil
 }
 

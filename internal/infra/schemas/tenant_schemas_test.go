@@ -4,10 +4,10 @@
 // test failure.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:39184a353db4e8cc411a1588e0c076bc2e2d9badabe8e450de6e6f7dddb5f574
+// checksum:   sha256:395ade6ddf533d83fd4547f88ce9e92fb8c3115c91dc8465aeebc99d5b061228
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

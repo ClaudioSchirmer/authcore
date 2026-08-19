@@ -3,10 +3,10 @@
 // The 6 tenant endpoints.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:4418dba6cdf9d13cc7725340fae056f8823e3ce638385729d2517ee18e575121
+// checksum:   sha256:d61e6232ce53c5c083088b80bd37d6c4b20a4941d71322d99e471fe7b60faa90
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

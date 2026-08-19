@@ -1,44 +1,28 @@
 # Tenant — generation report
 
-Generated from `ore.yaml`.
+Generated from `specs/omnicore-gen/tenant.omnicore.yaml`.
 
 The descriptions, examples and labels quoted here are in **en-US**, as the spec declares.
 
 ## What still needs implementing
 
-### Value objects you write
+### Value objects you already wrote
 
-Declared as `kind: manual`, so the generator wrote NO file for them — the emitted code already declares fields of these types and converts to and from their backing, so the package does not compile until each one exists:
+Declared as `kind: manual` and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
 
-- **`DisplayName`** — `../../internal/domain/vos/display_name.go`. A human-typed display name of a thing (not a person): 2 to 120 runes, at least one letter, at least min(3, length) distinct runes, no run of 4 or more identical runes, trimmed and single-spaced. No word count — single-word company names are ordinary.
-  ```go
-  type DisplayName string
-  func (v DisplayName) Value() string { return string(v) }
-  func (v DisplayName) IsValid(fieldName string, ctx *domain.NotificationContext) bool
-  ```
-  The underlying type is `string` and is not negotiable: the mappers convert with `vos.DisplayName(x)` and read back with `.Value()`. `IsValid` is the framework's entry point — it is found by TYPE, with no registration, and reports every problem it finds through the context rather than returning one, so a caller sees all of them at once.
-- **`Description`** — `../../internal/domain/vos/description.go`. A human-typed description: 15 to 500 runes, at least two words (a word is a run of 2 or more Unicode letters), at least 5 distinct runes, no run of 4 or more identical runes, and at least one vowel — where any letter outside the Latin script counts as one, so a non-Latin description is never rejected as junk.
-  ```go
-  type Description string
-  func (v Description) Value() string { return string(v) }
-  func (v Description) IsValid(fieldName string, ctx *domain.NotificationContext) bool
-  ```
-  The underlying type is `string` and is not negotiable: the mappers convert with `vos.Description(x)` and read back with `.Value()`. `IsValid` is the framework's entry point — it is found by TYPE, with no registration, and reports every problem it finds through the context rather than returning one, so a caller sees all of them at once.
-- **`TenantWorkspace`** — `../../internal/domain/vos/tenant_workspace.go`. The tenant's DNS-label handle: 3 to 63 runes matching ^[a-z0-9]+(-[a-z0-9]+)*$, at least 3 distinct runes, no run of 4 or more identical runes, and not a member of the reserved list (platform routes and phishing-prone words). No normalization — a value that does not already comply is refused, never quietly repaired. It also carries DeriveTenantID(), the UUIDv5 derivation that produces the tenant's public key.
-  ```go
-  type TenantWorkspace string
-  func (v TenantWorkspace) Value() string { return string(v) }
-  func (v TenantWorkspace) IsValid(fieldName string, ctx *domain.NotificationContext) bool
-  ```
-  The underlying type is `string` and is not negotiable: the mappers convert with `vos.TenantWorkspace(x)` and read back with `.Value()`. `IsValid` is the framework's entry point — it is found by TYPE, with no registration, and reports every problem it finds through the context rather than returning one, so a caller sees all of them at once.
+- **`DisplayName`** — `internal/domain/vos/display_name.go`. A human-typed display name of a thing (not a person): 2 to 120 runes, at least one letter, at least min(3, length) distinct runes, no run of 4 or more identical runes, trimmed and single-spaced. No word count — single-word company names are ordinary.
+- **`Description`** — `internal/domain/vos/description.go`. A human-typed description: 15 to 500 runes, at least two words (a word is a run of 2 or more Unicode letters), at least 5 distinct runes, no run of 4 or more identical runes, and at least one vowel — where any letter outside the Latin script counts as one, so a non-Latin description is never rejected as junk.
+- **`TenantWorkspace`** — `internal/domain/vos/tenant_workspace.go`. The tenant's DNS-label handle: 3 to 63 runes matching ^[a-z0-9]+(-[a-z0-9]+)*$, at least 3 distinct runes, no run of 4 or more identical runes, and not a member of the reserved list (platform routes and phishing-prone words). No normalization — a value that does not already comply is refused, never quietly repaired. It also carries DeriveTenantID(), the UUIDv5 derivation that produces the tenant's public key.
+
+The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec.
 
 ### Fields declared DERIVED, which nothing here computes
 
 - **`TenantID`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
 
-### `../../internal/domain/tenant_rules_manual.go`
+### `internal/domain/tenant_rules_manual.go`
 
-The spec declared these invariants as ones it could not express. The file was just created, with a stub for each; the code is yours to write, and regeneration will never touch it.
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are implemented. It lists them so you can check the file still covers what the spec declares, which is where a rule added to the spec later goes unnoticed.
 
 **`derive-tenant-id`**
 
@@ -64,7 +48,49 @@ The spec declared these invariants as ones it could not express. The file was ju
 
 - fires under `IfArchive`
 
-Its tests are yours too — the generator does not know what these rules mean.
+The tests for them are yours too, and the same check applies.
+
+### The migration — already yours
+
+The SQL for this entity was written on an earlier run and **was not touched**:
+
+- `migrations/postgres/0001_tenant_manual.down.sql`
+- `migrations/postgres/0001_tenant_manual.up.sql`
+
+That is permanent, and it is the same posture as the `_manual` rule files: created once, never regenerated. A migration is the only thing here whose effect outlives the file — once it has run anywhere, the framework's tracking table records it as applied, so rewriting the file would change what the file CLAIMS without changing a single table. A service that boots green and fails on the first query touching the change is the outcome being avoided.
+
+**If the shape below no longer matches what that migration created, the fix is a NEW numbered pair in the same folder** — never an edit to one that may have run. Two things are worth being deliberate about, because they are where data is lost: adding a NOT NULL column to a table that already has rows fails unless it carries a default, and a rename done as drop-then-add takes the data with it.
+
+If nothing about the storage changed this run, there is nothing to do here — read the shape as confirmation, not as a task.
+
+**A changed `description:` is a storage change too, on postgres.** The description is stored IN the database — a COMMENT on postgres, mysql and oracle, an `MS_Description` extended property on sqlserver — so that someone holding a connection and not this repository can read it. The code regenerates from the spec; that catalogue entry does not. Rewording a description therefore needs a new pair carrying just the `COMMENT ON` / `sp_addextendedproperty` statements, or the database keeps answering with the old wording.
+
+The shape the regenerated code expects, for `tenants`:
+
+**`tenants`** — the aggregate root
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `tenant_id` | id | no |  |
+| `name` | string(120) | no |  |
+| `workspace` | string(63) | no |  |
+| `description` | string(500) | no |  |
+| `status` | string(20) | no |  |
+| `revision` | int64 | no | optimistic concurrency, maintained by the framework |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+| `deleted_at` | time | yes | archive stamp |
+
+Indexes it expects:
+
+- `tenants_tenant_id_key` — UNIQUE on (tenant_id), over every row; a duplicate is reported as TenantIDAlreadyExistsNotification
+- `tenants_workspace_key` — UNIQUE on (workspace), over every row; a duplicate is reported as TenantWorkspaceAlreadyExistsNotification
+
+
+A new pair goes in every dialect this service targets (postgres), numbered after the highest existing one. Every `.up.sql` needs its `.down.sql` or the service refuses to boot.
+
+If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
 ### Fields the server fills
 
@@ -87,47 +113,40 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the tenants feature (repository + view + mount) | `../../bootstrap/tenants_feature.go` |
-| the TenantsFeature registration in the composition root | `../../bootstrap/wire.go` |
-| the archive command and result | `../../internal/application/commands/archive_tenant_command.go` |
-| the insert command and result | `../../internal/application/commands/insert_tenant_command.go` |
-| the patch command and result | `../../internal/application/commands/patch_tenant_command.go` |
-| tests for the command mappers | `../../internal/application/commands/tenant_commands_test.go` |
-| the unarchive command and result | `../../internal/application/commands/unarchive_tenant_command.go` |
-| the by-id query and its result | `../../internal/application/queries/find_tenant_by_id_query.go` |
-| the listing query and its result | `../../internal/application/queries/find_tenants_by_params_query.go` |
-| the read criteria tests | `../../internal/application/queries/tenant_queries_test.go` |
-| 18 DEU translation key(s) | `../../internal/application/translations/deu.go` |
-| 18 ENG translation key(s) | `../../internal/application/translations/eng.go` |
-| 18 ESP translation key(s) | `../../internal/application/translations/esp.go` |
-| 18 FRA translation key(s) | `../../internal/application/translations/fra.go` |
-| 18 ITA translation key(s) | `../../internal/application/translations/ita.go` |
-| 18 NLD translation key(s) | `../../internal/application/translations/nld.go` |
-| 18 PTBR translation key(s) | `../../internal/application/translations/ptbr.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `../../internal/application/translations/tenant_translations_test.go` |
-| 7 notification declaration(s) | `../../internal/domain/notifications.go` |
-| the Tenant aggregate root, its modes and its rules | `../../internal/domain/tenant.go` |
-| the hand-written rules for Tenant (4 to implement) | `../../internal/domain/tenant_rules_manual.go` |
-| the Tenant service port (1 fact(s)) | `../../internal/domain/tenant_service.go` |
-| tests for Tenant's rules | `../../internal/domain/tenant_test.go` |
-| the vos package documentation | `../../internal/domain/vos/doc.go` |
-| 5 notification declaration(s) | `../../internal/domain/vos/notifications.go` |
-| the TenantStatus enumeration (3 members) | `../../internal/domain/vos/tenant_status.go` |
-| tests for 4 value object(s) | `../../internal/domain/vos/tenant_vos_test.go` |
-| the tenants schema (5 columns) | `../../internal/infra/schemas/tenant_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `../../internal/infra/schemas/tenant_schemas_test.go` |
-| the Tenant repository and its constraint bindings | `../../internal/infra/tenant_repository.go` |
-| the Tenant service implementation | `../../internal/infra/tenant_service.go` |
-| the tenants view (relational-backed) | `../../internal/infra/views/tenant_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `../../internal/infra/views/tenant_view_test.go` |
-| the by-id request and response | `../../internal/web/requests/find_tenant_by_id.go` |
-| the listing request and response | `../../internal/web/requests/find_tenants_by_params.go` |
-| the insert request and response | `../../internal/web/requests/insert_tenant.go` |
-| the patch request and response | `../../internal/web/requests/patch_tenant.go` |
-| the request mapper tests | `../../internal/web/requests/tenant_requests_test.go` |
-| the 6 tenant endpoints | `../../internal/web/tenant_routes.go` |
-| the rollback of tenants on postgres | `../../migrations/postgres/0001_tenant_manual.down.sql` |
-| the tenants table on postgres | `../../migrations/postgres/0001_tenant_manual.up.sql` |
+| the tenants feature (repository + view + mount) | `bootstrap/tenants_feature.go` |
+| the archive command and result | `internal/application/commands/archive_tenant_command.go` |
+| the insert command and result | `internal/application/commands/insert_tenant_command.go` |
+| the patch command and result | `internal/application/commands/patch_tenant_command.go` |
+| tests for the command mappers | `internal/application/commands/tenant_commands_test.go` |
+| the unarchive command and result | `internal/application/commands/unarchive_tenant_command.go` |
+| the by-id query and its result | `internal/application/queries/find_tenant_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_tenants_by_params_query.go` |
+| the read criteria tests | `internal/application/queries/tenant_queries_test.go` |
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/tenant_translations_test.go` |
+| the Tenant aggregate root, its modes and its rules | `internal/domain/tenant.go` |
+| the Tenant service port (1 fact(s)) | `internal/domain/tenant_service.go` |
+| tests for Tenant's rules | `internal/domain/tenant_test.go` |
+| the vos package documentation | `internal/domain/vos/doc.go` |
+| the TenantStatus enumeration (3 members) | `internal/domain/vos/tenant_status.go` |
+| tests for 4 value object(s) | `internal/domain/vos/tenant_vos_test.go` |
+| the tenants schema (5 columns) | `internal/infra/schemas/tenant_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/tenant_schemas_test.go` |
+| the Tenant repository and its constraint bindings | `internal/infra/tenant_repository.go` |
+| the Tenant service implementation | `internal/infra/tenant_service.go` |
+| the tenants view (relational-backed) | `internal/infra/views/tenant_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/tenant_view_test.go` |
+| the by-id request and response | `internal/web/requests/find_tenant_by_id.go` |
+| the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
+| the insert request and response | `internal/web/requests/insert_tenant.go` |
+| the patch request and response | `internal/web/requests/patch_tenant.go` |
+| the request mapper tests | `internal/web/requests/tenant_requests_test.go` |
+| the 6 tenant endpoints | `internal/web/tenant_routes.go` |
+
+**Left untouched** (yours, by design):
+
+- `internal/domain/tenant_rules_manual.go` — hand-written rules live here, by design
+- `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+- `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
 ## What was NOT generated
 

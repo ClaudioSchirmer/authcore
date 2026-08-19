@@ -3,10 +3,10 @@
 // The by-id request and response.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:8901805c3dd034c1a4bfe93262cb91b77cad07f753b7c558bdd2eb6c8d535068
+// checksum:   sha256:cb26f9194445c996df6584af16032af40d48af4a75a9aaadf6fa6ed677c7b11a
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -19,7 +19,6 @@ package requests
 import (
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"time"
 
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
@@ -79,5 +78,3 @@ type FindTenantByIDResponse struct {
 func (FindTenantByIDResponse) FromResult(r appqueries.FindTenantByIDResult) FindTenantByIDResponse {
 	return fwresponses.AutoFromResult[FindTenantByIDResponse](r)
 }
-
-var _ = time.Time{}

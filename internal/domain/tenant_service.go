@@ -3,10 +3,10 @@
 // The Tenant service port (1 fact(s)).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:20dd643fd272c171257f38063db62bb43555ae6635d5f86ce0a15082992e53d6
+// checksum:   sha256:a2d41bfe98bb544c43098a6872e3a1a5a91dfd937232023c6dd8674c9aa0441a
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

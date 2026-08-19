@@ -2,121 +2,121 @@
   "version": 1,
   "entities": {
     "Tenant": {
-      "spec": "omnicore-gen/tenant.omnicore.yaml",
+      "spec": "specs/omnicore-gen/tenant.omnicore.yaml",
       "specHash": "3f1c2b9bd76309963a4660ffe0ca5fd9bc259b4ce8f5af578946df77f097a489",
       "framework": "v0.54.0",
       "files": {
         "bootstrap/tenants_feature.go": {
           "class": "owned",
-          "hash": "a93b21b55081585e9b76335d57a09b7a3698d32b0b0111629587158778ac32da"
+          "hash": "8a9c2e79f35665f4b1c49ca6b639dce7d381ef6b5fa2090cd1d19a5ebcc3c629"
         },
         "internal/application/commands/archive_tenant_command.go": {
           "class": "owned",
-          "hash": "08f653291fb23415b0a1715f754375f5b58bcc7edde5a3c27f4a55aa89d5e247"
+          "hash": "99d481ff63625266a87236b3f4132fde878dc3d371aa10859394c0426e210ccc"
         },
         "internal/application/commands/insert_tenant_command.go": {
           "class": "owned",
-          "hash": "20556ec7491b022d5aee10d24f5515c33b026f83c6ff5e0025fcad1615a40146"
+          "hash": "e2590250d47bf58f982912467ebe07d787685c23cbec15c53bc2a1985b3ad277"
         },
         "internal/application/commands/patch_tenant_command.go": {
           "class": "owned",
-          "hash": "74d439d642e6f0bcd2f1969d9a20cb43774b001ae6715b518841ba421d2d6431"
+          "hash": "272d0e76bc51715875ff817e768f19c47f050f2d14b51dec283a4d25a70f35a9"
         },
         "internal/application/commands/tenant_commands_test.go": {
           "class": "owned",
-          "hash": "9fc8459c559ca79f31068e2cd9caee674b1081b183b20407b55d4badaf966c95"
+          "hash": "0791fafbe1b6e8aaba38ca15c6a2ad8afa4a1f8cba595be7917f9ae62bc1b79d"
         },
         "internal/application/commands/unarchive_tenant_command.go": {
           "class": "owned",
-          "hash": "133a9d5fd85c6d9960435ab03d602fa36109b9ec0b414539e114be94072c0ee3"
+          "hash": "19dae59457683af3b20eaf28cca3bba8cdd0a5b115068cb37be1a211692ac9b3"
         },
         "internal/application/queries/find_tenant_by_id_query.go": {
           "class": "owned",
-          "hash": "9d54928b4abe993959255c8436f02ac0ef281578a6cdc54d33b53914df578caa"
+          "hash": "bd9162fa549d8ef4b936d5514b1b322a02b1027cd5e611f4514c5419ec666b10"
         },
         "internal/application/queries/find_tenants_by_params_query.go": {
           "class": "owned",
-          "hash": "b5c963f1984438174a44b573b4d7bf0d7b215a0bae97cb3c71256c12b6d9a766"
+          "hash": "36727c1a1609afdb10b5f550549d1f5448679c893f5763d54d71ee12d8a121f9"
         },
         "internal/application/queries/tenant_queries_test.go": {
           "class": "owned",
-          "hash": "cfa4c9828cf0771be1bace25db2bd5ca8205e68b7313928f1d2c584f364fa3a7"
+          "hash": "41dde58c6f22fd4db12cfa1cabc0455f9823f3f3c12c40be873d14deec2bb0b6"
         },
         "internal/application/translations/tenant_translations_test.go": {
           "class": "owned",
-          "hash": "4fdf582c64051e42b10371f09d047d130560c2a11027b4f5e36ca7b8060e8a40"
+          "hash": "dce8e5a8f5dd66972623bf7ba90d71b3a52418047b4837b1bf0c6fd933c29814"
         },
         "internal/domain/tenant.go": {
           "class": "owned",
-          "hash": "7906581e32bf775af4b8ba4583e0a41d8d99d1571ea3352f26f4858cd50ef6d7"
+          "hash": "cb59b36c8a83ee97036e682e5cc656db4d926a8632bdd24db64385530a4e4a7b"
         },
         "internal/domain/tenant_service.go": {
           "class": "owned",
-          "hash": "f1085378df8e10e029a9acda6d3a9f23a4aa1786e240b442bec7035f20ef2fcc"
+          "hash": "dcf09e324ceb9e975a4e3e4626d4098e43e0945a1d1e29fd0a9619d406fae20a"
         },
         "internal/domain/tenant_test.go": {
           "class": "owned",
-          "hash": "6d6bd3773a8e1d1a31a6a38ce853b6859a16348fd9030ab0360cbecfb14a2c8f"
+          "hash": "a64199a82b50895ffdba33c385c978736a36a8d8daff8d1571bab27c04feb68e"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",
-          "hash": "1da37bd7124cf44bb87dacc0aecfb61e8e45f0429c524482ba6de94bb701a46b"
+          "hash": "ceabe40b40dd4927ee7ad8781319e02d1ded956f7131ff174606692c768c203b"
         },
         "internal/domain/vos/tenant_status.go": {
           "class": "owned",
-          "hash": "b9da97d853cedfe5faa5a475f35fd6b28d7bae5f6b18be78e40971fa3f6e7968"
+          "hash": "99236ba94ba10f1e95930cbd4ffe69a38dd75e0a010f95abf302b66f8902978c"
         },
         "internal/domain/vos/tenant_vos_test.go": {
           "class": "owned",
-          "hash": "5d36cf03030efb4bddde58a55faac4317833be8ad39c7631da1aafeef965a629"
+          "hash": "12feee15f07cd0b3d9af58b218f3431622fcc5288827a284f73d6df6459f9c05"
         },
         "internal/infra/schemas/tenant_schema.go": {
           "class": "owned",
-          "hash": "79625e767dc3bc6ff59bf5ff273b2f910a48d93ab6a44176c0118e081080fb6b"
+          "hash": "b83dc6583331625292b534e94e46623a316ef4b36aa7c0e8bbdf8835fdeb1296"
         },
         "internal/infra/schemas/tenant_schemas_test.go": {
           "class": "owned",
-          "hash": "c0af0b38a390d36f3b8776bccdebd467859fae48dc17ba3db095a9431495d3f7"
+          "hash": "9f19cff9e1aadb0688236ab608b155dc708d0c14bb5f30ff3987c3d7c1e1d327"
         },
         "internal/infra/tenant_repository.go": {
           "class": "owned",
-          "hash": "ce477a7110e0b1b5dd20b8fbc2e70db49e9f96fda7c536f2a1fab99c8ba1c607"
+          "hash": "641691d8c9cb089df4d38dc98356df8cc0ebafd8f63df62e4896edc076022872"
         },
         "internal/infra/tenant_service.go": {
           "class": "owned",
-          "hash": "243c54a12d9004590d12f6a7f1080fcd7196dba71f611384d55c5f43c6af0352"
+          "hash": "3a01f630d46baa61f54d78ab69286208e8fbe73fc7321387bae5a475b15d5bad"
         },
         "internal/infra/views/tenant_view.go": {
           "class": "owned",
-          "hash": "979a86bff9990a781b4dfb0e127c8fe01d7a4378420b896110158d3785bbc844"
+          "hash": "b0b796eb0d51332ce075ee9c86be3ed2da58e4d0fda76ed0fa25c536c7fb3fc1"
         },
         "internal/infra/views/tenant_view_test.go": {
           "class": "owned",
-          "hash": "99d69cee07da7e13aaaa2d73683042eafaa8b677e28e5727fc0c7f5d5f5b2327"
+          "hash": "67784c6082ba7e4eb433d0043ad1fc466e322fe89f5a5393cf7995e480b49762"
         },
         "internal/web/requests/find_tenant_by_id.go": {
           "class": "owned",
-          "hash": "b66dd55244e9f3944b5a1ee93f683ce7731167d0f09d63c95c560aa5947e7359"
+          "hash": "4f5406cd903302f33dc66d5048175372b11718c088b974244a7825a3c519479b"
         },
         "internal/web/requests/find_tenants_by_params.go": {
           "class": "owned",
-          "hash": "5f4aba0bb5cbf0f289692f2fc20e1293205428c448c1820ff7c706edb7484352"
+          "hash": "de490990ab56cb81b83c4ed9f88ba7a53814b5876bb0d6a5150bbad2835c8def"
         },
         "internal/web/requests/insert_tenant.go": {
           "class": "owned",
-          "hash": "9ac0a8856f5212a206597efda1aafc14f08e21dc92de57cc3d40f92b5f9b2918"
+          "hash": "e18594d4a7221ad820822dff423e47add2f242998f9d16af8dc94fb15bbb30de"
         },
         "internal/web/requests/patch_tenant.go": {
           "class": "owned",
-          "hash": "6379989727b0b2c751cd35a0de00c7c1c624ad23adda4c3c0d71399542d1bdf7"
+          "hash": "95a15625e6a524073c3475f188d3fd95b92bcd49952d722b59bc0f3f1e319ec5"
         },
         "internal/web/requests/tenant_requests_test.go": {
           "class": "owned",
-          "hash": "867337a265bbe866d91ec6eb8445f09a408f755bb8c36eac99525bd9c7e82d77"
+          "hash": "5c4d30c4072b2a623a05e818036ea4be12d9fd71b95c183cfe1710f83cce1920"
         },
         "internal/web/tenant_routes.go": {
           "class": "owned",
-          "hash": "2e500c63b39804f68e469a3608157fdff108623bab5d242ffb6fee90ebdb0944"
+          "hash": "6fe9605d687d3b15430cfa11565fe62359a1c8eac2f28b3b5cafeb369a024537"
         }
       },
       "ordinals": {

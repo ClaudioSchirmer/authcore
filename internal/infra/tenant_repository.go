@@ -3,10 +3,10 @@
 // The Tenant repository and its constraint bindings.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:bb6678a332804829d8324e4b68cf54f0754aab4d3bc2c4b670bb4ff09d27dc0d
+// checksum:   sha256:1c28aab3cd437a6545972a8111343adc5e010d99d50ceb87bf17da79f8db43cf
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
