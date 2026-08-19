@@ -1,0 +1,26 @@
+# Build output — reproducible byte for byte by `go build`, so it is not a document.
+/bin/
+*.exe
+*.test
+/authcore
+
+# Go workspace overlays — local-only, and they mask a broken go.mod/go.sum pair.
+go.work
+go.work.sum
+
+# Environment files — secrets, never versioned.
+.env
+.env.*
+
+# Local bench data directories (bind mounts, when any are added).
+/devops/data/
+
+# OS / editor noise.
+.DS_Store
+Thumbs.db
+*.swp
+
+# NOTE — deliberately NOT ignored:
+#   scaffold-service/, scaffold-entity/, omnicore-gen/
+# Those hold the approved model and the per-layer plans this service was built from —
+# the documents a reviewer reads to see what was decided. They are not scratch.

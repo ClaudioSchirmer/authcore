@@ -1,0 +1,49 @@
+# authcore — production profile template.
+# Selected by APP_PROFILE=prd. Endpoints are bare ${VAR} on purpose: there is no
+# localhost fallback to accidentally deploy with.
+service: authcore
+
+http:
+  addr: ":8080"
+
+relational:
+  dialect: postgres
+  dsn: "${DATABASE_URL}"
+
+migrations:
+  dir: ./migrations/postgres
+  # Explicit, though it is also the non-dev default: validate only and abort the boot
+  # on a pending or dirty migration. Applying schema changes is a deploy step, not a
+  # side effect of a pod starting.
+  autoRun: check
+
+openapi:
+  uiPath: /docs
+  rootRedirect: true
+  # Note: under auth.mode jwt the framework auto-extends publicRoutes with
+  # /openapi.json and the resolved UI path, so the documentation surface is reachable
+  # without a token. Drop this block and Wiring.OpenAPI if the spec must not be public.
+
+graphql:
+  path: /graphql
+  playground: false
+  introspection: false
+
+auth:
+  mode: jwt
+  jwt:
+    issuer: "${JWT_ISSUER}"
+    audience: "${JWT_AUDIENCE}"
+    jwksUrl: "${JWKS_URL}"
+  # The probes are framework-owned but NOT auto-public: without these entries a
+  # tokenless kubelet gets 401 and the orchestrator kills a healthy pod. The
+  # "METHOD /path" form is mandatory and validated at boot against the registered
+  # routes — a typo aborts the boot.
+  publicRoutes:
+    - GET /livez
+    - GET /readyz
+
+shutdown:
+  drainTimeoutSeconds: 30
+  tracingDrainSeconds: 5
+  hardGraceSeconds: 5

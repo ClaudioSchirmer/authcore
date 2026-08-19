@@ -1,0 +1,46 @@
+# authcore — local development profile.
+# Selected by APP_PROFILE=dev. Every endpoint is written as ${VAR:default} so it can be
+# repointed through the environment without editing this file; the defaults match the
+# bench in devops/docker-compose.yml exactly.
+service: authcore
+
+http:
+  addr: ":8080"
+
+# Source of truth. No mongo: block and no transport: block — that absence IS the
+# declaration of the posture: reads are served straight from these tables
+# (.RelationalSource), so a write is visible to the very next read. See
+# scaffold-service/spec.md for what that buys and what it costs.
+relational:
+  dialect: postgres
+  dsn: "${DATABASE_URL:postgres://omnicore:omnicore@localhost:5432/authcore_db?sslmode=disable}"
+
+migrations:
+  dir: ./migrations/postgres
+  # autoRun is left unset: it resolves to true under dev (and to the strict check mode
+  # under every other profile), which is exactly the wanted behavior here.
+
+# Honored only because Wiring.OpenAPI is set in bootstrap/wire.go.
+openapi:
+  uiPath: /docs
+  rootRedirect: true
+
+# Serving knobs only. The surface stays unmounted until a feature implements
+# bootstrap.GraphQLFeature — on the empty shell this block is inert.
+graphql:
+  path: /graphql
+  uiPath: /graphql/ui
+  playground: true
+  introspection: true
+
+# Accepted ONLY under APP_PROFILE=dev; any other profile aborts the boot on this value.
+auth:
+  mode: disabled
+
+# No audit: block — the framework default keeps both destinations active
+# (in-transaction audit_events row + post-commit slog line).
+
+shutdown:
+  drainTimeoutSeconds: 30
+  tracingDrainSeconds: 5
+  hardGraceSeconds: 5
