@@ -3,10 +3,10 @@
 // The patch request and response.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:2b5b0d6e5987009fd7111965cc4aaf05083315e1b52f64e9d66948e7c5bc0853
+// checksum:   sha256:468cca6e88da647194028535dda304aaff36f82a7542de9fd76e2e277c0b1d07
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,7 +21,6 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
-	"time"
 )
 
 // PatchTenantRequest is the body of Update a tenant (partial).
@@ -71,5 +70,3 @@ type PatchTenantResponse struct {
 func (PatchTenantResponse) FromResult(r commands.PatchTenantResult) PatchTenantResponse {
 	return fwresponses.AutoFromResult[PatchTenantResponse](r)
 }
-
-var _ = time.Time{}

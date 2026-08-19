@@ -3,10 +3,10 @@
 // The read criteria tests.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:fdc269cebc7e9923d57ce4794fd764c8a6f3de74be3c674376fd5f7cb2e3dde2
+// checksum:   sha256:0d6dd8bc166c018172838af825d6982d6ae48bfdf4d14a64d1ef0d65e5d26ab0
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

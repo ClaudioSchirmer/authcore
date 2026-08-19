@@ -4,10 +4,10 @@
 // in every catalog.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:6d41defe04e8d5f338eb0c05285de06f792bb0cd6a77274d0d14540f74fd5c4c
+// checksum:   sha256:393a722be4d5b56292f2d7a122e402d795d1f21b85989c4b16ce1e000216e9c7
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

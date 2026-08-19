@@ -3,10 +3,10 @@
 // The Tenant aggregate root, its modes and its rules.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:e38f76d5ba5a15da032348e5f25a24033341defadfb1867389e29251dfcaa6bf
+// checksum:   sha256:931e7eecd667cec973253f290387c9679447c7fa4dcdec848f5c25e262643968
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

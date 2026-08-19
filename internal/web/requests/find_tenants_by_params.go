@@ -3,10 +3,10 @@
 // The listing request and response.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:383c8af126b40680a13c9087a920d72329658f264811508f3706212eb061c6d0
+// checksum:   sha256:03af26de3aec5ce009bffb620f7d4298db42976442e2418162a3b27b7be2d948
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -19,7 +19,6 @@ package requests
 import (
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"time"
 
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
@@ -88,5 +87,3 @@ type FindTenantsResponse struct {
 func (FindTenantsResponse) FromResult(r appqueries.FindTenantsByParamsResult) FindTenantsResponse {
 	return fwresponses.AutoFromResult[FindTenantsResponse](r)
 }
-
-var _ = time.Time{}

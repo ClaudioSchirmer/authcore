@@ -3,10 +3,10 @@
 // The patch command and result.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:b12207df20f64025d2961ab45c50067f0296652c8a1f3d3e5660e5469a453947
+// checksum:   sha256:b9484520b6f5cd86e67848828418fb86728f5c627757bb947ba839ec76fb126f
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -20,7 +20,6 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"time"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -53,7 +52,6 @@ func (c *PatchTenantCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *
 	if c.Status != nil {
 		e.Status = vos.TenantStatus(*c.Status)
 	}
-	_ = ctx
 	return nil
 }
 
@@ -82,5 +80,3 @@ func (c *PatchTenantCommand) FromEntity(_ *configuration.AppContext, e *appdomai
 		Status:      e.Status.Value(),
 	}, nil
 }
-
-var _ = time.Time{}

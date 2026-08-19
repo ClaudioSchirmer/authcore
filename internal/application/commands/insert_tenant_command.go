@@ -3,10 +3,10 @@
 // The insert command and result.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:3e14b42a302b2100cf949279228242d65f4269afaba7bdf68d648f16cd43e4c8
+// checksum:   sha256:6149da7a590ac5a796dabed6db184304b17d89c1ef4f637d8f1b3c751f2082d4
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -20,7 +20,6 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"time"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -42,7 +41,6 @@ func (c *InsertTenantCommand) ToEntity(ctx *configuration.AppContext) (*appdomai
 	e.Workspace = vos.TenantWorkspace(c.Workspace)
 	e.Description = vos.Description(c.Description)
 	e.Status = vos.TenantStatus(c.Status)
-	_ = ctx
 	return e, nil
 }
 
@@ -71,5 +69,3 @@ func (c *InsertTenantCommand) FromEntity(_ *configuration.AppContext, e *appdoma
 		Status:      e.Status.Value(),
 	}, nil
 }
-
-var _ = time.Time{}

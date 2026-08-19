@@ -3,10 +3,10 @@
 // The TenantStatus enumeration (3 members).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:5a5d0f5644893c26d26630d05a54efd4074ee1c4d977556dee67b94dadb1930a
+// checksum:   sha256:2634728d19df6b3f44e36b184f17e2623af3663e907e7061057e73c456c490c1
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

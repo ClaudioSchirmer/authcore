@@ -3,10 +3,10 @@
 // The tenants schema (5 columns).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:ae2dec032dd12d7a4690127a41049be9e488d9894d955bdd080d47d8ed5b73be
+// checksum:   sha256:85bf9f6ba4aa2f6a4ec4f38a2ede0e388dbadaf0731b78fbc2363cfaef3dc644
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

@@ -3,10 +3,10 @@
 // The tenants feature (repository + view + mount).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:649e60b3346c8048e4d79dcff2eddf23fd7d8b66536cb6df0aee61ff78b32a00
+// checksum:   sha256:a8d5162bd75e520c4472d12a99636faba052a724405a72e411482df571b2db17
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

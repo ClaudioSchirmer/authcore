@@ -3,10 +3,10 @@
 // The insert request and response.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:465cb4014cfec5de0cee604a3f069fbb0ea7136919e0baf85ccd4f09a66e2eb3
+// checksum:   sha256:87b0725bfb412c989abb3cde823fc69af771443015935dadaff290ed35671120
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,7 +21,6 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
-	"time"
 )
 
 // InsertTenantRequest is the body of Create a tenant.
@@ -70,5 +69,3 @@ type InsertTenantResponse struct {
 func (InsertTenantResponse) FromResult(r commands.InsertTenantResult) InsertTenantResponse {
 	return fwresponses.AutoFromResult[InsertTenantResponse](r)
 }
-
-var _ = time.Time{}

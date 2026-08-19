@@ -3,10 +3,10 @@
 // Tests for Tenant's rules.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:f43139b3f9c3a062fe739a77f9ba007160a48b0ed93035956de9e834131ffdb7
+// checksum:   sha256:fafbd230b49badea38476b8d3a636db27c7857acef5ca39569b5374fd92f9f63
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

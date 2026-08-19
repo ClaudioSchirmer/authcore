@@ -3,10 +3,10 @@
 // Tests for 4 value object(s).
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:0260c008f2a8aae2f83e8bd468f7fb93e23ca30b17dd1b20941ca1def5f118d1
+// checksum:   sha256:6bd8981e08f8c8b97712895e9b1b1d080194f8fcdd7048d0b4905526321ce5d0
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -16,13 +16,7 @@
 
 package vos
 
-import (
-	"strings"
-
-	"testing"
-)
-
-var _ = strings.Repeat
+import "testing"
 
 // TenantStatus declares its members; the framework validates membership
 // against exactly this set.

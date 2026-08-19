@@ -3,10 +3,10 @@
 // The by-id query and its result.
 //
 // entity:     Tenant
-// spec:       omnicore-gen/tenant.omnicore.yaml
+// spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-19
-// checksum:   sha256:17383a23ccbc8df569816a7342b993025486bb997ca0677b8b9d43ce9bec604d
+// checksum:   sha256:34cf7ec48767e43478d9178f8915faba15557c96d1a9971a27f688b154392cf1
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -38,7 +38,6 @@ type FindTenantByIDQuery struct {
 // the same criteria are ignored there by design.
 func (q FindTenantByIDQuery) ToCriteria(ctx *configuration.AppContext) (fwqueries.ReadCriteria, error) {
 	crit := q.Criteria
-	_ = ctx
 	return crit, nil
 }
 
