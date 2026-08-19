@@ -1,0 +1,27 @@
+package main
+
+import (
+	"github.com/ClaudioSchirmer/omnicore/bootstrap"
+	"github.com/ClaudioSchirmer/omnicore/web/openapi"
+)
+
+// Wire assembles the service. It is currently an empty shell: no features and no
+// translations yet, which the framework accepts under APP_PROFILE=dev with a loud
+// warning — the legitimate state of a freshly scaffolded service.
+//
+// The first aggregate is added with /omnicore:scaffold-entity, which appends its
+// feature to Features and its seven catalogs to Translations. Translations become
+// mandatory as soon as the first feature exists.
+func Wire(d bootstrap.Deps) bootstrap.Wiring {
+	return bootstrap.Wiring{
+		OpenAPI: &openapi.Config{
+			Title:       "authcore API",
+			Version:     "0.1.0",
+			Description: "Identity and authentication for a multi-tenant platform.",
+			// The dropdown content is filled by bootstrap from Wiring.Translations.
+			// While that slice is empty no selector is rendered; it starts showing
+			// up the moment the first entity registers its catalogs.
+			LanguageSelector: true,
+		},
+	}
+}

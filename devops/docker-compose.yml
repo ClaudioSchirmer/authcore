@@ -1,0 +1,32 @@
+# authcore — the exclusive local dev bench.
+#
+# One container: the PostgreSQL source of truth. There is deliberately no MongoDB, no
+# broker and no Debezium relay — this service declares neither `mongo:` nor
+# `transport:`, and reads are served straight from these tables.
+#
+# Run it through the project's start wrapper, which also builds and runs the service:
+#   ./start.sh                                  (macOS / Linux / WSL)
+#   start.cmd            or   pwsh -File .\start.ps1     (Windows)
+name: authcore-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: authcore-dev-postgres
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: omnicore
+      POSTGRES_PASSWORD: omnicore
+      POSTGRES_DB: authcore_db
+    # No `command:` overrides. Logical decoding (wal_level=logical, wal senders,
+    # replication slots) is only needed by a Debezium relay, and there is none here.
+    # Adding CDC later is an /omnicore:configure run, which rewrites this file.
+    volumes: [db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omnicore -d authcore_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:
