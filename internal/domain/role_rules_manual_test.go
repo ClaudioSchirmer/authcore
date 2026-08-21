@@ -325,6 +325,63 @@ func TestRole_GrantRulesFireOnUpdateToo(t *testing.T) {
 	}
 }
 
+// A grant ALREADY STORED is not re-judged by a write that does not touch it.
+//
+// This is the guarantee that keeps an unrelated write from becoming a hostage
+// of the past. The caller here holds neither stored grant and the catalog has
+// retired one of them, so the whole-collection form of these rules would answer
+// 403 and 422 to a request whose only change is a name — and would go on
+// refusing every attempt to REVOKE the offending grant, since a revocation is
+// an update like any other.
+func TestRole_StoredGrantsAreNotReJudgedOnAnUnrelatedUpdate(t *testing.T) {
+	svc := &factStub{
+		callerLacks:  map[string]bool{grantA: true, grantB: true},
+		notInCatalog: map[string]bool{grantB: true},
+	}
+
+	// AggregateConstructor is the load-from-DB path: these two arrive as
+	// PERSISTED entries, which is what separates them from an added one.
+	e := persisted(validRole())
+	e.GetAggregateRoot().AggregateConstructor([]domain.AggregateValueObject{
+		aggregatevos.RolePermission{PermissionID: domain.NewID(grantA)},
+		aggregatevos.RolePermission{PermissionID: domain.NewID(grantB)},
+	})
+
+	if _, err := domain.GetUpdatable(e, func(*Role) error { return nil }, svc, "GetUpdatable"); err != nil {
+		t.Fatalf("a write that grants nothing was refused over its stored grants: %v (%v)",
+			err, raisedNotifications(err))
+	}
+	if svc.catalogCalls != 0 || svc.wildcardCalls != 0 || svc.callerCalls != 0 {
+		t.Errorf("stored grants were probed by a write that adds none, got catalog=%d wildcard=%d caller=%d",
+			svc.catalogCalls, svc.wildcardCalls, svc.callerCalls)
+	}
+}
+
+// …and the entry this write DOES add is still judged, beside those same stored
+// ones. Without this case the one above would be satisfied by a rule that
+// simply stopped working on update.
+func TestRole_ANewGrantIsStillJudgedBesideStoredOnes(t *testing.T) {
+	svc := &factStub{callerLacks: map[string]bool{grantB: true}}
+
+	e := persisted(validRole())
+	e.GetAggregateRoot().AggregateConstructor([]domain.AggregateValueObject{
+		aggregatevos.RolePermission{PermissionID: domain.NewID(grantA)},
+	})
+	e.AddRolePermission(aggregatevos.RolePermission{PermissionID: domain.NewID(grantB)})
+
+	_, err := domain.GetUpdatable(e, func(*Role) error { return nil }, svc, "GetUpdatable")
+	if err == nil {
+		t.Fatal("an unheld grant was accepted because the row already had another")
+	}
+	if !raisedNotification(err, "CannotGrantUnheldPermissionNotification") {
+		t.Errorf("expected CannotGrantUnheldPermissionNotification, got %v", raisedNotifications(err))
+	}
+	// Exactly the added one was probed — one entry, not the whole collection.
+	if svc.callerCalls != 1 {
+		t.Errorf("expected the caller-holds question on the added grant alone, got %d calls", svc.callerCalls)
+	}
+}
+
 // A role with no grants at all asks nothing and is accepted. It is the shape a
 // role is created in before its first grant, so it must not be refused.
 func TestRole_NoGrantsAsksNothing(t *testing.T) {

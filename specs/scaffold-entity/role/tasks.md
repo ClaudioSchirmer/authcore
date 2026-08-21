@@ -76,6 +76,33 @@ a HOOK file, and it had not run anywhere.
   `role_permission.go:59.97,61.2 0 1` — zero statements, count 1. It is covered by
   `TestRoleRolePermission_RaisesNothingOnItsOwn`.
 
+**D6 — R6 / R9a / R9b judge the ADDED entries, not the whole collection.** Decided by the
+maintainer at review on 2026-08-21, and amended into `spec.md` (§7, "What these three rules
+judge"). The built tree walked `GetCurrentItemsOf`, which is the literal reading of
+`scope: [insertOrUpdate]` over `Permissions[]` — and it made two ordinary operations
+impossible: renaming a role whose permission the platform had since retired (422), and
+revoking a grant from a role holding permissions the caller had since lost (403 on every
+remaining entry). Now `domain.GetAddedItemsOf`. Insert is unchanged, since every entry of a
+new role is an added one; a revoke asks nothing, since it adds nothing. Two cases cover the
+new guarantee — `TestRole_StoredGrantsAreNotReJudgedOnAnUnrelatedUpdate` and
+`TestRole_ANewGrantIsStillJudgedBesideStoredOnes`; `refuseUngrantablePermissions` stays at
+100%. The `rules.manual[]` descriptions in `role.omnicore.yaml` were updated to match, so a
+future regeneration hands the same instruction.
+
+**D7 — the two cross-aggregate facts memoise per request, and their repositories are keyed
+by the owning repository.** Also from the 2026-08-21 review, both inside the hook file
+`internal/infra/role_service_manual.go`. `findActivePermission` caches its answer on the
+`AppContext` (`Set`/`Get`, the framework's request-scoped store), so the three facts asking
+about one entry cost ONE query instead of three — a role at the 200 cap drops from up to 600
+round trips inside the write transaction to 200. D3's note that the three probes are
+"funnelled through one `findActivePermission`" described the code path only; this is the
+query count. Separately, the `sync.Once` that built the tenant and permission repositories
+became a map keyed by the owning `*RoleRepository`: the previous form handed the FIRST
+engine's repositories to every later service, which is a wrong answer to a security rule
+rather than a visible failure. The key is a pointer deliberately — `core.RelationalEngine`
+is an interface whose dynamic type is not guaranteed comparable, and a map key that can
+panic has no place on the write path.
+
 **Not a deviation — the project's established boundary.** `internal/infra/role_repository.go`,
 `internal/infra/role_service.go`, `internal/infra/role_service_manual.go` and
 `internal/web/role_routes.go` measure 0%, exactly as their `tenant_*` and `permission_*`

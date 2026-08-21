@@ -51,23 +51,86 @@ import (
 // already holds, rather than injected: NewRoleServiceImpl is generated from the
 // spec and takes the role repository alone, and RoleServiceImpl is a generated
 // struct this file cannot add a field to. Building them here keeps the wiring
-// untouched and costs one construction per process — sync.Once, not per call,
-// because a repository construction runs the framework's schema boot checks.
+// untouched and costs one construction per owning repository — not one per
+// call, because a repository construction runs the framework's schema boot
+// checks.
+//
+// KEYED BY THE OWNING REPOSITORY, and that is the whole point of the map. A
+// bare sync.Once would build the pair from whichever RoleServiceImpl asked
+// first and then hand those same two repositories to every later one — so a
+// second engine would silently read the FIRST engine's tenants and permissions,
+// which is a wrong answer to a security rule rather than a failure anybody
+// notices. The key is a pointer, deliberately: the engine is an interface whose
+// dynamic type is not guaranteed comparable, and a map key that can panic has
+// no place on the write path. Two repositories sharing one engine would build
+// the pair twice, which costs a construction and is never wrong.
 //
 // They are read-only here. Nothing in this file writes through them.
+type roleCrossRepos struct {
+	tenants *TenantRepository
+	perms   *PermissionRepository
+}
+
 var (
-	roleFactsOnce sync.Once
-	tenantsRepo   *TenantRepository
-	permsRepo     *PermissionRepository
+	roleCrossReposMu sync.Mutex
+	roleCrossReposBy = map[*RoleRepository]*roleCrossRepos{}
 )
 
-// crossRepos returns the two catalogs these facts consult, building them once.
+// crossRepos returns the two catalogs these facts consult, building them once
+// per owning repository.
+//
+// The lock is held across the construction so two concurrent first requests
+// cannot both build: that is one boot-check pass on a cold process, never a
+// per-call cost, since every later call takes the hit of an uncontended lock
+// and a map read.
 func (s *RoleServiceImpl) crossRepos() (*TenantRepository, *PermissionRepository) {
-	roleFactsOnce.Do(func() {
-		tenantsRepo = NewTenantRepository(s.repo.Engine)
-		permsRepo = NewPermissionRepository(s.repo.Engine)
-	})
-	return tenantsRepo, permsRepo
+	roleCrossReposMu.Lock()
+	defer roleCrossReposMu.Unlock()
+
+	if built, ok := roleCrossReposBy[s.repo]; ok {
+		return built.tenants, built.perms
+	}
+	built := &roleCrossRepos{
+		tenants: NewTenantRepository(s.repo.Engine),
+		perms:   NewPermissionRepository(s.repo.Engine),
+	}
+	roleCrossReposBy[s.repo] = built
+	return built.tenants, built.perms
+}
+
+// permissionProbeMemoKey is where this request's resolved catalog rows live on
+// the AppContext. Namespaced, because the metadata map is shared with the whole
+// framework and with every other feature of this service.
+const permissionProbeMemoKey = "authcore.role.permissionProbe"
+
+// permissionMemo returns this REQUEST's resolved-permission cache, creating it
+// on first use. It answers nil where there is nothing to scope a cache to.
+//
+// AppContext.Set/Get is the framework's sanctioned request-scoped store
+// (docs, app-context: "extra request-scoped state ... via ctx.Set(key, val)"),
+// and it is the right lifetime here: the map must not outlive the write, or a
+// permission archived between two requests would keep reading as active. It is
+// safe as a plain map because the rules walk the collection sequentially inside
+// one write; the entry never escapes to another goroutine.
+//
+// Outside a request — a test or a background job — s.ctx is nil and there is no
+// cache. The probe still answers, one query at a time.
+func (s *RoleServiceImpl) permissionMemo() map[domain.ID]*appdomain.Permission {
+	if s.ctx == nil {
+		return nil
+	}
+	if v, ok := s.ctx.Get(permissionProbeMemoKey); ok {
+		// Somebody else owning this key is not something to fight over: fall
+		// back to querying rather than corrupt whatever they stored.
+		memo, ok := v.(map[domain.ID]*appdomain.Permission)
+		if !ok {
+			return nil
+		}
+		return memo
+	}
+	memo := map[domain.ID]*appdomain.Permission{}
+	s.ctx.Set(permissionProbeMemoKey, memo)
+	return memo
 }
 
 // findActivePermission resolves a grant's catalog row.
@@ -81,7 +144,21 @@ func (s *RoleServiceImpl) crossRepos() (*TenantRepository, *PermissionRepository
 // one PANICS rather than returning "absent": the pipeline turns the panic into a
 // 500 and the write never happens, whereas a plausible answer would skip the
 // very invariant the fact exists to enforce.
+//
+// The answer is MEMOISED for the request. Three facts ask about the same entry
+// — is it in the catalog, is it a wildcard, does the caller hold it — so
+// without this a role at the 200-permission cap would pay 600 round trips
+// inside one write transaction to learn 200 things. A not-found is cached as
+// such (a nil row), because "absent or archived" is an answer and re-asking it
+// costs exactly as much as asking it.
 func (s *RoleServiceImpl) findActivePermission(permissionID domain.ID) (*appdomain.Permission, bool) {
+	memo := s.permissionMemo()
+	if memo != nil {
+		if cached, seen := memo[permissionID]; seen {
+			return cached, cached != nil
+		}
+	}
+
 	_, perms := s.crossRepos()
 	q := criteria.Where(criteria.Eq("ID", permissionID))
 
@@ -91,9 +168,17 @@ func (s *RoleServiceImpl) findActivePermission(permissionID domain.ID) (*appdoma
 		// RecordNotFoundNotification, and it is an ANSWER here, not a failure.
 		var notFound *domain.DomainError
 		if errors.As(err, &notFound) {
+			if memo != nil {
+				memo[permissionID] = nil
+			}
 			return nil, false
 		}
+		// A FAILED query is never cached: the next ask must reach the database
+		// again rather than inherit a verdict nothing ever established.
 		panic("Role: permission catalog probe failed")
+	}
+	if memo != nil {
+		memo[permissionID] = p
 	}
 	return p, true
 }

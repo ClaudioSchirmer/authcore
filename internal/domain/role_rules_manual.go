@@ -80,12 +80,26 @@ func (e *Role) customRules(actionName string, service domain.Service, r *domain.
 // Each notification is raised AT MOST ONCE. A role may carry up to 200 grants
 // (role-permission-cap), and a caller who pasted the wrong list learns nothing
 // from reading the same refusal two hundred times.
+//
+// ONLY WHAT THIS WRITE GRANTS is judged — the entries this write ADDS, never
+// the ones already stored. All three questions are about the act of granting,
+// and a grant that is already in the row was asked all three when it entered.
+// Re-asking them turns unrelated writes into hostages of the past: a permission
+// the platform retires AFTER the grant would make the role impossible to
+// rename, and a caller who has since lost a permission could no longer even
+// REVOKE the others — every remaining grant would be re-judged against a claim
+// set that no longer holds them. Neither refusal describes anything the caller
+// is doing.
+//
+// An INSERT is unaffected: every entry of a new role is an added one, so the
+// whole collection is still judged there. A REVOKE is unaffected for the same
+// reason in reverse — it adds nothing, so it asks nothing.
 func (e *Role) refuseUngrantablePermissions(service domain.Service, r *domain.Rules) {
 	svc := service.(RoleService)
 
 	var wildcardRaised, catalogRaised, unheldRaised bool
 
-	for _, grant := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
+	for _, grant := range domain.GetAddedItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
 		// ── granted-permission-must-be-in-catalog ──
 		// Asked FIRST so an unresolvable id is reported as what it is. The
 		// foreign key already guarantees EXISTENCE; this earns its keep for

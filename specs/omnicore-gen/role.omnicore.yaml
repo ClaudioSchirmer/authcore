@@ -413,6 +413,14 @@ rules:
         is sized to this platform rather than to GCP's 3000 or Azure's 2000.
 
   manual:
+    # THE THREE GRANT RULES BELOW JUDGE THE ENTRIES A WRITE ADDS, never the ones
+    # already stored (spec.md §7, "What these three rules judge"; tasks.md D6). All
+    # three ask about the ACT of granting, and a stored grant was asked all three when
+    # it entered — re-asking them makes unrelated writes hostages of the past: a
+    # permission retired AFTER the grant makes the role impossible to rename, and a
+    # caller who has since lost a permission can no longer even REVOKE the others.
+    # Mechanically domain.GetAddedItemsOf, not GetCurrentItemsOf. An insert is
+    # unchanged: every entry of a new role is an added one.
     - id: tenant-must-be-active
       description: >-
         The owner tenant must exist and not be archived. Ask the TenantIsUnavailable fact
@@ -429,9 +437,9 @@ rules:
     # *:* catalog row — precisely the case the no-escalation rule exists to stop.
     - id: no-wildcard-grant
       description: >-
-        No granted permission may carry a wildcard in either part. For each entry of
-        Permissions, ask the PermissionIsWildcard fact with the entry's PermissionID and
-        refuse when it answers true. This rule MUST be evaluated before
+        No granted permission may carry a wildcard in either part. For each entry this
+        write ADDS to Permissions, ask the PermissionIsWildcard fact with the entry's
+        PermissionID and refuse when it answers true. This rule MUST be evaluated before
         caller-must-hold-granted-permission, and is what guarantees no wildcard string
         ever reaches Identity.HasPermission, which panics on one. Consequence, accepted:
         the platform's own *:* role is seeded by migration beside the reserved platform
@@ -443,8 +451,8 @@ rules:
     - id: granted-permission-must-be-in-catalog
       description: >-
         Every granted permission must exist in the catalog and be active. For each entry
-        of Permissions, ask the PermissionIsNotInCatalog fact with the entry's
-        PermissionID and refuse when it answers true. The database foreign key already
+        this write ADDS to Permissions, ask the PermissionIsNotInCatalog fact with the
+        entry's PermissionID and refuse when it answers true. The database foreign key already
         guarantees EXISTENCE; this rule earns its keep for the ACTIVE half, and for
         turning a violation into a readable 422 instead of a raw constraint error.
       scope: [insertOrUpdate]
@@ -454,8 +462,9 @@ rules:
     - id: caller-must-hold-granted-permission
       description: >-
         No privilege escalation: a caller may only grant a permission they themselves
-        hold. For each entry of Permissions, ask the CallerDoesNotHoldPermission fact with
-        the entry's PermissionID and refuse when it answers true. Evaluate this AFTER
+        hold. For each entry this write ADDS to Permissions, ask the
+        CallerDoesNotHoldPermission fact with the entry's PermissionID and refuse when it
+        answers true. Evaluate this AFTER
         no-wildcard-grant, so every key reaching it is concrete. A *:* super-admin needs
         no special case — Identity.HasPermission answers true for any concrete permission
         when the claim set carries *:*. TWO absent states, and collapsing them breaks one

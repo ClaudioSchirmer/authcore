@@ -1,6 +1,12 @@
 # Spec: Role
 
 - **Status:** APPROVED
+- **Amended:** maintainer, 2026-08-21 — R6 / R9a / R9b judge the entries a write ADDS,
+  never the ones already stored. Decided at review, after the built tree showed what the
+  whole-collection reading costs: a permission the platform retires AFTER a grant made the
+  role impossible to rename, and a caller who had since lost a permission could no longer
+  even REVOKE the others. An insert is unchanged — every entry of a new role is an added
+  one. See §7 "What these three rules judge" and `tasks.md` D6
 - **Amended:** maintainer, 2026-08-21 — pin moved v0.55.0 → **v0.56.0** at re-entry. The
   superadmin bypass of R5 / R9a / §10, which v0.55.0 left mechanism-less because
   `HasPermission("*:*")` panics, now names the sanctioned API `Identity.IsSuperAdmin()`.
@@ -279,11 +285,11 @@ exactly what an access review needs to read. Per-child revocation is
 | R3 | `Key`, `TenantID` | Unique **per tenant**, over active rows. Service pre-check with exclude-self + partial unique index as backstop | `IfInsertOrUpdate` | `RoleKeyAlreadyExistsNotification` | 409 |
 | R4 | `TenantID` | The owner tenant must exist and not be archived | `IfInsert` | `RoleTenantDoesNotExistNotification` | 422 |
 | R5 | `TenantID` | **Tenant isolation.** The row's tenant must equal the caller's `tenant_id` claim, unless the caller is a `*:*` superadmin | `IfInsertOrUpdate` + `IfArchive` | `domain.TenantMismatchNotification` (framework-owned, already translated) | 403 |
-| R6 | `Permissions[].PermissionID` | Every granted permission must exist in the catalog **and be active** | `IfInsertOrUpdate` | `PermissionNotInCatalogNotification` | 422 |
+| R6 | `Permissions[].PermissionID` | Every granted permission must exist in the catalog **and be active** | `IfInsertOrUpdate`, over the entries this write ADDS | `PermissionNotInCatalogNotification` | 422 |
 | R7 | `Permissions[]` | No duplicate permission within one role — `IsSameBusinessIdentity` on the GRANT path, plus the explicit guard on the by-id path, plus the partial unique index as backstop | `IfInsertOrUpdate` | `RoleAlreadyGrantsPermissionNotification` | 409 |
 | R8 | `Permissions[]` | At most **200** permissions in one role (proposed; GCP caps at 3 000, Azure at 2 000 — 200 is sized to this platform, not to theirs) | `IfInsertOrUpdate` | `TooManyPermissionsInRoleNotification` | 422 |
-| **R9a** | `Permissions[]` | **No privilege escalation** — a caller may only grant a permission they themselves hold. A `*:*` superadmin passes for everything, by construction | `IfInsertOrUpdate` | `CannotGrantUnheldPermissionNotification` | 403 |
-| **R9b** | `Permissions[]` | **No wildcard grant through the API** — a permission with `*` in either part cannot be granted on any role | `IfInsertOrUpdate` | `CannotGrantWildcardPermissionNotification` | 403 |
+| **R9a** | `Permissions[]` | **No privilege escalation** — a caller may only grant a permission they themselves hold. A `*:*` superadmin passes for everything, by construction | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantUnheldPermissionNotification` | 403 |
+| **R9b** | `Permissions[]` | **No wildcard grant through the API** — a permission with `*` in either part cannot be granted on any role | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantWildcardPermissionNotification` | 403 |
 | — | `Key`, `Name`, `Description` | format, length, substance, anti-junk | — | **not declared here** — `vos.RoleKey`, `vos.DisplayName` and `vos.Description` validate by type on every write. Declaring `required` beside a VO makes the caller read the same complaint twice | 422 |
 
 ### R5 — how the identity reaches the rule
@@ -363,6 +369,30 @@ wildcards through the API, the relaxation is one clause — `unless the role's t
 platform tenant` — and it needs no claim parsing either, because it tests the ROW's tenant,
 not the caller's token. It is left out now only because the constant it would compare
 against does not exist yet.
+
+### What these three rules judge — added entries, not the stored ones
+
+R6, R9a and R9b run on `IfInsertOrUpdate`, and on an update they judge **only the entries
+that write ADDS**. All three ask about the act of granting, and a grant already in the row
+was asked all three when it entered; re-asking them makes unrelated writes hostages of the
+past:
+
+- a permission the platform retires **after** a grant would make the role impossible to
+  rename — 422 on a request whose only change is a label;
+- a caller who has since lost a permission could no longer even **revoke** the others, since
+  a revocation is an update and every remaining grant would be re-judged against a claim set
+  that no longer holds them.
+
+Neither refusal describes anything the caller is doing. An **insert is unchanged** — every
+entry of a new role is an added one, so the whole collection is still judged there — and a
+**revoke asks nothing**, because it adds nothing. Mechanically this is
+`domain.GetAddedItemsOf` rather than `GetCurrentItemsOf` (`OpInsert`, which crosses the
+original and current status, so a row loaded from the database is excluded and a re-granted
+one is not).
+
+Cost, named: a grant that was legitimate when made is never re-vetted. That is the intended
+trade — revocation is the tool for a grant that stopped being acceptable, and it stays
+reachable precisely because of this rule shape.
 
 ### R6 + R9a share one probe
 
