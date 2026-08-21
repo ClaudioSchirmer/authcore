@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-19
-// checksum:   sha256:03af26de3aec5ce009bffb620f7d4298db42976442e2418162a3b27b7be2d948
+// generated:  2026-08-20
+// checksum:   sha256:d263ace38abcf58a0f0f8083440a116273003efa66f68d22b4f68242922a9648
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -33,9 +33,9 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindTenantsRequest struct {
-	TenantID        *domain.ID `query:"tenantID" filter:"eq,in"`
+	TenantID        *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc"`
 	Name            *string    `query:"name" filter:"eq,in,startswith,contains,istartswith,icontains"`
-	Workspace       *string    `query:"workspace" filter:"eq,in,startswith,istartswith"`
+	Workspace       *string    `query:"workspace" filter:"eq,in,startswith,istartswith" sort:"asc,desc"`
 	Description     *string    `query:"description" filter:"contains,icontains"`
 	Status          *string    `query:"status" filter:"eq,in"`
 	First           *int64     `query:"first"`
