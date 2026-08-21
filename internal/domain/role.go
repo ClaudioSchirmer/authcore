@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-21
-// checksum:   sha256:182e018cf6aa03711f6eb8600402672ab8ab8e3db3c5429df50814f0bc31f808
+// checksum:   sha256:2715255dc81875ae9ad5872fae008db743c66a1e30f4ca1fe3d95d52769deeaf
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -116,7 +116,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 			for i := range items {
 				for j := i + 1; j < len(items); j++ {
 					if items[i].IsSameBusinessIdentity(items[j]) {
-						r.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{})
+						r.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{}, items[i].PermissionID)
 						break
 					}
 				}
@@ -130,7 +130,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot())
 			if len(items) > 200 {
-				r.AddNotification("Permissions", TooManyPermissionsInRoleNotification{})
+				r.AddNotification("Permissions", TooManyPermissionsInRoleNotification{Max: "200"}, len(items))
 			}
 		}
 		// The database unique index is the backstop for the race between this
@@ -144,7 +144,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 				selfID = *id
 			}
 			if service.(RoleService).RoleKeyTaken(e.TenantID, e.Key.Value(), selfID) {
-				r.AddNotification("Key", RoleKeyAlreadyExistsNotification{})
+				r.AddNotification("Key", RoleKeyAlreadyExistsNotification{}, e.Key)
 			}
 		}
 	})
@@ -155,14 +155,14 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 		// invisibly.
 		if old := domain.Old(e); old != nil {
 			if old.Key != e.Key {
-				r.AddNotification("Key", RoleKeyIsImmutableNotification{})
+				r.AddNotification("Key", RoleKeyIsImmutableNotification{}, e.Key)
 			}
 		}
 		// A role never moves between tenants; moving one would hand a
 		// customer's grants to another customer in a single write.
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", RoleTenantIsImmutableNotification{})
+				r.AddNotification("TenantID", RoleTenantIsImmutableNotification{}, e.TenantID)
 			}
 		}
 	})
@@ -205,7 +205,7 @@ func (e *Role) AddRolePermission(item aggregatevos.RolePermission) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{})
+			e.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{}, item.PermissionID)
 			return
 		}
 	}
