@@ -1,17 +1,33 @@
-Rollback point for the omnicore upgrade of 2026-08-20.
+# Rollback snapshot — omnicore upgrade
 
-Previous pin: v0.54.0
-Target pin:   v0.55.0
+Exact restore point taken before bumping the omnicore pin.
 
-go.mod and go.sum here are verbatim copies taken BEFORE the bump.
+- Previous version: `v0.56.0`
+- Target version:   `v0.56.1`
+- Taken on:         2026-08-21
+- Build tags:       `postgres` (both profiles declare `relational.dialect: postgres`
+  and neither declares a `transport:` block)
 
-Both files are tracked in git and the working tree was clean when the snapshot was
-taken, so `git checkout -- go.mod go.sum` is an equivalent restore. The copies here
-make rollback work with or without git.
+`go.mod` and `go.sum` in this directory are verbatim copies of the repository root
+files as they were at `v0.56.0`.
 
-To roll back:
-    cp specs/upgrade/rollback/go.mod specs/upgrade/rollback/go.sum .
-    go build -tags postgres ./...
+## To roll back
 
-The build tag set is `postgres` alone: the engine comes from `relational.dialect` in
-microservice.*.yaml, and neither profile declares a `transport:` block.
+```sh
+cp specs/upgrade/rollback/go.mod go.mod
+cp specs/upgrade/rollback/go.sum go.sum
+go build -tags postgres ./...
+```
+
+Restoring the snapshot reverses `go get` **and** `go mod tidy` together; `go get
+@v0.56.0` alone would not.
+
+## Earlier snapshots
+
+This directory holds only the most recent restore point. The snapshot of the
+previous upgrade (`v0.55.0` → `v0.56.0`) is still reachable through git history:
+
+```sh
+git show HEAD:specs/upgrade/rollback/go.mod
+git show HEAD:specs/upgrade/rollback/go.sum
+```

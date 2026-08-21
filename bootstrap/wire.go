@@ -26,6 +26,7 @@ func Wire(d bootstrap.Deps) bootstrap.Wiring {
 		Features: []bootstrap.Feature{
 			NewTenantsFeature(d),
 			NewPermissionsFeature(d),
+			NewRolesFeature(d),
 		},
 
 		OpenAPI: &openapi.Config{
