@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-19
-// checksum:   sha256:931e7eecd667cec973253f290387c9679447c7fa4dcdec848f5c25e262643968
+// generated:  2026-08-21
+// checksum:   sha256:8667384ca04def118e35e93d1ea96fa84672ab53e4cf1644da4db266f0ddabc2
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -83,7 +83,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 		// The public key is derived once, at creation, and never moves.
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", TenantIDIsImmutableNotification{})
+				r.AddNotification("TenantID", TenantIDIsImmutableNotification{}, e.TenantID)
 			}
 		}
 		// A trial is a beginning — no tenant returns to it.
@@ -104,7 +104,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 					}
 				}
 				if !ok {
-					r.AddNotification("Status", InvalidTenantStatusTransitionNotification{})
+					r.AddNotification("Status", InvalidTenantStatusTransitionNotification{}, e.Status)
 				}
 			}
 		}
@@ -122,7 +122,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 				selfID = *id
 			}
 			if service.(TenantService).WorkspaceTaken(e.Workspace.Value(), selfID) {
-				r.AddNotification("Workspace", TenantWorkspaceAlreadyExistsNotification{})
+				r.AddNotification("Workspace", TenantWorkspaceAlreadyExistsNotification{}, e.Workspace)
 			}
 		}
 	})

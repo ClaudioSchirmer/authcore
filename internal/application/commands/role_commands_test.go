@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-21
-// checksum:   sha256:8ea9479969cd4f339e2b149883862c395ee8d782f5ac5fecd63b37de418d1e70
+// checksum:   sha256:9bc8106a353e5b502040d6a788a192920978aa499afc4454e0fd878eb7c2e58f
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -237,11 +237,22 @@ func TestArchiveRoleCommandApplies(t *testing.T) {
 // the server minted for it — the id the caller addresses it by afterwards.
 func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	ctx := &configuration.AppContext{}
+	// A request has a caller. With no identity the mappers' identity feed is
+	// skipped entirely, and what a scoped write is checked against is exactly
+	// what the feed carries.
+	ctx.SetIdentity(&configuration.Identity{
+		Claims: map[string]any{
+			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+		},
+	})
 	e := &appdomain.Role{}
 	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
 	cmd := &AddRolePermissionCommand{PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")}
 	if err := cmd.ApplyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyTo: %v", err)
+	}
+	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {
@@ -259,6 +270,14 @@ func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 // alone — the entry it names is gone, so there is nothing to project.
 func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	ctx := &configuration.AppContext{}
+	// A request has a caller. With no identity the mappers' identity feed is
+	// skipped entirely, and what a scoped write is checked against is exactly
+	// what the feed carries.
+	ctx.SetIdentity(&configuration.Identity{
+		Claims: map[string]any{
+			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+		},
+	})
 	e := &appdomain.Role{}
 	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
 	seeded := domain.WithID(
@@ -270,6 +289,9 @@ func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	cmd := &RemoveRolePermissionCommand{RolePermissionID: "019ffd00-0000-7000-8000-0000000000a1"}
 	if err := cmd.ApplyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyTo: %v", err)
+	}
+	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {

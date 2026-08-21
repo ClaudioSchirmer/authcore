@@ -363,7 +363,6 @@ rules:
       scope: [update]
       fields: [Workspace]
       notification: TenantWorkspaceIsImmutableNotification
-      echoValue: true
       description: A changed workspace changes tenant_id, orphaning every live token and FK.
 
     - id: tenant-id-immutable

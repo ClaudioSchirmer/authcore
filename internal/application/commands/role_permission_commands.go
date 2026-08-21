@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-21
-// checksum:   sha256:b7478eb4fa89a066342108d86d60c8bf9185691ab015c4590df3e0b06c18fa44
+// checksum:   sha256:d750c8b64a82631ca4d87443f12761f4dd4ea2d73eb1a7752dc9364efa8ca031
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -36,10 +36,20 @@ type AddRolePermissionCommand struct {
 	PermissionID domain.ID
 }
 
-func (cmd *AddRolePermissionCommand) ApplyTo(_ *configuration.AppContext, e *appdomain.Role) error {
+func (cmd *AddRolePermissionCommand) ApplyTo(ctx *configuration.AppContext, e *appdomain.Role) error {
 	e.AddRolePermission(dtos.RolePermissionInput{
 		PermissionID: cmd.PermissionID,
 	}.ToRolePermission())
+
+	// Identity-derived state the rules read. It is never persisted.
+	if id := ctx.Identity(); id != nil {
+		e.RequestingIdentityPresent = true
+		e.RequestingTenant = id.TenantID()
+		// A super-admin crosses the scope. Not asked through
+		// HasPermission, which panics on the *:* the claim carries —
+		// the wildcard has its own question, and this is it.
+		e.RequestingMayCrossScope = id.IsSuperAdmin()
+	}
 	return nil
 }
 
@@ -69,8 +79,18 @@ type RemoveRolePermissionCommand struct {
 	RolePermissionID string
 }
 
-func (cmd *RemoveRolePermissionCommand) ApplyTo(_ *configuration.AppContext, e *appdomain.Role) error {
+func (cmd *RemoveRolePermissionCommand) ApplyTo(ctx *configuration.AppContext, e *appdomain.Role) error {
 	e.RemoveRolePermissionByID(cmd.RolePermissionID)
+
+	// Identity-derived state the rules read. It is never persisted.
+	if id := ctx.Identity(); id != nil {
+		e.RequestingIdentityPresent = true
+		e.RequestingTenant = id.TenantID()
+		// A super-admin crosses the scope. Not asked through
+		// HasPermission, which panics on the *:* the claim carries —
+		// the wildcard has its own question, and this is it.
+		e.RequestingMayCrossScope = id.IsSuperAdmin()
+	}
 	return nil
 }
 

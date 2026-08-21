@@ -96,7 +96,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Storage | flat table `permissions` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
-| Unique | `Resource` — scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `PermissionAlreadyExistsNotification`. |
+| Unique | `Resource` — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `PermissionAlreadyExistsNotification`. |
 | Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. |
 
@@ -104,8 +104,8 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/permission_translations_test.go` |
-| tests for Permission's rules | `internal/domain/permission_test.go` |
+| the Permission aggregate root, its modes and its rules | `internal/domain/permission.go` |
+| the vos package documentation | `internal/domain/vos/doc.go` |
 
 **Left untouched** (yours, by design):
 
@@ -129,9 +129,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.55.0)
+Verdict: **exact** (project pins v0.56.1)
 
-framework v0.55.0 meets the required v0.55.0
+framework v0.56.1 meets the required v0.56.0
 
 Verify what was generated:
 

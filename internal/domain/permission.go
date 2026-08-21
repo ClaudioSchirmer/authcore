@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-20
-// checksum:   sha256:4c9fbedad41478928bdb9c46497c2f040b8b01a4100feef87452c368a4a06cb0
+// generated:  2026-08-21
+// checksum:   sha256:b3aa95e369d165a3f62411bd59a1a0ca82bfd798279c7cefd686686fc27bd7f8
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -73,7 +73,7 @@ func (e *Permission) BuildRules(actionName string, service domain.Service, r *do
 		// the one editable field.
 		if old := domain.Old(e); old != nil {
 			if old.Key != e.Key {
-				r.AddNotification("Key", PermissionKeyIsImmutableNotification{})
+				r.AddNotification("Key", PermissionKeyIsImmutableNotification{}, e.Key)
 			}
 		}
 	})

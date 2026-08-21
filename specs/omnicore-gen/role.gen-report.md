@@ -6,21 +6,17 @@ The descriptions, examples and labels quoted here are in **en-US**, as the spec 
 
 ## What still needs implementing
 
-### Value objects you write
+### Value objects you already wrote
 
-Declared as `kind: manual` (a scalar whose rule is beyond this language) or as a composite with `written: manual` (its shape is declared, its file is yours), so the generator wrote NO file for them — the emitted code already declares fields of these types and converts to and from them, so the package does not compile until each one exists:
+Written by hand — `kind: manual`, or a composite with `written: manual` — and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
 
 - **`RoleKey`** — `internal/domain/vos/role_key.go`. The stable machine handle of a role: 2-64 runes, a single lowercase slug of letters, digits and single hyphens, never leading, trailing or doubled. It carries no reserved list and no derivation — it is a handle within one tenant, not a public key. The same anti-junk predicates the other human-typed handles use apply, so a held key and a one-character masher are refused.
-  ```go
-  type RoleKey string
-  func (v RoleKey) Value() string { return string(v) }
-  func (v RoleKey) IsValid(fieldName string, ctx *domain.NotificationContext) bool
-  ```
-  The underlying type is `string` and is not negotiable: the mappers convert with `vos.RoleKey(x)` and read back with `.Value()`. `IsValid` is the framework's entry point — it is found by TYPE, with no registration, and reports every problem it finds through the context rather than returning one, so a caller sees all of them at once.
+
+The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec.
 
 ### `internal/domain/role_rules_manual.go`
 
-The spec declared these invariants as ones it could not express. The file was just created, with a stub for each; the code is yours to write, and regeneration will never touch it.
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are implemented. It lists them so you can check the file still covers what the spec declares, which is where a rule added to the spec later goes unnoticed.
 
 **`tenant-must-be-active`**
 
@@ -30,23 +26,23 @@ The spec declared these invariants as ones it could not express. The file was ju
 
 **`no-wildcard-grant`**
 
-> No granted permission may carry a wildcard in either part. For each entry of Permissions, ask the PermissionIsWildcard fact with the entry's PermissionID and refuse when it answers true. This rule MUST be evaluated before caller-must-hold-granted-permission, and is what guarantees no wildcard string ever reaches Identity.HasPermission, which panics on one. Consequence, accepted: the platform's own *:* role is seeded by migration beside the reserved platform tenant, not created through this API.
+> No granted permission may carry a wildcard in either part. For each entry this write ADDS to Permissions, ask the PermissionIsWildcard fact with the entry's PermissionID and refuse when it answers true. This rule MUST be evaluated before caller-must-hold-granted-permission, and is what guarantees no wildcard string ever reaches Identity.HasPermission, which panics on one. Consequence, accepted: the platform's own *:* role is seeded by migration beside the reserved platform tenant, not created through this API.
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantWildcardPermissionNotification{}` · attach it to `Permissions`
 
 **`granted-permission-must-be-in-catalog`**
 
-> Every granted permission must exist in the catalog and be active. For each entry of Permissions, ask the PermissionIsNotInCatalog fact with the entry's PermissionID and refuse when it answers true. The database foreign key already guarantees EXISTENCE; this rule earns its keep for the ACTIVE half, and for turning a violation into a readable 422 instead of a raw constraint error.
+> Every granted permission must exist in the catalog and be active. For each entry this write ADDS to Permissions, ask the PermissionIsNotInCatalog fact with the entry's PermissionID and refuse when it answers true. The database foreign key already guarantees EXISTENCE; this rule earns its keep for the ACTIVE half, and for turning a violation into a readable 422 instead of a raw constraint error.
 
 - fires under `IfInsertOrUpdate` · raise `PermissionNotInCatalogNotification{}` · attach it to `Permissions`
 
 **`caller-must-hold-granted-permission`**
 
-> No privilege escalation: a caller may only grant a permission they themselves hold. For each entry of Permissions, ask the CallerDoesNotHoldPermission fact with the entry's PermissionID and refuse when it answers true. Evaluate this AFTER no-wildcard-grant, so every key reaching it is concrete. A *:* super-admin needs no special case — Identity.HasPermission answers true for any concrete permission when the claim set carries *:*. TWO absent states, and collapsing them breaks one profile or the other: no Identity at all (auth.mode: disabled, dev only) means this rule stands down; an Identity present whose claim is empty or insufficient is REFUSED, fail closed.
+> No privilege escalation: a caller may only grant a permission they themselves hold. For each entry this write ADDS to Permissions, ask the CallerDoesNotHoldPermission fact with the entry's PermissionID and refuse when it answers true. Evaluate this AFTER no-wildcard-grant, so every key reaching it is concrete. A *:* super-admin needs no special case — Identity.HasPermission answers true for any concrete permission when the claim set carries *:*. TWO absent states, and collapsing them breaks one profile or the other: no Identity at all (auth.mode: disabled, dev only) means this rule stands down; an Identity present whose claim is empty or insufficient is REFUSED, fail closed.
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantUnheldPermissionNotification{}` · attach it to `Permissions`
 
-Its tests are yours too — the generator does not know what these rules mean.
+The tests for them are yours too, and the same check applies.
 
 ### `internal/infra/role_service_manual.go`
 
@@ -69,6 +65,58 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 > Whether the authenticated caller lacks the permission this grant points at. Asked once per entry, and only for concrete keys — no-wildcard-grant has already refused the wildcards. Implementation: resolve the id to its key; return false when ctx.Identity() is nil (auth disabled, dev only) so the rule stands down; otherwise answer NOT Identity.HasPermission(key). Guard the wildcard here as well and answer true rather than calling through — a panic on a security rule is a 500.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+### The migration — already yours
+
+The SQL for this entity was written on an earlier run and **was not touched**:
+
+- `migrations/postgres/0003_role_manual.down.sql`
+- `migrations/postgres/0003_role_manual.up.sql`
+
+That is permanent, and it is the same posture as the `_manual` rule files: created once, never regenerated. A migration is the only thing here whose effect outlives the file — once it has run anywhere, the framework's tracking table records it as applied, so rewriting the file would change what the file CLAIMS without changing a single table. A service that boots green and fails on the first query touching the change is the outcome being avoided.
+
+**If the shape below no longer matches what that migration created, the fix is a NEW numbered pair in the same folder** — never an edit to one that may have run. Two things are worth being deliberate about, because they are where data is lost: adding a NOT NULL column to a table that already has rows fails unless it carries a default, and a rename done as drop-then-add takes the data with it.
+
+If nothing about the storage changed this run, there is nothing to do here — read the shape as confirmation, not as a task.
+
+**A changed `description:` is a storage change too, on postgres.** The description is stored IN the database — a COMMENT on postgres, mysql and oracle, an `MS_Description` extended property on sqlserver — so that someone holding a connection and not this repository can read it. The code regenerates from the spec; that catalogue entry does not. Rewording a description therefore needs a new pair carrying just the `COMMENT ON` / `sp_addextendedproperty` statements, or the database keeps answering with the old wording.
+
+The shape the regenerated code expects, for `roles`:
+
+**`roles`** — the aggregate root
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `tenant_id` | id | no |  |
+| `role_key` | string(64) | no |  |
+| `name` | string(120) | no |  |
+| `description` | string(500) | no |  |
+| `revision` | int64 | no | optimistic concurrency, maintained by the framework |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+| `deleted_at` | time | yes | archive stamp |
+
+Indexes it expects:
+
+- `roles_tenant_id_role_key_key` — UNIQUE on (tenant_id, role_key), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as RoleKeyAlreadyExistsNotification
+- `role_permissions_role_id_permission_id_key` — UNIQUE on (role_id, permission_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as RoleAlreadyGrantsPermissionNotification
+
+
+**`role_permissions`** — the permissions collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `role_id` | id | no | foreign key to roles |
+| `permission_id` | id | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+A new pair goes in every dialect this service targets (postgres), numbered after the highest existing one. Every `.up.sql` needs its `.down.sql` or the service refuses to boot.
+
+If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
 ### Per-entry command tests are generated now
 
@@ -94,55 +142,19 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the roles feature (repository + view + mount) | `bootstrap/roles_feature.go` |
-| the RolesFeature registration in the composition root | `bootstrap/wire.go` |
-| the archive command and result | `internal/application/commands/archive_role_command.go` |
-| the insert command and result | `internal/application/commands/insert_role_command.go` |
-| the patch command and result | `internal/application/commands/patch_role_command.go` |
-| the shapes for 1 child collection(s) | `internal/application/commands/role_child_results.go` |
 | tests for the command mappers | `internal/application/commands/role_commands_test.go` |
 | the per-entry commands for role_permissions | `internal/application/commands/role_permission_commands.go` |
-| tests for the 1 collection input mapper(s) | `internal/application/dtos/role_dtos_test.go` |
-| the RolePermission input DTO | `internal/application/dtos/role_permission_input.go` |
-| the by-id query and its result | `internal/application/queries/find_role_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_roles_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/role_queries_test.go` |
-| the read shapes for 1 child collection(s) | `internal/application/queries/role_row_results.go` |
-| 16 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 16 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 16 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 16 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 16 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 16 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 16 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/role_translations_test.go` |
-| tests for the collection types | `internal/domain/aggregatevos/role_children_test.go` |
-| the RolePermission child value object | `internal/domain/aggregatevos/role_permission.go` |
-| 9 notification declaration(s) | `internal/domain/notifications.go` |
 | the Role aggregate root, its modes and its rules | `internal/domain/role.go` |
-| the hand-written rules for Role (4 to implement) | `internal/domain/role_rules_manual.go` |
-| the Role service port (5 fact(s)) | `internal/domain/role_service.go` |
-| tests for Role's rules | `internal/domain/role_test.go` |
 | the vos package documentation | `internal/domain/vos/doc.go` |
-| 1 notification declaration(s) | `internal/domain/vos/notifications.go` |
-| the Role repository and its constraint bindings | `internal/infra/role_repository.go` |
-| the Role service implementation | `internal/infra/role_service.go` |
-| the hand-written facts for Role (4 to implement) | `internal/infra/role_service_manual.go` |
-| the role_permissions child schema | `internal/infra/schemas/role_permission_schema.go` |
-| the roles schema (4 columns) | `internal/infra/schemas/role_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/role_schemas_test.go` |
-| the roles view (relational-backed) | `internal/infra/views/role_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/role_view_test.go` |
-| the by-id request and response | `internal/web/requests/find_role_by_id.go` |
-| the listing request and response | `internal/web/requests/find_roles_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_role.go` |
-| the patch request and response | `internal/web/requests/patch_role.go` |
-| the wire types for 1 child collection(s) | `internal/web/requests/role_children.go` |
-| the per-entry wire types for role_permissions | `internal/web/requests/role_permission_requests.go` |
-| the request mapper tests | `internal/web/requests/role_requests_test.go` |
-| the 5 role endpoints | `internal/web/role_routes.go` |
-| the rollback of roles on postgres | `migrations/postgres/0003_role_manual.down.sql` |
-| the roles table on postgres | `migrations/postgres/0003_role_manual.up.sql` |
+
+**Left untouched** (yours, by design):
+
+- `internal/domain/role_rules_manual.go` — hand-written rules live here, by design
+- `internal/infra/role_service_manual.go` — hand-written rules live here, by design
+- `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+- `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+31 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -157,9 +169,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.56.0)
+Verdict: **exact** (project pins v0.56.1)
 
-framework v0.56.0 meets the required v0.56.0
+framework v0.56.1 meets the required v0.56.0
 
 Verify what was generated:
 
