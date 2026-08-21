@@ -32,9 +32,10 @@ Honest scope, so nobody reads intent as delivery:
 | User entity | not started |
 | User ↔ tenant association | not started |
 | `Permission` entity | **done** — the global catalog; see below |
-| Group, Role entities | not started — target model agreed, see below |
+| `Role` entity | **done** — a tenant's own bundle of catalog permissions; generated from `specs/omnicore-gen/role.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** |
+| `Group` entity | not started — target model agreed, see below |
 | Effective-permission resolution (group path ∪ direct path) | not started |
-| Reserved platform tenant | not started |
+| Reserved platform tenant | not started — and `Role` now DEPENDS on it: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant |
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
 | Commercial status (`trial` / `active` / `suspended`) | **built** on Tenant; nothing consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
@@ -284,6 +285,92 @@ and nothing needs to. The cost is the nature of a wildcard rather than a defect:
 granted `tenant:*` holds every permission that will ever exist for `tenant`, including ones a
 future release adds that nobody reviewed the grant for.
 
+### Role
+
+A tenant's own cut of the global permission catalog. `Permission` says what the platform can
+enforce; `Role` says which of those a given customer has bundled together and hands out.
+Flat aggregate, table `roles`, with one owned collection, `role_permissions`. Its approved
+model, with the alternatives that were rejected and why, is in
+`specs/scaffold-entity/role/spec.md`.
+
+It is the **first aggregate in this service owned by a tenant** rather than by the platform,
+which is what every authorization note below exists for.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or grant |
+| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.tenant_id` — the PUBLIC derived key, not the surrogate row id |
+| `key` | string(64) | the stable machine handle (`billing-manager`). Immutable, and unique **per tenant**, not globally. Stored in `role_key` |
+| `name` | string(120) | the display name. Not unique — two tenants, or two roles, may share a label |
+| `description` | string(500) | required, and validated for substance |
+| `permissions[]` | collection | the grants. Each entry carries `id` and `permissionID`, and nothing else |
+
+Five things a reader will otherwise get wrong.
+
+**1. The read returns catalog ids, not permission strings.** `GET /roles/{id}` answers
+`"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…" }]`. A client that wants to show
+*what* the role grants calls `GET /permissions` and joins by id itself. The server cannot do
+it: this service has no Mongo, so its views are served straight from the tables and there is
+no read-time join to compose one with. The alternative was denormalizing the
+`resource:action` pair into each grant, and that was rejected for a specific reason — a
+retired permission comes back as a **new row with a new id**, so a grant holding the *string*
+would silently re-attach to the recreated row and quietly break that promise. A grant holding
+the **id** cannot. This stops being the client's problem the day the service gains Mongo, with
+no change to the model.
+
+**2. You can only grant what you hold.** A caller may add a permission to a role only if
+their own token carries it — the standard defence against a tenant admin minting themselves
+more power than they have. A `*:*` super-admin is exempt **by construction rather than by a
+special case**: the framework's `HasPermission` already answers true for any concrete
+permission when the claim set contains `*:*`, so the rule needs no branch and no claim
+parsing of its own.
+
+**3. No wildcard can be granted through the API.** A permission carrying `*` in either part
+is refused on every role, for everyone. That is partly a policy and partly a safety
+interlock: `Identity.HasPermission` **panics** on any argument containing `*`, so the naive
+form of rule 2 — ask `HasPermission` for each granted key — would crash into a 500 on exactly
+the `*:*` row the rule exists to stop. Refusing wildcards first means no wildcard string ever
+reaches that call. The consequence is deliberate and has a home: the platform's own `*:*`
+role is **seeded by migration** beside the reserved platform tenant, not created through this
+API.
+
+**4. Archive is one-way here too**, and for the same reason it is one-way on the catalog. A
+role is granted to users and groups, and those grants point at the role's id, which does not
+change — so a single `PATCH /roles/{id}/unarchive` would silently re-authorize everyone still
+holding it, with no re-approval and an audit line reading "restored". A retired role comes
+back as a new row that must be granted again. Same rule one level down: revoking a grant is
+`PATCH /roles/{id}/permissions/{entryId}/archive`, never `DELETE`, because the row lingers
+with a `deleted_at` stamp and a `DELETE` that soft-removes is a lying contract. There is no
+`DELETE` anywhere on this aggregate: purging a role would destroy the only human-readable
+record of what a past grant meant, which is exactly what an access review needs to read.
+
+**5. You cannot filter or sort by a granted permission.**
+`?filter[permissions.permissionID][eq]=…` is a typed 400, not a result. "Which roles grant
+`tenant:read`?" is not answerable from this listing on this backing — a relational-served
+view carries the collection in the document it returns, but cannot filter or order by a field
+inside it. It becomes answerable the day the service gains Mongo (`/omnicore:configure`),
+with no change to this model.
+
+#### Tenant isolation
+
+Every row is tenant-scoped, on reads **and** on writes:
+
+- **Reads.** The listing injects the caller's `tenant_id` claim as a filter, so it returns
+  only their own roles, and a by-id read of another tenant's role answers **404 rather than
+  403** — it does not exist for that caller, which leaks nothing about who else exists.
+- **Writes.** Creating, patching or archiving a row whose `tenantID` is not the caller's is
+  refused with 403. A `*:*` super-admin crosses the scope in both directions, which is what
+  lets a platform operator support a customer.
+- **An absent identity is not an absent claim.** With no identity at all the scope stands
+  down — that state is reachable only with `auth.mode: disabled`, which the framework refuses
+  outside `APP_PROFILE=dev`, so the dev bench stays usable. A real signed token that simply
+  carries no `tenant_id` claim is an ordinary production request and is still **refused**.
+
+All of this is generated and correct today, and **inert until `auth.authorization` is turned
+on** — neither profile configures it yet, so `RequirePermission` currently no-ops across the
+whole service. The rules fail closed the moment it is switched on. Flipping it is a
+service-wide posture change, owned by `/omnicore:configure`.
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -324,6 +411,16 @@ PATCH  /permissions/{id}             partial update (description only)
 PATCH  /permissions/{id}/archive     removal — ONE-WAY, there is no unarchive
 ```
 
+```
+GET    /roles/                                    list, filter, paginate
+POST   /roles/                                    create
+GET    /roles/{id}                                read one
+PATCH  /roles/{id}                                partial update (name, description)
+PATCH  /roles/{id}/archive                        removal — ONE-WAY, there is no unarchive
+POST   /roles/{id}/permissions                    grant one permission
+PATCH  /roles/{id}/permissions/{entryId}/archive  revoke one — never DELETE
+```
+
 Permission serves the same five listing controls as Tenant, and `?orderBy` over
 `resource`, `action` and `description`. Filters served, per field: `resource` (eq, ne, in,
 contains, prefix) · `action` (eq, ne, in, contains) · `description` (contains). Neither
@@ -331,6 +428,27 @@ contains, prefix) · `action` (eq, ne, in, contains) · `description` (contains)
 what comes back is the rendered `permission`. `?orderBy=permission` and `?orderBy=id` are
 both a typed 400: a computed field has no column to sort on, and the row id is not in the
 declared vocabulary.
+
+Role serves the same five listing controls as Tenant and Permission, and `?orderBy` over
+`tenantId`, `key` and `name` — `description` is deliberately not sortable, since ordering a
+listing by a 500-character free-text column is a blocking sort nobody asks for. Filters
+served, per field: `tenantId` (eq, in) · `key` (eq, ne, in, prefix, contains, and the
+case-insensitive twins) · `name` (eq, in, prefix, contains, and the twins) · `description`
+(contains, icontains).
+
+The two collection verbs are a **pair, not the usual trio**: there is no "change this grant".
+An entry's single field IS its identity, so changing which permission is granted is revoking
+one and granting another — expressing it as an edit would keep the old row's id while
+changing what it means, which an audit trail reads as one grant *becoming* another instead of
+as two events. Re-granting a revoked permission is a fresh `POST` with a fresh entry id.
+
+Both collection verbs ride the parent's permission, `role:update`, rather than inventing a
+verb the rest of the service does not have. A distinct `role:grant` — so that "may rename the
+role" and "may change what the role can do" are separately grantable — is a real distinction
+and a one-line change if it is wanted.
+
+The **GraphQL surface carries the root verbs only** (`roles`, `role`, `createRole`,
+`patchRole`, `archiveRole`). The two collection verbs are REST-only.
 
 Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?fields`,
 `?onlyTotal`, `?includeArchived`. A control that is not declared is answered with a typed

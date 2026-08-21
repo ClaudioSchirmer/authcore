@@ -1,6 +1,10 @@
 # Spec: Role
 
 - **Status:** APPROVED
+- **Amended:** maintainer, 2026-08-21 — pin moved v0.55.0 → **v0.56.0** at re-entry. The
+  superadmin bypass of R5 / R9a / §10, which v0.55.0 left mechanism-less because
+  `HasPermission("*:*")` panics, now names the sanctioned API `Identity.IsSuperAdmin()`.
+  Additive: no modeling decision moved
 - **Amended:** maintainer, 2026-08-20 — §B Q5 (absent identity vs absent claim) answered after
   the plan gate; §7 gained the two-state table. No other slot moved
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-20 — the four OPEN slots
@@ -11,6 +15,10 @@
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
 - **Generation:** omnicore-gen — chosen by the maintainer at gate 1d, 2026-08-20
+- **Built:** 2026-08-21. Five deviations between this model and the generated tree — the
+  `role_key` column, the fact names, the split of the shared probe, the hand-written
+  cross-aggregate FKs and two measured coverage numbers — are recorded with their reasons
+  in `tasks.md` § "Deviations from `spec.md`, and why"
 
 A **tenant's own cut of the global permission catalog**. `Permission` says what the
 platform can enforce; `Role` says which of those a given customer has decided to bundle
@@ -31,11 +39,11 @@ row. A role belongs to somebody, and the whole of §10 exists because of it.
 | `../permission/spec.md` · `../tenant/spec.md` (both APPROVED) | the local flavor: shared vs entity-specific VOs, substance-validated text, archive-not-delete, the `<entity>:<verb>` permission taxonomy, the service pre-check + DB backstop uniqueness style |
 | `../../scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI + GraphQL wired |
 | `internal/domain/vos/` | inventory for reuse: `Description`, `DisplayName`, `PermissionKey` (composite), `TenantWorkspace`, `TenantStatus`, `text_predicates` |
-| omnicore `v0.55.0` `/docs` | `authz-seams` (the three layers), `relational-view` (what a SoR-backed view serves), `aggregate-persistence` / `table-schema` (children) |
+| omnicore `v0.56.0` `/docs` | `authz-seams` (the three layers), `relational-view` (what a SoR-backed view serves), `aggregate-persistence` / `table-schema` (children) |
 
 ### Verified framework facts that shaped this spec (read, not assumed)
 
-| Fact | Evidence at the pin (`v0.55.0`) |
+| Fact | Evidence at the pin (`v0.56.0`) |
 |---|---|
 | A **relational view DOES serve the aggregate's 1:N children** — the loader reaches them "by their own keyed reads" and the served document carries them | `relational-view.html`, "A subtlety worth calling out" |
 | What a relational view refuses is **filter/sort on a child field** — typed 400 `RelationalCapabilityNotification`, never 500 | `relational-view.html`, feature-parity table + "Unsupported capabilities return 400" |
@@ -287,7 +295,15 @@ translated into the entity by the **command mapper** — the only layer allowed 
 never persists or scans them:
 
 - `RequestingTenantID` ← `ctx.Identity().TenantID()`
-- `RequestingPrincipalIsSuperAdmin` ← see below; **not** `HasPermission("*:*")`
+- `RequestingPrincipalIsSuperAdmin` ← **`ctx.Identity().IsSuperAdmin()`** — the framework's
+  sanctioned way to ask the `*:*` question (v0.56.0). **Never** `HasPermission("*:*")`, which
+  panics by design, and never a hand-read of the claim: the claim NAME is configurable via
+  `authorization.permissionsClaim`, so parsing `Claims["permissions"]` by hand starts
+  answering `false` the day an operator renames it. `IsSuperAdmin` is nil-safe, reads the
+  CONFIGURED claim name, tolerates all four claim shapes, and shares the parsed-claim cache
+  with `HasPermission`. Like every `Identity` helper it reads the TOKEN, not the gate — so it
+  is unaffected by the `auth.authorization.enabled` master switch that §10 leaves off. Note a
+  resource wildcard is **not** a superadmin grant: `role:*` reports `false`
 
 ### Absent identity vs absent claim — two states, not one (Q5)
 
@@ -359,6 +375,7 @@ RoleService (internal/domain/role_service.go) — plain values, no error, per th
   TenantIsActive(tenantID domain.ID) bool
   ActivePermissionKeys(ids []domain.ID) map[domain.ID]vos.PermissionKey   // absent id ⇒ unknown or archived (R6)
   CallerHolds(key vos.PermissionKey) bool                                 // concrete keys only (R9a)
+  CallerIsSuperAdmin() bool                                              // ctx.Identity().IsSuperAdmin() (R5, R9a, §10)
 ```
 
 `CallerHolds` is where the ctx-bound seam pays off: `ScopedService(ctx)` already binds the
@@ -457,7 +474,9 @@ the service does not have. **Proposed: `role:update` for both**; say the word fo
   caller's own roles, and a by-id read of another tenant's role returns **404 rather than
   403** — it does not exist for this caller, which leaks nothing about who else exists. **A
   `*:*` holder skips the filter and sees every tenant's roles**, which is what lets a
-  platform operator support a customer.
+  platform operator support a customer — detected with `ctx.Identity().IsSuperAdmin()`, the
+  exact case v0.56.0's changelog names for it ("cross-tenant bypass inside
+  `Query.ToCriteria(ctx)`").
 - The rejected alternative, recorded: writes-only isolation, with every authenticated caller
   able to *read* every tenant's roles. It is the narrower reading of *"alterar"*, and it
   leaks each customer's org structure to every other customer.

@@ -5,7 +5,7 @@ model; where a task file and the spec disagree, the spec wins. Where a task file
 mechanical detail contradicts a `/docs` section or a layer convention, **the doc wins** —
 apply it and record the deviation in the Notes column here.
 
-Pin: omnicore **`v0.55.0`** · dialect: postgres · read backing: relational · surfaces:
+Pin: omnicore **`v0.56.0`** · dialect: postgres · read backing: relational · surfaces:
 REST + OpenAPI + GraphQL. Generation: **omnicore-gen** (gate 1d, 2026-08-20) —
 the task files below become the REVIEW CHECKLIST for the generated tree.
 
@@ -15,14 +15,72 @@ rather than assumed from here.
 
 | # | Layer | Task file | Status | Notes |
 |---|---|---|---|---|
-| 1 | domain | `task_domain.md` | pending | the new role-key value object, the aggregate, the child aggregate value object, modes, the ten rules, the service port, notifications |
-| 2 | application | `task_application.md` | pending | root commands, the two child commands, the identity translation, queries with the tenant filter, the seven catalogs |
-| 3 | web | `task_web.md` | pending | requests/responses, root routes, the two child routes, the permission gate |
-| 4 | infra | `task_infra.md` | pending | table schema with the child declaration, repository + constraint bindings, the cross-aggregate service implementation, the relational view |
-| 5 | migrations | `task_migrations.md` | pending | two tables in FK order, two partial unique indexes, comments |
-| 6 | bootstrap | `task_bootstrap.md` | pending | the feature, its cross-repository construction, registration |
-| 7 | tests | `task_tests.md` | pending | **≥ 95% per generated file** — the project floor, not the skill's 80% |
-| 8 | docs | `task_docs.md` | pending | bring the project README in step with what was built |
+| 1 | domain | `task_domain.md` | **done** | generated + `vos.RoleKey` and the 4 manual rules written by hand |
+| 2 | application | `task_application.md` | **done** | generated; identity translation is the generator's (`RequestingIdentityPresent` / `RequestingTenant` / `RequestingMayCrossScope`) |
+| 3 | web | `task_web.md` | **done** | generated; 5 REST routes + 2 child routes + 5 GraphQL operations |
+| 4 | infra | `task_infra.md` | **done** | generated + the 4 manual facts written by hand |
+| 5 | migrations | `task_migrations.md` | **done** | generated, then the 2 cross-aggregate FKs added by hand (D4) |
+| 6 | bootstrap | `task_bootstrap.md` | **done** | generated (`bootstrap/roles_feature.go` + `wire.go`) |
+| 7 | tests | `task_tests.md` | **done** | generated suite + 4 hand-written files; see D5 for the two measured deviations |
+| 8 | docs | `task_docs.md` | **done** | README: status table, `### Role` section, API shape. The scoping table needed no change |
+
+## Deviations from `spec.md`, and why
+
+Recorded per the precedence rule at the top: the doc/convention wins over a plan detail, and
+the deviation is written down rather than absorbed.
+
+**D1 — the `key` column is `role_key`.** `key` is a reserved word in the UNION of the five
+engines the generator guards against, so it refused it. The EXPOSED name is untouched: every
+filter, `?orderBy` token, OpenAPI parameter, GraphQL argument and JSON field still says
+`key`. Exactly the move `Permission` already made for `resource` → `resource_name`. `spec.md`
+§1's ER sketch says `key`; the table says `role_key`.
+
+**D2 — the service facts are named for the PROBLEM, not the healthy state.** `spec.md` §7
+sketched `TenantIsActive`, `ActivePermissionKeys` and `CallerHolds`. The generator's own rule
+(`omnicore-gen explain rules`) is that a fact must be named for the problem, because the
+generated suite stubs the service so every probe answers "nothing found": a fact spelled
+`TenantIsActive` reads false under that stub and therefore means *the tenant is gone*,
+turning a perfectly correct spec red on the day it is written. Final names:
+`TenantIsUnavailable`, `PermissionIsNotInCatalog`, `PermissionIsWildcard`,
+`CallerDoesNotHoldPermission`.
+
+**D3 — R6 and R9a do NOT share one probe.** `spec.md` §7 planned one lookup answering both,
+via `ActivePermissionKeys(ids) map[domain.ID]vos.PermissionKey`. A generator fact returns a
+scalar (`bool`/`int64`/`float64`/`string`) and is asked once per entry, so a map-valued fact
+over the whole collection is not expressible. It became three per-entry facts. The happy path
+therefore costs 3 probes per grant, bounded by the 200-permission cap; the refusing paths
+short-circuit. Mitigated in the domain by walking the collection ONCE
+(`refuseUngrantablePermissions`) instead of three times, and in infra by funnelling all three
+through one `findActivePermission`. **Surfaced to the maintainer** as a language gap to
+file upstream: a fact that answers for a whole COLLECTION in one query, instead of one
+scalar per entry.
+
+**D4 — the two cross-aggregate FKs are hand-written.** The generator writes the PARENT key
+(`role_permissions.role_id` → `roles.id`) because a collection's owner is part of the
+aggregate it declares. A reference to ANOTHER aggregate is outside the spec language, so
+`roles.tenant_id` → `tenants.tenant_id` and `role_permissions.permission_id` →
+`permissions.id` were appended to the migration by hand. Legal and expected: the migration is
+a HOOK file, and it had not run anywhere.
+
+**D5 — two measured coverage deviations from the 95% floor** (`CLAUDE.md` rule 6):
+
+- `internal/domain/role.go` `BuildRules` — **93.1%**. The single uncovered block is the
+  generated `childDuplicate` backstop, and it is **unreachable through any public path**: the
+  framework's own carrier refuses a same-business-identity add with
+  `EntityAlreadyAddedNotification` before `BuildRules` ever sees two such entries. The
+  reachable guarantee is asserted instead
+  (`TestRole_TwoIdenticalGrantsCannotCoexist`). Every other function in the file is 100%.
+- `internal/domain/aggregatevos/role_permission.go` `BuildRules` — **reported 0.0%, actually
+  executed.** The body has ZERO statements (the entry declares no rule of its own), so
+  `go tool cover -func` divides 0 by 0 and prints 0.0%. The profile row is
+  `role_permission.go:59.97,61.2 0 1` — zero statements, count 1. It is covered by
+  `TestRoleRolePermission_RaisesNothingOnItsOwn`.
+
+**Not a deviation — the project's established boundary.** `internal/infra/role_repository.go`,
+`internal/infra/role_service.go`, `internal/infra/role_service_manual.go` and
+`internal/web/role_routes.go` measure 0%, exactly as their `tenant_*` and `permission_*`
+counterparts do: they need a database or a running app, and the boot plus `/omnicore:qa` are
+what prove them.
 
 Execution order is inside → out. Each task names the `/docs` sections that must be READ
 before its layer is written; that read is mandatory at execution time, not optional, and is
