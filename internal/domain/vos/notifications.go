@@ -37,3 +37,18 @@ type InvalidTenantWorkspaceNotification struct{ domain.DomainNotificationBase }
 // NAME is the translation key, so renaming it here without renaming it in the
 // seven catalogs leaves the message untranslated.
 type ReservedTenantWorkspaceNotification struct{ domain.DomainNotificationBase }
+
+// InvalidResourceNameNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidResourceNameNotification struct{ domain.DomainNotificationBase }
+
+// InvalidActionNameNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidActionNameNotification struct{ domain.DomainNotificationBase }
+
+// UnmatchablePermissionKeyNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type UnmatchablePermissionKeyNotification struct{ domain.DomainNotificationBase }

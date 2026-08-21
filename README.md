@@ -31,13 +31,14 @@ Honest scope, so nobody reads intent as delivery:
 | Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — generated from `specs/omnicore-gen/tenant.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** — `/omnicore:run` boots it, `/omnicore:qa` proves the endpoints |
 | User entity | not started |
 | User ↔ tenant association | not started |
-| Group, Role, Permission entities | not started — target model agreed, see below |
+| `Permission` entity | **done** — the global catalog; see below |
+| Group, Role entities | not started — target model agreed, see below |
 | Effective-permission resolution (group path ∪ direct path) | not started |
 | Reserved platform tenant | not started |
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
 | Commercial status (`trial` / `active` / `suspended`) | **built** on Tenant; nothing consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Permission enforcement in production | routes are gated (`tenant:read`, `tenant:insert`, `tenant:update`, `tenant:archive`); `auth.mode` is `disabled` in dev and `jwt` in prd |
+| Permission enforcement in production | routes are gated (`tenant:*` and `permission:*`, four verbs each); `auth.mode` is `disabled` in dev and `jwt` in prd. The eight literals have **no catalog row until an operator inserts one** — see the seeding note below |
 
 ## Architecture posture
 
@@ -131,8 +132,14 @@ an e-mail is not a durable reference — tokens and audit rows point at the user
 `Permission` is deliberately *not* tenant-scoped. A permission exists only because some
 route enforces it — `tenant:read` is a string literal in `internal/web/tenant_routes.go`,
 not a row a customer invented. Letting a tenant create permissions would produce rows no
-code ever consults, so the catalog is seeded from what the code actually enforces and is
-read-only to tenants.
+code ever consults, so the catalog is global and read-only to tenants.
+
+**Nothing seeds it.** The migration creates the table empty and an operator populates it
+through the API; there is no seed script and no fixture, because a migration that invents
+grants is a migration that grants power nobody reviewed. The consequence is worth stating
+plainly: the service ships gating eight literals — four `tenant:*`, four `permission:*` —
+that have no catalog row until somebody inserts one. The catalog documents what the code
+enforces; it does not control it.
 
 #### Where the platform operators live
 
@@ -218,6 +225,65 @@ forces the status to `suspended`**, which makes archived-and-active an unreprese
 state rather than a refused one, and unarchiving therefore returns the tenant suspended —
 reactivation is always a separate, explicit, separately audited act.
 
+### Permission
+
+The global catalog of enforceable permissions. Flat aggregate, table `permissions`. Its
+approved model, with the alternatives that were rejected and why, is in
+`specs/scaffold-entity/permission/spec.md`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch or archive the row |
+| `resource` | string(64) | what is protected. A slug, or a colon-joined path (`user:profile`); `*` means every resource. Stored in `resource_name` |
+| `action` | string(64) | what may be done to it. Exactly one slug, never a path; `*` means every action. Stored in `action_name` |
+| `description` | string(500) | required, and validated for substance — it must explain the permission, not repeat it |
+| `permission` | string | **not a column.** `resource:action`, rendered on read |
+
+Three things a reader will otherwise get wrong.
+
+**1. The permission string is rendered, never stored.** Three columns go in, two values come
+out: `resource` and `action` are stored apart so each can be filtered and ordered on its own,
+and neither is ever returned. What the API returns is `permission` — the exact string a JWT
+claim carries and `RequirePermission(...)` compares against — built by one method,
+`vos.PermissionKey.String()`, which is the only place in this service that knows the
+separator is a colon. Filtering is unaffected: a caller looking for `tenant:read` sends
+`?filter[resource][eq]=tenant&filter[action][eq]=read`, because filters are declared on the
+request and never consult the response.
+
+**2. The resource and the action are frozen after creation.** Only `description` is
+editable. The pair IS the permission's identity everywhere except this table — the string in
+the token and the literal in the route — so editing it would rewrite the meaning of every
+existing grant, retroactively and invisibly.
+
+**3. Archive is one-way.** There is no unarchive verb, deliberately. Restoring a retired row
+would re-enable, in a single call, every grant still pointing at it: users would silently
+regain a permission nobody re-approved, and the audit trail would read as a restore rather
+than a grant. A retired permission comes back as a **new row, with a new id**, which must be
+granted explicitly. The unique index over `(resource, action)` is scoped to the ACTIVE rows
+precisely so that this is possible — an archived `tenant:export` does not block a fresh one.
+Removal is `PATCH /permissions/:id/archive`; there is no `DELETE`, because purging the row
+would destroy the only human-readable record of what a past grant meant.
+
+#### Wildcards
+
+A catalog row may carry `*` on either part, and `*:*` is the super-admin row. Two rules
+govern them, and both come from the framework's claim matcher, which honors exactly three
+shapes — an exact string, `resource:*`, and `*:*`:
+
+- **A wildcard resource requires a wildcard action.** `*:read` is refused. It fits none of
+  the three shapes, so it would be a row that matches no route while reading like a sweeping
+  grant.
+- **`*` is legal only as an ENTIRE part** — never as a segment inside a path (`user:*`),
+  never mixed into a slug (`ten*`).
+
+A wildcard row is **grantable but never enforceable**: no route may declare
+`RequirePermission("tenant:*")` — a caller-side wildcard reaching the route side is a runtime
+panic. So the catalog holds two kinds of row: the ones that mirror a literal in the code, and
+the wildcard ones that only ever appear in grants. Nothing in the schema distinguishes them,
+and nothing needs to. The cost is the nature of a wildcard rather than a defect: a role
+granted `tenant:*` holds every permission that will ever exist for `tenant`, including ones a
+future release adds that nobody reviewed the grant for.
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -249,6 +315,22 @@ PATCH  /tenants/{id}             partial update (name, description, status)
 PATCH  /tenants/{id}/archive     reversible removal
 PATCH  /tenants/{id}/unarchive   undo
 ```
+
+```
+GET    /permissions/                 list, filter, paginate
+POST   /permissions/                 create
+GET    /permissions/{id}             read one
+PATCH  /permissions/{id}             partial update (description only)
+PATCH  /permissions/{id}/archive     removal — ONE-WAY, there is no unarchive
+```
+
+Permission serves the same five listing controls as Tenant, and `?orderBy` over
+`resource`, `action` and `description`. Filters served, per field: `resource` (eq, ne, in,
+contains, prefix) · `action` (eq, ne, in, contains) · `description` (contains). Neither
+`resource` nor `action` is ever returned in a response body — they go in and stay in, and
+what comes back is the rendered `permission`. `?orderBy=permission` and `?orderBy=id` are
+both a typed 400: a computed field has no column to sort on, and the row id is not in the
+declared vocabulary.
 
 Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?fields`,
 `?onlyTotal`, `?includeArchived`. A control that is not declared is answered with a typed
@@ -338,7 +420,12 @@ kept in the repository rather than in chat history:
   at Tenant, both are now closed upstream (server-derived fields, and field labels being
   seeded from the field's description); one new one is open, and it is visible in this
   service: the status enum's per-locale member labels are accepted by the generator's
-  validator and emitted by nothing.
+  validator and emitted by nothing. Permission's own first pass found six; the rebuild on
+  generator 0.25.0 closed four of them outright — uniqueness and immutability over a
+  composite value object are now generated, the archive endpoint's documentation no longer
+  advertises an undo that does not exist, and the write responses carry the derived field.
+  Two of those four had cost a permanent file adoption on the first pass; this entity pays
+  none, so every file of it still tracks its spec.
 - `specs/upgrade/rollback/` — the `go.mod`/`go.sum` pair from before the framework upgrade this
   entity needed, kept as an exact restore point.
 

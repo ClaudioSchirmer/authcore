@@ -1,6 +1,9 @@
 # Spec: Permission
 
 - **Status:** APPROVED
+- **Re-approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-20 — the pin moved
+  v0.54.0 → v0.55.0 after the original approval, which reopened one slot (§B Q8, the
+  ordering vocabulary). Answered; the rest of the model is unchanged
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-19 — the four ⚠️ OPEN slots
   answered at the model gate (§B), then three refinements taken at the plan gate (§B
   Q5–Q7): the one-way archive, the collapsed value objects and the lean read payload. The
@@ -43,12 +46,12 @@ concatenates a resource and an action with a colon.
 | `../../../README.md` (§ Domain model) | `Permission` is a **global catalog**, defined by the platform, **not tenant-scoped** and read-only to tenants; the target `User → Group → Role → Permission` graph |
 | `../tenant/spec.md` (APPROVED) | the local flavor: shared vs entity-specific VOs, the anti-junk predicates, archive-not-delete, the `<entity>:<verb>` permission taxonomy already granted on the tenant routes |
 | `../../scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI + GraphQL wired |
-| omnicore `v0.54.0` `/docs` | `value-objects` (the composite kind), `table-schema` (`Composite`/`As`, the boot panics, the once rule), `auto-query-handlers` (computed read fields), `authz-seams` (the permission string format and the claim-side wildcard rules) |
+| omnicore `v0.54.0` `/docs` (superseded — see §B Q8; the entity is now built against `v0.55.0`) | `value-objects` (the composite kind), `table-schema` (`Composite`/`As`, the boot panics, the once rule), `auto-query-handlers` (computed read fields), `authz-seams` (the permission string format and the claim-side wildcard rules) |
 | `omnicore-gen explain coverage` (plugin 0.23.0) | composite value objects ✓ and computed read fields ✓ are both emitted by the generator — the 1d gateway has two real options |
 
 ### Verified framework facts that shaped this spec (read, not assumed)
 
-| Fact | Evidence at the pin (`v0.54.0`) |
+| Fact | Evidence at the pin (`v0.54.0`; re-verified against `v0.55.0` unless noted) |
 |---|---|
 | A composite VO declares `IsValid` and **must not** declare `Value()`; that method is the discriminator | `value-objects.html`, "Composite value objects" |
 | Its canonical rendering is exposed "under any other name (`String()`, `Format()`)" | `value-objects.html`, same section |
@@ -276,7 +279,7 @@ The vocabulary is **open** (§B Q1): `read`, `insert`, `update`, `archive` today
 |---|---|---|
 | 5 | both parts pass their 7a rule, each reported under its own name | (7a's) |
 | 6 | **a `*` resource forces a `*` action** — `*:read` is refused | `UnmatchablePermissionKeyNotification` |
-| 7 | the **rendered** token is at most 129 runes (64 + `:` + 64) | `InvalidPermissionKeyNotification` |
+| ~~7~~ | ~~the **rendered** token is at most 129 runes (64 + `:` + 64)~~ — **withdrawn 2026-08-20, enforced structurally**; see below | ~~`InvalidPermissionKeyNotification`~~ — removed |
 
 **Rule 6 is the reason this concept had to be a composite** and could not be two loose
 fields: it is only expressible with both values in hand. `authz-seams.html` lists the three
@@ -284,7 +287,19 @@ claim shapes the matcher honors — exact, `resource:*`, `*:*`. `*:read` is not 
 so a caller granted it would match no route ever, while the catalog row reads like a
 sweeping grant. The rule refuses the row instead of shipping the illusion.
 
-Rule 7 bounds what one entry costs in a `permissions` claim.
+**Rule 7 was withdrawn at the rebuild — the bound it stated is real, the check was not.**
+It bounded what one entry costs in a `permissions` claim, and that bound still holds: each
+part is independently capped at 64 runes by `isResource`/`isAction`, and the pair-level
+rules run only after both parts pass, so the rendered form is at most 64 + `:` + 64 —
+*exactly* the cap. The branch could therefore never be taken, and
+`InvalidPermissionKeyNotification` had no raiser: dead code plus a notification type and
+seven catalog entries nothing could ever emit.
+
+Withdrawn on the maintainer's call, 2026-08-20, having been surfaced rather than removed
+silently. What replaces it is a comment where the parts are sized, saying that the claim
+budget is what the two 64-rune bounds are FOR — so that widening a part is visibly a
+decision about the token as well. `maxRenderedRunes` is kept as a declared derived bound
+for the same reason. The invariant is not lost; only the unreachable statement of it is.
 
 ### 7c. `Permission.BuildRules`
 
@@ -368,20 +383,42 @@ Two boot guards this shape must respect, both verified against the pin:
   only on the wire.
 - The Result carries **no** `json` tags; wire naming belongs to the Response alone.
 
-**What this shape costs, accepted at the gate:** `?orderBy=` is validated against the
-Response's declared wire paths, so **ordering by `resource` or `action` is a typed 400** —
-they are not on the Response. `permission` was never orderable (a computed path cannot be,
-by construction). What remains sortable is `description` and the id. The catalog is small
-and capped at 200 rows per page, so a client that wants it grouped by resource sorts
-locally. Filtering, which is what was asked for, is untouched: it comes from the Request
-DTO's own tags and never consults the Response.
+**What this shape costs — REVISED at the v0.55.0 re-approval (§B Q8).** The paragraph
+that stood here was built on a v0.54.0 premise that no longer holds. It read that
+`?orderBy=` is validated against the Response's declared wire paths, so ordering by
+`resource` or `action` was a typed 400 because they are not on the Response.
+
+At **v0.55.0** the ordering vocabulary *"lives where the endpoint declares what it accepts
+on the wire — the Request DTO — and **never on the Response**"*
+(`auto-query-handlers.html`, "The ordering pair"). A leaf may be orderable while carrying
+no value on the wire at all. **The lean wire shape therefore costs no ordering.** All three
+stored fields are orderable *and* filterable, while only `id`, `description` and
+`permission` leave on the wire — the hidden parts included, verified with
+`omnicore-gen check`.
+
+What is genuinely unavailable, and why:
+
+| Path | Orderable | Why |
+|---|---|---|
+| `resource` | **yes** | index-backed — the prefix of the partial unique index on the pair |
+| `action` | **yes** | declared; a blocking sort on its own (not an index prefix) |
+| `description` | **yes** | declared; a blocking sort — no index |
+| `permission` | no | computed, and a computed path has no column to order by |
+| `id` | no | the generator refuses `sort: [ID]` — *"`ID` does not name a readable field"*. It stays the implicit trailing cursor tiebreak, the same refusal the Tenant run recorded |
+
+The two blocking sorts are admitted deliberately against the project's otherwise
+indexed-only doctrine (`../../upgrade/migration-plan.md` §1, option C): that doctrine was
+adopted for `tenants`, a table that grows with the customer base. This catalog is bounded
+by the number of `resource:action` pairs the platform's own routes enforce — dozens, and
+capped at 200 rows per page — so the cost of sorting it without an index is immaterial.
+**Filtering is untouched** and never consulted the Response in either version.
 
 - **Reserved read controls served by the listing:**
 
 | Control | Served | Why |
 |---|---|---|
 | pagination (`?first=`, cursor) | yes | default |
-| `?orderBy=` | yes — over `description` and the id only | see the cost above |
+| `?orderBy=` | yes — over `resource`, `action` and `description` (§B Q8) | not the id, and not the computed `permission`; see the table above |
 | `?fields=` | yes | `?fields=permission` returns the strings and nothing else — exactly what a token issuer wants. Selecting it pushes `Resource` + `Action` down to the store automatically |
 | `?includeArchived` | yes | a retired permission must stay auditable — and with no unarchive verb, this listing is the only way to see one |
 | `?onlyTotal` | yes | cheap |
@@ -445,7 +482,8 @@ DTO's own tags and never consults the Response.
 | **Q4** | Should the migration seed the catalog with the permissions the code already enforces? | **No** — the migration creates the table and nothing else. The catalog is populated through the API by whoever operates the platform. Consequence recorded: the service ships gating eight literals (four `tenant:*`, four `permission:*`) that have no catalog row until someone inserts them, and `../../../README.md`'s line about the catalog being "seeded from what the code actually enforces" becomes a statement of intent for an operator, not of a migration. **Correcting that README line is a task of this run** |
 | **Q5** | Does the aggregate accept `unarchive`? | **No — archive is one-way.** Un-archiving would re-enable, in a single call, every grant still pointing at that row: old users would silently regain a permission nobody re-approved, and the audit trail would show a restore rather than a grant. A retired permission comes back as a **new row** (new id) that must be granted explicitly — see §6. The mode is absent from `Modes()`, so no route, no mutation, no command, and no `IfUnarchive` rule is generated |
 | **Q6** | Do `resource` and `action` each get their own value object inside the composite? | **No — plain `string` parts, validated by the composite itself.** A value object earns its keep by giving a rule one home and by being reusable; here nothing else in this microservice carries a resource or an action alone, and both parts are built from one shared segment rule. Two named types would be two copies of one helper for no reader. The composite therefore owns **both** halves of the concept: how a permission is validated and how it is rendered. Extracting a part later is mechanical and touches no data. **The hierarchy stayed**: the resource is still a colon-joined path (§7a rule 3) — collapsing the types never required collapsing the vocabulary |
-| **Q7** | What leaves on the wire? | **`id` + `description` + `permission`.** `resource` and `action` are read into the Result to feed the derivation and stop there — the documented computed-field shape. All three stored fields remain **filterable**, since filters are declared on the Request DTO and never consult the Response. Accepted cost: `?orderBy=` is Response-scoped, so ordering by resource or action is a typed 400. `id` is present because the by-id routes need it |
+| **Q7** | What leaves on the wire? | **`id` + `description` + `permission`.** `resource` and `action` are read into the Result to feed the derivation and stop there — the documented computed-field shape. All three stored fields remain **filterable**, since filters are declared on the Request DTO and never consult the Response. `id` is present because the by-id routes need it. (This answer originally carried an accepted cost — that `?orderBy=` was Response-scoped, so ordering by resource or action was a typed 400. **v0.55.0 removed that cost**; see §B Q8. The wire shape itself is unchanged) |
+| **Q8** | *(reopened by the v0.55.0 bump, answered 2026-08-20)* v0.55.0 turns `?orderBy=` into a two-half declaration — the `controls.orderBy` switch plus a `sort:` vocabulary on the Request DTO — and *"half a declaration is a boot failure"*. Q7's accepted cost was built on the v0.54.0 rule that the vocabulary came from the Response. What does the listing accept? | **`sort: [Resource, Action, Description]`** — all three stored fields, both directions. The vocabulary now lives on the Request DTO and never on the Response, so the lean wire shape (Q7) no longer costs any ordering: the two hidden composite parts are orderable while still absent from every response body (verified with `omnicore-gen check` before the answer was taken). `resource` is index-backed by the partial unique index on the pair; `action` and `description` are blocking sorts, admitted deliberately because this catalog is bounded by the platform's own route literals and capped at 200 rows a page. Alternatives on the table and declined: `[Resource]` only (strict indexed-only, mirroring Tenant's option C — dropped `description`, which §9 wanted); `[Description]` only (§9 as literally written — the one unindexed choice, and it kept the group-by-resource gap); and dropping the control entirely. **`id` was asked for by §9 and is not expressible**: `sort: [ID]` is refused by the generator |
 
 ## C. `(proposed)` picks carried into the approved model
 
@@ -460,6 +498,22 @@ data access · the filter-operator table.
 ---
 
 ## Deviations recorded at generation time
+
+> ⚠️ **HISTORICAL — this section describes a build that is not in this repository.**
+> The 2026-08-19 generation was never committed: PR #4 (`b5aa2cf`) landed this directory's
+> ten planning documents and no code. No Permission source file, no migration, and no
+> `../../omnicore-gen/permission.omnicore.yaml` exists on any branch, and
+> `../../omnicore-gen/lock.json` has no Permission entry. Two of the closures below (**B**
+> and **E**) were closures *by adoption* of files that do not exist, so they are **void**
+> and must be re-decided. That run also used generator **0.23.0**; the rebuild runs on
+> **0.25.0** against framework v0.55.0, so A/B/C/E may not reproduce at all. Each is
+> re-verified during the rebuild, and the OUTCOME now lives in `tasks.md` under
+> "Deviations found while executing — REBUILD". **Four of the six are CLOSED** on generator
+> 0.25.0 — B and C (uniqueness and immutability over a composite are now generated),
+> E (the archive text is accurate) and G (the write responses carry `permission`) — and
+> **neither adoption below was needed**, so no file of this entity has stopped tracking the
+> spec. A and D stand; F is narrowed. This section is kept because it records *why* each
+> deviation was accepted, which is still the reasoning to apply if a refusal recurs.
 
 Generated on 2026-08-19 via `omnicore-gen` (the 1d gateway choice, recorded in the header),
 from `../../omnicore-gen/permission.omnicore.yaml`. Everything below is a place where the
