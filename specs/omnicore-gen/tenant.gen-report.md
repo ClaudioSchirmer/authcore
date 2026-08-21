@@ -8,7 +8,7 @@ The descriptions, examples and labels quoted here are in **en-US**, as the spec 
 
 ### Value objects you already wrote
 
-Declared as `kind: manual` and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
+Written by hand — `kind: manual`, or a composite with `written: manual` — and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
 
 - **`DisplayName`** — `internal/domain/vos/display_name.go`. A human-typed display name of a thing (not a person): 2 to 120 runes, at least one letter, at least min(3, length) distinct runes, no run of 4 or more identical runes, trimmed and single-spaced. No word count — single-word company names are ordinary.
 - **`Description`** — `internal/domain/vos/description.go`. A human-typed description: 15 to 500 runes, at least two words (a word is a run of 2 or more Unicode letters), at least 5 distinct runes, no run of 4 or more identical runes, and at least one vowel — where any letter outside the Latin script counts as one, so a non-Latin description is never rejected as junk.
@@ -113,40 +113,16 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the tenants feature (repository + view + mount) | `bootstrap/tenants_feature.go` |
-| the archive command and result | `internal/application/commands/archive_tenant_command.go` |
-| the insert command and result | `internal/application/commands/insert_tenant_command.go` |
-| the patch command and result | `internal/application/commands/patch_tenant_command.go` |
-| tests for the command mappers | `internal/application/commands/tenant_commands_test.go` |
-| the unarchive command and result | `internal/application/commands/unarchive_tenant_command.go` |
-| the by-id query and its result | `internal/application/queries/find_tenant_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_tenants_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/tenant_queries_test.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/tenant_translations_test.go` |
-| the Tenant aggregate root, its modes and its rules | `internal/domain/tenant.go` |
-| the Tenant service port (1 fact(s)) | `internal/domain/tenant_service.go` |
-| tests for Tenant's rules | `internal/domain/tenant_test.go` |
-| the vos package documentation | `internal/domain/vos/doc.go` |
-| the TenantStatus enumeration (3 members) | `internal/domain/vos/tenant_status.go` |
-| tests for 4 value object(s) | `internal/domain/vos/tenant_vos_test.go` |
-| the tenants schema (5 columns) | `internal/infra/schemas/tenant_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/tenant_schemas_test.go` |
-| the Tenant repository and its constraint bindings | `internal/infra/tenant_repository.go` |
-| the Tenant service implementation | `internal/infra/tenant_service.go` |
-| the tenants view (relational-backed) | `internal/infra/views/tenant_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/tenant_view_test.go` |
-| the by-id request and response | `internal/web/requests/find_tenant_by_id.go` |
+| tests for 1 value object(s) | `internal/domain/vos/tenant_vos_test.go` |
 | the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_tenant.go` |
-| the patch request and response | `internal/web/requests/patch_tenant.go` |
-| the request mapper tests | `internal/web/requests/tenant_requests_test.go` |
-| the 6 tenant endpoints | `internal/web/tenant_routes.go` |
 
 **Left untouched** (yours, by design):
 
 - `internal/domain/tenant_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+26 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -161,9 +137,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.54.0)
+Verdict: **exact** (project pins v0.55.0)
 
-framework v0.54.0 meets the required v0.54.0
+framework v0.55.0 meets the required v0.55.0
 
 Verify what was generated:
 

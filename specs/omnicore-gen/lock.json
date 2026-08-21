@@ -3,8 +3,8 @@
   "entities": {
     "Tenant": {
       "spec": "specs/omnicore-gen/tenant.omnicore.yaml",
-      "specHash": "3f1c2b9bd76309963a4660ffe0ca5fd9bc259b4ce8f5af578946df77f097a489",
-      "framework": "v0.54.0",
+      "specHash": "b4c28d5f9a1e316e4e980142b9ca11099bb209483b1195ae70edab55a81f1b40",
+      "framework": "v0.55.0",
       "files": {
         "bootstrap/tenants_feature.go": {
           "class": "owned",
@@ -68,7 +68,7 @@
         },
         "internal/domain/vos/tenant_vos_test.go": {
           "class": "owned",
-          "hash": "12feee15f07cd0b3d9af58b218f3431622fcc5288827a284f73d6df6459f9c05"
+          "hash": "15783d0936c4a39d4522c9ef08c05f266cd886d20c5e9d01c59fdd0b2c92c676"
         },
         "internal/infra/schemas/tenant_schema.go": {
           "class": "owned",
@@ -100,7 +100,7 @@
         },
         "internal/web/requests/find_tenants_by_params.go": {
           "class": "owned",
-          "hash": "de490990ab56cb81b83c4ed9f88ba7a53814b5876bb0d6a5150bbad2835c8def"
+          "hash": "204ca86aceee0c43c4c817468461cd8167890e6e9c9e7afb4244b90bd35dcf94"
         },
         "internal/web/requests/insert_tenant.go": {
           "class": "owned",

@@ -451,6 +451,7 @@ read:
       # CreatedAt / UpdatedAt are NOT declarable filters: this build serves filters only
       # over declared entity fields, and the managed timestamps are not among them.
       # spec.md §9 asked for range filters on both — recorded as a deviation there.
+    sort: [TenantID, Workspace]
     controls:
       pagination: true
       orderBy: true
