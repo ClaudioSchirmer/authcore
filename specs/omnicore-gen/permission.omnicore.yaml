@@ -1,0 +1,359 @@
+# Permission — the global catalog of enforceable permissions.
+#
+# Model authority: scaffold-entity/permission/spec.md (Status: APPROVED, re-approved
+# 2026-08-20 for the v0.55.0 pin). Nothing here re-decides the model; where this file and
+# that spec disagree, the spec wins.
+#
+# The single idea this file encodes: THREE COLUMNS GO IN, TWO GO OUT.
+#   resource_name  stored, filterable, orderable — never on the wire (hidden)
+#   action_name    stored, filterable, orderable — never on the wire (hidden)
+#   description    stored, filterable, and returned
+#   permission     NO column — derived at read time as resource:action, the exact string
+#                  a JWT claim carries and RequirePermission(...) compares against
+#
+# resource and action are stored apart so each is filterable and orderable on its own;
+# they are validated and rendered by ONE type, vos.PermissionKey — a composite value
+# object written by hand (written: manual), because its invariants are neither a shape
+# nor a closed set: a colon-joined resource path, a single-segment action, the wildcard
+# admitted only as a WHOLE part, and "a * resource forces a * action".
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: Permission
+plural: Permissions
+language: en-US
+
+storage:
+  kind: flat
+  table: permissions
+  description: >-
+    The global catalog of enforceable permissions. One row per resource:action pair some
+    route enforces; defined by the platform, never by a tenant. The resource:action string
+    is rendered on read, never stored.
+  managed:
+    revision: revision
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+
+fields:
+  # The permission itself. ONE concept, TWO columns: `read` alone is not a permission and
+  # `tenant` alone is not one either, which is exactly what a composite value object is
+  # for. hidden keeps both parts out of every response body while leaving the columns,
+  # the filters, the sort vocabulary and the derivation below entirely reachable.
+  #
+  # The physical columns carry a _name suffix: `resource` is a reserved word on oracle.
+  # The EXPOSED names (as:) are untouched, so every filter, orderBy token, OpenAPI
+  # parameter and GraphQL argument still says resource and action.
+  - name: Key
+    livesOn: root
+    hidden: true
+    vo: {kind: composite, ref: PermissionKey}
+    parts:
+      - part: Resource
+        column: resource_name
+        as: Resource
+        type: string
+        length: 64
+        example: tenant
+      - part: Action
+        column: action_name
+        as: Action
+        type: string
+        length: 64
+        example: read
+    # Uniqueness over the PAIR, among ACTIVE rows only. The archived remnant must not
+    # block a fresh row: with no unarchive verb (modes below), re-inserting is the ONLY
+    # way a retired permission comes back, and the new row gets a new id on purpose.
+    unique:
+      enforce: service-precheck+constraint
+      notification: PermissionAlreadyExistsNotification
+      scope: active-only
+    description: >-
+      The permission itself: what resource, and what may be done to it. Stored as two
+      columns, rendered as one resource:action string on read.
+
+  - name: Description
+    type: string
+    column: description
+    length: 500
+    livesOn: root
+    vo: {kind: reuse, ref: Description}
+    example: "Read tenants: list the tenant registry and fetch a tenant by id."
+    description: >-
+      What holding this permission actually lets a caller do, in the platform operators'
+      own words.
+    labelKey: PermissionDescriptionField
+    text:
+      eng: Description
+      ptbr: Descrição
+      esp: Descripción
+      fra: Description
+      deu: Beschreibung
+      ita: Descrizione
+      nld: Beschrijving
+
+valueObjects:
+  # written: manual — the SHAPE stays declared (the schema decomposes it, the mappers fold
+  # it, the migration sizes it), only the FILE is hand-written. Its invariants are beyond
+  # every rule kind: a colon-joined resource path vs a single-segment action, the wildcard
+  # accepted only as an entire part, and rule 6 — a * resource forces a * action — which is
+  # expressible only with BOTH values in hand. It also carries String(), the one place in
+  # this service that knows the separator is a colon.
+  #
+  # It must NOT declare Value(): that method's absence is what tells the framework to
+  # decompose the value across two columns instead of storing a rendering in one.
+  - name: PermissionKey
+    kind: composite
+    written: manual
+    description: >-
+      A permission: what resource, and what may be done to it. The resource is a
+      colon-joined path of 2-64 rune lowercase slugs (tenant, user:profile); the action is
+      exactly one such slug, so the LAST colon segment is always the action and the
+      rendering parses back exactly one way. The wildcard * is accepted only as an ENTIRE
+      part — never inside a path, never mixed into a slug — because the claim matcher
+      honors exactly three shapes: an exact string, resource:*, and *:*. A * resource
+      therefore forces a * action. The rendered token is bounded at 129 runes by
+      construction, since each part is bounded at 64. No normalization: a value that does
+      not already comply is refused, never repaired,
+      because it is compared byte-for-byte against a token claim. Renders itself through
+      String().
+    parts:
+      - name: Resource
+        type: string
+        labelKey: PermissionResourceField
+        description: >-
+          The thing being protected, as the enforcing route names it. A single slug or a
+          colon-joined path; * means every resource.
+        text:
+          eng: Resource
+          ptbr: Recurso
+          esp: Recurso
+          fra: Ressource
+          deu: Ressource
+          ita: Risorsa
+          nld: Bron
+      - name: Action
+        type: string
+        labelKey: PermissionActionField
+        description: >-
+          What may be done to the resource — exactly one slug, never a path; * means every
+          action on that resource.
+        text:
+          eng: Action
+          ptbr: Ação
+          esp: Acción
+          fra: Action
+          deu: Aktion
+          ita: Azione
+          nld: Actie
+
+notifications:
+  - name: PermissionAlreadyExistsNotification
+    semantic: conflict
+    description: >-
+      The resource:action pair is already held by another ACTIVE permission. An archived
+      remnant does not collide — re-inserting is how a retired permission comes back.
+    text:
+      eng: This permission already exists.
+      ptbr: Esta permissão já existe.
+      esp: Este permiso ya existe.
+      fra: Cette permission existe déjà.
+      deu: Diese Berechtigung existiert bereits.
+      ita: Questo permesso esiste già.
+      nld: Deze permissie bestaat al.
+
+  - name: PermissionKeyIsImmutableNotification
+    semantic: validation
+    description: >-
+      An attempt to change the resource:action pair, which is the permission's identity in
+      every JWT claim and every RequirePermission literal.
+    text:
+      eng: The resource and the action cannot be changed.
+      ptbr: O recurso e a ação não podem ser alterados.
+      esp: El recurso y la acción no se pueden modificar.
+      fra: La ressource et l'action ne peuvent pas être modifiées.
+      deu: Ressource und Aktion können nicht geändert werden.
+      ita: La risorsa e l'azione non possono essere modificate.
+      nld: De bron en de actie kunnen niet worden gewijzigd.
+
+  - name: PermissionDescriptionEchoesKeyNotification
+    semantic: validation
+    description: A description that merely repeats the rendered resource:action string.
+    text:
+      eng: The description must explain the permission, not repeat it.
+      ptbr: A descrição deve explicar a permissão, não repeti-la.
+      esp: La descripción debe explicar el permiso, no repetirlo.
+      fra: La description doit expliquer la permission, pas la répéter.
+      deu: Die Beschreibung muss die Berechtigung erklären, nicht wiederholen.
+      ita: La descrizione deve spiegare il permesso, non ripeterlo.
+      nld: De beschrijving moet de permissie uitleggen, niet herhalen.
+
+  # Raised by the hand-written vos.PermissionKey, so they live in the vos package.
+  - name: InvalidResourceNameNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A resource outside the accepted shape — not a colon-joined path of lowercase slugs,
+      or a partially wildcarded value the claim matcher could never honor.
+    text:
+      eng: The resource must be lowercase slugs joined by colons, or exactly *.
+      ptbr: O recurso deve ser slugs minúsculos unidos por dois-pontos, ou exatamente *.
+      esp: El recurso debe ser slugs en minúsculas unidos por dos puntos, o exactamente *.
+      fra: La ressource doit être des slugs minuscules joints par des deux-points, ou exactement *.
+      deu: Die Ressource muss aus durch Doppelpunkte verbundenen Kleinbuchstaben-Slugs bestehen oder genau * sein.
+      ita: La risorsa deve essere slug minuscoli uniti da due punti, o esattamente *.
+      nld: De bron moet bestaan uit kleine slugs verbonden door dubbele punten, of precies *.
+
+  - name: InvalidActionNameNotification
+    package: vos
+    semantic: validation
+    description: >-
+      An action outside the accepted shape — not a single lowercase slug, or one carrying
+      a colon, which would make the rendering ambiguous.
+    text:
+      eng: The action must be a single lowercase slug, or exactly *.
+      ptbr: A ação deve ser um único slug minúsculo, ou exatamente *.
+      esp: La acción debe ser un único slug en minúsculas, o exactamente *.
+      fra: L'action doit être un seul slug minuscule, ou exactement *.
+      deu: Die Aktion muss ein einzelner Kleinbuchstaben-Slug sein oder genau *.
+      ita: L'azione deve essere un singolo slug minuscolo, o esattamente *.
+      nld: De actie moet één kleine slug zijn, of precies *.
+
+  - name: UnmatchablePermissionKeyNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A * resource with a specific action. The claim matcher honors exact, resource:* and
+      *:* and nothing else, so such a row would match no route while reading like a
+      sweeping grant.
+    text:
+      eng: A wildcard resource requires a wildcard action.
+      ptbr: Um recurso curinga exige uma ação curinga.
+      esp: Un recurso comodín exige una acción comodín.
+      fra: Une ressource joker exige une action joker.
+      deu: Eine Platzhalter-Ressource erfordert eine Platzhalter-Aktion.
+      ita: Una risorsa jolly richiede un'azione jolly.
+      nld: Een jokerbron vereist een jokeractie.
+
+# No unarchive: un-archiving would re-enable, in one call, every grant still pointing at
+# that row — old users would silently regain a permission nobody re-approved, with nothing
+# in the audit trail reading like a grant. A retired permission comes back as a NEW row.
+# No delete: a purge destroys the only human-readable record of what a past grant meant.
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+  # Structural immutability: the pair is not a member of the partial body at all. The
+  # key-immutable rule below is the belt-and-braces layer over the same fact.
+  patchExcludes: [Key]
+
+delete:
+  root: soft
+
+rules:
+  list:
+    # Presence, format and the closed-set questions are NOT declared here: both fields are
+    # value-object backed and the framework validates those on every write by itself.
+    - id: permission-key-immutable
+      kind: immutable
+      scope: [update]
+      fields: [Key]
+      notification: PermissionKeyIsImmutableNotification
+      description: >-
+        A changed pair silently rewrites what every role grant and every issued token
+        means, retroactively and invisibly. Description stays the one editable field.
+
+  manual:
+    - id: description-differs-from-key
+      description: >-
+        The Description must differ from the rendered resource:action string under a
+        normalized comparison — case-folded, with whitespace, colons and hyphens collapsed
+        — which catches the lazy paste and nothing more. Render the key through
+        Key.String(); nothing else in this service joins a resource and an action.
+      scope: [insertOrUpdate]
+      notification: PermissionDescriptionEchoesKeyNotification
+      attachTo: Description
+
+service:
+  required: true
+  facts:
+    - name: PermissionKeyTaken
+      kind: exists
+      filters: [Resource, Action]
+      # An update must not collide with itself.
+      excludeSelf: true
+      # ACTIVE rows only: an archived tenant:export must not block a fresh one, which is
+      # the only route back now that /unarchive does not exist.
+      activeOnly: true
+      description: >-
+        Whether any ACTIVE permission already holds this resource:action pair.
+
+read:
+  backing: relational
+  view:
+    name: permissions
+    version: 1
+    maxLimit: 200
+  byId: true
+  byParams:
+    filters:
+      - {field: Resource, ops: [eq, ne, in, contains, startswith]}
+      - {field: Action, ops: [eq, ne, in, contains]}
+      - {field: Description, ops: [contains]}
+    # The ordering VOCABULARY (spec.md §B Q8). At v0.55.0 this lives on the Request DTO and
+    # never on the Response, so the two hidden parts are orderable while still absent from
+    # every response body. resource is index-backed (the prefix of the partial unique index
+    # on the pair); action and description are blocking sorts, admitted deliberately because
+    # this catalog is bounded by the platform's own route literals. ID is not declarable.
+    sort: [Resource, Action, Description]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      # A retired permission must stay auditable — and with no unarchive verb, this listing
+      # is the only way to see one.
+      includeArchived: true
+      # search is deliberately absent: a relational-served view answers free text with a
+      # typed 400, and filter[description][contains] covers the real need.
+  computed:
+    # The permission string itself — no column holds it. The derivation rebuilds the value
+    # object from the two stored parts and asks it, rather than joining two strings.
+    - name: Permission
+      type: string
+      from: [Resource, Action]
+      example: tenant:read
+      description: >-
+        The permission as a JWT claim carries it and RequirePermission compares it —
+        resource:action, rendered from the two stored columns.
+      labelKey: PermissionPermissionField
+      text:
+        eng: Permission
+        ptbr: Permissão
+        esp: Permiso
+        fra: Permission
+        deu: Berechtigung
+        ita: Permesso
+        nld: Permissie
+
+surfaces:
+  rest: true
+  graphql:
+    enabled: true
+    connection: true
+    # No unarchive mutation: the verb does not exist on this aggregate.
+    mutations: [insert, update, archive]
+  # No CSV/XLSX exports: the catalog is small and operator-facing.
+
+authz:
+  resource: permission
+  # The catalog is global by design — not partitioned by tenant, so there is no tenant_id
+  # to filter on and no owner to check. Tenants never write it at all.
+  dataAccess: anyone-with-permission
+  permissions:
+    insert: permission:insert
+    patch: permission:update
+    archive: permission:archive
+    read: permission:read

@@ -59,3 +59,24 @@ type TenantDescriptionMustDifferNotification struct{ domain.DomainNotificationBa
 // struct NAME is the translation key, so renaming it here without renaming it
 // in the seven catalogs leaves the message untranslated.
 type InvalidTenantStatusTransitionNotification struct{ domain.DomainNotificationBase }
+
+// PermissionAlreadyExistsNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type PermissionAlreadyExistsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (PermissionAlreadyExistsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// PermissionKeyIsImmutableNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type PermissionKeyIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// PermissionDescriptionEchoesKeyNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+type PermissionDescriptionEchoesKeyNotification struct{ domain.DomainNotificationBase }
