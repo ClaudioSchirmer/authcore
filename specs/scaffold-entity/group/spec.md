@@ -10,7 +10,7 @@
   separately. Every `(proposed)` pick stands as written.
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md` rule 3
   and the maintainer's invocation
-- **Generation:** `<pending>` — asked at gate 1d, after the plan gate
+- **Generation:** `omnicore-gen` — chosen by the maintainer at gate 1d, 2026-08-21
 - **Pin:** omnicore `v0.56.1` (checked at Phase 0v: no newer release; the plugin is current
   at `0.30.0`). `v0.56.1` is a fix-only release — `BaseAggregateRepository` embeds the write
   base directly to kill a GoLand false positive. **No framework fact this spec relies on
@@ -667,3 +667,45 @@ Neither is a blocker and neither is fixed by this run without approval:
   closely enough to mirror it, and its use of `domain.ID`, the runtime-only identity fields,
   the `Constraints` bindings and the child-op shape all match the pinned docs. Recorded
   because "found nothing" is a result, and the skill asks for the check either way.
+
+---
+
+## Deviations recorded at generation time
+
+Generated on 2026-08-21 with `omnicore-gen` (plugin `0.31.0`, framework `v0.56.1`), the
+path chosen at gate 1d. `check` passed on the first run, `generate` emitted 38 new files
+and updated 11, and `doctor` reports no drift.
+
+**No tooling gap was found, and no file was adopted.** Every generated file of this entity
+still tracks `specs/omnicore-gen/group.omnicore.yaml`, so every later emitter fix reaches
+it. That is a result rather than an absence: the two defects the generator skill warns
+about by name were checked against the emitted code and both are closed on this build —
+the `groupCap` notification carries its interpolated bound (`TooManyRolesInGroupNotification{Max: "50"}`,
+not an empty struct), and `authz.dataAccess: tenant` feeds its write guard on the
+**per-entry child mappers** as well as on the root's, so a holder of the collection
+permission cannot attach into another tenant's group.
+
+Four things were written by hand, all of them by design rather than by shortfall — the
+declared escapes the language provides:
+
+| Written by hand | Why the generator did not | Where |
+|---|---|---|
+| `vos.GroupKey` | `kind: manual`. The shape is a regex, but the substance checks are not: the project's shared anti-junk predicates (distinct-rune count, run-of-identical-runes) are not statable as a pattern | `internal/domain/vos/group_key.go` |
+| G4, G6, G10a, G10b | `rules.manual`. All four need a cross-aggregate probe the rule DSL cannot phrase | `internal/domain/group_rules_manual.go` |
+| The four facts behind them | `kind: manual`. Each asks about the tenants, roles or permissions table, not this entity's | `internal/infra/group_service_manual.go` |
+| The two cross-aggregate foreign keys | A reference to ANOTHER aggregate is outside the spec language — the generator writes the parent key only. The migration is a hook file, so this is the designed path and not an adoption | `migrations/postgres/0004_group_manual.up.sql` |
+
+Two decisions in §7 above were satisfied differently from how they were written, both
+recorded in `tasks.md`'s deviations table: the `CallerIsSuperAdmin()` port entry is served
+by `authz.bypass: "*:*"` and its generated `Identity.IsSuperAdmin()` guard rather than by a
+sixth hand-written fact, and the attach walk runs G6 → G10b → G10a (§7 constrains only
+G10b before G10a; G6 must precede both, because the wildcard fact answers true for an id it
+cannot resolve and would otherwise report an unknown role as an escalation attempt).
+
+**One deviation is open and is the maintainer's to accept or fund:** `internal/infra/` and
+the two route-mount functions sit at **0%** coverage against `CLAUDE.md`'s 95% floor. It is
+pre-existing and repo-wide — `Tenant`, `Permission` and `Role` all read 0% there, because
+`internal/infra` has no test files at all and exercising a repository or a fact needs a
+live relational engine. Every other file of this entity is at 100%, except the generated
+`BuildRules` at 93.1% (exactly `Role`'s figure) and the child entry's empty `BuildRules`,
+which has no statements to cover.
