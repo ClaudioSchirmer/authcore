@@ -33,13 +33,13 @@ Honest scope, so nobody reads intent as delivery:
 | User ↔ tenant association | not started |
 | `Permission` entity | **done** — the global catalog; see below |
 | `Role` entity | **done** — a tenant's own bundle of catalog permissions; generated from `specs/omnicore-gen/role.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** |
-| `Group` entity | not started — target model agreed, see below |
+| `Group` entity | **done** — a tenant's org unit and the bundle of roles its members inherit; generated from `specs/omnicore-gen/group.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** |
 | Effective-permission resolution (group path ∪ direct path) | not started |
-| Reserved platform tenant | not started — and `Role` now DEPENDS on it: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant |
+| Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
 | Commercial status (`trial` / `active` / `suspended`) | **built** on Tenant; nothing consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Permission enforcement in production | routes are gated (`tenant:*` and `permission:*`, four verbs each); `auth.mode` is `disabled` in dev and `jwt` in prd. The eight literals have **no catalog row until an operator inserts one** — see the seeding note below |
+| Permission enforcement in production | routes are gated (`tenant:*`, `permission:*` and `role:*`, four verbs each, plus `group:`'s **five**); `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
 
 ## Architecture posture
 
@@ -371,6 +371,113 @@ on** — neither profile configures it yet, so `RequirePermission` currently no-
 whole service. The rules fail closed the moment it is switched on. Flipping it is a
 service-wide posture change, owned by `/omnicore:configure`.
 
+### Group
+
+A tenant's own org unit, and the bundle of roles its members inherit by belonging to it. It
+is the **second node** of `User → Group → Role → Permission` — the inherited half of a
+user's effective permissions, where the direct `User → Role` path is the other. Flat
+aggregate, table `groups`, with one owned collection, `group_roles`. Its approved model —
+including a survey of what AWS IAM, Entra ID, Okta, Keycloak and Google Cloud actually do
+with groups, and the alternatives that were rejected — is in
+`specs/scaffold-entity/group/spec.md`.
+
+Structurally it is **`Role` one level up**, and deliberately so. Four things are not a copy
+of it, and three of them are the interesting part.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or attach |
+| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.tenant_id` — the PUBLIC derived key, not the surrogate row id |
+| `key` | string(64) | the stable machine handle (`engineering`). Immutable, and unique **per tenant**, not globally. Stored in `group_key` |
+| `name` | string(120) | the display name. Not unique — two groups in one tenant may share a label; the `key` is what disambiguates |
+| `description` | string(500) | required, and validated for substance |
+| `roles[]` | collection | the bundle. Each entry carries `id` and `roleID`, and nothing else |
+
+**1. The read returns role ids, not role names.** `GET /groups/{id}` answers
+`"roles": [{ "id": "…", "roleID": "7c2e9b41-…" }]`. A client that wants to show *what* the
+group confers calls `GET /roles` and joins by id itself. Same reason as on `Role`, one level
+up: with no Mongo there is no read-time join, and an entry holding the role's *key* would
+silently re-attach to a retired-and-recreated role. An entry holding the **id** cannot.
+
+**2. The collection verbs are a pair, not the usual trio.** ATTACH and DETACH, no "change
+this entry": its single field IS its identity, so an edit would keep one row id while
+changing what it means, which an audit trail reads as one grant *becoming* another instead of
+as two events.
+
+**3. `group:grant` is a fifth verb, and this is where the taxonomy diverges from `Role`'s.**
+The two collection routes do **not** ride `group:update`. `Role` weighed a `role:grant` and
+declined it to keep four verbs per resource; `Group` takes it, because the group→role edge
+reaches further — a group hands a member every permission of every role it carries. Entra
+guards a role-assignable group behind Privileged Role Administrator rather than Groups
+Administrator, and AWS spells `iam:AttachGroupPolicy` apart from `iam:UpdateGroup`. So a
+principal with `group:update` may rename and re-describe a group and gets **403** on both
+collection verbs, and a principal with only `group:grant` may attach and detach on a group
+they cannot rename. Named honestly: this is a catalog row somebody has to insert and a grant
+somebody has to make, and until they do, nobody can attach a role to a group once
+`auth.authorization` is on. That is the correct failure direction for an escalation surface,
+and it must not be forgotten when the reserved-platform-tenant seeding work happens.
+
+**4. No escalation, and the check is TRANSITIVE.** A caller may attach a role only if they
+hold **every** permission that role grants — a set, not one key, because a role is an
+indirection. And as on `Role`, no **wildcard-bearing** role can be attached through the API
+at all: partly policy, partly the safety interlock, since `Identity.HasPermission` panics on
+any argument containing `*`. The two are a pair and the order is load-bearing — wildcards are
+refused first, so no wildcard string ever reaches that call. `group:grant` does not replace
+this: Layer 1 asks "may this principal touch the edge at all", the rule asks "may they confer
+*this* role", and holding the permission still does not let you attach a role you do not
+fully hold.
+
+**5. An attached role must be available IN YOUR TENANT — and the message deliberately will
+not say which of three things went wrong.** Absent from the catalog, archived, or owned by
+another tenant all answer with the same *"This role is not available in your tenant, or is no
+longer active."* The tenant half is the question `Role` never had to ask (`Permission` is a
+global catalog), and separating the three would confirm to a caller in tenant A that a
+specific UUID is a live role in some other tenant — an existence oracle over a competitor's
+org chart. It is the same reasoning that makes a cross-tenant by-id read answer 404 rather
+than 403.
+
+**6. Only what a write ATTACHES is judged**, never what is already stored. A role the tenant
+archives *after* it was attached does not make the group impossible to rename, and a caller
+who has since lost a permission can still **detach** the others — which is the tool for
+fixing exactly that situation.
+
+**7. Archive is one-way here too, and it hurts more than it does on `Role`.** A group is
+granted to users, and those memberships point at the group's id — so a single
+`PATCH /groups/{id}/unarchive` would silently re-authorize **an entire team at once**, with
+no re-approval and an audit line reading "restored". A retired group comes back as a new row
+whose members must be re-added. Entra soft-deletes a group with a 30-day restore window
+precisely because losing a 50-member group to a fat-finger is brutal; this model's answer is
+"create it again", and since `User ↔ Group` membership does not exist yet, nobody has been
+hurt by it yet either. Same rule one level down: detaching is
+`PATCH /groups/{id}/roles/{entryId}/archive`, never `DELETE`.
+
+**8. You cannot filter or sort by an attached role.**
+`?filter[roles.roleID][eq]=…` is a typed 400. **"Which groups confer role X?" is not
+answerable from this listing on this backing** — and it is a question an access review asks
+more often than `Role`'s equivalent, because it is how you find out who a role actually
+reaches. With `Group` in the graph a client is now joining three listings rather than two.
+It becomes answerable the day the service gains Mongo (`/omnicore:configure`), with no change
+to this model.
+
+**Nesting is refused, and that is a decision rather than an omission.** Keycloak nests and
+Entra nests, but AWS IAM and Okta both refuse outright — and Entra, the one platform that
+both nests *and* treats group→role as a security boundary, **forbids nesting on
+role-assignable groups**. Nesting turns "what can this user do?" into a graph walk with cycle
+detection, on the exact path the token issuer runs on every login. "Engineering ⊃ Platform"
+is two groups and two memberships, with no graph.
+
+**Membership is out of scope, by design.** `User ↔ Group` is its own aggregate, later. This
+entity is the *definition* plus the role bundle.
+
+#### Tenant isolation
+
+Identical to `Role`'s, and applied unchanged — reads filtered by the claim with a by-id read
+of another tenant's group answering **404 rather than 403**; writes refused with 403; a `*:*`
+super-admin crossing in both directions; and an absent identity distinguished from an absent
+claim. The rejected alternative is worth naming here specifically: reads-open isolation would
+leak each customer's org chart to every other customer, and a group listing **is** the org
+chart.
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -421,6 +528,16 @@ POST   /roles/{id}/permissions                    grant one permission
 PATCH  /roles/{id}/permissions/{entryId}/archive  revoke one — never DELETE
 ```
 
+```
+GET    /groups/                              list, filter, paginate
+POST   /groups/                              create
+GET    /groups/{id}                          read one
+PATCH  /groups/{id}                          partial update (name, description)
+PATCH  /groups/{id}/archive                  removal — ONE-WAY, there is no unarchive
+POST   /groups/{id}/roles                    attach one role      — group:grant
+PATCH  /groups/{id}/roles/{entryId}/archive  detach one — never DELETE — group:grant
+```
+
 Permission serves the same five listing controls as Tenant, and `?orderBy` over
 `resource`, `action` and `description`. Filters served, per field: `resource` (eq, ne, in,
 contains, prefix) · `action` (eq, ne, in, contains) · `description` (contains). Neither
@@ -435,6 +552,18 @@ listing by a 500-character free-text column is a blocking sort nobody asks for. 
 served, per field: `tenantId` (eq, in) · `key` (eq, ne, in, prefix, contains, and the
 case-insensitive twins) · `name` (eq, in, prefix, contains, and the twins) · `description`
 (contains, icontains).
+
+Group serves the same five listing controls and the same `?orderBy` vocabulary as Role
+(`tenantId`, `key`, `name`; `description` deliberately not sortable). Filters served, per
+field: `tenantId` (eq, in) · `key` (eq, ne, in, prefix, contains, and the case-insensitive
+twins) · `name` (eq, **ne**, in, prefix, contains, and the twins) · `description` (contains,
+icontains). `name` carries `ne` where Role's does not — it costs nothing, and "everything
+except the ops group" is a listing an operator does ask for. `?search=` is not served, for
+the same reason as everywhere else here.
+
+Group's two collection verbs are the one place in this service where a child route does NOT
+ride the parent's update permission: both require `group:grant`. See the Group section above
+for why.
 
 The two collection verbs are a **pair, not the usual trio**: there is no "change this grant".
 An entry's single field IS its identity, so changing which permission is granted is revoking
