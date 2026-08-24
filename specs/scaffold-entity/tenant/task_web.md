@@ -2,7 +2,7 @@
 
 Model authority: `spec.md` §8, §9, §10. Layout/naming/granularity: `service-layout.html`.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|
@@ -14,11 +14,11 @@ Model authority: `spec.md` §8, §9, §10. Layout/naming/granularity: `service-l
 | `status-mapping.html` | so the documented responses match what the domain actually emits |
 | `service-layout.html` | where requests, responses and route registration live |
 
-**v0.54.0 notes that change this layer:** the documented responses grow by two. Every root
-write — the partial update, the archive and the unarchive — can now answer **409** for a
-stale-revision write, and archiving a row that is not there answers **404** rather than
-committing an event about nothing. Both are part of the contract and belong in the OpenAPI
-responses, not discovered by a caller in production.
+**Two documented responses that are easy to leave out.** Every root write — the partial
+update, the archive and the unarchive — can answer **409** for a stale-revision write, and
+archiving a row that is not there answers **404** rather than committing an event about
+nothing. Both are part of the contract and belong in the OpenAPI responses, not discovered
+by a caller in production.
 
 ## What to build
 

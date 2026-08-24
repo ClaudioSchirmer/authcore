@@ -4,7 +4,7 @@ Model authority: `spec.md` §1 (the ER sketch), §2, §7. Granularity and number
 migrations convention plus `service-layout.html` — this file specifies WHAT the schema must
 contain, never how many files carry it or what they are called.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|

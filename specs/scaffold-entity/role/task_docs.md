@@ -9,17 +9,20 @@ carries a section per aggregate, and the status table at the top is kept honest.
 field table, then the small number of things a reader would otherwise get wrong. For this
 entity those are:
 
-1. **The read returns catalog ids, not permission strings** — and why the server cannot
-   render them on this posture. A reader who expects a joined payload should learn the
-   reason here rather than from an empty field.
+1. **The read returns the permission, not just its id** — `resource`, `action` and
+   `archivedAt` come across the foreign key at load time while the row still stores only the
+   id. Say why the id is what is stored (a retired permission returns as a NEW row, so a
+   stored string would silently re-attach), and say what `archivedAt` is for: a grant
+   pointing at a retired permission is a normal long-lived state, and this is how a reader
+   sees it.
 2. **You can only grant what you hold**, and a superadmin is exempt by construction rather
    than by a special case.
 3. **No wildcard can be granted through the API** — and where the platform's own wildcard
    role is therefore meant to come from.
 4. **Archive is one-way here too**, for the same reason it is one-way on the catalog: a
    restore would silently re-authorize everyone still holding the role.
-5. **Filtering by a granted permission is not available** on this backing, and what would
-   make it available.
+5. **Filtering by a granted permission is not available** — the join renders the
+   counterpart, it does not make it addressable — and what would make it available.
 
 **Update the status table** at the top of the README so this aggregate is no longer listed
 as not started, and leave the reserved platform tenant's row honest — this run does not

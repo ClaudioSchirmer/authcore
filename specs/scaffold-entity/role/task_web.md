@@ -42,8 +42,13 @@ of the listing response **and of its nested child response type** is a pointer o
 the omit-empty tag; a bare value type or a tag missing omit-empty is a boot panic, and the
 nested type is the half that gets forgotten.
 
-**The read payload carries the catalog reference and no rendered permission string** (§2,
-Q2). No computed field is declared here; there is nothing to derive from.
+**The read payload carries the catalog reference plus the three join-filled values** —
+`resource`, `action` and `archivedAt` (§2, Q2) — and **no rendered `resource:action`
+string**. A computed field lands on the ROOT result and this one would have to land on each
+entry of a collection, so it is not expressible; the client concatenates the two halves.
+`archivedAt` is nullable and therefore a pointer with omit-empty, like the rest of the nested
+type. All three are read-only: they appear on the child response and on no request DTO, no
+command, and no filter or ordering vocabulary.
 
 **Filters and sorts** exactly as §9 tabulates them. `?search=` is NOT declared — the
 relational backing answers it with a typed 400, and declaring it would advertise a capability

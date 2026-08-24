@@ -1,30 +1,18 @@
 # Spec: Role
 
 - **Status:** APPROVED
-- **Amended:** maintainer, 2026-08-21 — R6 / R9a / R9b judge the entries a write ADDS,
-  never the ones already stored. Decided at review, after the built tree showed what the
-  whole-collection reading costs: a permission the platform retires AFTER a grant made the
-  role impossible to rename, and a caller who had since lost a permission could no longer
-  even REVOKE the others. An insert is unchanged — every entry of a new role is an added
-  one. See §7 "What these three rules judge" and `tasks.md` D6
-- **Amended:** maintainer, 2026-08-21 — pin moved v0.55.0 → **v0.56.0** at re-entry. The
-  superadmin bypass of R5 / R9a / §10, which v0.55.0 left mechanism-less because
-  `HasPermission("*:*")` panics, now names the sanctioned API `Identity.IsSuperAdmin()`.
-  Additive: no modeling decision moved
-- **Amended:** maintainer, 2026-08-20 — §B Q5 (absent identity vs absent claim) answered after
-  the plan gate; §7 gained the two-state table. No other slot moved
-- **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-20 — the four OPEN slots
-  of §B answered at the model gate. Q1 → key + name + description · Q2 → **id only** ·
-  Q3 → **the general no-escalation rule** ("só pode conceder o que você tem, a não ser que
-  seja um `*:*`") · Q4 → isolation on reads AND writes, with the service-wide
-  `auth.authorization` switch left to `/omnicore:configure`. The `(proposed)` picks stand
+- **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-20 — the five slots of §B
+  answered at the model gate. Q1 → key + name + description · Q2 → **id only, plus the
+  catalog's own `resource` / `action` reached by a read join** · Q3 → **the general
+  no-escalation rule** ("só pode conceder o que você tem, a não ser que seja um `*:*`") ·
+  Q4 → isolation on reads AND writes, with the service-wide `auth.authorization` switch
+  left to `/omnicore:configure` · Q5 → absent identity ≠ absent claim. The `(proposed)`
+  picks stand
+- **Pin:** omnicore **`v0.57.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
+  relational-served views
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
-- **Generation:** omnicore-gen — chosen by the maintainer at gate 1d, 2026-08-20
-- **Built:** 2026-08-21. Five deviations between this model and the generated tree — the
-  `role_key` column, the fact names, the split of the shared probe, the hand-written
-  cross-aggregate FKs and two measured coverage numbers — are recorded with their reasons
-  in `tasks.md` § "Deviations from `spec.md`, and why"
+- **Generation:** omnicore-gen — chosen by the maintainer at gate 1d
 
 A **tenant's own cut of the global permission catalog**. `Permission` says what the
 platform can enforce; `Role` says which of those a given customer has decided to bundle
@@ -44,16 +32,22 @@ row. A role belongs to somebody, and the whole of §10 exists because of it.
 | `../../../README.md` § Permission (rules 2 and 3) + § Wildcards | permission keys are frozen; archive is **one-way** so a retired permission "comes back as a new row, with a new id, which must be granted explicitly"; `*:*` is a grantable-but-unenforceable catalog row |
 | `../permission/spec.md` · `../tenant/spec.md` (both APPROVED) | the local flavor: shared vs entity-specific VOs, substance-validated text, archive-not-delete, the `<entity>:<verb>` permission taxonomy, the service pre-check + DB backstop uniqueness style |
 | `../../scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI + GraphQL wired |
-| `internal/domain/vos/` | inventory for reuse: `Description`, `DisplayName`, `PermissionKey` (composite), `TenantWorkspace`, `TenantStatus`, `text_predicates` |
-| omnicore `v0.56.0` `/docs` | `authz-seams` (the three layers), `relational-view` (what a SoR-backed view serves), `aggregate-persistence` / `table-schema` (children) |
+| `../tenant/spec.md` §2 · `../permission/spec.md` §2 (the VO inventory they declare) | what is available to reuse: `Description`, `DisplayName`, `PermissionKey` (composite), `TenantWorkspace`, `TenantStatus`, and the shared `text_predicates` helpers |
+| omnicore `v0.57.0` `/docs` | `authz-seams` (the three layers), `read-joins` (reaching the catalog across the foreign key), `relational-view` (what a SoR-backed view serves and what it inherits from the loader), `aggregate-persistence` / `table-schema` (children) |
 
 ### Verified framework facts that shaped this spec (read, not assumed)
 
-| Fact | Evidence at the pin (`v0.56.0`) |
+| Fact | Evidence at the pin (`v0.57.0`) |
 |---|---|
 | A **relational view DOES serve the aggregate's 1:N children** — the loader reaches them "by their own keyed reads" and the served document carries them | `relational-view.html`, "A subtlety worth calling out" |
-| What a relational view refuses is **filter/sort on a child field** — typed 400 `RelationalCapabilityNotification`, never 500 | `relational-view.html`, feature-parity table + "Unsupported capabilities return 400" |
-| No read-time join exists on this posture: `Embed`/`Link`/`ComposedView` are boot-fail or not expressible without Mongo | `relational-view.html`, feature-parity table |
+| What a relational view refuses is **filter/sort on a child field** — typed 400 `UnsupportedCapabilityNotification`, never 500 | `relational-view.html`, feature-parity table + "Unsupported capabilities return 400" |
+| A **read join** reaches another aggregate across a foreign key, is declared once on the repository with `WithJoins`, and every consumer of that loader inherits it — `FindByID`, `ScopedReader`, a service calling `repo.Loader.FindAll`, and a relational view declared over it | `read-joins.html`, "Why the repository, and not the schema or the view" |
+| A join hanging off a **collection** (`LeftJoinInChild` / `InnerJoinInChild`) fills its fields on every loaded entry but is **not addressable in a criteria** — the same 1:N boundary every child field has | `read-joins.html`, "Joining from an aggregate child" |
+| A join's predicate is **always `fk = target.id`** — the target's declared id column, nothing else. A traversal onto a non-id column of the target is deliberately not expressible | `read-joins.html`, "Mapping columns onto your own names" |
+| A join field carries **no domain type** — no value object, no `domain.ID`. An identity column of the target arrives as canonical text in a `string` field | `read-joins.html`, "What a join field may be" |
+| A join may map the target's **managed columns** — `created_at`, `updated_at`, `deleted_at`; `revision` is out — and a nullable one lands in a nullable Go type: `deleted_at` arrives as `*time.Time` | `read-joins.html`, "What a join field may be" · proven by generating this entity at this pin: the child entry comes out with `ArchivedAt *time.Time`, `go build` and `go vet` clean |
+| A join is **not gated on the archived state of the target**: an archived counterpart keeps supplying its columns, and an inner join keeps matching it. Mapping `deleted_at` is therefore how a read *reports* that state — never how it filters on it | `read-joins.html`, "What a NULL means, and what archived means" |
+| A relational view **declares no join of its own** — it carries the loader, and the loader carries whatever the repository declared | `relational-view.html`, "Read joins come from the loader, not from the view" |
 | Layer 3 tenant isolation = middleware claim gate + `crit.Filter["tenant_id"]` in `ToCriteria` + a `BuildRules` match check | `authz-seams.html`, Layer 3 |
 | `TenantMismatchNotification` (403) and `TenantMissingNotification` (403) are **framework-owned and already translated in all seven catalogs** — this entity declares neither | `application/translation/*.go` line 83 |
 | The claim matcher honors exactly three shapes: exact, `resource:*`, `*:*`; `HasPermission` is nil-safe | `authz-seams.html`, Layer 1 |
@@ -91,9 +85,15 @@ Two further notes that are about this codebase rather than about the industry:
   re-attach to the recreated row and break that promise; one that stores the **id** cannot.
   This is what decides §3's reference shape, and it is derived from the project's own stated
   invariant rather than from taste.
-- **`ROLE` is a reserved word in Postgres.** Harmless here — every identifier in this
-  project's DDL is quoted — but the migration must not be the first place that stops
+- **`ROLE` is a reserved word in Postgres.** Harmless for the TABLE name — every identifier
+  in this project's DDL is quoted — but the migration must not be the first place that stops
   quoting.
+- **`key` is a reserved word across the engine set, so the physical column is `role_key`.**
+  The generator refuses a bare `key` in the union of the five engines it guards against.
+  Only the storage name moves: the **exposed** name stays `key` everywhere — every filter,
+  `?orderBy` token, OpenAPI parameter, GraphQL argument and JSON field. Exactly the move
+  `../permission/spec.md` already made for `resource` → `resource_name`, and for the same
+  reason: the DDL stays portable if a second dialect is ever added.
 
 ---
 
@@ -113,7 +113,7 @@ tenants                          roles                              role_permiss
 ─────────                        ─────                              ────────────────
 id            UUID PK      ┌──── id           UUID PK         ┌──── id            UUID PK
 tenant_id     UUID UQ  ────┘     tenant_id    UUID FK ────────┘     role_id       UUID FK → roles.id
-workspace     …                  key          VARCHAR(64)          permission_id UUID FK → permissions.id
+workspace     …                  role_key     VARCHAR(64)          permission_id UUID FK → permissions.id
 …                                name         VARCHAR(120)         revision / created_at
                                  description  VARCHAR(500)         updated_at / deleted_at
                                  revision / created_at                    │
@@ -122,7 +122,7 @@ workspace     …                  key          VARCHAR(64)          permission_
                                  permissions ─────────────────────────────┘
                                  id UUID PK · resource_name · action_name · description
 
-UNIQUE (tenant_id, key)      WHERE deleted_at IS NULL     -- roles
+UNIQUE (tenant_id, role_key) WHERE deleted_at IS NULL     -- roles
 UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
 ```
 
@@ -130,6 +130,15 @@ UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
 |---|---|
 | `roles` | A tenant's own bundle of catalog permissions — the unit a user or a group is granted. Owned by exactly one tenant; the platform's own roles live in the reserved platform tenant rather than in a null scope. |
 | `role_permissions` | The permissions a role grants. One row per permission in the bundle, holding nothing but the catalog row's id — so a retired-and-recreated permission is never silently re-granted, and the pair is never stored twice. |
+
+- **The two cross-aggregate foreign keys are written into the migration BY HAND.** The
+  generator writes the PARENT key only — `role_permissions.role_id` → `roles.id` — because a
+  collection's owner is part of the aggregate that declares it. A reference to *another*
+  aggregate is outside the spec language, so `roles.tenant_id` → `tenants.tenant_id` and
+  `role_permissions.permission_id` → `permissions.id` are appended by whoever writes the
+  migration. That is the designed path and not an adoption: the migration is a hook file,
+  written once and never regenerated. Both are load-bearing — §2's `inner` join is only safe
+  because `permission_id` is `NOT NULL` and FK-backed.
 
 - **The FK target is `tenants.tenant_id`, not `tenants.id`.** The public derived key is what
   the `tenant_id` JWT claim carries, and Layer 3 writes that claim straight onto
@@ -151,29 +160,101 @@ UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
 
 Child `RolePermission` (`internal/domain/aggregatevos/`):
 
-| Field | Go type | VO? | Nullable | Unique | example: | Description |
+| Field | Go type | Source | Nullable | Unique | example: | Description |
 |---|---|---|---|---|---|---|
-| `PermissionID` | `domain.ID` | plain (an id) | no | yes, within the role | `9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3` | The catalog row this grant points at — the id and not the string, so a retired-and-recreated permission needs an explicit re-grant |
+| `PermissionID` | `domain.ID` | **stored column** `permission_id` | no | yes, within the role | `9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3` | The catalog row this grant points at — the id and not the string, so a retired-and-recreated permission needs an explicit re-grant |
+| `Resource` | `string` | **read join** → `permissions.resource_name` | no | — | `tenant` | What the granted permission protects. Read-only, filled on load, never written through this aggregate |
+| `Action` | `string` | **read join** → `permissions.action_name` | no | — | `read` | What the granted permission allows on that resource. Same read-only contract |
+| `ArchivedAt` | `*time.Time` | **read join** → `permissions.deleted_at` | **yes** | — | `null` | When the catalog row this grant points at was archived, `null` while it is live. `Permission` archives one-way, so a non-null value here is a normal long-lived state — this grant points at a retired permission — and not an edge case. Read-only, filled on load, never written through this aggregate |
 
-**One field, and that is the whole child (Q2 = id only).** The rendered `resource:action`
-pair is NOT copied into the row. Three consequences, all accepted deliberately:
+**One STORED field, and three read across the foreign key (Q2).** The `(resource, action)`
+pair is still **not copied** into `role_permissions` — that denormalization is what §A
+rejects, and it stays rejected. What the row holds is the id; what the *read* returns is
+the id plus the pair plus the counterpart's archive stamp, fetched across the FK at load
+time. Four consequences:
 
-- **The read returns UUIDs, not permission strings.** `GET /roles/:id` answers
-  `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…" }]`. A client that wants to
-  display *what* the role grants calls `GET /permissions` and joins by id itself. The
-  server cannot do it for them: with no Mongo there is no read-time join
-  (`relational-view.html` — `Embed` / `Link` / `ComposedView` are all unavailable), so the
-  only way to render the string server-side would have been the denormalized copy that was
-  rejected. This stops being the client's problem the day the service gains Mongo, with no
-  change to this model.
+- **The read returns the permission itself, not just a UUID.** `GET /roles/:id` answers
+  `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…", "resource": "tenant",
+  "action": "read", "archivedAt": null }]`. A client renders `tenant:read` by joining the
+  two halves it was handed, with no second call to `GET /permissions` — and a non-null
+  `archivedAt` is how the same answer says *this grant points at a permission that has
+  been retired*, which is the one thing an access review most needs to see and the one
+  thing a stored id alone could never tell it.
+- **Nothing about the write side moves.** A join field is not part of the `TableSchema`,
+  so it never enters an INSERT or an UPDATE (`read-joins.html`, "What a read join is
+  not"). The grant is still one column, and the invariant §A protects — a retired
+  permission comes back as a new row with a new id, so a grant holding the *string* would
+  silently re-attach and one holding the **id** cannot — is untouched, because the string
+  is never stored.
 - **`permission_id` is a real database foreign key** to `permissions.id` (the PK, so
-  FK-able — unlike the partial unique index over the pair). Referential integrity for the
-  *existence* half of R6 comes free; the rule still earns its keep for the *active* half,
-  and for turning a violation into a readable 422 instead of a raw constraint error.
-- **The no-escalation rule (R9a) now costs a lookup.** It has to compare permission
-  *strings* against the caller's claim, and the row holds only an id — so the domain
-  service resolves ids → keys on every write that touches the collection. One probe
-  answers both R6 and R9a, so it is one query and not two.
+  FK-able — unlike the partial unique index over the pair). It is also what makes the join
+  an `inner` one legal: the column is `NOT NULL` and referential integrity guarantees the
+  counterpart, so no entry is ever dropped. Referential integrity for the *existence* half
+  of R6 comes free; the rule still earns its keep for the *active* half, and for turning a
+  violation into a readable 422 instead of a raw constraint error.
+- **The rendered `resource:action` string is not served as one field, deliberately.** A
+  computed read field lands on the aggregate's ROOT result, not on each entry of a
+  collection, so "one `permission` string per grant" is not expressible. The two halves
+  are, and the client concatenates them. Nothing inside this service concatenates
+  anything: `vos.PermissionKey.String()` remains the only place that knows the separator
+  is a colon, exactly as `../permission/spec.md` requires.
+
+### The read join into the catalog — the declaration and its four properties
+
+```
+read.InnerJoinInChild(schemas.PermissionSchema()).To(...)   -- shape; the repository declares it
+  RolePermission.permission_id  =  permissions.id
+    → Resource    ← permissions.resource_name
+    → Action      ← permissions.action_name
+    → ArchivedAt  ← permissions.deleted_at        -- managed column; arrives *time.Time
+```
+
+Declared **once on `RoleRepository` with `WithJoins`**, beside `WithSchema`. Every consumer
+of that loader inherits it in the same call: the relational view of §9, `repo.FindByID` (the
+load the write-side auto handlers go through), `repo.ScopedReader(ctx)`, and any service
+calling `repo.Loader.FindOne/FindAll`. That last one is not incidental — it is what
+`../group/spec.md` §7 spends its escalation probe on.
+
+Four properties that are the framework's, not this model's, and that every layer must hold:
+
+1. **`inner`, and only because the key is `NOT NULL`.** Over a nullable foreign key an inner
+   join silently drops rows — from `FindByID` too, which would turn a legitimate write into
+   a 404. The framework refuses that combination at construction; here there is nothing to
+   refuse, and the choice is intent rather than risk. **Inside a child, an inner join drops
+   the ENTRY, not the aggregate** — one more reason the `NOT NULL` + FK pair is what makes
+   it safe.
+2. **Load-only: not filterable, not sortable.** A child join field is served on every loaded
+   entry and is **not** addressable in a criteria — the same 1:N boundary every child field
+   already has. `?filter[permissions.resource][eq]=tenant` is a typed 400. See §9 for what
+   that costs.
+3. **Not gated on the catalog's archived state — and it reports that state instead of
+   hiding it.** An archived permission keeps supplying its `resource` and `action`, and the
+   inner join keeps matching it. That is the wanted behaviour here: a grant pointing at a
+   retired row must stay *readable* — an access review has to be able to see what a past
+   grant meant, which is the whole reason `Permission` never hard-deletes. Mapping the
+   catalog's `deleted_at` onto `ArchivedAt` is the other half of the same intent: the entry
+   is served either way, and the reader is told which it is. `Permission` archives one-way,
+   so this is not a transient — a grant can point at a retired row for the rest of the
+   role's life, and the read says so on every load.
+
+   The line the field does **not** cross: it renders, it never judges. §7 is where "is that
+   key still live" is decided, and it is decided by a probe, not by this column.
+4. **Filled on load, empty on an added entry.** An entry the request just added exists only
+   in memory; nothing traversed a foreign key for it. So `Resource`, `Action` and
+   `ArchivedAt` are populated for the grants **loaded from the row** and empty for the ones
+   this write is adding — and note the direction `ArchivedAt` fails in: an added entry
+   reads `nil`, which is indistinguishable from "the target is live". §7 depends on this and
+   states it again where it bites.
+
+**No traversal to `Tenant` is declared, and the reason is a trap worth naming.** A join's
+predicate is always `fk = target.id`. `roles.tenant_id` does not point at `tenants.id` — it
+points at `tenants.tenant_id`, the derived public key (§1). A declaration reaching Tenant
+would therefore be *accepted* (the column is an id) and would render
+`roles.tenant_id = tenants.id`, which matches nothing: a `left` join would fill every field
+with NULL and an `inner` one would drop every role from every read, `FindByID` included.
+**Do not declare it.** The tenant's `workspace` and `name` are not reachable from this
+aggregate, and the honest fix, if they are ever wanted on a role listing, is a second
+foreign key onto `tenants.id` — never a join over the existing one.
 
 Notes on the decisions embedded above:
 
@@ -181,6 +262,14 @@ Notes on the decisions embedded above:
   shapes make an id-holding field `domain.ID` and the dialect's native id column follows
   from the Go type; `Tenant.TenantID` in this project already proves the pattern. Wire DTOs
   stay `string` and convert at the mappers.
+- **`Resource` and `Action` are plain `string`, NOT `vos.PermissionKey` and not two halves
+  of it.** A join field carries no domain type at all — the framework refuses a value
+  object of any kind, and it refuses `domain.ID`. The reason is not mechanical: the value
+  belongs to `Permission`, arrives read-only, and is never validated by *this* domain, so
+  reconstructing `vos.PermissionKey` here would hand back an instance no rule of the owning
+  aggregate ever approved. It is also structurally impossible — a composite spans two
+  columns and a join field maps exactly one. The catalog validates its own pair; this
+  aggregate reads the two columns it was given.
 - **`vos.RoleKey` is a NEW raw VO, not a reuse.** `TenantWorkspace` is the closest shape
   (a DNS-ish slug) but it carries two rules that belong to nothing else — the platform's
   reserved-route list and `DeriveTenantID` — so reusing it would drag both onto a role.
@@ -224,10 +313,13 @@ Notes on the decisions embedded above:
 - **The by-id guard lives in a domain method on `Role`**, not in a loop inside the command
   mapper: absent child → the canonical `RecordNotFoundNotification` (404), never the
   framework's `EntityDoesNotExistNotification` (422).
-- **`IsSameBusinessIdentity` is over `PermissionID`.** Today that happens to be every field,
-  so `domain.IsSameByBusinessFields` would behave identically — the explicit form is written
-  anyway, because it states which column carries identity and survives a second field being
-  added later. It is what the framework's GRANT path reuses as the duplicate guard (R7).
+- **`IsSameBusinessIdentity` is over `PermissionID`, and the explicit form is now
+  load-bearing.** The entry struct carries three fields, and two of them are read-only join
+  fields that are blank on a freshly added entry (§2, property 4). `domain.IsSameByBusinessFields`
+  would compare all three and answer "different" for a grant that duplicates a stored one —
+  same permission, blank `Resource`, populated `Resource` — which is the duplicate guard
+  failing open. Naming `PermissionID` explicitly is what keeps R7 correct. It is what the
+  framework's GRANT path reuses as its own duplicate guard.
 - **No per-child unarchive**, by framework construction. Re-granting a revoked permission is
   a fresh GRANT with a fresh child id — which reads correctly in the audit trail and matches
   the README's stance on `Permission`.
@@ -302,7 +394,7 @@ never persists or scans them:
 
 - `RequestingTenantID` ← `ctx.Identity().TenantID()`
 - `RequestingPrincipalIsSuperAdmin` ← **`ctx.Identity().IsSuperAdmin()`** — the framework's
-  sanctioned way to ask the `*:*` question (v0.56.0). **Never** `HasPermission("*:*")`, which
+  sanctioned way to ask the `*:*` question. **Never** `HasPermission("*:*")`, which
   panics by design, and never a hand-read of the claim: the claim NAME is configurable via
   `authorization.permissionsClaim`, so parsing `Claims["permissions"]` by hand starts
   answering `false` the day an operator renames it. `IsSuperAdmin` is nil-safe, reads the
@@ -394,29 +486,89 @@ Cost, named: a grant that was legitimate when made is never re-vetted. That is t
 trade — revocation is the tool for a grant that stopped being acceptable, and it stays
 reachable precisely because of this rule shape.
 
-### R6 + R9a share one probe
+### Why the read join does NOT answer R6, R9a or R9b
 
-Both need the same fact: the active catalog keys behind the granted ids. The domain port
-therefore exposes one lookup, not two, and the rules read it once:
+Worth stating up front, because §2 just put `Resource`, `Action` and `ArchivedAt` on the
+entry and the obvious next thought is that the probes are now redundant. **They are not**, and the reason
+is one sentence: these three rules judge the entries a write ADDS, and an added entry has
+has no joined value — nothing traversed a foreign key for a struct the mapper built from a
+request body a millisecond ago. Reading `Resource` off it yields `""`, which R9b would read
+as "no wildcard" and R6 as nothing at all. A security rule that passes on a blank field is
+the worst possible failure direction.
+
+**`ArchivedAt` is the sharpest case of that, and it is barred from the rules outright.** It
+is the one joined field whose empty value is also a perfectly legitimate one: an added
+entry reads `nil`, and so does a grant on a live permission. A rule that skipped archived
+keys by testing `ArchivedAt == nil` would therefore wave through **every entry the write is
+adding** — fail-open on exactly the path R6 exists to close. R6 keeps asking the probe
+whether the id is in the catalog and still active. `ArchivedAt` is a rendering field, and
+§9 is the whole of its job.
+
+The join and the probes therefore answer two different questions, and both are needed:
+
+| | The read join | The domain-service probe |
+|---|---|---|
+| Answers for | grants **already stored** on a loaded role | the grant this write is **adding** |
+| Question | "which key does this grant point at, and is that catalog row retired" | "is that id in the catalog, still active, a wildcard, and held by the caller" |
+| Costs | nothing — the columns ride the child's own SELECT | one lookup per added entry |
+| Sees archived counterparts | yes, returns them, and stamps them with `ArchivedAt` | yes, and that is exactly what it reports on |
+| Trusted by a rule | **never** | yes — it is the authority for all three |
+
+What the join *does* change is who else can stop paying for the lookup: a **consumer** of
+this repository's loader now gets the keys for free. `../group/spec.md` §7 is built on that
+— its escalation check resolves a role to its permission keys in one read through
+`RoleRepository.Loader` instead of a second query into `permissions`.
+
+### The domain port — three per-entry facts, named for the problem
+
+R6, R9a and R9b all ask about the catalog rows behind the granted ids, and the shape the
+port may take is fixed by two properties of the spec language, both confirmed at this pin
+(`omnicore-gen explain rules`):
+
+- **A fact answers with a SCALAR** — `bool` / `int64` / `float64` / `string`. A map over the
+  whole collection is not expressible, so "the active keys behind these ids" cannot be one
+  lookup returning a map.
+- **A fact about a collection is asked ONCE PER ENTRY** —
+  `filters: [<collection>.<field>]`, the entry's field arriving as the argument.
+
+- **And a fact is named for the PROBLEM, never for the healthy state.** The generated suite
+  stubs the service so every probe answers "nothing found". A fact spelled `TenantIsActive`
+  reads false under that stub and therefore means *the tenant is gone*, turning a correct
+  spec red on the day it is written. `TenantIsUnavailable` reads false and the happy path
+  passes. This is not a style preference — it is what makes the generated suite green.
+
+So the port is:
 
 ```
 RoleService (internal/domain/role_service.go) — plain values, no error, per the local pattern
   RoleKeyTaken(tenantID domain.ID, key string, selfID domain.ID) bool
-  TenantIsActive(tenantID domain.ID) bool
-  ActivePermissionKeys(ids []domain.ID) map[domain.ID]vos.PermissionKey   // absent id ⇒ unknown or archived (R6)
-  CallerHolds(key vos.PermissionKey) bool                                 // concrete keys only (R9a)
-  CallerIsSuperAdmin() bool                                              // ctx.Identity().IsSuperAdmin() (R5, R9a, §10)
+  TenantIsUnavailable(tenantID domain.ID) bool
+  PermissionIsNotInCatalog(permissionID domain.ID) bool    // per entry — unknown or archived (R6)
+  PermissionIsWildcard(permissionID domain.ID) bool        // per entry (R9b)
+  CallerDoesNotHoldPermission(permissionID domain.ID) bool // per entry, concrete keys only (R9a)
+  CallerIsSuperAdmin() bool                                // ctx.Identity().IsSuperAdmin() (R5, R9a, §10)
 ```
 
-`CallerHolds` is where the ctx-bound seam pays off: `ScopedService(ctx)` already binds the
-request to the service in this project (`internal/infra/permission_service.go`), so the impl
-reads `s.ctx.Identity()` without the domain ever seeing a context. Its implementation
-**guards the wildcard itself** and returns `false` rather than calling through — defence in
-depth behind R9b, because a panic here is a 500 on a security rule.
+**The cost this shape carries, stated rather than discovered.** The happy path asks three
+questions per granted entry instead of one per collection, bounded by the 200-permission
+cap; the refusing paths short-circuit. Two mitigations belong in the build and not in a
+later optimization pass: the domain walks the collection **once** (a single
+`refuseUngrantablePermissions` pass, not three), and the implementation funnels all three
+facts through **one** cached catalog lookup per entry, memoised on the request-scoped store
+so three questions about one id cost one query. A role at the cap then pays 200 round trips
+inside the write transaction rather than 600.
 
-**Cross-aggregate reach:** `ActivePermissionKeys` queries `permissions` and `TenantIsActive`
-queries `tenants`, so the impl holds those repositories beside its own. Confirm the shape
-against `service-to-service.html` before writing it.
+`CallerDoesNotHoldPermission` is where the ctx-bound seam pays off: `ScopedService(ctx)`
+binds the request to the service in this project, so the impl reads `s.ctx.Identity()`
+without the domain ever seeing a context. It **guards the wildcard itself** and answers
+"does not hold" rather than calling through — defence in depth behind R9b, because a panic
+here is a 500 on a security rule.
+
+**Cross-aggregate reach:** the three per-entry facts query `permissions` and
+`TenantIsUnavailable` queries `tenants`, so the impl holds those repositories beside its
+own — keyed by the owning repository, never in a package-level `sync.Once`, which would hand
+the first engine's repositories to every later service. Confirm the shape against
+`service-to-service.html` before writing it.
 
 ## 8. Update shape                                      [required]
 
@@ -439,21 +591,53 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
 - **Reads:** by-id + by-params.
 - **Reserved read controls served by the listing:** pagination (`first`/`last`/`after`/
   `before`) · `orderBy` · `?fields=` **yes** · `?onlyTotal` **yes** · `?includeArchived`
-  **yes** · **`?search=` no** — the relational backing answers it with a typed 400, so
-  declaring it would advertise a capability the server refuses.
-- **Computed read fields: none.** The obvious candidate — rendering `resource:action` on
-  each grant — died with Q2: the child stores only the id, and a computed field derives from
-  *stored* fields of the same document, so there is nothing to derive from. The rendering is
-  the client's job (§2). Nothing else in this model is derived.
+  **yes** · **`?search=` no** — the relational backing answers it with a typed 400
+  (`UnsupportedCapabilityNotification`, `SemanticSchema`), so declaring it would advertise
+  a capability the server refuses.
+- **Computed read fields: none.** The obvious candidate — one rendered `resource:action`
+  string per grant — is not expressible: a computed field lands on the ROOT result, and
+  this one would have to land on each entry of a collection. §2 serves the two halves
+  through the read join instead and lets the client concatenate them. Nothing else in this
+  model is derived.
 - **Field-level read authz (`ReadCriteria.Restrict`): none.** Every field a caller may see
-  the row at all for, they may see entirely. Row-level isolation does the work here.
-- **View backing: relational** (`.RelationalSource(repo.Loader)`) — the project posture, and
-  the only option without Mongo. Confirmed serviceable: a relational view **does** carry the
-  1:N children in its document.
+  the row at all for, they may see entirely. Row-level isolation does the work here. (Noted
+  because the backing matters: on a relational view a restricted column is still read from
+  the SoR and dropped before the document is served — the value never reaches the wire, but
+  it is not withheld from the SELECT. A column whose VALUE must not leave the database
+  belongs behind a view that does not project it. Nothing here is in that class.)
+- **View backing: relational** — `query.RelationalView("roles", repo.Loader)`, contributed
+  through the feature's `RelationalViews()` opt-in (the sibling of `ReadableFeature`). The
+  project posture, and the only option without Mongo. It takes its schema from the loader,
+  so there is no `.Schema(...)` to get out of step, and it carries **no** `Version`, no
+  registry row, no rebuild and no Mongo collection — changing what it serves, including
+  adding a read join, needs no version bump.
+- **The view inherits the read join and declares nothing.** `Resource`, `Action` and
+  `ArchivedAt` reach the served document because `RoleRepository` declared the traversal,
+  not because the view asked for it. One consequence worth stating: the view is not the source of truth for the
+  reads — the loader is — so a service reading through `repo.Loader` sees exactly what the
+  endpoint sees.
+- **`?fields=` reaches the joined values under `permissions.resource`,
+  `permissions.action` and `permissions.archivedAt`** — a child join's fields are addressed
+  as `<segment>.<field>`, the same shape as any leaf inside a collection. A path this read model does not have is a
+  **400** (`SchemaViolationNotification`, `SemanticSchema`) naming the offending Go path —
+  never a silent `200 {}`. Note the cost profile: this backing composes the aggregate as
+  declared and prunes afterwards, so a narrow `?fields=` shapes the answer without buying
+  any I/O.
+- **Pagination is a camouflaged offset.** The wire contract is identical to a Mongo view —
+  `?first=`, `?after=`, `?before=`, `endCursor`/`startCursor` emitted only where the
+  neighbour exists — but each cursor carries an absolute row index rather than a sort-key
+  tuple. Paging a static result set visits every row exactly once; a row inserted or removed
+  ahead of the window shifts every later page by one, so a walk under heavy concurrent
+  writes can skip or repeat. The right trade for an operator-facing listing, and recorded so
+  it is not discovered during an access review.
 - **The one real cost, stated up front:** a caller **cannot filter or sort by a granted
-  permission** (`?filter[permissions.resource][eq]=tenant` → typed 400
-  `RelationalCapabilityNotification`). "Which roles grant `tenant:read`?" is not answerable
-  by this listing on this posture. It becomes answerable the day the service gains Mongo
+  permission**. The read join renders it, it does not make it addressable —
+  `?filter[permissions.resource][eq]=tenant` and `?orderBy=permissions.action` are both a
+  typed 400 (`UnsupportedCapabilityNotification`). This is the 1:N boundary, not the
+  backing: a filter on a child field is a pushdown a single root `SELECT` cannot express.
+  **"Which roles grant `tenant:read`?" is still not answerable from this listing** — what
+  changed is that once you have the roles, you can see what each one grants without a second
+  call. The reverse question becomes answerable the day the service gains Mongo
   (`/omnicore:configure`), with no change to this model.
 
 - **Filter/sort operators per field** (low-risk — decided):
@@ -505,8 +689,7 @@ the service does not have. **Proposed: `role:update` for both**; say the word fo
   403** — it does not exist for this caller, which leaks nothing about who else exists. **A
   `*:*` holder skips the filter and sees every tenant's roles**, which is what lets a
   platform operator support a customer — detected with `ctx.Identity().IsSuperAdmin()`, the
-  exact case v0.56.0's changelog names for it ("cross-tenant bypass inside
-  `Query.ToCriteria(ctx)`").
+  case the framework names for it ("cross-tenant bypass inside `Query.ToCriteria(ctx)`").
 - The rejected alternative, recorded: writes-only isolation, with every authenticated caller
   able to *read* every tenant's roles. It is the narrower reading of *"alterar"*, and it
   leaks each customer's org structure to every other customer.
@@ -542,14 +725,14 @@ enforce, and they fail closed until the switch is flipped.
 
 ---
 
-## §B — the four open questions, as answered
+## §B — the open questions, as answered
 
-All four were answered at the model gate; nothing in this spec is defaulted or assumed.
+All were answered at the model gate; nothing in this spec is defaulted or assumed.
 
 | # | Question | Answer | What it changed |
 |---|---|---|---|
 | Q1 | Does a role carry a key and a display name, or only a description? | **key + name + description** | §2 gains `Key` (new VO `vos.RoleKey`) and `Name` (reuse `vos.DisplayName`); R1 and R3 exist because of it |
-| Q2 | How does a grant reference the catalog? | **`permission_id` only** — no denormalized pair | §2's child is a single field; the read returns UUIDs and the client joins; a real FK replaces the copy; R9a gains a lookup |
+| Q2 | How does a grant reference the catalog, and what does a read of it return? | **`permission_id` is the only STORED field — no denormalized pair — and the read reaches `resource` / `action` across the foreign key** | §2's child stores one column and serves four — the id, the pair, and the counterpart's archive stamp; the copy §A rejects is still rejected, because the pair is read, not written; a real FK backs the traversal and makes an `inner` join safe; R6/R9a/R9b still probe, because they judge ADDED entries and those carry no joined value |
 | Q3 | May a tenant-owned role grant a wildcard? | **the general no-escalation rule** — you may only grant what you hold, unless you are `*:*` | R9a + R9b, and the framework-panic finding that forced them to be a pair |
 | Q4 | Does the tenant rule gate reads too, and do we flip the config now? | **reads and writes both; the config switch is left to `/omnicore:configure`** | §10 Layer 3 filter; the fail-closed treatment of an empty tenant claim |
 | Q5 | How do R5 and R9a treat an ABSENT identity (dev, auth disabled)? — raised after the plan gate, when the maintainer asked where the caller's permissions are actually compared | **nil identity ⇒ no identity gate; identity present but insufficient ⇒ refuse** | §7's two-state table; the dev profile stays usable and prd stays fail-closed, guaranteed by the framework's own boot guard rather than by this entity |
@@ -560,7 +743,7 @@ All four were answered at the model gate; nothing in this spec is defaulted or a
    R9b's consequence is that the platform's own `*:*` role has to be seeded by migration
    alongside that tenant, when that work happens — not created through this API. See §7 R9b
    for the one-clause relaxation if that turns out to be the wrong call.
-2. **`auth.authorization` is off service-wide**, so Layer 1 no-ops on all eight existing
-   routes and the tenant claim is not required. The rules generated here enforce correctly
-   the moment it is switched on, and fail closed until then. `/omnicore:configure` owns the
-   flip.
+2. **`auth.authorization` is off service-wide**, so Layer 1 no-ops on every route this
+   service mounts and the tenant claim is not required. The rules generated here enforce
+   correctly the moment it is switched on, and fail closed until then. `/omnicore:configure`
+   owns the flip.

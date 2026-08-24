@@ -24,15 +24,25 @@ filled so they can be corrected here rather than reverse-engineered from the fil
 | MongoDB | absent — no `mongo:` block | maintainer |
 | Transport / broker | absent — no `transport:` block, no transport build tag | maintainer |
 | CDC relay (Debezium) | none | follows from the two above |
-| Read-side posture | relational-served (`.RelationalSource(repo.Loader)`) | maintainer |
+| Read-side posture | relational-served — `query.RelationalView("<name>", repo.Loader)`, contributed through each feature's `RelationalViews()` opt-in | maintainer |
 | Build tags | `postgres` only | follows from the posture |
 
 What the posture buys and what it costs, recorded so it is not rediscovered later:
 
 - Reads are composed from the source of truth at read time — read-your-writes, no CDC lag.
 - Free-text search (`?search=`) is answered with a typed 400
-  (`RelationalCapabilityNotification`), as are filter/sort over 1:N child fields.
+  (`UnsupportedCapabilityNotification`), as are filter/sort over 1:N child fields.
   Filter/sort over root columns, siblings and shared-base fields work normally.
+- A relational view takes its schema from the loader and inherits whatever read joins the
+  repository declared. It carries **no `Version`**, no registry row, no rebuild and no
+  collection, so changing what it serves is not a versioned event.
+- An unresolvable `?fields=` path is a typed **400** (`SchemaViolationNotification`) naming
+  the offending Go path — never a silent `200 {}`.
+- Pagination on this backing is **offset-in-cursor**. The wire contract matches a Mongo
+  view exactly, but each cursor carries an absolute row index rather than a sort-key tuple,
+  so a concurrent insert ahead of the window can make a later page skip or repeat a row.
+- A read-model name may not end in `__0` or `__1` — those are the blue-green slots, across
+  every read-model family.
 - Integration events cannot be PUBLISHED — publishing rides the CDC relay, which does not
   exist here. CONSUMING another service's events would need only a broker plus the
   transport build tag.
@@ -83,7 +93,7 @@ without editing the YAML; the prd profile uses bare `${VAR}` with no localhost d
 
 | Slot | Value |
 |---|---|
-| omnicore version | `v0.53.0` |
+| omnicore version | `v0.57.0` (matches `go.mod`) |
 
 ## Out of scope for this run
 

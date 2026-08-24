@@ -31,7 +31,9 @@ child id. There is no child update, because the child has no editable field. The
 travels beside the input on the command, bound from an extra path segment — never inside the
 input body.
 
-**A child input type** for the grant, context-free and carrying field values only.
+**A child input type** for the grant, context-free and carrying field values only — the
+catalog reference, and **only** that. The three join fields are read-side: they belong to the
+child's row-result and to the response, never to an input, a command or a filter.
 
 **The identity translation.** Every write command's mapper populates the two runtime-only
 fields from the request identity: the requesting tenant, and whether the caller is a
@@ -59,5 +61,9 @@ redeclared here.
 - The grant and revoke commands mount their own handlers; neither touches the root archive
   handler (trap 1).
 - Every new notification key resolves in all seven catalogs.
-- The insert response mirrors the post-write aggregate WITH the minted child ids.
+- The insert response mirrors the post-write aggregate WITH the minted child ids. Note what
+  the join fields read on that response: an entry this write just added was never loaded
+  through the traversal, so `Resource` and `Action` come back empty and `ArchivedAt` `null`.
+  That is the framework's contract, not a defect — a client that needs them re-reads. Do not
+  paper over it by having the mapper fill them.
 - Builds and vets clean.

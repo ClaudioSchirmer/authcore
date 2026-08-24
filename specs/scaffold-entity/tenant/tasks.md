@@ -8,9 +8,11 @@ task and the spec disagree, the spec wins. When a task's mechanical detail contr
 recorded at the bottom of this file (a plan detail is a guess made before the layer's rules
 were read).
 
-Framework pin: **omnicore `v0.54.0`** — upgraded mid-run from `v0.53.0` (see `spec.md` §C
-and `../../upgradepgrade/rollback`). Every doc read below is against `v0.54.0`; the `v0.53.0` docs are
-stale for this entity, notably on archive semantics.
+Framework pin: **omnicore `v0.57.0`** · generator `omnicore-gen` **0.33.1**. Every doc read
+below is against `v0.57.0`.
+
+**Nothing here is built.** Every layer is pending and no code for this entity exists in the
+repository.
 
 Dialect: `postgres` (single). Build tag: `postgres` (no transport block, so no transport tag).
 Read-side posture: relational-served.
@@ -22,21 +24,21 @@ Inside → out. Each layer is executed from its own `task_<layer>.md`, which nam
 
 | # | Layer | Task file | Status |
 |---|---|---|---|
-| 1 | domain | `task_domain.md` | **done** — generated; the 3 manual value objects and the 4 hook rules written by hand |
-| 2 | application | `task_application.md` | **done** — generated |
-| 3 | web | `task_web.md` | **done** — generated |
-| 4 | infra | `task_infra.md` | **done** — generated |
-| 5 | migrations | `task_migrations.md` | **done** — generated (`0001`, postgres, with its down twin) |
-| 6 | bootstrap | `task_bootstrap.md` | **done** — generated |
-| 7 | tests | `task_tests.md` | **done** — generated suite green; the hand-written VOs and hook rules tested by hand to 100% |
-| 8 | docs refresh | `task_docs.md` | **done** |
+| 1 | domain | `task_domain.md` | **pending** |
+| 2 | application | `task_application.md` | **pending** |
+| 3 | web | `task_web.md` | **pending** |
+| 4 | infra | `task_infra.md` | **pending** |
+| 5 | migrations | `task_migrations.md` | **pending** |
+| 6 | bootstrap | `task_bootstrap.md` | **pending** |
+| 7 | tests | `task_tests.md` | **pending** |
+| 8 | docs refresh | `task_docs.md` | **pending** |
 
 **How layers 1–6 were built.** The 1d generation gateway was answered **`omnicore-gen`**
 (recorded in `spec.md` as `Generation: omnicore-gen`), so those layers were emitted from
-`../../omnicore-genre-gen/tenant.omnicore.yaml` rather than written file by file. The task files were
+`../../omnicore-gen/tenant.omnicore.yaml` rather than written file by file. The task files were
 not discarded: they became the REVIEW CHECKLIST the generated tree was read against, which
 is what step 7 of the generator skill asks for. What the generator cannot express was
-written by hand and is listed in `../../omnicore-genre-gen/tenant.gen-report.md`:
+written by hand and is listed in `../../omnicore-gen/tenant.gen-report.md`:
 
 - `../../../internal/domain/vos/display_name.go`, `description.go`, `tenant_workspace.go` — the
   three `kind: manual` value objects, plus `text_predicates.go`, the shared anti-junk
@@ -69,31 +71,18 @@ green — it is not part of this plan and must not be reported as covered by it.
 
 ## Deviations (plan vs what the docs/conventions actually required)
 
-Recorded in full in **`spec.md` § "Deviations recorded at generation time"** — that is the
-model authority and the one place a reviewer should read them. In short:
+The model's own narrowings are named BEFORE generation, in **`spec.md` § "What generation
+will have to write by hand, and where the model narrows"** — that is the model authority and
+the one place a reviewer should read them. This table is for what the BUILD turns out to do
+differently from the approved model, filled as it happens.
 
-- **A** — two read-side promises of `spec.md` §9 the generator's language cannot express:
-  the per-field sort allowlist, and filters over the managed `createdAt`/`updatedAt`
-  columns. `?orderBy=` is served view-wide instead of restricted; `?createdAt=` is a typed
-  400. Neither was worked around by hand.
-- **B** — the enum's per-locale member labels were accepted by `check` and emitted by no
-  generator, so a status renders as its raw token. Reported upstream.
-- **D** — two places where `spec.md` §7 as written is not implementable: the `3m` example
-  contradicts its own 3-rune floor (the alphabet rule is what shipped), and the
-  description's two-word rule refuses languages that do not space their words (shipped as
-  approved, pinned by a test that names the limit).
-- **E** — coverage is 85.0%: every function at 100% except the repository, the domain
-  service and the routes, which need a live engine and a running app. That misses
-  `../../../CLAUDE.md` rule 6's 95% floor and is an OPEN deviation for the maintainer.
+*(An empty table at the end of a build means the tree matches the model exactly; an unfilled
+one means nobody looked.)*
+
+| # | Spec says | Built as | Why |
+|---|---|---|---|
 
 ## Final verify — result
 
-| Level | Result |
-|---|---|
-| 1. Mechanical boot-trap checklist | **pass** — every applicable item run pre-boot; details in the hand-back |
-| 2. `gofmt -l` · `go vet` · `go build` (tag `postgres`) | **pass** — all three silent |
-| 3. Unit tests, per file via `-coverpkg=./internal/...` | **pass on every file the framework's division makes unit-testable** (100%); the repository/service/routes trio is 0% — deviation E |
-| 4. Existing QA suite (regression) | **no-op** — the project has none yet; reported, not silently skipped |
-
-Functional e2e of the six endpoints is `/omnicore:qa`'s job and is NOT covered by anything
-above.
+Filled after the levels above have actually run. Empty until then: a verify table is
+evidence, and there is nothing to be evidence of yet.

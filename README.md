@@ -18,7 +18,7 @@ key — and the row id is never issued to anyone. Every other service scopes its
 reading that claim off the token instead of asking this one.
 
 Go module: `github.com/ClaudioSchirmer/authcore` · Go 1.26.5 · built on
-[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.54.0** (DDD + CQRS framework).
+[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.57.0** (DDD + CQRS framework).
 
 ---
 
@@ -28,18 +28,19 @@ Honest scope, so nobody reads intent as delivery:
 
 | Capability | State |
 |---|---|
-| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — generated from `specs/omnicore-gen/tenant.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** — `/omnicore:run` boots it, `/omnicore:qa` proves the endpoints |
+| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **specified, not built** — the approved model is `specs/scaffold-entity/tenant/spec.md`; no code in this working tree |
 | User entity | not started |
 | User ↔ tenant association | not started |
-| `Permission` entity | **done** — the global catalog; see below |
-| `Role` entity | **done** — a tenant's own bundle of catalog permissions; generated from `specs/omnicore-gen/role.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** |
-| `Group` entity | **done** — a tenant's org unit and the bundle of roles its members inherit; generated from `specs/omnicore-gen/group.omnicore.yaml`; `gofmt`/`vet`/`build`/tests green. **Not yet booted against a real Postgres in this working tree** |
+| `Permission` entity | **specified, not built** — the global catalog; model in `specs/scaffold-entity/permission/spec.md`, described below |
+| `Role` entity | **specified, not built** — a tenant's own bundle of catalog permissions; model in `specs/scaffold-entity/role/spec.md` |
+| `Group` entity | **specified, not built** — a tenant's org unit and the bundle of roles its members inherit; model in `specs/scaffold-entity/group/spec.md` |
 | Effective-permission resolution (group path ∪ direct path) | not started |
 | Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
-| Commercial status (`trial` / `active` / `suspended`) | **built** on Tenant; nothing consumes it yet |
+| Commercial status (`trial` / `active` / `suspended`) | **specified** on Tenant; nothing consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Permission enforcement in production | routes are gated (`tenant:*`, `permission:*` and `role:*`, four verbs each, plus `group:`'s **five**); `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
+| Any generated code at all | **none.** `bootstrap/` holds the empty shell and `specs/` holds the approved models. Everything below describes what those models say the service will be, not what a caller can hit today |
+| Permission enforcement in production | the models gate their routes (`tenant:*`, `permission:*` and `role:*`, four verbs each, plus `group:`'s **five**); `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
 
 ## Architecture posture
 
@@ -49,8 +50,10 @@ block.
 
 What that buys and what it costs:
 
-- **Reads are served straight from the tables** (`.RelationalSource`), so a write is
-  visible to the very next read — no eventual consistency, no waiting on a projection.
+- **Reads are served straight from the tables** — `query.RelationalView("<name>",
+  repo.Loader)`, contributed through the feature's `RelationalViews()` opt-in — so a write is
+  visible to the very next read: no eventual consistency, no waiting on a projection, and no
+  `Version`, registry row, rebuild or Mongo collection behind the view.
 - **Free-text search is not served.** A relational-backed view answers `?search=` with a
   typed 400 rather than pretending; filters and sorts over 1:1-reachable fields work
   normally.
@@ -67,9 +70,8 @@ the posture in one pass.
 
 ### The shape we are building towards
 
-Only **Tenant** exists in code today. Everything else below is the agreed target, recorded
-here so a reader can see the destination without reverse-engineering it from half a
-service:
+Nothing below exists in code yet. It is the agreed target, recorded here so a reader can
+see the destination without reverse-engineering it from a half-built service:
 
 ```
                         ┌──> Group ──> Role ──> Permission     (inherited, via group)
@@ -303,20 +305,28 @@ which is what every authorization note below exists for.
 | `key` | string(64) | the stable machine handle (`billing-manager`). Immutable, and unique **per tenant**, not globally. Stored in `role_key` |
 | `name` | string(120) | the display name. Not unique — two tenants, or two roles, may share a label |
 | `description` | string(500) | required, and validated for substance |
-| `permissions[]` | collection | the grants. Each entry carries `id` and `permissionID`, and nothing else |
+| `permissions[]` | collection | the grants. Each entry carries `id`, `permissionID`, and the catalog's own `resource`, `action` and `archivedAt`, read across the foreign key |
 
 Five things a reader will otherwise get wrong.
 
-**1. The read returns catalog ids, not permission strings.** `GET /roles/{id}` answers
-`"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…" }]`. A client that wants to show
-*what* the role grants calls `GET /permissions` and joins by id itself. The server cannot do
-it: this service has no Mongo, so its views are served straight from the tables and there is
-no read-time join to compose one with. The alternative was denormalizing the
-`resource:action` pair into each grant, and that was rejected for a specific reason — a
-retired permission comes back as a **new row with a new id**, so a grant holding the *string*
-would silently re-attach to the recreated row and quietly break that promise. A grant holding
-the **id** cannot. This stops being the client's problem the day the service gains Mongo, with
-no change to the model.
+**1. The read returns the permission, not just its id — without storing a copy of it.**
+`GET /roles/{id}` answers `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…",
+"resource": "tenant", "action": "read", "archivedAt": null }]`. A client renders
+`tenant:read` from the two halves it was handed, with no second call to `GET /permissions`.
+
+The row still holds **only the id**. `resource`, `action` and `archivedAt` are a **read
+join** — declared once on the repository, traversed at load time, never written. That
+distinction is the whole point: denormalizing the `resource:action` pair into each grant was
+rejected, because a retired permission comes back as a **new row with a new id**, so a grant
+holding the *string* would silently re-attach to the recreated row. A grant holding the
+**id** cannot, and reading the string across the FK costs nothing that a copy would cost.
+
+`archivedAt` is the half an access review actually needs: `Permission` archives one-way, so a
+non-null value says *this role still grants a permission the platform has retired* — a
+long-lived state, not an edge case, and one a bare id could never surface. It renders the
+state; it never decides anything. Granting still asks the domain whether the id is in the
+catalog and still active, because an entry a request is **adding** carries no joined value at
+all — its `archivedAt` reads `null` exactly like a live one's.
 
 **2. You can only grant what you hold.** A caller may add a permission to a role only if
 their own token carries it — the standard defence against a tenant admin minting themselves
@@ -345,11 +355,15 @@ with a `deleted_at` stamp and a `DELETE` that soft-removes is a lying contract. 
 record of what a past grant meant, which is exactly what an access review needs to read.
 
 **5. You cannot filter or sort by a granted permission.**
-`?filter[permissions.permissionID][eq]=…` is a typed 400, not a result. "Which roles grant
-`tenant:read`?" is not answerable from this listing on this backing — a relational-served
-view carries the collection in the document it returns, but cannot filter or order by a field
-inside it. It becomes answerable the day the service gains Mongo (`/omnicore:configure`),
-with no change to this model.
+`?filter[permissions.resource][eq]=tenant` is a typed 400, not a result — and so is the same
+path on `permissionID`. A read join **renders** a child's counterpart; it does not make it
+addressable. "Which roles grant `tenant:read`?" is therefore not answerable from this
+listing: a relational-served view carries the collection in the document it returns, but a
+filter on a field inside it is a pushdown a single root `SELECT` cannot express. That is the
+1:N boundary, not the backing. It becomes answerable the day the service gains Mongo
+(`/omnicore:configure`), with no change to this model. What the join already gives you is the
+other direction — once you have the roles, you can see what each grants without a second
+call.
 
 #### Tenant isolation
 
@@ -391,13 +405,17 @@ of it, and three of them are the interesting part.
 | `key` | string(64) | the stable machine handle (`engineering`). Immutable, and unique **per tenant**, not globally. Stored in `group_key` |
 | `name` | string(120) | the display name. Not unique — two groups in one tenant may share a label; the `key` is what disambiguates |
 | `description` | string(500) | required, and validated for substance |
-| `roles[]` | collection | the bundle. Each entry carries `id` and `roleID`, and nothing else |
+| `roles[]` | collection | the bundle. Each entry carries `id`, `roleID`, and the role's own `roleKey`, `roleName` and `archivedAt`, read across the foreign key |
 
-**1. The read returns role ids, not role names.** `GET /groups/{id}` answers
-`"roles": [{ "id": "…", "roleID": "7c2e9b41-…" }]`. A client that wants to show *what* the
-group confers calls `GET /roles` and joins by id itself. Same reason as on `Role`, one level
-up: with no Mongo there is no read-time join, and an entry holding the role's *key* would
-silently re-attach to a retired-and-recreated role. An entry holding the **id** cannot.
+**1. The read returns the role, not just its id.** `GET /groups/{id}` answers
+`"roles": [{ "id": "…", "roleID": "7c2e9b41-…", "roleKey": "billing-manager",
+"roleName": "Billing Manager", "archivedAt": null }]` — a read join, exactly as on `Role`
+one level down. The entry still stores only the id, because an entry holding the role's
+*key* would silently re-attach to a retired-and-recreated role and one holding the **id**
+cannot. A non-null `archivedAt` says the group still confers a role the tenant has retired.
+
+So the forward walk is two complete reads: `GET /groups/{id}` names the roles,
+`GET /roles/{id}` names the permissions. Neither needs a third listing joined by hand.
 
 **2. The collection verbs are a pair, not the usual trio.** ATTACH and DETACH, no "change
 this entry": its single field IS its identity, so an edit would keep one row id while
@@ -452,12 +470,12 @@ hurt by it yet either. Same rule one level down: detaching is
 `PATCH /groups/{id}/roles/{entryId}/archive`, never `DELETE`.
 
 **8. You cannot filter or sort by an attached role.**
-`?filter[roles.roleID][eq]=…` is a typed 400. **"Which groups confer role X?" is not
-answerable from this listing on this backing** — and it is a question an access review asks
-more often than `Role`'s equivalent, because it is how you find out who a role actually
-reaches. With `Group` in the graph a client is now joining three listings rather than two.
-It becomes answerable the day the service gains Mongo (`/omnicore:configure`), with no change
-to this model.
+`?filter[roles.roleKey][eq]=…` is a typed 400 — the join renders the role, it does not make
+it addressable. **"Which groups confer role X?" is not answerable from this listing** — and
+it is a question an access review asks more often than `Role`'s equivalent, because it is how
+you find out who a role actually reaches. Only the REVERSE direction is missing; the forward
+walk arrives complete. It becomes answerable the day the service gains Mongo
+(`/omnicore:configure`), with no change to this model.
 
 **Nesting is refused, and that is a decision rather than an omission.** Keycloak nests and
 Entra nests, but AWS IAM and Okta both refuse outright — and Entra, the one platform that
@@ -609,10 +627,9 @@ Answer semantics:
 | `404` | archiving or reading a tenant that is not there. Archiving a missing row answers 404 rather than committing an event about nothing |
 | `400` | a read control the listing does not declare — `?search=` is the one this entity does not serve, because a relational-backed view cannot answer free-text search and pretending otherwise would be worse |
 
-Two of those — the stale-write `409` and the archive `404` — arrived with omnicore
-`v0.54.0`, which also made archiving a real update: it stamps `updated_at`, and a rule
-that changes a field while archiving now reaches the row instead of only the audit trail.
-That last one is what lets archiving force a tenant to `suspended`.
+Archiving is a real update at this pin: it stamps `updated_at`, and a rule that changes a
+field while archiving reaches the row and not only the audit trail. That is what lets
+archiving force a tenant to `suspended`.
 
 **`tenantID` is not in any write body at all.** It is declared `assignedFrom: derived`,
 which takes it out of the create and patch request schemas, out of the commands and out of
@@ -621,17 +638,11 @@ and nothing has to ignore a value that was sent. It is fully present on the READ
 every response carries it and it is filterable, which is how a consuming service resolves a
 token claim back to a tenant.
 
-(An earlier run of this service could not say that: the generator had no way to declare a
-server-computed field, so `tenantID` sat in the write schema being silently overwritten.
-That gap was reported upstream and is closed — the key exists as of omnicore plugin
-`0.22.0`, and this entity uses it.)
-
 Every message ships in seven languages (pt-BR, English, Spanish, French, German, Italian,
-Dutch); the OpenAPI page carries a language selector. **Field labels are translated;
-`status` VALUES are not** — a response carries the raw token (`trial`, `active`,
-`suspended`), because the generator accepted the seven member translations and emitted no
-catalog entry for them. The texts are already written in the spec, so they will land the
-moment that emitter exists.
+Dutch); the OpenAPI page carries a language selector. Enum VALUES are translated
+alongside the field labels: each member's label is registered under the key the framework
+derives from its value (`TenantStatus.trial`) and resolved at the boundary by
+`translator.EnumDescription`, so a response renders `Avaliação` rather than `trial`.
 
 ## Layout
 
@@ -657,24 +668,14 @@ kept in the repository rather than in chat history:
   alternatives that were rejected and why.
 - `specs/scaffold-entity/<entity>/tasks.md` — what each layer had to contain, plus the
   **deviations** between what was specified and what was actually generated.
-- `specs/omnicore-gen/<entity>.omnicore.yaml` — the generator's input; the code regenerates from
-  it, the database never does.
+- `specs/omnicore-gen/<entity>.omnicore.yaml` — the generator's input, written when the
+  entity is generated; the code regenerates from it, the database never does.
 - `specs/omnicore-gen/<entity>.gen-report.md` — what was generated, what was refused, and what
   had to be written by hand.
-- tooling gaps found while generating are recorded in each entity's `spec.md`, under
-  *Deviations recorded at generation time* — that keeps them next to the model decision
-  they affect instead of in a file that outlives them. Of the two found on the first pass
-  at Tenant, both are now closed upstream (server-derived fields, and field labels being
-  seeded from the field's description); one new one is open, and it is visible in this
-  service: the status enum's per-locale member labels are accepted by the generator's
-  validator and emitted by nothing. Permission's own first pass found six; the rebuild on
-  generator 0.25.0 closed four of them outright — uniqueness and immutability over a
-  composite value object are now generated, the archive endpoint's documentation no longer
-  advertises an undo that does not exist, and the write responses carry the derived field.
-  Two of those four had cost a permanent file adoption on the first pass; this entity pays
-  none, so every file of it still tracks its spec.
-- `specs/upgrade/rollback/` — the `go.mod`/`go.sum` pair from before the framework upgrade this
-  entity needed, kept as an exact restore point.
+- anything the spec language cannot express is named in each entity's `spec.md` **before**
+  generation, under *What generation will have to write by hand, and why* — next to the model
+  decision it affects rather than in a file that outlives it. A gap in the tooling itself goes
+  upstream to the maintainer; it is never routed around in this repository.
 
 Read those before changing an entity. They exist so a reviewer can see what was decided
 without reverse-engineering it from the code.

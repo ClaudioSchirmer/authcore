@@ -13,7 +13,7 @@
   write.
 - `custom-command-handler` + `service-to-service` — the ctx-bound domain service seam, and
   how an implementation reaches another aggregate's repository.
-- `/Users/claudio/.claude/plugins/cache/omnicore/omnicore/0.30.0/shared/query-primitives.md` — which primitive answers each
+- `shared/query-primitives.md` (the pinned plugin's copy) — which primitive answers each
   fact of the service port.
 
 Convention: `conventions/domain.md`. Read `task_children.md` too.
@@ -30,9 +30,13 @@ Convention: `conventions/domain.md`. Read `task_children.md` too.
   tenant and the super-admin flag. They are **not declared in the table schema**, so nothing
   persists or scans them. Spec §7 names where they are populated (the command mapper, the
   only layer allowed to read the request context).
-- The aggregate value object `GroupRole` in the aggregate-VO package: one field, the role
-  reference, plus the framework's managed embed, **no id field of its own**, and the
-  mandatory business-identity method.
+- The aggregate value object `GroupRole` in the aggregate-VO package: one stored field, the
+  role reference, plus the three join-filled fields of spec §2 (`RoleKey`, `RoleName`,
+  `ArchivedAt`), the framework's managed embed, **no id field of its own**, and the mandatory
+  business-identity method written over the role reference alone. The join fields carry plain
+  Go types — `string`, `string`, `*time.Time` — never `vos.RoleKey`. **The framework lets a
+  rule read them; this model forbids it** (spec §7): the entries a rule judges are the ones a
+  write is ATTACHING, and those carry `""` and `nil`, indistinguishable from a live role.
 - A new raw value object for the group handle: 2–64 runes, one lowercase slug of letters,
   digits and single hyphens — never leading, trailing or doubled — plus the project's shared
   anti-junk predicates (distinct-rune count and the run-of-identical-runes guard) already in

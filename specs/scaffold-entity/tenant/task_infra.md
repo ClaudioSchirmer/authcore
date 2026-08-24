@@ -2,24 +2,27 @@
 
 Model authority: `spec.md` §1, §2, §7, §9. Layout/naming/granularity: `service-layout.html`.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|
 | `table-schema.html` | the schema DSL, the managed-column declarations, the boot checks, and the Go-to-column table for postgres — the authority on every column shape, never memory |
 | `relational-view.html` | what the relational backing serves and what it refuses, at this exact pin |
-| `views.html` | the view declaration surface and its version rule |
+| `views.html` | the view declaration surface. Note which family the version rule belongs to: a relational view has none |
 | `auto-query-handlers.html` | the view's indexes and options, and the filter operator vocabulary |
 | `custom-command-handler.html` | the loader's hydration-free existence probe, which is what the uniqueness pre-check uses |
 | `service-to-service.html` | the channels a domain Service implementation may use |
 | `service-layout.html` | one schema per file, one view per file, repositories at the layer root |
 | `shared/dialects/postgres.md` (plugin) | the identity column type, and the constraint key the repository binds |
 
-**v0.54.0 note that changes this layer:** unarchiving through a repository that cannot load
-an archived aggregate is now an error — the empty-sample fallback is gone. The framework's
-base aggregate repository provides the needed capability; a hand-rolled repository would
-have to implement it. Confirm the repository this entity gets is on the supported path
-rather than assuming it.
+**A trap this layer must confirm rather than assume:** unarchiving through a repository that
+cannot load an archived aggregate is an error — there is no empty-sample fallback. The
+framework's base aggregate repository provides the capability; a hand-rolled one would have
+to implement it. Confirm the repository this entity gets is on the supported path.
+
+**The view** is `query.RelationalView("tenants", repo.Loader)`, contributed through the
+feature's `RelationalViews()` opt-in, sharing the repository's own loader and never a second
+one. It takes its schema from the loader and carries **no `Version`** — do not write one.
 
 ## What to build
 

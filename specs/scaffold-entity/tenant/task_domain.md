@@ -2,22 +2,20 @@
 
 Model authority: `spec.md` §1, §2, §5, §7. Layout/naming/granularity: `service-layout.html`.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|
 | `value-objects.html` | the raw kind vs the enum kind, what the automatic pass discovers and validates, where the field label lives, and the closed persistable set a VO's underlying type must belong to |
 | `rules-dsl.html` | the mode gates (`IfInsert` / `IfUpdate` / `IfInsertOrUpdate` / `IfArchive` / `IfUnarchive`), how a rule emits its notification, and how the domain Service is reached from inside a rule |
-| `old-state.html` | what `domain.Old(e)` guarantees — **changed in v0.54.0**: the snapshot is now captured when the entity is born, uniformly across all five state-changing verbs. The immutability guard depends on this |
+| `old-state.html` | what `domain.Old(e)` guarantees — the snapshot is captured when the entity is born, uniformly across all five state-changing verbs. The immutability guard depends on this |
 | `status-mapping.html` | which notification maps to which HTTP status, so the spec's 422/409 column is honored rather than assumed |
 | `service-layout.html` | where each type lives and how files are split |
 
-**v0.54.0 note that changes this layer specifically:** a mutation performed inside an
-`IfArchive` closure now reaches the database (archive executes the update path). At
-`v0.53.0` it reached only the audit event. Rule 13 depends entirely on this — do not carry
-any `v0.53.0` reasoning into it. The doc comments claiming `BuildRules` ran in
-`ModeUpdate` on the archive verbs were also corrected: `IfArchive` / `IfUnarchive` are the
-scopes that fire.
+**The fact this layer leans on:** a mutation performed inside an `IfArchive` closure reaches
+the database — archive executes the update path, not a `deleted_at`-only statement. Rule 13
+depends entirely on it. And it is `IfArchive` / `IfUnarchive` that fire on the archive verbs,
+never `ModeUpdate`.
 
 ## What to build
 
