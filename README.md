@@ -31,7 +31,7 @@ Honest scope, so nobody reads intent as delivery:
 | Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — six REST endpoints and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/tenant.omnicore.yaml` against the model in `specs/scaffold-entity/tenant/spec.md`. Build, vet and the unit suite are green, and the service has been booted against Postgres with a tenant registered through the API. The contract suite (`/omnicore:qa`) is still to come |
 | User entity | not started |
 | User ↔ tenant association | not started |
-| `Permission` entity | **specified, not built** — the global catalog; model in `specs/scaffold-entity/permission/spec.md`, described below |
+| `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **specified, not built** — a tenant's own bundle of catalog permissions; model in `specs/scaffold-entity/role/spec.md` |
 | `Group` entity | **specified, not built** — a tenant's org unit and the bundle of roles its members inherit; model in `specs/scaffold-entity/group/spec.md` |
 | Effective-permission resolution (group path ∪ direct path) | not started |
@@ -39,8 +39,8 @@ Honest scope, so nobody reads intent as delivery:
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Generated code | **Tenant only.** `internal/` now holds that one aggregate end to end — domain, application, web, infra, migration `0001`, wiring and the seven catalogs. The `Permission`, `Role` and `Group` sections below still describe what their models say, not what a caller can hit |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `permission:*`, `role:*` and `group:*` (the latter **five** verbs) are still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
+| Generated code | **Tenant and Permission.** `internal/` holds both aggregates end to end — domain, application, web, infra, migrations `0001` and `0002`, wiring and the seven catalogs. The `Role` and `Group` sections below still describe what their models say, not what a caller can hit |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:*` and `group:*` (the latter **five** verbs) are still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
 
 ## Architecture posture
 
@@ -241,6 +241,7 @@ approved model, with the alternatives that were rejected and why, is in
 | `action` | string(64) | what may be done to it. Exactly one slug, never a path; `*` means every action. Stored in `action_name` |
 | `description` | string(500) | required, and validated for substance — it must explain the permission, not repeat it |
 | `permission` | string | **not a column.** `resource:action`, rendered on read |
+| `createdAt` / `updatedAt` | timestamp | framework-stamped, returned on every read and filterable by range. `deletedAt` is not exposed — archived rows are reached through `?includeArchived` |
 
 Three things a reader will otherwise get wrong.
 

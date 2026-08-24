@@ -5,8 +5,10 @@
   at the model gate (§B), then three refinements taken at the plan gate (§B Q5–Q7): the
   one-way archive, the collapsed value objects and the lean read payload. The `(proposed)`
   picks of §C stand
-- **Pin:** omnicore **`v0.57.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
+- **Pin:** omnicore **`v0.57.1`** · dialect postgres · Postgres SoR, no Mongo, no broker →
   relational-served views
+  (modelled against `v0.57.0`; built against `v0.57.1`, a fix-only patch that changes
+  nothing this entity declares — see `tasks.md` deviation 3)
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
 - **Generation:** omnicore-gen
@@ -378,6 +380,20 @@ discovered later:
 
 **PATCH only** (alternative: `both`). No sibling exists, so nothing needs PUT's ability to
 assign null, and every field is mandatory — there is nothing clearable.
+
+**The pair is excluded from the partial body — `patchExcludes: [Key]`** (maintainer's call,
+2026-08-24, taken during the build). Rule 9 already refused a changed pair with a 422, but
+it was the ONLY layer: the PATCH request carried `resource` and `action`, the OpenAPI schema
+documented both as editable, and `ApplyPartiallyTo` assigned them onto the entity before the
+rule compared against the snapshot. Excluding them makes the refusal structural — there is
+no field to send, nothing to assign, and nothing in the published contract claiming
+otherwise. Mirrors what `../tenant/spec.md` does with `Workspace`.
+
+**Rule 9 STAYS, and the two are not redundant.** This key closes the PATCH door; the rule
+guards the value on every update path, whatever door it came through. The reason is the one
+the maintainer gave: a permission whose `resource:action` moves hands the old permission,
+free, to everyone who already held it — the grant rows and the issued tokens still say the
+old string, and it now means something else.
 
 ## 9. Surfaces & reads                       [required]
 
