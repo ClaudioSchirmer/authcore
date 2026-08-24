@@ -28,7 +28,7 @@ Honest scope, so nobody reads intent as delivery:
 
 | Capability | State |
 |---|---|
-| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **specified, not built** — the approved model is `specs/scaffold-entity/tenant/spec.md`; no code in this working tree |
+| Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — six REST endpoints and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/tenant.omnicore.yaml` against the model in `specs/scaffold-entity/tenant/spec.md`. Build, vet and the unit suite are green, and the service has been booted against Postgres with a tenant registered through the API. The contract suite (`/omnicore:qa`) is still to come |
 | User entity | not started |
 | User ↔ tenant association | not started |
 | `Permission` entity | **specified, not built** — the global catalog; model in `specs/scaffold-entity/permission/spec.md`, described below |
@@ -37,10 +37,10 @@ Honest scope, so nobody reads intent as delivery:
 | Effective-permission resolution (group path ∪ direct path) | not started |
 | Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
 | Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
-| Commercial status (`trial` / `active` / `suspended`) | **specified** on Tenant; nothing consumes it yet |
+| Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Any generated code at all | **none.** `bootstrap/` holds the empty shell and `specs/` holds the approved models. Everything below describes what those models say the service will be, not what a caller can hit today |
-| Permission enforcement in production | the models gate their routes (`tenant:*`, `permission:*` and `role:*`, four verbs each, plus `group:`'s **five**); `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
+| Generated code | **Tenant only.** `internal/` now holds that one aggregate end to end — domain, application, web, infra, migration `0001`, wiring and the seven catalogs. The `Permission`, `Role` and `Group` sections below still describe what their models say, not what a caller can hit |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `permission:*`, `role:*` and `group:*` (the latter **five** verbs) are still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
 
 ## Architecture posture
 
@@ -603,13 +603,15 @@ Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?field
 
 Filters served, per field: `tenantId` (eq, in) · `name` (eq, in, prefix, contains, and the
 case-insensitive twins) · `workspace` (eq, in, prefix, iprefix) · `description` (contains,
-icontains) · `status` (eq, in).
+icontains) · `status` (eq, in) · `createdAt` and `updatedAt` (eq, and the four range
+operators). The two timestamps reach the read side through `read.managed`, which names the
+framework-stamped columns; `deletedAt` stays off, because archived rows are reached with
+`?includeArchived` rather than through a timestamp filter.
 
-Two narrower-than-intended edges, both recorded in `specs/scaffold-entity/tenant/spec.md`:
-**`createdAt` and `updatedAt` are not filterable** (the generator declares filters only over
-declared entity fields, and the framework-managed timestamps are not among them), and
-**`?orderBy` is not restricted to a field allowlist** — the model named four sortable
-fields, and what the generator can express is orderBy on or off for the whole view.
+**`?orderBy` is a field allowlist**, and it admits three paths: `name`, `workspace` and
+`createdAt`. Anything else — `description`, `status`, `tenantId`, `updatedAt` — is a typed
+400, which is the point: nothing is orderable by accident, and an undeclared path never
+becomes a blocking sort. `updatedAt` filters but does not order, deliberately.
 
 `{id}` is the row id, not the public key. That is a deliberate trade: the management API
 is operator-only and already behind a permission, and keeping the row id out of the URLs

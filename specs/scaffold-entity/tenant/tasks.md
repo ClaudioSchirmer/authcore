@@ -8,11 +8,12 @@ task and the spec disagree, the spec wins. When a task's mechanical detail contr
 recorded at the bottom of this file (a plan detail is a guess made before the layer's rules
 were read).
 
-Framework pin: **omnicore `v0.57.0`** · generator `omnicore-gen` **0.33.1**. Every doc read
+Framework pin: **omnicore `v0.57.0`** · generator `omnicore-gen` (omnicore plugin **0.34.0**). Every doc read
 below is against `v0.57.0`.
 
-**Nothing here is built.** Every layer is pending and no code for this entity exists in the
-repository.
+**Built on 2026-08-24**, on branch `feature/tenant-entity`, from the APPROVED `spec.md`.
+Every layer below is done and the four verify levels have run; the results are at the
+bottom of this file.
 
 Dialect: `postgres` (single). Build tag: `postgres` (no transport block, so no transport tag).
 Read-side posture: relational-served.
@@ -24,20 +25,20 @@ Inside → out. Each layer is executed from its own `task_<layer>.md`, which nam
 
 | # | Layer | Task file | Status |
 |---|---|---|---|
-| 1 | domain | `task_domain.md` | **pending** |
-| 2 | application | `task_application.md` | **pending** |
-| 3 | web | `task_web.md` | **pending** |
-| 4 | infra | `task_infra.md` | **pending** |
-| 5 | migrations | `task_migrations.md` | **pending** |
-| 6 | bootstrap | `task_bootstrap.md` | **pending** |
-| 7 | tests | `task_tests.md` | **pending** |
-| 8 | docs refresh | `task_docs.md` | **pending** |
+| 1 | domain | `task_domain.md` | **done** |
+| 2 | application | `task_application.md` | **done** |
+| 3 | web | `task_web.md` | **done** |
+| 4 | infra | `task_infra.md` | **done** |
+| 5 | migrations | `task_migrations.md` | **done** |
+| 6 | bootstrap | `task_bootstrap.md` | **done** |
+| 7 | tests | `task_tests.md` | **done** |
+| 8 | docs refresh | `task_docs.md` | **done** |
 
-**How layers 1–6 were built.** The 1d generation gateway was answered **`omnicore-gen`**
-(recorded in `spec.md` as `Generation: omnicore-gen`), so those layers were emitted from
-`../../omnicore-gen/tenant.omnicore.yaml` rather than written file by file. The task files were
-not discarded: they became the REVIEW CHECKLIST the generated tree was read against, which
-is what step 7 of the generator skill asks for. What the generator cannot express was
+**How layers 1–6 are built.** The 1d generation gateway was answered **`omnicore-gen`**
+(recorded in `spec.md` as `Generation: omnicore-gen`), so those layers are emitted from
+`../../omnicore-gen/tenant.omnicore.yaml` rather than written file by file. The task files are
+not discarded: they are the REVIEW CHECKLIST the generated tree is read against, which
+is what step 7 of the generator skill asks for. What the generator cannot express is
 written by hand and is listed in `../../omnicore-gen/tenant.gen-report.md`:
 
 - `../../../internal/domain/vos/display_name.go`, `description.go`, `tenant_workspace.go` — the
@@ -81,8 +82,22 @@ one means nobody looked.)*
 
 | # | Spec says | Built as | Why |
 |---|---|---|---|
+| 1 | §C.3: the `tenant_id` derivation "runs in the insert command's `ToEntity` — the application-layer mapper — never in `BuildRules`, which is a validation pass and may run more than once" | An `IfInsert` closure in `internal/domain/tenant_rules_manual.go` | `assignedFrom: derived` is the generator's declared path for a server-filled field, and it is what removes `tenant_id` from every write request, command and OpenAPI request schema — which is what §9 requires and what `ToEntity` alone would not achieve. The generator writes no assignment for such a field and asks for a `rules.manual` entry scoped to insert. §C.3's objection is answered by idempotency rather than by placement: the derivation is a pure function of an immutable field, so a second pass cannot produce a second answer. `TestTenantIDDerivationIsIdempotent` pins that, and `TestTenantIDIsDerivedFromWorkspaceOnInsert` pins that a value the entity already carried is overwritten. |
+| 2 | An earlier draft of §9 carried "View `maxLimit` = 200" | No `maxLimit` on the view; the framework default page ceiling (100) applies, overridable per environment through `query.maxLimit` in the service yaml | The 200 was a low-risk value this run chose, never a maintainer requirement. The maintainer decided during the build to follow the framework default: the ceiling is operational state, and pinning it on the view is the top of the cascade (view override > yaml > framework default), which takes the choice away from whoever runs the service. `spec.md` §"Decided at low risk" now records that. No yaml key is needed unless an environment wants something other than 100. |
+| 3 | §9's filter/sort table marks `updatedAt` sortable, giving four ordering paths | Three: `Name`, `Workspace`, `CreatedAt` — `UpdatedAt` orders by nothing | Maintainer's decision during the build. `UpdatedAt` keeps its full filter set (`eq,gte,lte,gt,lt`), so "changed since" is still answerable; only the ordering is withdrawn. Narrowing the vocabulary is safe in this direction — an undeclared path is a typed 400 rather than a silent free-for-all — and widening it later costs one spec line and a regeneration. |
+
 
 ## Final verify — result
 
-Filled after the levels above have actually run. Empty until then: a verify table is
-evidence, and there is nothing to be evidence of yet.
+Run on 2026-08-24 against the built tree. Commands are quoted so each line can be re-run.
+
+| Level | Result | Evidence |
+|---|---|---|
+| 1 — boot-trap checklist | **PASS** | Every applicable item ran BEFORE any boot. `.up.sql` ↔ `.down.sql` twin present; no `path:"id"` on any request; no `json:`/`db:` tag anywhere under `internal/domain/`; no regex or format check inline in a root rule (every one lives in a value object); `Modes()` Archive/Unarchive ⟺ `DeletedAt("deleted_at")` on the schema ⟺ `deleted_at TIMESTAMPTZ NULL` in the migration; `?fields=` declared with every `FindTenantsResponse` field a pointer + `,omitempty`; the `sort:` tags are exactly the three declared ordering paths (`Name`, `Workspace`, `CreatedAt`), with `UpdatedAt` carrying `filter:` and no `sort:`; every scalar `query:`-tagged filter a pointer, so none renders REQUIRED in OpenAPI; `RequiresService() … true` matched by `NewTenantServiceImpl(repo)` in the feature and `Service:` on all 8 write handlers (4 REST + 4 GraphQL); one root schema per file. N/A here: native-id sweep (postgres only), SQLite constraint-name reflex, view `Version` bump (a relational read model has none — and the emitted view declares no `Version`), root-archive auto handler (no children). |
+| 2 — format · vet · build | **PASS** | `gofmt -l bootstrap/ internal/` prints nothing · `go vet -tags postgres ./...` clean · `go build -tags postgres ./...` clean. |
+| 3 — unit tests, per generated FILE | **PASS with one stated deviation** | `go test -tags postgres -coverpkg=./internal/... -coverprofile=… ./internal/...` — all suites green. Read per file from the profile: **27 of 30 files at 100.0%**, total 83.1% of statements. The three exceptions are at **0.0%** and are the ones `spec.md` named in advance: `internal/infra/tenant_repository.go`, `internal/infra/tenant_service.go` and `internal/web/tenant_routes.go` — a repository, a domain-service implementation and route mounts cannot be exercised without a live relational engine and a running app. That is the collision `spec.md` records between `CLAUDE.md` rule 6's 95% floor and the framework's own test division; `/omnicore:qa` is the route to closing it without touching production code. |
+| 4 — existing QA suite | **NO-OP, reported rather than skipped** | The service has no QA suite yet, so there is no regression to prove. This level did not run because there was nothing to run, not because it was passed over. |
+
+Functional e2e of the six endpoints — create → read back → CRUD round-trip → archive/unarchive
+→ 409 on a stale revision → OpenAPI/GraphQL — is `/omnicore:qa`'s job and is **not** covered
+by anything above. A green build proves the code compiles; it does not prove the entity works.

@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "entities": {
+    "Tenant": {
+      "spec": "specs/omnicore-gen/tenant.omnicore.yaml",
+      "specHash": "80683778e711644dcd7f19f4e7f5a9522320a0bebf631e1ff776dc1b5d8911da",
+      "framework": "v0.57.0",
+      "files": {
+        "bootstrap/tenants_feature.go": {
+          "class": "owned",
+          "hash": "6f51e167a110aa39f52db9e8d01c1c5ebe3fdc555a3d89edbe917f775c96f8de"
+        },
+        "internal/application/commands/archive_tenant_command.go": {
+          "class": "owned",
+          "hash": "5f2b30aef70685a5be53184c2d4b9eb618332c568d984439dd23f8370b19b7d0"
+        },
+        "internal/application/commands/insert_tenant_command.go": {
+          "class": "owned",
+          "hash": "1dd8edffe40a45c736cfbf5c7d8412ce17f9456896b983fb29855be0f82850f9"
+        },
+        "internal/application/commands/patch_tenant_command.go": {
+          "class": "owned",
+          "hash": "2053a5ee50a16eeaa1877640c2afd68afda38a1033c6c9541201b29dfba35cfb"
+        },
+        "internal/application/commands/tenant_commands_test.go": {
+          "class": "owned",
+          "hash": "ebbdf4fbb6360c20bb43216e6e2af9259f094a3d528518ec8007498145bb8671"
+        },
+        "internal/application/commands/unarchive_tenant_command.go": {
+          "class": "owned",
+          "hash": "37ebaadec505c2ac353b3bf7e3783a95838aa69549bd7a1554a6af3484e7b44f"
+        },
+        "internal/application/queries/find_tenant_by_id_query.go": {
+          "class": "owned",
+          "hash": "b338e93f863d279777322c799df2f6ebc5c36132faef08e8dfc88eb977e66432"
+        },
+        "internal/application/queries/find_tenants_by_params_query.go": {
+          "class": "owned",
+          "hash": "34659fe56b8564bb2ce43810faa6ac131d68722c5d4a30f3ce1e7ee1f98ea85f"
+        },
+        "internal/application/queries/tenant_queries_test.go": {
+          "class": "owned",
+          "hash": "01d6b02b2443ff35282f2a3a58ff3e24d2ecb03ee9669a4e214e1ab901033b06"
+        },
+        "internal/application/translations/tenant_translations_test.go": {
+          "class": "owned",
+          "hash": "cae348c852ffc44d97195bce617c5923c4bfdd39c0558864b0a6aac358eb7ffd"
+        },
+        "internal/domain/tenant.go": {
+          "class": "owned",
+          "hash": "428fef0e42f8f59a52a5cad4693889a9368d5692ead4131a9b6456b33078820b"
+        },
+        "internal/domain/tenant_service.go": {
+          "class": "owned",
+          "hash": "b88812d1f8ce1848d805ee7f02e87d0c4bdc768c36ea6ad48f71592ce1ad95a3"
+        },
+        "internal/domain/tenant_test.go": {
+          "class": "owned",
+          "hash": "b879b42d39f1eea64648cb92d1b452a1418b8b3a549023d3b218ac9244b56659"
+        },
+        "internal/domain/vos/doc.go": {
+          "class": "owned",
+          "hash": "edecfcdcd8e9b007c541345b1a585570ae124cc5c74a83e6c47b7c639dbc7040"
+        },
+        "internal/domain/vos/tenant_status.go": {
+          "class": "owned",
+          "hash": "9a84f79fd71b824c4940ffced73348769e9b0361b8dd8d65f229730f0e555b07"
+        },
+        "internal/domain/vos/tenant_vos_test.go": {
+          "class": "owned",
+          "hash": "9ef7922d56e53c2eea056fbd5df241b5801749890c365272a35e17d8f5d3c360"
+        },
+        "internal/infra/schemas/tenant_schema.go": {
+          "class": "owned",
+          "hash": "e99846f63d9b3d8014a26d157a776346e78d45865a5ea4b164e538a39d2d6f5d"
+        },
+        "internal/infra/schemas/tenant_schemas_test.go": {
+          "class": "owned",
+          "hash": "df53776fd5b07005138cf4c02e417e02895d157ebe3dfd45d696c6986cc3b7dd"
+        },
+        "internal/infra/tenant_repository.go": {
+          "class": "owned",
+          "hash": "ab69ca387822e8d55736cd5d73b0842f4f5f5fe509423e6a2cdba0d6a8f2fd0f"
+        },
+        "internal/infra/tenant_service.go": {
+          "class": "owned",
+          "hash": "87d0009a55c746431edef186cd3f09e092d9d0c28c79bdd62ba84e2e37d67df3"
+        },
+        "internal/infra/views/tenant_view.go": {
+          "class": "owned",
+          "hash": "3d135d0eb1e60ece376222f1d4d989b8897b00f71a4366a375eb95bea5e83ce4"
+        },
+        "internal/infra/views/tenant_view_test.go": {
+          "class": "owned",
+          "hash": "a7104d85087bbf84d08a58293f4c4b901adaac32c59316d4148859afac05d44c"
+        },
+        "internal/web/requests/find_tenant_by_id.go": {
+          "class": "owned",
+          "hash": "08d167b8a3d1e73e186e56a78f211f0fac87f24962348dfae9f61809ee094dea"
+        },
+        "internal/web/requests/find_tenants_by_params.go": {
+          "class": "owned",
+          "hash": "4a34a3060b8a87b39f076b72295d18f26975724334a9c746ce7a92a6fb0027e6"
+        },
+        "internal/web/requests/insert_tenant.go": {
+          "class": "owned",
+          "hash": "ea1e0096b5ebe3cc2e164f2013ef1ab65d33b93cdbcb7694be12627ab7b260f2"
+        },
+        "internal/web/requests/patch_tenant.go": {
+          "class": "owned",
+          "hash": "3e1f79d8581020f48ac0b3dd981405229deb0672a19892cafc959c51d2dd1c8a"
+        },
+        "internal/web/requests/tenant_requests_test.go": {
+          "class": "owned",
+          "hash": "52ee00169ecdedc09234ea4b2e4de01aed6ccb8d968854fe21c79905dfb472a2"
+        },
+        "internal/web/tenant_routes.go": {
+          "class": "owned",
+          "hash": "48b183592dc3d03bc3481e55d112879049798192a7373e51f842e50d1f216e3d"
+        }
+      },
+      "ordinals": {
+        "postgres": 1
+      },
+      "viewShape": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "registrations": {
+        "internal/application/translations/deu.go": {
+          "InvalidDescriptionNotification": "d2b69e2a46d133d9ad87b6c3d1d71f2e81de9ec10ccc63edac1867740f4c85f0",
+          "InvalidDisplayNameNotification": "648e752deb9bd300d819d74d32b9def2c52691814c5c48506dc46778a3dd50b4",
+          "InvalidTenantStatusTransitionNotification": "4ee53178753326d370da2a3e2dfb01057ed81ce0edeb3b9527346772eed34f14",
+          "InvalidTenantWorkspaceNotification": "7dd37f51e5750375077e8bce8c06a149c256ab4ea0ed23452928b351619efce4",
+          "ReservedTenantWorkspaceNotification": "45e2a4c335db93e931f2eb4c5268584312b0cdcb7eddaecc43d9eb6a89a68415",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
+          "TenantDescriptionMustDifferNotification": "76d2c33be108b8985b97d6fb115e732cc2b0ae8286bf418f75f73bae65ff41c7",
+          "TenantIDAlreadyExistsNotification": "3610d333f100f8e34a4263da124be6f235c399ef2915b35bb47e225fa1acc2e0",
+          "TenantIDDerivationMismatchNotification": "3e0dadc6f401861fdb2e5cab03df4122803935a1b243f683e3cfe4baef9c3dcc",
+          "TenantIDIsImmutableNotification": "ecf76e310d9b4b4a7c8f7f42f196f31bd96ddf9c3f6a01100f130e875ee9d31c",
+          "TenantNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "TenantStatus.active": "8163454f378f0814a0911afc75bb63814643a45803a0460003800e1c6b9be636",
+          "TenantStatus.suspended": "45f96e916050cd8a6465b8b36bea037d0b5e3642a13b253a23298fb1a67feb46",
+          "TenantStatus.trial": "f7fb18879d64ea1cd8386c9eeca6128f8271ca57dbb991d3e32e6e23cfebead1",
+          "TenantStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "TenantTenantIDField": "4a62164f4531072d1f3df43efcae1e88097e47a7715a0a87c2dfdcf332a62807",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "ec8e50a5e47129bfe63af6169b3a7d7f73c5a8dc67d0ec9d7c0a49e61cfa3568",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "a35c8a7eac6c50aeda3de9546e1b3e11ed5629d396ed8d5193e4da8b9b8ca1b7",
+          "UnknownTenantStatusNotification": "34b9075393acb7c15ac8b05bc07cf31937086cf58232d756e1f830d3aa1e7b6c"
+        },
+        "internal/application/translations/eng.go": {
+          "InvalidDescriptionNotification": "2077fd05fccc0704e59826b3ee9d1c3f0e29545097ca7709fa103a553a833860",
+          "InvalidDisplayNameNotification": "2481f2c51182bfe2da74b03c469935c875768b0dedb3291fc3853c2512505e04",
+          "InvalidTenantStatusTransitionNotification": "8e580255803155290171458cf517b13aea5eb72371f5a24f4e5833ba29829f15",
+          "InvalidTenantWorkspaceNotification": "6567b20dee8ffb44bc568ac75420504c31933ee68dd3000930fd73c0cc3e0b76",
+          "ReservedTenantWorkspaceNotification": "2d13d9f28cd75f53d2d35603d1549ab73fe907e0f008d7ee37491d413e74b963",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "TenantDescriptionMustDifferNotification": "4881d9028772f2199774ec8fec2edce7715dd0d907f0a8ff26ce7d19145b9748",
+          "TenantIDAlreadyExistsNotification": "f544a39f49b6ab63aaecfce741a21c6681c0eb130d4b8923d146d90163760e75",
+          "TenantIDDerivationMismatchNotification": "139192b993501a5940d48af0a5f0661bf4566b778f42d080bff20174efc9f730",
+          "TenantIDIsImmutableNotification": "f7061b096178d88b4cf19557242c4fbd21a3c3144f1a5dfc336f617cc97b46d5",
+          "TenantNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "TenantStatus.active": "92340695899bd2d86223e4a007620e0d6502fc0e08809773634c7e0743764a9c",
+          "TenantStatus.suspended": "e392a3891c070abe312d9c08bb6a4a9f5342424dd15c80f1d5cf67d14b79650a",
+          "TenantStatus.trial": "98a66e9745c9cb5e5fdd92f61d20d803eee090f81fce7da85e5f2b55ef0da147",
+          "TenantStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "TenantTenantIDField": "de1f5fff34138660c31bd550e5da98b7674d852afbff6f517e0e222b2dbf09a9",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "65127b373ccc084d8c5f52b3521c3e1e4fc7d167b35cf8dbcbb5e71ccf53ce6b",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "460fc5dc87a84ab5506e9d618ffbd65afab3d056c97b33b7949932e4be465344",
+          "UnknownTenantStatusNotification": "41cd8ca2467916a9a86a16f7933a8ba5223b660ece3ec8d1454c588a063b654a"
+        },
+        "internal/application/translations/esp.go": {
+          "InvalidDescriptionNotification": "2680a98d6a38c34df9502fad971cf6ab0089431a334032f2f1f770ba8f7e6d30",
+          "InvalidDisplayNameNotification": "f1185d317b1b38d6f7a8d08a3a065948d36ae767fed38f1d3c2c9ef555dd2c0c",
+          "InvalidTenantStatusTransitionNotification": "6e02e9f74097f8a565952e5d3754e7f12f5a7088b8550cbc1846a39b6786eb13",
+          "InvalidTenantWorkspaceNotification": "aa7eaa375e0eee38a1f260f57920feafa8405164bc01784bfa5be2f0c8b4e846",
+          "ReservedTenantWorkspaceNotification": "a26e4a2438c89a5c798453b96277463da7a33b3f8658a445dc2bd0a4eab819c0",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
+          "TenantDescriptionMustDifferNotification": "3980718ee00edf67534a4a8b8e338bd1063fd225d0453d244eae3b170881affe",
+          "TenantIDAlreadyExistsNotification": "6b4a85c72f0f648b253a308fb62febf1e4b49442b3ff457899df79368c265ffe",
+          "TenantIDDerivationMismatchNotification": "e151a6c623cf9c30b9a024cb02ebf7ce3325b6b10c8354523149d37c7fc3bcfb",
+          "TenantIDIsImmutableNotification": "1f3aee0c9ecc79b9aff830d4f65485e1963d7f48014d9a50f62e46e6edea1de6",
+          "TenantNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
+          "TenantStatus.active": "723858144bd5482d4ad8ae46e5fbbcca18061cf39e453730e025a286f1c0ea7f",
+          "TenantStatus.suspended": "6d0de22751da62efda46926fd1c772886e300a2a045f342d62d88b78f2b76b8b",
+          "TenantStatus.trial": "ac3f091ca34109c5427afb46cf83b296e2004ca9e55d3b0da8aa7434f47c69ed",
+          "TenantStatusField": "98e5acddb6c46a248f96e8a549b4103a91f47299e1dbf508e436d738912c5cbd",
+          "TenantTenantIDField": "51b7700aeda847cd8766a1231b9f9c0a6b993a927fbdb0950dee9fdb0ff0af61",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "d6a165e4da08f67d9f9b4975b0ca7339250227c505f7908a69f087a9daddb366",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "d8eb7f988ac7649c14c262e1772a8300df947ef9a6e18d1b770a782ee1ab19d8",
+          "UnknownTenantStatusNotification": "ae37c912c969b83e3dbff332b3437ec540346b76ee2c469c1f40b6b5a43f1c34"
+        },
+        "internal/application/translations/fra.go": {
+          "InvalidDescriptionNotification": "527c6957220efdeb8a927b29158332d54e9cc1f557929c3a688017c535a5b9e0",
+          "InvalidDisplayNameNotification": "a5f6a5ecab2de5333d8d3b84fd6f9f125c0effddc4b57b062d18472e6003fca9",
+          "InvalidTenantStatusTransitionNotification": "8b5a20efc78a15aeab370657001ae85598a62a35b222c96fd58a9ec60ed7e44a",
+          "InvalidTenantWorkspaceNotification": "8ab4c1b8c93734a4a253786e8baef73c017d4d6e00715fcb965729eb0df165c1",
+          "ReservedTenantWorkspaceNotification": "dd530cb71c85a4edaffd970f87c62a7465947d9ee4bb43d6d2b755e4461349f9",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "TenantDescriptionMustDifferNotification": "36a6eeb0366a0f863353b7479820fc868acd544ebc3c8b59da27fc58b99403cc",
+          "TenantIDAlreadyExistsNotification": "20939093fc6c6861fe4efba32ada5a88a391ea06903db525386e3b4b1babf8cf",
+          "TenantIDDerivationMismatchNotification": "e67f310df9ab2caec3dce87b049553532acee861c9fac26361fecb47eb10d257",
+          "TenantIDIsImmutableNotification": "4d79216171c534a848b0c70c197133291b8fc85a853af2d870e80eb976132df7",
+          "TenantNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
+          "TenantStatus.active": "ad26287ab66ba05cce95d869b68d61cc706c2dc4804ee819c9600a805fce59cd",
+          "TenantStatus.suspended": "ff129984f4a1c75543abb0b74a03fb0e608124346ce4eaf10738eabad3b2b94f",
+          "TenantStatus.trial": "6eadea55976ebb0dd97719e84e33252e47e0855568ff6cb93963d0a983b4de03",
+          "TenantStatusField": "dee377cfd8cddfb8db49d63a6f80174955c594a7cb995d4a70c2f6f305286786",
+          "TenantTenantIDField": "a71173cf9413a7840e0d9f2b2afea1dbe8aac8f928874fdea5cb902621360332",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "c2c0b5e96658208a75e76f75e062c8707574d2521c8a985bc81737c6625e0db3",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "4588d833b98c5c6f73453a402937a9e3a8af3ba697148ce1983b37e9c299ac94",
+          "UnknownTenantStatusNotification": "f2b71e4cc6843256d588d6aa72647980061bd038696acd22e674bfd7fbb6b402"
+        },
+        "internal/application/translations/ita.go": {
+          "InvalidDescriptionNotification": "6e6d139b274de1519c54e78fb27d25128c1439219a5656fe00cf86f5a893e297",
+          "InvalidDisplayNameNotification": "86d4af6bc532b57c6fe1426397b5b80057fb7ea920b529a84de8dc42b2bb0549",
+          "InvalidTenantStatusTransitionNotification": "a02a86d61673af5925ab6f8bab3dc675c31c7174783395599b5531574e990acd",
+          "InvalidTenantWorkspaceNotification": "ead76b0a829fad259533d80454eba40c98a7554b41fa07400482a8d53a164199",
+          "ReservedTenantWorkspaceNotification": "f697ee55780b9c2e81d92dbcf09390eed5f831fd585f897826151a5f64715ee5",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
+          "TenantDescriptionMustDifferNotification": "3a0cb1140783a8e777a16b6e002d84d659b8f65aadf731ad11f47709a73d669a",
+          "TenantIDAlreadyExistsNotification": "ab8947e272ed0e9cd71ef30a15eed65d99a1ab6ad73a71c7d158b7a7aa6314ba",
+          "TenantIDDerivationMismatchNotification": "d1476bbf10e634a9f12f488c9e1fd2c22d8248b8928f532e3fb0bdec2c2b8221",
+          "TenantIDIsImmutableNotification": "207b37a7f2b1cb94a12f6c82b4500fef3160b2c85467e913e3116054d6134028",
+          "TenantNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "TenantStatus.active": "39df52d249a64fe99319f2051da0de0ad9e7a4c5abad198d50dbb84589868973",
+          "TenantStatus.suspended": "743f8e855e9f490781ca32b1c1c08ed5ca47c2ac77c7857e8ebcdf1eeac393ae",
+          "TenantStatus.trial": "3340ae93d3acadc4bfad32c67f9498e8350fa94dab19cd70c15d882fcf06546a",
+          "TenantStatusField": "5d788017bfe473fd869501b6fab47c5f70558acd54e8edb5fb4be9ef7d2459c7",
+          "TenantTenantIDField": "a51f66748ef58437438d2716041e3d8199d4d649f2a1f8ffbef0a46ef2481e3a",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "4880a821aac539499281d8dce9cfc298e8fa5ef8c824bed22daebb3a555a1344",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "e7650b765bef652c1d723fd50d9e8e2d610f5392ec48cd2544193bbdd7e94887",
+          "UnknownTenantStatusNotification": "79b8a52152a90324230f0740422c78f9b5bc9a3aaff6e49f1015fa05f26abab5"
+        },
+        "internal/application/translations/nld.go": {
+          "InvalidDescriptionNotification": "bfbc890dfaf632f318f81258cc9f9af9168d6fa6072bd17aef5de8035e467ebd",
+          "InvalidDisplayNameNotification": "fb8bd06e332be92559b8703cf5b23697beedaaddbf307de12ecebb5ab52a05e5",
+          "InvalidTenantStatusTransitionNotification": "36d86e4192772a527b0f5fce1ec3ff63e22f9415ac95e226654cec9edd3a8fbb",
+          "InvalidTenantWorkspaceNotification": "601177bceac4b1b75f3906bbc076e4f065996b56dca0152044bc4e415cb773cc",
+          "ReservedTenantWorkspaceNotification": "b5d542c943688931e2deb1d76631f7b7ffb242ce9fe3e3b18fc41743035b2c82",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
+          "TenantDescriptionMustDifferNotification": "9189cc8aadf6b63418e3d08f0002c62eaea422ccc197fff2b3087ace435c5229",
+          "TenantIDAlreadyExistsNotification": "3e281cf2d4f5eb623279b8f38f9f7ec7c006edd2d58229708e5539be40aaf7d1",
+          "TenantIDDerivationMismatchNotification": "e97107fd333d40bd2b02cdb6006bd197c0036ad212a008ce646a08379d7404eb",
+          "TenantIDIsImmutableNotification": "cc2d5b80f56885e583610143f2ae4a9ee8bacf5e925d8e9d6eb3b1091babf5d2",
+          "TenantNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
+          "TenantStatus.active": "de9f5d2dd16fa56bc228c7c994b1f3fec75c74d49f83e7927f72ca99866a8ced",
+          "TenantStatus.suspended": "88fcf0f2a26bf868f18bbacefccd997b4eb1b7d57f79bf521a52cd57a3a9519e",
+          "TenantStatus.trial": "c1c0f08d23af2ecad864606933732c1dbbf3d0ebb8b74499facf0162ac4dfd34",
+          "TenantStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "TenantTenantIDField": "d1f2e1b5fc8a823db7853e705136353504970ab56978f7800bf855f01728112f",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "aa437790eb964e72cda4422b398d3f1ba23dc7cd4a5025cadd2640d5aed0eb6b",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "febfda38628c863584e76e9ea1381d53652b28ea4c409a464ed66e698f73181d",
+          "UnknownTenantStatusNotification": "8d677d424cd6a59cd1c91b86420242534afd06e15132996f2ab2b50fd08fc689"
+        },
+        "internal/application/translations/ptbr.go": {
+          "InvalidDescriptionNotification": "6ec6247d6c5d2c4eb8c548e48cd77bbc6b83fc66c4f3726b2eaf2f496b03aeaa",
+          "InvalidDisplayNameNotification": "b260970b7939f7435f8590133a2ddd734622b71f9bf77006b4b3185a02c36f78",
+          "InvalidTenantStatusTransitionNotification": "64a770d028fa57d8ebd432ad4424a00bb83c2f05a5fdc440feb15686bd01fcec",
+          "InvalidTenantWorkspaceNotification": "355d9ae213bfeaeaaab478fa76aca6e93dc2f28e8607f93be8013c9e5ede8b57",
+          "ReservedTenantWorkspaceNotification": "904b40fdd512a9dff9909d08a23efb43b7d9efd908df1ec7071c52325272e948",
+          "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "TenantDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
+          "TenantDescriptionMustDifferNotification": "76f27327c31526c6ed59fe6c17deae2b7ea4a1a940f9e564ec00b0c711b7a86f",
+          "TenantIDAlreadyExistsNotification": "d1b56b151f5a783d610189a9fa5cb34b7a9693ce3cb1ec52716696fa75b530bf",
+          "TenantIDDerivationMismatchNotification": "95caf2a5ba48519023ee77f9158fc898610d9ec8460aabbbc497d8eacff6f939",
+          "TenantIDIsImmutableNotification": "1bd52cd79b81d7d1353844d8c759d4ef60201bf82819d68570bd58b0defc3d89",
+          "TenantNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "TenantStatus.active": "499ee302f6884f271c02454123715953dc245991fead15d51ee12c5e4f405bc6",
+          "TenantStatus.suspended": "2d605a7bf3e4a32cc87091f76ece58ba653df84dc410be4286ca7e97e0f73b80",
+          "TenantStatus.trial": "7d8c7e430b48f8d7cc9bb2ff3cfd2fcf9eb4f2e3ea4e1488318fd433bba787aa",
+          "TenantStatusField": "cf7d46ded085ce31f8c37c963b3504f6f56d9ef089b926c25f5bf12b5aa313ee",
+          "TenantTenantIDField": "0524ed96abc99e4b7755dbb28c4582090f2970ed0fa177d7e2c5bb94e585e451",
+          "TenantUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "TenantWorkspaceAlreadyExistsNotification": "717f822253762b48edb915e0d9c6954e80c2de892b7c70d86fac5986ecbccc8c",
+          "TenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "TenantWorkspaceIsImmutableNotification": "cf5b14037e23c14cf778a01911afbd75d963be0765b70d54ba8e40d2e6e0fd0f",
+          "UnknownTenantStatusNotification": "111f01450cc0277eab52f5a6c07be48a87757cfd1d0643e0e44e8c6eec027218"
+        },
+        "internal/domain/notifications.go": {
+          "InvalidTenantStatusTransitionNotification": "7ff3667dab153380e0be6152322ff23190fa735e255b4b86e159bb2c37583950",
+          "TenantDescriptionMustDifferNotification": "c80322931162ab7ea09accfc14f31193cd7f590fefad656a3d17c73cb39ead17",
+          "TenantIDAlreadyExistsNotification": "dde90bb84b1451e4cad4a3cbf2bf68390d30655cc29f31173543061d45438fa7",
+          "TenantIDDerivationMismatchNotification": "f420e3f8dae91935b8ed2ebd5a21e3b8b27f5532afa9008ee314eb3a96fef7a5",
+          "TenantIDIsImmutableNotification": "67e1cf84b0888046d9fcf78e5802d0f8cf593879a4a3c6414a7f20ec9e7c0217",
+          "TenantWorkspaceAlreadyExistsNotification": "be3f0013907483c341806a274791749b6637fdcff37e5d1045a04886712906fe",
+          "TenantWorkspaceIsImmutableNotification": "08089ef2ffe8a81305c718d25fa0c898d7216b66473fa1a44da7dfb1e2b52e10"
+        },
+        "internal/domain/vos/notifications.go": {
+          "InvalidDescriptionNotification": "88dc952c9cd562e78ef0b415b7266b250de0f7816bc0e30fba67e37ac62eb08e",
+          "InvalidDisplayNameNotification": "2506d5eeced7d677f19882743f223a5b39a1b4f63033f470dbcdedd7364716cc",
+          "InvalidTenantWorkspaceNotification": "bdb6a5031c157e2880d206985bb63a804485ca29b4b77b26aeeacd4f61e73e8a",
+          "ReservedTenantWorkspaceNotification": "c334bc8942344464ae19643edac00a957755f2faafd9a2f1841fc2ad3f7a3eb1",
+          "UnknownTenantStatusNotification": "c14c9e5f8671de68adbde5c0caf98f6c4bae82bc222e7f1e20033a46cea7676a"
+        }
+      }
+    }
+  }
+}

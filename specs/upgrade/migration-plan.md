@@ -2,8 +2,10 @@
 
 Status: APPROVED
 
-Decision on the open item: **option (C) — indexed only**, `sort: [TenantID, Workspace]`.
-Recorded 2026-08-20. Rationale below.
+Decision on the open item: `?orderBy=` gets an explicit vocabulary rather than staying
+open — **`sort: [Name, Workspace, CreatedAt]`**, which is what the service ships and what
+`../scaffold-entity/tenant/spec.md` §9 records. Two of the three are not index-backed;
+§1 says which and what that costs.
 
 Service: `authcore` · Build tags: `postgres` (engine from `relational.dialect`; neither
 profile declares a `transport:` block)
@@ -83,10 +85,10 @@ anything else — including an empty tag — is a boot panic.
 hand edit is refused by the next generator run. The fix belongs in the spec.
 
 **File: `specs/omnicore-gen/tenant.omnicore.yaml`** — add a `sort:` list under
-`read.byParams`, immediately above `controls:` (currently line 455):
+`read.byParams`, immediately above `controls:`:
 
 ```yaml
-    sort: [TenantID, Workspace]
+    sort: [Name, Workspace, CreatedAt]
     controls:
       pagination: true
       orderBy: true
@@ -95,62 +97,67 @@ hand edit is refused by the next generator run. The fix belongs in the spec.
 
 Then regenerate: `omnicore-gen generate`.
 
-Verified on a clone — the generator accepts this and emits `sort:"asc,desc"` on each
-named leaf:
+The generator emits `sort:"asc,desc"` on each named leaf:
 
 ```go
-TenantID  *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc"`
+Name      *string    `query:"name" filter:"eq,in,startswith,contains,istartswith,icontains" sort:"asc,desc"`
 Workspace *string    `query:"workspace" filter:"eq,in,startswith,istartswith" sort:"asc,desc"`
+CreatedAt *time.Time `query:"createdAt" filter:"eq,gte,lte,gt,lt" sort:"asc,desc"`
 ```
 
-`Name`, `Description` and `Status` keep their `filter:` tags and gain no `sort:` tag:
-still filterable, no longer orderable.
+`TenantID`, `Description`, `Status` and `UpdatedAt` keep their `filter:` tags and gain no
+`sort:` tag: still filterable, not orderable.
 
 The spec's `sort:` is a plain list of field names; the generator always emits both
 directions. Per-direction control (`sort:"asc"` only) is not expressible through this
 spec key.
 
-### RESOLVED: which paths are orderable — option (C), indexed only
+### RESOLVED: which paths are orderable
 
-`sort: [TenantID, Workspace]`. Validated with `omnicore-gen check` on a clone before
-application: `✓ this spec can be generated`.
+`sort: [Name, Workspace, CreatedAt]` — the vocabulary this service ships, and what
+`specs/scaffold-entity/tenant/spec.md` §9 records. `?orderBy=` is a two-half declaration:
+this list is the vocabulary, `controls.orderBy` is the switch, and either half alone fails
+the boot.
 
-**This is a deliberate capability removal**, chosen with the alternatives on the table.
-Paths that were orderable at v0.54.0 and are orderable no longer:
+Paths that were orderable at v0.54.0 and are not any more:
 
 | Path | Was | Now | Why dropped |
 |---|---|---|---|
-| `id` | orderable | **400** | Not expressible — `sort: [ID]` is refused by the generator (*"`ID` does not name a readable field"*). Stays the implicit trailing cursor tiebreak. |
-| `name` | orderable | **400** | No index on `tenants.name` — a blocking sort whose cost grows with the matching set. |
-| `description` | orderable | **400** | No index; long free text, ordering by it is not meaningful. |
-| `status` | orderable | **400** | No index; low cardinality — a filter serves this better, and `status` is already filterable `eq,in`. |
+| `description` | orderable | **400** | Long free text; ordering a listing by a 500-character column is not a meaningful sequence. |
+| `status` | orderable | **400** | Low cardinality — a filter serves this better, and `status` is already filterable `eq,in`. |
+| `id` | orderable | **400** | Not in the vocabulary. It IS declarable — `sort: [ID]` is an ordinary entry and the id is the one path indexed before anybody asks — so this is the model's choice, not a limit. The keyset cursor appends the id as its trailing tiebreak either way, so the listing stays deterministic without it. |
+| `tenantID` | orderable | **400** | Not in the vocabulary. Ordering by an opaque derived UUID is ordering by nothing a reader can follow; it remains filterable `eq,in`, which is how a consuming service resolves a token claim back to a tenant. |
 
-Retained, both directions, each index-backed in
-`migrations/postgres/0001_tenant_manual.up.sql`:
+**The shipped vocabulary is NOT indexed-only, and that is the one thing to be deliberate
+about here.** Of the three paths admitted, only `workspace` is index-backed:
 
-| Path | Index |
+| Path | Index in `migrations/postgres/0001_tenant_manual.up.sql` |
 |---|---|
-| `tenantID` | `CREATE UNIQUE INDEX tenants_tenant_id_key ON tenants (tenant_id)` |
 | `workspace` | `CREATE UNIQUE INDEX tenants_workspace_key ON tenants (workspace)` |
+| `name` | **none** — a blocking sort whose cost grows with the row count |
+| `createdAt` | **none** — same |
 
-Rationale: every sort this endpoint admits is now served by an index, which is exactly
-the posture the v0.55.0 change was introduced to make explicit. Nothing is orderable by
-accident, and no request can trigger a blocking sort.
+Option (C), "indexed only", was the resolution recorded when this plan was written and it
+is not what the service ships: `name` and `createdAt` are admitted without an index. That
+is defensible while `tenants` is small — this table grows with the customer base, not with
+traffic — and it is a real cost to revisit when it is not. Closing it is a new numbered
+migration adding a `tenants (name)` and a `tenants (created_at)` index; narrowing the
+vocabulary instead is one line in the spec and a regeneration. Either way it is a decision
+someone should take on purpose rather than inherit.
 
-**Consumer impact to communicate:** `?orderBy=name`, `?orderBy=description`,
-`?orderBy=status` and `?orderBy=id` (and their `-` descending forms) now answer 400
-`SchemaViolationNotification` on `orderBy[<token>]`. If a UI offers an alphabetical
-tenant listing today, it breaks — reinstating it means adding `Name` to `sort:` **and**
-an index on `tenants.name` in a new migration.
+**Consumer impact to communicate:** `?orderBy=description`, `?orderBy=status`,
+`?orderBy=id` and `?orderBy=tenantId` (and their `-` descending forms) answer 400
+`SchemaViolationNotification` on `orderBy[<token>]`. Reinstating any of them means adding
+it to `sort:` and regenerating — plus an index, if the intent is to keep every admitted
+sort backed by one.
 
 ### Knock-on: the GraphQL schema narrows
 
-`surfaces.graphql.connection: true`. Per the changelog, GraphQL derives its
-`<Entity>OrderField` enum from the same `sort:` set and cuts direction in the resolver
-(an enum cannot express per-member directions). Under option (C) the `TenantOrderField`
-enum members become exactly `TENANT_ID` and `WORKSPACE` — a **breaking GraphQL schema
-change** for any client naming a member that is gone. Regenerate/redistribute the schema
-to consumers alongside this deploy.
+`surfaces.graphql.connection: true`. GraphQL derives its `<Entity>OrderField` enum from the
+same `sort:` set and cuts direction in the resolver (an enum cannot express per-member
+directions), so the `TenantOrderField` members are exactly `NAME`, `WORKSPACE` and
+`CREATED_AT` — a **breaking GraphQL schema change** for any client naming a member that is
+gone. Regenerate/redistribute the schema to consumers alongside this deploy.
 
 ---
 
