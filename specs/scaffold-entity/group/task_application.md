@@ -41,7 +41,11 @@ read of another tenant's row must come back as **not found**, not as forbidden �
 nothing about who else exists.
 
 **DTOs** — the collection entry's input, and the read row results. Granularity and naming
-per `service-layout.html`.
+per `service-layout.html`. The entry's **input carries the role reference and nothing else**;
+the three join-filled values belong to the row result and the response only, never to an
+input, a command or a filter vocabulary. On the attach response they come back empty, because
+that entry was never loaded through the traversal — the framework's contract, not a defect,
+and the mapper must not paper over it.
 
 **Translations** — all seven catalogs (pt-BR, English, Spanish, French, German, Italian,
 Dutch), for the nine notifications and every field label. Real translations in all seven;

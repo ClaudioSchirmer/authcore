@@ -24,10 +24,9 @@ keeps its decisions.
   second dependency:** no wildcard-bearing role can be attached to a group through the API,
   so the platform's own super-admin **group** has to be seeded by migration beside that
   tenant and that role. Say so there, not only in the spec.
-- **Advisory, needs the maintainer's word** (spec §D): the badge line still says the service
-  is built on omnicore `v0.54.0` while `go.mod` pins `v0.56.1`. The prose below it already
-  describes the newer behavior correctly, so it is the badge alone. Correct it in this pass
-  only if approved.
+- The badge line at the top of the README must name the pin this entity was generated at.
+  Check it against `go.mod` before writing anything else in this file — a badge that
+  disagrees with the pin is the one error a reader trusts.
 
 **`specs/scaffold-entity/group/tasks.md`:** fill the deviations table — every place the built
 tree differs from the approved model, with the reason. An empty table is a valid and good

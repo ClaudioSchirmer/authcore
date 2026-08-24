@@ -5,7 +5,7 @@
 - `migrations` — numbering, the up/down pair, and dialect layout.
 - `yaml-reference` — how the profiles point at the migration set.
 - `table-schema` — the column shape per Go type, so the DDL and the schema agree.
-- `/Users/claudio/.claude/plugins/cache/omnicore/omnicore/0.30.0/shared/dialects/postgres.md` — id column type, decimal and
+- `shared/dialects/postgres.md` (the pinned plugin's copy) — id column type, decimal and
   boolean shapes, and active-only uniqueness.
 
 Convention: `conventions/migrations.md`. Numbering, naming and granularity per

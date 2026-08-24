@@ -50,8 +50,10 @@ No unarchive route, on the root or the entry. No purge route anywhere. No export
 - Field projection is opt-in here, so **every response field and every nested response field
   must be a pointer or a slice with omit-empty**. A bare value type is a boot panic, not a
   lint warning.
-- The entry response carries the entry id and the role reference, and nothing else — there is
-  no rendered role key or name to return (spec §2; with no Mongo there is no read-time join).
+- The entry response carries the entry id, the role reference, and the three values the read
+  join fills — `roleKey`, `roleName` and `archivedAt` (spec §2). All three are **read-only**:
+  they appear on the response and on no request DTO, no command and no filter vocabulary.
+  `archivedAt` is nullable, so it is a pointer with omit-empty like every other field here.
 
 ## Acceptance check
 

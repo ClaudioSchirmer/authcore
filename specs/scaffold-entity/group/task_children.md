@@ -21,8 +21,12 @@ Convention: `conventions/aggregate-children.md`. Layout and naming: `service-lay
 ## Model decisions this delta carries
 
 - The collection is **`group_roles`**, owned by the flat root `groups`, edit strategy **B**
-  (targeted per-child operations). The entry is an aggregate value object with **one field**,
-  the referenced role's id — no key, no name, no denormalized copy.
+  (targeted per-child operations). The entry is an aggregate value object with **one stored
+  field**, the referenced role's id — no key, no name, no denormalized copy — plus the three
+  fields the read join fills: `RoleKey`, `RoleName` and `ArchivedAt`. Those three are
+  read-only, absent from the table schema, populated on every load and empty on an entry a
+  write is attaching. Do not confuse them with a copy: a copy would break the re-attach
+  invariant, a traversal cannot.
 - **Two operations, not three.** ATTACH and DETACH. There is deliberately no "update this
   entry": its single column *is* its identity, so an edit would keep one row id while
   changing what it means, which an audit trail reads as one grant *becoming* another instead
@@ -57,7 +61,8 @@ operations mount their **own** commands and follow the operation's own field con
   not a purge.
 - The root-archive auto handler appears at most once per surface, and not on a collection
   route.
-- The explicit business-identity method exists over the role reference.
+- The explicit business-identity method exists over the role reference — and over that
+  alone, never over a join field.
 - The duplicate guard, the cap and the three attach-time rules all reach the collection
   under the update mode.
 - `go build` and `go vet` clean.

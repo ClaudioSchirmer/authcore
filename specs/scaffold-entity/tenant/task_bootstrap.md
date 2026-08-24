@@ -2,7 +2,7 @@
 
 Model authority: `spec.md` §7, §9, §10.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|

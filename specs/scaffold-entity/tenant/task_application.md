@@ -2,7 +2,7 @@
 
 Model authority: `spec.md` §2, §7, §8, §9. Layout/naming/granularity: `service-layout.html`.
 
-## Read BEFORE generating (mandatory, at pin v0.54.0)
+## Read BEFORE generating (mandatory, at pin v0.57.0)
 
 | Section | Why this layer needs it |
 |---|---|
@@ -14,11 +14,10 @@ Model authority: `spec.md` §2, §7, §8, §9. Layout/naming/granularity: `servi
 | `status-mapping.html` | the notification → HTTP mapping the results depend on |
 | `service-layout.html` | where commands, queries, DTOs and catalogs live |
 
-**v0.54.0 notes that change this layer:** every root update is guarded on the revision it
-was loaded with, so a stale write is refused with a concurrency notification rather than
-silently overwriting — the update and archive results must carry that outcome honestly.
-Archive and unarchive now execute the update path, so their audit entries can carry a
-changes block.
+**Two facts this layer must carry honestly:** every root update is guarded on the revision
+it was loaded with, so a stale write is refused with a concurrency notification rather than
+silently overwriting — the update and archive results must report that outcome. And archive
+and unarchive execute the update path, so their audit entries carry a changes block.
 
 ## What to build
 

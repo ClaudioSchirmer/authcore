@@ -1,9 +1,13 @@
 # Spec: Tenant
 
-Status: APPROVED
-Approved: maintainer (Cláudio Schirmer Guedes), 2026-08-19 — every ⚠️ OPEN slot answered (§B Q1–Q10) and the remaining `(proposed)` picks accepted in one go
-Language: English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md` rule 3 and the maintainer's invocation
-Generation: omnicore-gen
+- **Status:** APPROVED
+- **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-19 — every ⚠️ OPEN slot
+  answered (§B Q1–Q10) and the remaining `(proposed)` picks accepted in one go
+- **Pin:** omnicore **`v0.57.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
+  relational-served views
+- **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
+  rule 3 and the maintainer's invocation
+- **Generation:** omnicore-gen
 
 The tenant is the isolation partition every other aggregate of this service will hang off.
 It carries **three identifiers, and each has exactly one job** — the single most important
@@ -26,19 +30,17 @@ values answering to that name, which is a defect that ships silently.
 | Input | What it contributed |
 |---|---|
 | Maintainer invocation | three fields (name, workspace identifier, description); "name ≥ 2 words"; "description ≥ 2 words, no keyboard junk"; "identifier per large-company practice" |
-| Maintainer decisions at the model gate | §B — ten decisions, including the derived `tenant_id`, what the PK may be used for, the shared-vs-specific VO scope, the commercial status field, and the framework upgrade the archive rule required |
-| `../../scaffold-serviceervice/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI wired, GraphQL block present but inert |
+| Maintainer decisions at the model gate | §B — ten decisions, including the derived `tenant_id`, what the PK may be used for, the shared-vs-specific VO scope, the commercial status field, and the archive rule's shape |
+| `../../scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI wired, GraphQL block present but inert |
 | `../../../README.md` | a **prior, already-reasoned Tenant model** from an earlier iteration — see the contradiction note below |
 | Industry survey (Auth0, Microsoft Entra ID, Atlassian Cloud, Slack) | the workspace handle's shape and its mutability doctrine — §A |
-| omnicore `v0.54.0` `/docs` **and source** | value objects, table schema, relational view capability, the `Loader.Exists` probe — plus the verified id-minting facts in §C |
+| omnicore `v0.57.0` `/docs` **and source** | value objects, table schema, relational view capability, the `Loader.Exists` probe — plus the verified id-minting facts in §C |
 
 ### ⚠️ Discovery contradiction — surfaced, not resolved silently
 
-`../../../README.md` states the tenant registry is **built** (CRUD, archive/unarchive, REST +
-GraphQL, permissions already gated) and documents a full field/rule model. **No such code
-exists**: `../../../internal` is absent entirely and the service is the empty shell
-`scaffold-service` produced. The README also pins omnicore `v0.51.0`; `../../../go.mod` pinned
-`v0.53.0` when this run started and `v0.54.0` after the upgrade taken mid-run (§C).
+`../../../README.md` documents a full field/rule model for the tenant registry. **No such
+code exists**: `../../../internal` is absent entirely and the service is the empty shell
+`scaffold-service` produced.
 
 Reading: the README is a **stale forward-declaration** from an earlier attempt, not a
 description of this working tree. It is treated here as a *prior recorded decision by the
@@ -53,7 +55,7 @@ so it describes reality rather than intent.
 | Point | README (prior) | Settled here | Why |
 |---|---|---|---|
 | the handle's wire name | `slug` | **`workspace`** | maintainer — the product's word, not the dev's |
-| handle regex | `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (leading letter) | `^[a-z0-9]+(-[a-z0-9]+)*$` | RFC 1123 relaxed RFC 1035's leading-letter rule; `3m` is a legitimate value |
+| handle regex | `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (leading letter) | `^[a-z0-9]+(-[a-z0-9]+)*$` | RFC 1123 relaxed RFC 1035's leading-letter rule; a handle may LEAD with a digit — `3m9`, `3m-brasil` |
 | handle max length | 40 | **63** | the DNS-label ceiling every surveyed product uses; Auth0 is exactly 3–63 |
 | `name` | 2–120 characters | 2–120 **+ anti-junk, no word count** | maintainer — §A.3 |
 | what the JWT carries | `id` (the UUIDv7 PK) | **`tenant_id` = `UUIDv5(ns, workspace)`** | maintainer — §A.6. The PK is never issued to anyone |
@@ -80,7 +82,9 @@ The shape is the same everywhere because the value lands in a hostname or a URL 
 a **DNS label** — letters, digits and hyphens, no leading or trailing hyphen, at most 63
 octets. Nothing here is a taste decision; it is the constraint the transport already
 imposes. (RFC 1035 additionally required a leading letter; RFC 1123 relaxed that, which is
-why `3m` is accepted here and the README's prior regex is widened.)
+why a leading digit is accepted here — `3m9`, `3m-brasil` — and the README's prior regex is
+widened. The relaxation is about the ALPHABET, not the length: the 3-rune floor of §7 rule 3
+still applies, so `3m` itself is refused.)
 
 ### A.2 — Two doctrines on mutability, and only one fits this service
 
@@ -173,7 +177,7 @@ this is recorded as the constraint that entity must honor.
 | Q7 | Shared VOs or entity-specific ones? | **`vos.DisplayName` and `vos.Description` are shared** (Tenant now, `Group`/`Role` later); **`vos.TenantWorkspace` stays specific** — it carries the reserved list and the derivation. Anti-junk predicates extracted as pure helpers. Line drawn: `DisplayName` is for things, so `User` will get its own `PersonName`. Full reasoning in §2 |
 | Q8 | Is `name` unique? | **No.** Reversed from an earlier draft, which contradicted this spec's own survey — no surveyed product makes the display name unique, only the handle. Removes rule 3, the partial index, the `IfUnarchive` re-check and the unarchive 409 |
 | Q9 | A commercial status field? | **Yes, now: `vos.TenantStatus` = `trial` \| `active` \| `suspended`** (§7 rules 11–12). Moves through the ordinary `PATCH` under `tenant:update`, not through dedicated intent routes — the two costs of that are recorded in §10. **Mandatory on insert, no server-side default** |
-| Q10 | Archiving and status | **Archiving forces `suspended`** (rule 13). Reaching it required upgrading the framework mid-run, `v0.53.0` → `v0.54.0`, because at the old pin the mutation reached the audit event and never the row — §C. Rejected alternatives: requiring `suspended` before archive (an `IfArchive` validation), a hand-written lifecycle hook, deriving it on read |
+| Q10 | Archiving and status | **Archiving forces `suspended`** (rule 13) — a mutation inside an `IfArchive` closure, which reaches the row because archive is an ordinary full-field write at this pin (§C). Rejected alternatives: requiring `suspended` before archive (an `IfArchive` validation), a hand-written lifecycle hook, deriving it on read |
 
 **Recorded inference, correctable in one word:** Q5's chosen option stated that the PK
 becomes "a surrogate nothing references". Taken at face value, that means the future
@@ -188,14 +192,14 @@ claim and FK, and it is how this spec records it.
 The derivation was originally proposed as "compute it inside `IfInsert`". **That does not
 work, and it fails silently** — which is why it was checked before being written down.
 
-| Fact | Evidence at the pin (`v0.54.0`) |
+| Fact | Evidence at the pin (`v0.57.0`) |
 |---|---|
 | The framework already derives ids this way — but **only for a shared base** | `infra/db/command/write/shared_base_write.go:57` → `deterministicBaseID(v)` = `uuid.NewSHA1(sharedBaseNamespace, []byte(v))`, reached only from shared-base write paths |
 | `NaturalID(col)` is declarable on any `TableSchema`, but only the shared-base writer consumes it | `infra/db/core/shared_base.go:81`; no flat-path reader of `naturalIDCol` |
 | **The flat insert mints its own id unconditionally** | `infra/db/command/write/flat_write.go:35` → `id, err := newWriteID()` (`uuid.NewV7()`), with no check of any pre-set entity id |
 | **The handler then overwrites the entity's id with the minted one** | `application/handlers/insert.go:67` → `entity.SetID(id)` after `Repo.Insert` returns |
 | By-id routes bind `:id` to the PK | `web/spec_query.go:60`, `web/spec_command.go:40`,`:104` — `HasPathID: true` |
-| **Archive persists the entity's full field set**, so a mutation made in an `IfArchive` closure reaches the row | `infra/db/command/write/flat_write.go` → `Archive` delegates to `softWrite`, which calls `schema.WriteFields(src)` + `buildUpdate(...)`. **This is new in v0.54.0** — see the note below |
+| **Archive persists the entity's full field set**, so a mutation made in an `IfArchive` closure reaches the row | `infra/db/command/write/flat_write.go` → `Archive` delegates to `softWrite`, which calls `schema.WriteFields(src)` + `buildUpdate(...)` |
 
 **Consequences, applied throughout this spec:**
 
@@ -207,25 +211,13 @@ work, and it fails silently** — which is why it was checked before being writt
 3. The derivation runs in the insert command's `ToEntity` — the application-layer mapper —
    never in `BuildRules`, which is a validation pass and may run more than once.
 
-### The one fact that changed under this run — and why the pin moved
+### Archive is an ordinary write, and rule 13 depends on it
 
-This spec was first written against **v0.53.0**, where archive was the framework's last
-write-path exception: `UPDATE <table> SET deleted_at = $1, revision = revision + 1 WHERE
-id = $2` and nothing else (`write_sql.go:118` at that pin). A rule like
-`r.IfArchive(func(){ t.Status = Suspended })` therefore mutated the entity, reached the
-audit event and the outbox payload — both built from `schema.WriteFields(src)`, i.e. from
-memory — and **never reached the row**. Not a no-op: a divergence between the row and the
-event stream, with nothing to detect it.
-
-**v0.54.0 removes that exception** (released 2026-08-19, upgraded to in this run):
-archive and unarchive now emit the same UPDATE every other verb emits — full field set,
-managed timestamps, revision bump, revision guard — with the archive transition riding
-along as one more written column. Its changelog names this exact rule shape as the
-motivation. Rule 13 below is therefore a plain `IfArchive` closure with no supporting
-infrastructure.
-
-**Every OTHER fact in the table above was re-verified against v0.54.0 and is unchanged**,
-so the derived-`tenant_id` design stands exactly as written.
+Archive and unarchive emit the same UPDATE every other verb emits — full field set, managed
+timestamps, revision bump, revision guard — with the archive transition riding along as one
+more written column. That is what makes rule 13 a plain `IfArchive` closure with no
+supporting infrastructure: a mutation made inside it reaches the ROW, not only the audit
+event and the outbox payload.
 
 ### The namespace constant
 
@@ -505,7 +497,7 @@ from every default read.
 Verb truth, honored: `PATCH /tenants/{id}/archive` and `PATCH /tenants/{id}/unarchive`.
 Nothing soft is ever wired behind `DELETE`.
 
-**What archiving actually executes at this pin (v0.54.0):** the same UPDATE every other
+**What archiving actually executes at this pin:** the same UPDATE every other
 verb emits — the full field set, `updated_at` stamped, `revision` bumped and guarded —
 with `deleted_at` bound to the operation's instant as one more written column. Three
 consequences that reach the API contract: archiving a tenant **stamps `updated_at`** (it
@@ -537,7 +529,7 @@ gates.
 | 10 | `Description` vs `Name` / `Workspace` | must differ from both under a normalized comparison (case-folded, whitespace- and hyphen-collapsed) — catches the pasted-name description | `IfInsertOrUpdate` | `TenantDescriptionMustDifferNotification` | 422 |
 | 11 | `Status` | must be a declared member — `trial`, `active` or `suspended`. **Mandatory on insert with no default** (§B Q9): an absent or unrecognized value converges to the Unknown sentinel and is rejected. **On insert ANY member is accepted, `suspended` included** — rule 12 gates transitions, not creation, and a data migration must be able to land a delinquent tenant in the state it was already in. **No separate `required` rule is declared** — the enum's own unknown-member notification already answers an empty value | auto (VO, enum) | `UnknownTenantStatusNotification` | 422 |
 | 12 | `Status` | **allowed transitions only.** `trial → active` · `trial → suspended` · `active → suspended` · `suspended → active` · and any no-op (same value). Everything else is refused — notably `active → trial` and `suspended → trial`: a trial is a beginning, never something a tenant returns to. Compared against `domain.Old(e).Status`, which is nil on insert, so the rule is `IfUpdate` only | `IfUpdate` | `InvalidTenantStatusTransitionNotification` | 422 |
-| 13 | `Status` | **archiving forces `suspended`** — set in an `IfArchive` closure, not validated. An archived tenant is never commercially active, so `archived + active` becomes an unrepresentable state. Requires v0.54.0: at v0.53.0 this mutation reached the audit event and never the row (§C) | `IfArchive` | — (a mutation, not a validation) | — |
+| 13 | `Status` | **archiving forces `suspended`** — set in an `IfArchive` closure, not validated. An archived tenant is never commercially active, so `archived + active` becomes an unrepresentable state. It reaches the row because archive is an ordinary full-field write (§C) | `IfArchive` | — (a mutation, not a validation) | — |
 
 ### How the text predicates are defined — binding, not stylistic
 
@@ -685,10 +677,10 @@ so there is no surface on which a caller proposes it (§9).
 - **Exports (CSV/XLSX): no.**
 - **gRPC: no** — additive later via `/omnicore:implement`, no rework.
 - **Integration events: not available on this posture** (publishing rides the CDC relay,
-  which does not exist here — `../../scaffold-serviceervice/spec.md`). Noted so it is not lost.
+  which does not exist here — `../../scaffold-service/spec.md`). Noted so it is not lost.
 
-- **Optimistic concurrency — every write can answer 409.** New at v0.54.0 and part of this
-  entity's contract, not an implementation detail: every root update pins the revision it
+- **Optimistic concurrency — every write can answer 409.** Part of this entity's contract,
+  not an implementation detail: every root update pins the revision it
   was loaded with in its own `WHERE`, so a write built on a stale read matches zero rows
   and is **refused** with `ConcurrentModificationNotification` (409) instead of silently
   reverting another writer's columns. This covers `PATCH`, `archive` and `unarchive`
@@ -705,26 +697,51 @@ so there is no surface on which a caller proposes it (§9).
   |---|---|---|
   | pagination (`?first`/`?after`/…) | yes | default |
   | `?orderBy` | yes | default |
-  | `?fields` | yes | every Response field and every nested type must then be `*T`/slice + `,omitempty` — a boot guard |
+  | `?fields` | yes | every Response field and every nested type must then be `*T`/slice + `,omitempty` — a boot guard. A path this read model does not have is a typed **400** (`SchemaViolationNotification`), never a silent `200 {}` |
   | `?onlyTotal` | yes | cheap, and operators count tenants |
   | `?includeArchived` | yes | required — archived tenants must stay reachable (§6) |
-  | `?search` | **no** | a relational-served view answers free-text search with a typed 400 (`RelationalCapabilityNotification`). Declaring it would promise what the posture cannot serve. Prefix/contains filters over root columns cover the real need. |
+  | `?search` | **no** | a relational-served view answers free-text search with a typed 400 (`UnsupportedCapabilityNotification`). Declaring it would promise what the posture cannot serve. Prefix/contains filters over root columns cover the real need. |
 
 - **Computed read fields: none.** `tenant_id` is a stored column, not a computed field —
   deliberately, so it can be filtered and indexed (a computed field can be neither).
 - **Field-level read authz: none** (Q4). All fields are visible to any caller that passes
   the permission gate; nothing here is a secret — and per §A.6, `tenant_id` must never be
   treated as one.
-- **View backing: relational (`.RelationalSource(repo.Loader)`)** — the project posture on
-  record in `../../scaffold-serviceervice/spec.md`, not re-asked. Read-your-writes: a created tenant is
-  visible to the very next read, no CDC wait. The view reuses the aggregate's existing
-  `repo.Loader`; a second loader on the same table boots fine and is pure waste.
+- **View backing: relational** — `query.RelationalView("tenants", repo.Loader)`, contributed
+  through the feature's `RelationalViews()` opt-in. The project posture on record in
+  `../../scaffold-service/spec.md`, not re-asked. It takes its schema from the loader, so
+  there is no `.Schema(...)` to get out of step, and it carries **no `Version`**, no registry
+  row, no rebuild and no Mongo collection. Read-your-writes: a created tenant is visible to
+  the very next read, no CDC wait. The view reuses the aggregate's existing `repo.Loader`; a
+  second loader on the same table boots fine and is pure waste.
+- **Pagination is a camouflaged offset.** The wire contract is identical to a Mongo view,
+  but each cursor carries an absolute row index rather than a sort-key tuple: a static
+  result set is walked exactly once, while a row inserted or removed ahead of the window
+  shifts every later page by one, so a concurrent walk can skip or repeat. Recorded so it
+  is not discovered during an operator's audit.
+- **The view's name may not end in `__0` or `__1`** — those are the blue-green slots,
+  reserved across every read-model family.
 - **Archive regime: kept-but-hidden, revealed by `?includeArchived`.** Not a choice on this
   backing — `DeleteOnArchive()` is a Mongo-projection knob and a relational view composes
   from the source at read time, so there is no document to drop (`shared/read-side.md`).
   Stated rather than defaulted.
+- **The ordering vocabulary is a per-field allowlist**, declared as `read.byParams.sort`
+  on the Request DTO and paired with the `controls.orderBy` switch — either half alone is a
+  boot failure. `?orderBy=` therefore accepts the four paths marked sortable below and
+  nothing else; an undeclared path is a typed 400 rather than a view-wide free-for-all.
+- **`createdAt` / `updatedAt` are exposed and filterable through `read.managed`**, which
+  puts the framework-stamped columns on the read side by name. Each one needs its column
+  declared under `storage.managed`, which §1 already does. `deletedAt` stays off the read
+  side — archived state is reached through `?includeArchived`, not through a timestamp
+  filter.
+- **The status renders localized, not as a raw token.** Each member's label is declared as
+  `valueObjects[].members[].text` in §2 and registered under the key the framework derives
+  from the member's VALUE — `TenantStatus.trial` — resolved at the boundary by
+  `translator.EnumDescription`. There is no flag to ask for it: `descriptionKeys` is refused
+  by name precisely because the catalog entries are written from the member texts. Declaring
+  the seven texts IS the declaration.
 - **Filter / sort per field** (low-risk — exact operator tokens per
-  `auto-query-handlers.html` at generation time):
+  `auto-query-handlers.html`):
 
   | Field | Filter | Sort |
   |---|---|---|
@@ -785,90 +802,39 @@ so there is no surface on which a caller proposes it (§9).
 
 **None.** Q1–Q6 were answered at the model gate and are recorded in §B.
 
-## Deviations recorded at generation time
+## What generation will have to write by hand, and where the model narrows
 
-Generated on 2026-08-19 via `omnicore-gen` (the 1d gateway choice), from
-`../../omnicore-genre-gen/tenant.omnicore.yaml`. Everything below is a place where the shipped code
-and this document do not match, or where a low-risk detail was decided during generation.
+Named here BEFORE generation, so a run can tell a declared escape from a shortfall. None of
+these is a workaround; each is the path the generator's own documentation points at.
 
-### A. Promises of §9 the generator could not express — the read side is narrower
+### A. Decided at low risk, recorded so they are not reverse-engineered
 
-1. **No per-field sort allowlist.** §9 marked `name`, `workspace`, `createdAt` and
-   `updatedAt` sortable and the rest not. `read.byParams.sort` is REFUSED by this
-   generator build ("declared sort allowlists are not generated; controls.orderBy decides
-   whether `?orderBy=` is served at all"), so `?orderBy=` is served view-wide rather than
-   restricted to those four. Nothing is *missing* — the restriction is.
-2. **No filters on `createdAt` / `updatedAt`.** §9 asked for equality + range on both.
-   Filters are declarable only over declared ENTITY fields, and the framework-managed
-   timestamps are not among them — refused under both the Go name and the column name.
-   `?createdAt=` is therefore a typed 400. The seven business-field filters of §9 are all
-   served as specified.
+- **Case-insensitive filter twins.** §9's prefix/contains operators are declared alongside
+  `icontains` and `istartswith` for `name`, `workspace` and `description`. A
+  case-sensitive-only `contains` over a display name is close to unusable, and declaring an
+  operator is additive.
+- **View `maxLimit` = 200.**
+- **The Latin vowel set is wider than §7's list.** §7 pins `a e i o u á é í ó ú ã õ â ê ô à
+  ü`; the predicate also accepts `ä ë ï ö å ø æ ñ ý ÿ` and their uppercase. `ü` is already in
+  the list, so umlauts were plainly intended and the omission of `ä`/`ö` reads as an
+  oversight rather than a decision. Strictly more permissive: it cannot reject anything the
+  spec's list accepts.
 
-Both are read-side reach, not correctness, and both are additive later. Neither is worked
-around by hand: doing so would mean adopting a generated file, which stops it tracking the
-spec forever.
+### B. One limit of §7 itself, shipped as approved
 
-### B. Promise of §2 the generator accepted and did not emit — enum labels
+**The description's two-word rule refuses scriptio-continua languages.** "At least two words"
+counts runs of letters separated by a non-letter, so Japanese, Chinese and Thai — which do
+not space their words — read as ONE word and are refused as junk. That is the exact failure
+mode §7's vowel clause exists to prevent, in a different predicate. It is accepted because
+all seven catalogs this service serves are space-separated Latin scripts, so it only bites an
+operator describing a tenant IN such a language. It must be pinned by a test that NAMES the
+limit, so that changing it later is a deliberate act:
+`TestDescriptionWordRuleRefusesScriptioContinua`.
 
-§2 states the status members render per-locale through `domain.EnumDescriptionKey` →
-`TenantStatus.trial`, "registered in all seven catalogs". The seven translations were
-written into the spec YAML under `valueObjects[].members[].text`, `check` accepted them,
-and **no emitter consumed them**: no `TenantStatus.*` key exists in any catalog and the
-member texts appear nowhere in the tree. The sibling key `descriptionKeys` IS refused by
-name for this reason; `members[].text` is not, so this one passes silently.
+### C. What a unit test cannot reach
 
-Consequence: a caller reading a status renders the raw token (`trial`), never a localized
-label. Nothing else is affected — membership, validation, persistence and the wire
-contract are all correct. **Reported upstream** (see the hand-back); the texts stay in the
-spec so they are already there when the emitter arrives.
-
-### C. Low-risk details decided during generation
-
-4. **Case-insensitive filter twins added.** §9 said prefix/contains; `icontains` and
-   `istartswith` were declared alongside them for `name`, `workspace` and `description`. A
-   case-sensitive-only `contains` over a display name is close to unusable, and declaring
-   an operator is additive.
-5. **View `maxLimit` = 200.** §9 did not state one.
-6. **The Latin vowel set is wider than §7 lists.** §7 pins `a e i o u á é í ó ú ã õ â ê ô
-   à ü`; the implementation also accepts `ä ë ï ö å ø æ ñ ý ÿ` and their uppercase. `ü` is
-   already in the spec's list, so umlauts were plainly intended and the omission of `ä`/`ö`
-   reads as an oversight rather than a decision. The change is strictly more permissive and
-   cannot reject anything the spec's list accepts.
-
-### D. Two places where §7 as written is not implementable, and what shipped
-
-7. **`3m` is cited as a legitimate handle but cannot be one.** §A.1 and §7 rule 3 set the
-   floor at 3 runes (Auth0 is exactly 3–63) and then cite `3m` — two runes — as the reason
-   RFC 1123's relaxation matters. Both cannot hold. The substantive rule is the ALPHABET
-   (a handle may LEAD with a digit), and that is what shipped and is tested: `3m9` and
-   `3m-brasil` are accepted, `3m` is refused by the length floor. **This is a wording fix
-   this document still owes**, not a behavior question.
-8. **The description's two-word rule refuses scriptio-continua languages.** "At least two
-   words" counts runs of letters separated by a non-letter, so Japanese, Chinese and Thai
-   — which do not space their words — read as ONE word and are refused as junk. That is
-   the exact failure mode §7's vowel clause was written to prevent, in a different
-   predicate. **Shipped as approved**, because all seven catalogs this service serves are
-   space-separated Latin scripts, so it only bites an operator describing a tenant IN such
-   a language. It is pinned by a test that names the limit, so changing it is deliberate:
-   `TestDescriptionWordRuleRefusesScriptioContinua`.
-
-### E. Test coverage — 85.0%, and where the rest is
-
-Every function in the entity's tree is at **100%** except three files, which are at 0%:
-
-| File | Statements | Why no unit test |
-|---|---|---|
-| `../../../internal/infra/tenant_repository.go` | 45 | constructing it needs a live `core.RelationalEngine` |
-| `../../../internal/infra/tenant_service.go` | 144 | `WorkspaceTaken` probes through `repo.Loader.Exists` |
-| `../../../internal/web/tenant_routes.go` | 180 | mounting needs a running Fiber app and the OpenAPI registry |
-
-369 of 2225 statements, which is exactly the 15% gap. This is the framework's own division
-— the generated tests cover the mappers, rules, schemas, catalogs and criteria and
-explicitly do not cover the repository, the domain service or the routes; a boot proves
-those. Reaching them by unit test would need a fake engine wired into production
-constructors, which `../../../CLAUDE.md` rule 6 forbids without approval.
-
-**This misses the 95% floor of `../../../CLAUDE.md` rule 6 and is recorded as an open deviation for
-the maintainer to accept or direct.** The route to close it without touching production
-code is `/omnicore:qa`, which generates the executable contract suite that exercises those
-three files end to end.
+`internal/infra/` (the repository and the domain service) and the route-mount functions.
+Exercising a repository, a fact or a route needs a live relational engine and a running app.
+This is repo-wide rather than specific to this entity, and it is where `../../../CLAUDE.md`
+rule 6's 95% floor collides with the framework's own test division. `/omnicore:qa` is the
+route to closing it without touching production code, which rule 6 forbids without approval.

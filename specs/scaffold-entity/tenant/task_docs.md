@@ -21,8 +21,8 @@ Against `spec.md`, which is the approved model, and against the code as generate
 - what the JWT carries, which is the derived public key and never the primary key;
 - the tenant business rules, which the README lists in a form that predates most of this
   run's decisions;
-- the API shape, including the responses that v0.54.0 added — a stale-write refusal on every
-  root write, and a not-found on archiving a row that is not there;
+- the API shape, including the two responses that are easy to leave out — a stale-write
+  refusal on every root write, and a not-found on archiving a row that is not there;
 - the current-state table, which must say what is built and what is not, without rounding up;
 - the verification command it records for building the service, which collides with the
   bootstrap directory and reports a file-naming error rather than a compile result.

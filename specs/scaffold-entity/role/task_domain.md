@@ -39,10 +39,20 @@ deliberately absent from the table schema, which is what keeps them out of persi
 out of the state snapshot.
 
 **The child aggregate value object**, in the aggregate-value-object package with its own
-scoped notifications: one field, the catalog reference. It embeds the framework's managed
-carrier and declares **no id field of its own** — a hand-declared exported id compiles, is
-never persisted, and the real id never round-trips. Its business-identity method is written
-explicitly over the catalog reference.
+scoped notifications: **one stored field** — the catalog reference — plus the **three
+join-filled fields** of §2, `Resource`, `Action` and `ArchivedAt`. It embeds the framework's
+managed carrier and declares **no id field of its own** — a hand-declared exported id
+compiles, is never persisted, and the real id never round-trips. Its business-identity method
+is written explicitly over the catalog reference, and over that alone: the join fields are
+not part of sameness.
+
+The three join fields are ordinary fields of the entry. They are populated on every load by
+the traversal `task_infra.md` declares, they are absent from the `TableSchema` so no write
+carries them and no migration creates them, and their Go types are plain — `string`,
+`string`, `*time.Time` — never a value object. **The framework lets a rule read them; this
+model forbids it.** §7 says why: a rule runs over the entries a write is ADDING, and those
+carry `""` and `nil`, which is indistinguishable from "live". A rule that consulted
+`ArchivedAt` would be fail-open on the exact path R6 exists to close.
 
 **Modes** per §5 — display, insert, update, archive; **no unarchive**. The set must agree
 with the schema's archive-column declaration or the repository refuses to construct.

@@ -34,7 +34,19 @@ to leave half-covered, listed so they are not:
 anti-junk predicates, and the fact that it refuses rather than normalizes.
 
 **The child aggregate value object**: its business-identity method, including that a
-cosmetically different but identically-referenced child is the same child.
+cosmetically different but identically-referenced child is the same child — and that two
+entries pointing at the same permission stay the same entry whatever their join fields say,
+since sameness is the catalog reference alone.
+
+**The join fields, from the read side and from the rule side.** Two assertions that must not
+be dropped, because both failures are silent:
+
+- an entry the write is ADDING carries `Resource == ""`, `Action == ""` and
+  `ArchivedAt == nil` — a test that pins this is what stops a later "optimization" from
+  reading them in a rule;
+- R6, R9a and R9b reach their verdicts through the domain-service facts and **not** through
+  the join: a fixture whose added entry points at an archived permission must still be
+  refused by R6.
 
 **Every command mapper** — the full-body one, the partial one, the result projection, and
 the two child ones. The identity translation is mapper logic and is tested here: each of the

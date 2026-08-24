@@ -49,6 +49,13 @@ files may cross DDD layers only where production imports already allow it.
   since-archived role must **succeed**, and a detach must **not** re-judge the remaining
   entries. These two are the whole reason spec §7 reads added entries rather than the
   collection, and they are the regression that amendment exists to prevent.
+- **The join fields never reach a verdict.** An entry the write is ATTACHING carries
+  `RoleKey == ""`, `RoleName == ""` and `ArchivedAt == nil`; pin that, and pin that G6 still
+  refuses an attach onto an archived role even though `ArchivedAt` reads `nil` on it. Both
+  failures are silent, and the second is fail-open.
+- **The escalation facts judge every key the role grants, archived rows included** (spec §7,
+  fail-closed): a role whose bundle carries a retired `tenant:export` is refused to a caller
+  who does not hold `tenant:export`, even though the grant's own `ArchivedAt` is set.
 
 **Value object** — the new handle: the boundary lengths, the slug shape (leading, trailing
 and doubled hyphen each refused), and the anti-junk predicates. Rune-based, not byte-based.
