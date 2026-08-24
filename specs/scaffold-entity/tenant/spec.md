@@ -813,7 +813,11 @@ these is a workaround; each is the path the generator's own documentation points
   `icontains` and `istartswith` for `name`, `workspace` and `description`. A
   case-sensitive-only `contains` over a display name is close to unusable, and declaring an
   operator is additive.
-- **View `maxLimit` = 200.**
+- **No `maxLimit` on the view — the entity follows the framework's default page ceiling**
+  (100), overridable per environment through `query.maxLimit` in the service yaml. The
+  ceiling is operational state, not model: pinning it on the view would be the top of the
+  framework's cascade (view override > yaml > framework default) and would take the
+  decision away from whoever runs the service.
 - **The Latin vowel set is wider than §7's list.** §7 pins `a e i o u á é í ó ú ã õ â ê ô à
   ü`; the predicate also accepts `ä ë ï ö å ø æ ñ ý ÿ` and their uppercase. `ü` is already in
   the list, so umlauts were plainly intended and the omission of `ä`/`ö` reads as an

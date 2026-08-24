@@ -3,7 +3,7 @@ module github.com/ClaudioSchirmer/authcore
 go 1.26.5
 
 require (
-	github.com/ClaudioSchirmer/omnicore v0.56.1
+	github.com/ClaudioSchirmer/omnicore v0.57.0
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/google/uuid v1.6.0
 )

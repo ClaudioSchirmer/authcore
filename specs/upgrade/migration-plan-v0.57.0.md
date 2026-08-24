@@ -9,9 +9,10 @@ Rollback point: `specs/upgrade/rollback/` (verbatim pre-bump `go.mod` + `go.sum`
 `v0.56.1`, taken 2026-08-23).
 
 > This file records the diagnosis behind the "upgrade + migrate" path. The previous
-> record, `migration-plan.md` (v0.54.0 → v0.55.0, APPROVED), is left intact — this run
-> writes a version-suffixed file rather than overwriting a decision record that is still
-> the only written trace of the `sort: [TenantID, Workspace]` choice.
+> record, `migration-plan.md` (v0.54.0 → v0.55.0, APPROVED), is a separate document rather
+> than something this run overwrote. Its §1 carries the ordering vocabulary, which has since
+> moved: the live answer is `../scaffold-entity/tenant/spec.md` §9, and §1 states what the
+> shipped vocabulary costs.
 
 ## Outcome of the bump
 

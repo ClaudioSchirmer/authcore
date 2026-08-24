@@ -433,13 +433,14 @@ What is genuinely unavailable, and why:
 | `action` | **yes** | declared; a blocking sort on its own (not an index prefix) |
 | `description` | **yes** | declared; a blocking sort — no index |
 | `permission` | no | computed, and a computed path has no column to order by |
-| `id` | no | the generator refuses `sort: [ID]` — *"`ID` does not name a readable field"*. It stays the implicit trailing cursor tiebreak, the same refusal the Tenant run recorded |
+| `id` | no | not in the declared vocabulary. It is declarable — `sort: [ID]` is an ordinary entry — so this is the model's choice, not a limit |
 
-The two blocking sorts are admitted deliberately against the project's otherwise
-indexed-only doctrine (`../../upgrade/migration-plan.md` §1, option C): that doctrine was
-adopted for `tenants`, a table that grows with the customer base. This catalog is bounded
-by the number of `resource:action` pairs the platform's own routes enforce — dozens, and
-capped at 200 rows per page — so the cost of sorting it without an index is immaterial.
+The two blocking sorts are admitted deliberately. The project has no indexed-only rule to
+break — `tenants` itself admits two unindexed sorts (`../../upgrade/migration-plan.md` §1)
+— but the cost is worth naming per entity rather than inheriting. Here it is immaterial:
+this catalog is bounded by the number of `resource:action` pairs the platform's own routes
+enforce — dozens — and capped at 200 rows per page. `tenants`, which grows with the
+customer base, is the one where it will eventually need an index.
 **Filtering is untouched** and never consulted the Response in either version.
 
 - **Reserved read controls served by the listing:**
@@ -447,7 +448,7 @@ capped at 200 rows per page — so the cost of sorting it without an index is im
 | Control | Served | Why |
 |---|---|---|
 | pagination (`?first=`, cursor) | yes | default |
-| `?orderBy=` | yes — over `resource`, `action` and `description` (§B Q8) | not the id, and not the computed `permission`; see the table above |
+| `?orderBy=` | yes — over `resource`, `action` and `description` (§B Q8) | the id is declarable and simply not declared; the computed `permission` is the one path that cannot be, see the table above |
 | `?fields=` | yes | `?fields=permission` returns the strings and nothing else — exactly what a token issuer wants. Selecting it pushes `Resource` + `Action` down to the store automatically |
 | `?includeArchived` | yes | a retired permission must stay auditable — and with no unarchive verb, this listing is the only way to see one |
 | `?onlyTotal` | yes | cheap |
@@ -524,7 +525,7 @@ capped at 200 rows per page — so the cost of sorting it without an index is im
 | **Q5** | Does the aggregate accept `unarchive`? | **No — archive is one-way.** Un-archiving would re-enable, in a single call, every grant still pointing at that row: old users would silently regain a permission nobody re-approved, and the audit trail would show a restore rather than a grant. A retired permission comes back as a **new row** (new id) that must be granted explicitly — see §6. The mode is absent from `Modes()`, so no route, no mutation, no command, and no `IfUnarchive` rule is generated |
 | **Q6** | Do `resource` and `action` each get their own value object inside the composite? | **No — plain `string` parts, validated by the composite itself.** A value object earns its keep by giving a rule one home and by being reusable; here nothing else in this microservice carries a resource or an action alone, and both parts are built from one shared segment rule. Two named types would be two copies of one helper for no reader. The composite therefore owns **both** halves of the concept: how a permission is validated and how it is rendered. Extracting a part later is mechanical and touches no data. **The hierarchy stayed**: the resource is still a colon-joined path (§7a rule 3) — collapsing the types never required collapsing the vocabulary |
 | **Q7** | What leaves on the wire? | **`id` + `description` + `permission`.** `resource` and `action` are read into the Result to feed the derivation and stop there — the documented computed-field shape. All three stored fields remain **filterable**, since filters are declared on the Request DTO and never consult the Response. `id` is present because the by-id routes need it. The hidden pair stays orderable — the vocabulary is declared on the Request DTO, never on the Response — so the lean shape costs nothing on the read controls; see Q8 |
-| **Q8** | `?orderBy=` is a two-half declaration — the `controls.orderBy` switch plus a `sort:` vocabulary on the Request DTO — and *"half a declaration is a boot failure"*. What does the listing accept? | **`sort: [Resource, Action, Description]`** — all three stored fields, both directions. The vocabulary lives on the Request DTO and never on the Response, so the lean wire shape (Q7) costs no ordering: the two hidden composite parts are orderable while still absent from every response body (verified with `omnicore-gen check` before the answer was taken). `resource` is index-backed by the partial unique index on the pair; `action` and `description` are blocking sorts, admitted deliberately because this catalog is bounded by the platform's own route literals and capped at 200 rows a page. Alternatives on the table and declined: `[Resource]` only (strict indexed-only, mirroring Tenant's option C — dropped `description`, which §9 wanted); `[Description]` only (§9 as literally written — the one unindexed choice, and it kept the group-by-resource gap); and dropping the control entirely. **`id` was asked for by §9 and is not expressible**: `sort: [ID]` is refused by the generator |
+| **Q8** | `?orderBy=` is a two-half declaration — the `controls.orderBy` switch plus a `sort:` vocabulary on the Request DTO — and *"half a declaration is a boot failure"*. What does the listing accept? | **`sort: [Resource, Action, Description]`** — all three stored fields, both directions. The vocabulary lives on the Request DTO and never on the Response, so the lean wire shape (Q7) costs no ordering: the two hidden composite parts are orderable while still absent from every response body (verified with `omnicore-gen check` before the answer was taken). `resource` is index-backed by the partial unique index on the pair; `action` and `description` are blocking sorts, admitted deliberately because this catalog is bounded by the platform's own route literals and capped at 200 rows a page. Alternatives on the table and declined: `[Resource]` only (strict indexed-only, mirroring Tenant's option C — dropped `description`, which §9 wanted); `[Description]` only (§9 as literally written — the one unindexed choice, and it kept the group-by-resource gap); and dropping the control entirely. `id` is declarable — `sort: [ID]` is an ordinary declaration — and is deliberately not in this vocabulary |
 
 ## C. `(proposed)` picks carried into the approved model
 
@@ -551,14 +552,14 @@ the reason it exists.
 | `vos.PermissionKey` | `kind: manual`. The part shape is a regex, but rule 6 (`*` resource forces `*` action) is a pair-level invariant only the composite can see, and the substance checks reuse the project's shared anti-junk predicates, which are not statable as a pattern |
 | The migration's partial unique index and the `Constraints` binding | The migration is a hook file. The index name is a contract written in two places — rename it there and the 409 binding silently stops matching |
 
-**Two boundaries to expect, both of which stand rather than being worked around:**
+**One thing to declare, and it is a declaration rather than a boundary:**
 
-1. **`createdAt` / `updatedAt` are not filterable.** Filters are served only over declared
-   entity fields, and the framework-managed timestamps are not among them. `?createdAt=` is
-   a typed 400. `read.managed` exists and would project them; §9 does not ask for them on
-   the wire.
-2. **`sort: [ID]` is refused** — *"`ID` does not name a readable field"*. The row id stays
-   the implicit trailing cursor tiebreak, which is what §B Q8 records.
+`createdAt` / `updatedAt` reach the read side through **`read.managed`**, which names the
+framework-stamped columns by their fixed logical names. Listing one there returns it from
+the by-id read and every listing row and makes it filterable like any other field, which is
+what §9's operator table asks for — `{field: CreatedAt, ops: [gte, lte]}` is an ordinary
+filter once the column is exposed. `deletedAt` stays off: archived state is reached through
+`?includeArchived`, never through a timestamp filter.
 
 **Two things that are unreachable by construction and must not be "fixed" into existence:**
 
