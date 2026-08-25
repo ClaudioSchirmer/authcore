@@ -57,3 +57,8 @@ type UnmatchablePermissionKeyNotification struct{ domain.DomainNotificationBase 
 // translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type InvalidRoleKeyNotification struct{ domain.DomainNotificationBase }
+
+// InvalidGroupKeyNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidGroupKeyNotification struct{ domain.DomainNotificationBase }
