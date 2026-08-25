@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:83c6c378921b406719e365d6860e3aca8f351b14faf09ebb478be0bc1c1f66de
+// checksum:   sha256:07ad4b6529056f7f082ab7920854b8722f337ec0eddd81d3693dc53aef4f0f4e
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -58,7 +58,6 @@ func (c *PatchTenantCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *
 // PatchTenantResult is the write response, projected from the entity.
 type PatchTenantResult struct {
 	ID          domain.ID
-	TenantID    domain.ID
 	Name        string
 	Workspace   string
 	Description string
@@ -73,7 +72,6 @@ type PatchTenantResult struct {
 func (c *PatchTenantCommand) FromEntity(_ *configuration.AppContext, e *appdomain.Tenant) (PatchTenantResult, error) {
 	return PatchTenantResult{
 		ID:          *e.GetID(),
-		TenantID:    e.TenantID,
 		Name:        e.Name.Value(),
 		Workspace:   e.Workspace.Value(),
 		Description: e.Description.Value(),

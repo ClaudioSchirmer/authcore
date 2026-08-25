@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:a3dfb068ea1485fa1f5a7ea3f7a8cd91e424f5ee2794da127a769cdf3b87108b
+// checksum:   sha256:553649012b03c4c2116dc9bbd7b6e1ec99793a9806eee77cd668f117b598946f
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -50,7 +50,6 @@ type PatchTenantResponse struct {
 	fwresponses.Auto
 
 	ID          domain.ID `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    domain.ID `json:"tenantID" example:"a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"`
 	Name        string    `json:"name" example:"Acme Comércio e Serviços Ltda"`
 	Workspace   string    `json:"workspace" example:"acme-comercio"`
 	Description string    `json:"description" example:"Retail operations of the Acme group in Brazil."`

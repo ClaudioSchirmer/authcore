@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:4727b1ea0a7c2e6e17a6c91a00fa82f57c4b01138af99b6b2dc026106785ca63
+// checksum:   sha256:53af37941e2b32b3674df37b3605b239326094abb0034761d83458321b05a2f7
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -77,7 +77,7 @@ func (c *PatchPermissionCommand) FromEntity(ctx *configuration.AppContext, e *ap
 	out.Resource = e.Key.Resource
 	out.Action = e.Key.Action
 	{
-		v, err := appqueries.ComputePermission(ctx, e.Key.Resource, e.Key.Action)
+		v, err := appqueries.ComputePermissionPermission(ctx, e.Key.Resource, e.Key.Action)
 		if err != nil {
 			return out, err
 		}

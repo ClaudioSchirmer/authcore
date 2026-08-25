@@ -8,20 +8,28 @@
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
 - **Generation:** omnicore-gen
+- **AMENDED 2026-08-24 — the derived `tenant_id` was REMOVED.** The maintainer reversed
+  §A.6 and §B Q5 after seeing the two-key model in use. A tenant's id is stored inside every
+  OTHER microservice that references it, so it is a public key in practice whatever this
+  service calls it — the second, derived identifier could not deliver the containment it
+  existed for, while charging a translation step on every isolation filter, a foreign key
+  that pointed somewhere non-obvious, and a whole class of "which of these two UUIDs is
+  this?" bugs. **The row id is now the tenant's only identifier**: the `tenant_id` token
+  claim carries it and every tenant-scoped foreign key targets it. §A.6 is kept below,
+  marked SUPERSEDED, because the argument explains why it was tried.
 
 The tenant is the isolation partition every other aggregate of this service will hang off.
-It carries **three identifiers, and each has exactly one job** — the single most important
+It carries **two identifiers, and each has exactly one job** — the single most important
 thing to understand before reading anything else here:
 
 | Identifier | Value | Who sees it |
 |---|---|---|
-| `id` | UUIDv7, minted by the framework | internal. Referenced by nothing; appears in the management API's URLs and nowhere else |
+| `id` | UUIDv7, minted by the framework | **the key.** The `tenant_id` claim of every token, the FK target of every tenant-scoped aggregate, and the management API's by-id URLs |
 | `workspace` | `acme-comercio` | the human-facing handle — URLs, logs, support |
-| `tenant_id` | `UUIDv5(namespace, workspace)` | **the public key.** The `tenant_id` claim of every token, and the FK target for every future aggregate |
 
-`tenant_id` therefore means exactly one value everywhere it appears — column, token claim
-and foreign key. That is deliberate: two earlier drafts of this spec had two different
-values answering to that name, which is a defect that ships silently.
+There is exactly one value to mean "which tenant", and it answers to `tenant_id` on the wire
+and to `id` in this table. An earlier model had a second, derived identifier alongside it;
+the amendment above says why it went.
 
 ---
 
@@ -58,7 +66,7 @@ so it describes reality rather than intent.
 | handle regex | `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (leading letter) | `^[a-z0-9]+(-[a-z0-9]+)*$` | RFC 1123 relaxed RFC 1035's leading-letter rule; a handle may LEAD with a digit — `3m9`, `3m-brasil` |
 | handle max length | 40 | **63** | the DNS-label ceiling every surveyed product uses; Auth0 is exactly 3–63 |
 | `name` | 2–120 characters | 2–120 **+ anti-junk, no word count** | maintainer — §A.3 |
-| what the JWT carries | `id` (the UUIDv7 PK) | **`tenant_id` = `UUIDv5(ns, workspace)`** | maintainer — §A.6. The PK is never issued to anyone |
+| what the JWT carries | `id` (the UUIDv7 PK) | ~~`UUIDv5(ns, workspace)`~~ → **reverted to `id`, 2026-08-24** | maintainer — see the amendment at the top; §A.6 is superseded |
 | `name` uniqueness | unique among active tenants | **not unique** | §B Q8 — the README's own rule contradicted the market it was modeled on |
 | commercial status | absent | **`status` = trial \| active \| suspended** | §B Q9 — suspension is not archiving (§5) |
 | `description` | 15–500, ≥2 words, anti-junk, must differ | adopted as-is | agreed |
@@ -137,9 +145,20 @@ single character repeated, the name pasted into the description — and nothing 
 defenses against a determined actor are rate limiting and operator review, which are not
 this entity's job. Recorded so the rules are not mistaken for a guarantee.
 
-### A.6 — Why the token carries a derived UUID and not the PK
+### A.6 — Why the token carries a derived UUID and not the PK — **SUPERSEDED 2026-08-24**
 
-The maintainer's call, and the reasoning is worth keeping because it is not the obvious one.
+> **This section no longer describes the model.** The derived `tenant_id` was removed; the
+> token carries the PK. It is kept because the argument below is sound as far as it goes,
+> and reading it is the fastest way to understand what the reversal traded away.
+>
+> **What it missed:** the containment it buys is local to this service. The moment another
+> microservice stores a reference to a tenant, that value is pinned in ITS tables, ITS
+> logs and ITS own API — public in practice, whatever authcore calls it. The leak §A.6
+> prevents is real but small (a creation timestamp), and the price turned out to be a
+> translation step on every isolation filter plus a foreign key whose target nobody could
+> guess right the first time.
+
+The reasoning as it stood:
 
 **Why not the PK.** `tenants.id` is a **UUIDv7**, and UUIDv7 embeds a millisecond timestamp
 by construction. Issuing it as a claim would hand every client and every consuming service
@@ -172,7 +191,7 @@ this is recorded as the constraint that entity must honor.
 | Q2 | What is the handle called on the wire? | **`workspace`**. Rejected: `identity`, which `../../../README.md` already reserves for the future person-credential aggregate — one word, two concepts is the defect being avoided |
 | Q3 | Which surfaces? | **REST + OpenAPI and GraphQL.** No CSV/XLSX exports |
 | Q4 | Data-access (Layer 2/3)? | **Anyone holding the permission sees and edits every row** — no ctx row filter |
-| Q5 | What does the JWT carry? | **`tenant_id`, a UUID derived from `workspace`** — not the PK. §A.6 |
+| Q5 | What does the JWT carry? | ~~a UUID derived from `workspace`~~ — **REVERSED 2026-08-24: the PK.** See the amendment at the top |
 | Q6 | By-id routes expose the PK in the URL. Accept? | **Accepted.** The goal is the PK staying out of tokens and out of consuming services, which is where the leak would scale. The management API is operator-only and already behind a permission. Keeps the framework's automatic by-id handlers — the alternative was custom query + command handlers resolving `tenant_id` → PK on every write |
 | Q7 | Shared VOs or entity-specific ones? | **`vos.DisplayName` and `vos.Description` are shared** (Tenant now, `Group`/`Role` later); **`vos.TenantWorkspace` stays specific** — it carries the reserved list and the derivation. Anti-junk predicates extracted as pure helpers. Line drawn: `DisplayName` is for things, so `User` will get its own `PersonName`. Full reasoning in §2 |
 | Q8 | Is `name` unique? | **No.** Reversed from an earlier draft, which contradicted this spec's own survey — no surveyed product makes the display name unique, only the handle. Removes rule 3, the partial index, the `IfUnarchive` re-check and the unarchive 409 |
@@ -181,8 +200,9 @@ this is recorded as the constraint that entity must honor.
 
 **Recorded inference, correctable in one word:** Q5's chosen option stated that the PK
 becomes "a surrogate nothing references". Taken at face value, that means the future
-`users.tenant_id` (and `groups`, `roles`) reference **`tenants.tenant_id`**, not
-`tenants.id`. That is what makes `tenant_id` a single unambiguous value across column,
+~~`users.tenant_id` (and `groups`, `roles`) reference `tenants.tenant_id`~~ — **REVERSED
+2026-08-24: they reference `tenants.id`.** That is what makes `tenant_id` a single
+unambiguous value across column,
 claim and FK, and it is how this spec records it.
 
 ---
@@ -323,11 +343,10 @@ survive precisely so the erased user's foreign keys and audit trail stay coheren
 
   ```
   tenants  (the isolation partitions of the platform; one row per customer organization)
-    id           UUID        PK    — UUIDv7, framework-minted. Referenced by nothing;
-                                     appears only in the management API's by-id URLs
-    tenant_id    UUID        NOT NULL, UNIQUE  — UUIDv5(namespace, workspace).
-                                     The public key: the `tenant_id` token claim and the
-                                     FK target of every future aggregate
+    id           UUID        PK    — UUIDv7, framework-minted. THE key: the `tenant_id`
+                                     token claim carries it, every tenant-scoped foreign
+                                     key targets it, and the management API's by-id URLs
+                                     use it
     name         TEXT        NOT NULL           — NOT unique; see §7 and §B Q8
     workspace    TEXT        NOT NULL, UNIQUE across ALL rows, active and archived alike
                                      (plain unique index)
@@ -447,7 +466,7 @@ cultural norms, and a change made for it must not silently move the tenant's bou
 ## 3. Children (1:N)
 
 **N/A — no collections.** `User`, `Group` and `Role` will each be their own root aggregate
-holding a `tenant_id` reference (to `tenants.tenant_id` — see §B), per the target model
+holding a `tenant_id` reference (to `tenants.id` — see the amendment at the top), per the target model
 recorded in `../../../README.md`. Modeling them as children of `Tenant` would mean a user could only
 ever be loaded through its tenant and could not be archived on its own — the "restorable
 alone ⇒ own aggregate" test answers this in one line.
@@ -486,7 +505,7 @@ suspended. The reverse does not hold — activating a tenant does not unarchive 
 **Soft only — archive/unarchive. No `DELETE` verb is generated** (proposed; alternative:
 both verbs).
 
-The reason is structural. `tenants.tenant_id` will be a foreign key target for `users`, and
+The reason is structural. `tenants.id` is the foreign key target for `users`, and
 the same value is the `tenant_id` claim inside tokens already issued and still valid. An
 irreversible purge orphans both. Worse, it would erase the row that *reserves* the
 workspace — and since `tenant_id` is a pure function of the workspace (§A.2), the next

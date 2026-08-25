@@ -37,7 +37,7 @@ three of them are the interesting part of this spec.
 | `../permission/spec.md` · `../tenant/spec.md` (both APPROVED) | the local flavor: shared vs entity-specific VOs, substance-validated text, archive-not-delete, the `<entity>:<verb>` taxonomy, service pre-check + DB backstop uniqueness |
 | `../../scaffold-service/spec.md` (APPROVED) | posture: Postgres SoR, **no Mongo**, no broker → relational-served views; REST + OpenAPI + GraphQL wired |
 | `../tenant/spec.md` · `../permission/spec.md` · `../role/spec.md` §2 (the VO inventory they declare) | what is available to reuse: `Description`, `DisplayName`, `RoleKey`, `PermissionKey`, `TenantWorkspace`, `TenantStatus`, and the shared `text_predicates` helpers |
-| `../role/spec.md` §1 (the FK shape this entity mirrors) | `roles.tenant_id → tenants.tenant_id` (the public derived key, NO ACTION), and `role_permissions.permission_id → permissions.id` (the PK, because the pair's own uniqueness is a partial index Postgres will not point an FK at) |
+| `../role/spec.md` §1 (the FK shape this entity mirrors) | `roles.tenant_id → tenants.id` (the PK — the derived key was removed 2026-08-24, NO ACTION), and `role_permissions.permission_id → permissions.id` (the PK, because the pair's own uniqueness is a partial index Postgres will not point an FK at) |
 | omnicore `v0.57.0` `/docs` | `read-joins` (the traversal, and what a collection-level one can and cannot do), `relational-view` (what a SoR-backed view serves and what it inherits from the loader), `application/configuration/identity.go` (the `IsSuperAdmin` / `HasPermission` contract) |
 
 ### Verified framework facts (read at this pin, not assumed)
@@ -199,7 +199,7 @@ INDEX  (group_id)                                         -- group_roles, the pa
 | `groups` | A tenant's own org unit — the bundle of roles a member inherits by belonging to it. Owned by exactly one tenant; groups never nest, and membership lives in its own aggregate. |
 | `group_roles` | The roles a group confers on its members. One row per role in the bundle, holding nothing but the role's id — so a retired-and-recreated role is never silently re-conferred, and the pair is never stored twice. |
 
-- **The `tenant_id` FK targets `tenants.tenant_id`**, the public derived key the JWT claim
+- **The `tenant_id` FK targets `tenants.id`** *(corrected 2026-08-24 — the derived key was removed)*, the PK the JWT claim
   carries — not the surrogate `tenants.id` — so the Layer 3 isolation filter compares the
   claim directly instead of paying a lookup on every read. `NO ACTION`, deliberately, for
   the reason written into `0003_role_manual.up.sql`: a tenant is archived and never purged.
@@ -301,7 +301,7 @@ Four properties that are the framework's, not this model's:
 
 **No traversal to `Tenant` is declared, and the reason is the same trap `../role/spec.md`
 §2 names.** A join's predicate is always `fk = target.id`, and `groups.tenant_id` points at
-`tenants.tenant_id` — the derived public key — not at `tenants.id`. The declaration would be
+`tenants.id` since 2026-08-24, so a traversal into Tenant IS expressible; the paragraph below is the record of why it was refused while the derived key existed. The declaration would be
 *accepted* (the column is an id) and would render `groups.tenant_id = tenants.id`, matching
 nothing: `left` fills every field with NULL, `inner` drops every group from every read,
 `FindByID` included. **Do not declare it.**

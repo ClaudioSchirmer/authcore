@@ -9,13 +9,21 @@ here:
 
 | Identifier | Value | Who sees it |
 |---|---|---|
-| `id` | UUID v7, minted by the framework | internal. Referenced by no foreign key; appears only in the management API's by-id URLs |
+| `id` | UUID v7, minted by the framework | **the key**: the `tenant_id` token claim, the foreign-key target of every tenant-scoped aggregate, and the management API's by-id URLs |
 | `workspace` | `acme-comercio` | the human-facing handle — URLs, logs, support |
-| `tenant_id` | `UUIDv5(namespace, workspace)` | **the public key**: the token claim, and the foreign-key target of every future aggregate |
 
 So `tenant_id` means exactly one value everywhere it appears — column, claim and foreign
-key — and the row id is never issued to anyone. Every other service scopes its data by
-reading that claim off the token instead of asking this one.
+key. Every other service scopes its data by reading that claim off the token instead of
+asking this one.
+
+An earlier model carried a **third** identifier beside these: a `UUIDv5` derived from the
+workspace, kept so the row id would never leave the service. It was removed on 2026-08-24,
+because it could not deliver what it existed for. A tenant's id is stored inside every OTHER
+microservice that references it — in their tables, their logs and their own APIs — so it is
+public in practice whatever this service calls it. The second key bought a translation step
+on every isolation filter, a foreign key whose target nobody guessed right the first time,
+and a standing "which of these two UUIDs is this?" question, in exchange for hiding a
+creation timestamp. One key is the better trade.
 
 Go module: `github.com/ClaudioSchirmer/authcore` · Go 1.26.5 · built on
 [omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.57.0** (DDD + CQRS framework).
@@ -32,15 +40,15 @@ Honest scope, so nobody reads intent as delivery:
 | User entity | not started |
 | User ↔ tenant association | not started |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
-| `Role` entity | **specified, not built** — a tenant's own bundle of catalog permissions; model in `specs/scaffold-entity/role/spec.md` |
+| `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **specified, not built** — a tenant's org unit and the bundle of roles its members inherit; model in `specs/scaffold-entity/group/spec.md` |
 | Effective-permission resolution (group path ∪ direct path) | not started |
 | Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
-| Token issuance with the `tenant_id` claim | not started — the value it must carry is the tenant's derived `tenant_id`, never the row id |
+| Token issuance with the `tenant_id` claim | not started — the value it must carry is `tenants.id`. Nothing in the code enforces that yet |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Generated code | **Tenant and Permission.** `internal/` holds both aggregates end to end — domain, application, web, infra, migrations `0001` and `0002`, wiring and the seven catalogs. The `Role` and `Group` sections below still describe what their models say, not what a caller can hit |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:*` and `group:*` (the latter **five** verbs) are still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
+| Generated code | **Tenant, Permission and Role.** `internal/` holds all three aggregates end to end — domain, application, web, infra, migrations `0001` to `0003`, wiring and the seven catalogs. The `Group` section below still describes what its model says, not what a caller can hit |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) is still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
 
 ## Architecture posture
 
@@ -160,37 +168,18 @@ alternatives that were rejected and why, is in `specs/scaffold-entity/tenant/spe
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | UUID v7 | the row id. Internal — never issued, never a foreign-key target |
-| `tenant_id` | UUID v5 | **derived** from `workspace`; the token claim and the FK target. Read-only: computed on insert, immutable afterwards |
+| `id` | UUID v7 | the row id, and the tenant's only identifier: the `tenant_id` token claim carries it and every tenant-scoped foreign key targets it |
 | `name` | string(120) | display name. **Not unique** — two customers may legitimately share a trade name |
 | `workspace` | string(63) | the handle. Unique across **all** rows, archived included; immutable after creation |
 | `description` | string(500) | required, and validated for substance |
 | `status` | enum | `trial` · `active` · `suspended`. Mandatory on create, no default |
 
-#### Why the public key is derived instead of being the row id
-
-The row id is a **UUID v7**, which embeds a millisecond timestamp by construction. Issuing
-it as a claim would hand every client and every consuming service the creation instant and
-the creation ORDER of every tenant — how many customers signed in March, and who was first.
-A `UUIDv5(namespace, workspace)` carries no time at all, and any service that knows the
-handle can recompute it offline with no call back here.
-
-**It is not a secret and must never be treated as one.** UUID v5 is a hash of the namespace
-and the name, so given the namespace it is brute-forceable back to the handle over a small
-dictionary of company handles. That costs nothing here: the handle is public by design. What
-the derivation hides is the timestamp, and that it hides completely.
-
-The namespace is a project constant in `internal/domain/vos/tenant_workspace.go`, and it
-**must never change**: changing it re-derives every `tenant_id` in existence, invalidating
-every issued token and orphaning every foreign key pointing at one.
-
 #### The three asymmetries worth knowing before you touch them
 
-- **The workspace is reserved forever.** It reaches URLs, logs and bookmarks — and it
-  derives the public key, so re-issuing a handle would re-issue a byte-identical
-  `tenant_id`. Every token ever minted for the archived tenant would then validate, and be
-  *authorized*, against the new one's data. Valid signature, correct claim, wrong tenant,
-  nothing to detect. Its unique index is therefore total, never partial.
+- **The workspace is reserved forever.** It reaches URLs, logs, bookmarks and external
+  configuration, so re-issuing a handle would make a new tenant answer to a retired
+  tenant's history — support threads, dashboards and integrations all pointing at the wrong
+  customer, with nothing to detect. Its unique index is therefore total, never partial.
 - **The name is not unique at all.** No large multi-tenant product makes the display name
   unique — only the handle. Operators tell two "Acme" rows apart by the workspace beside
   the name.
@@ -206,7 +195,6 @@ table):
 |---|---|
 | `name` | 2–120 characters · at least one letter · at least min(3, length) distinct characters · no run of 4 or more identical characters · no leading/trailing whitespace and no double space |
 | `workspace` | 3–63 characters · `^[a-z0-9]+(-[a-z0-9]+)*$` · at least 3 distinct characters · no run of 4 or more identical · not on the 51-entry reserved list · unique across all rows · immutable · **no input normalization** — `" Acme "` and `"ACME-CORP"` are refused, never silently repaired |
-| `tenant_id` | must equal `workspace.DeriveTenantID()` · immutable |
 | `description` | 15–500 characters · at least two words · at least 5 distinct characters · no run of 4 or more identical · at least one vowel · must differ from the name and the workspace under a normalized comparison |
 | `status` | a declared member · transitions `trial→active`, `trial→suspended`, `active→suspended`, `suspended→active` and no-ops only — `active→trial` and `suspended→trial` are refused |
 
@@ -222,7 +210,7 @@ that do not separate words with spaces — Japanese, Chinese, Thai, Lao, Khmer. 
 Japanese sentence counts as one word and is refused. Arabic and Cyrillic are unaffected.
 
 Removal is **archive only** — there is no `DELETE`. Users and issued tokens will carry
-`tenant_id`, and an irreversible purge would orphan them; it would also erase the row that
+its id, and an irreversible purge would orphan them; it would also erase the row that
 *reserves* the workspace, handing that public key to the next registration. **Archiving
 forces the status to `suspended`**, which makes archived-and-active an unrepresentable
 state rather than a refused one, and unarchiving therefore returns the tenant suspended —
@@ -302,32 +290,50 @@ which is what every authorization note below exists for.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or grant |
-| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.tenant_id` — the PUBLIC derived key, not the surrogate row id |
+| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.id` — the tenant's only identifier, and the value the `tenant_id` token claim carries |
 | `key` | string(64) | the stable machine handle (`billing-manager`). Immutable, and unique **per tenant**, not globally. Stored in `role_key` |
 | `name` | string(120) | the display name. Not unique — two tenants, or two roles, may share a label |
 | `description` | string(500) | required, and validated for substance |
-| `permissions[]` | collection | the grants. Each entry carries `id`, `permissionID`, and the catalog's own `resource`, `action` and `archivedAt`, read across the foreign key |
+| `permissions[]` | collection | the grants. Each entry carries `id`, `permissionID` and the rendered `permission` token — the last one derived from two columns read across the foreign key |
+| `tenantWorkspace` · `tenantStatus` | string | the owning tenant's handle and commercial state, **read across the foreign key**. Read-only, absent from every write body, and — unlike a grant's fields — filterable and sortable, because a ROOT join's fields are addressable in a criteria |
 
 Five things a reader will otherwise get wrong.
 
 **1. The read returns the permission, not just its id — without storing a copy of it.**
-`GET /roles/{id}` answers `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…",
-"resource": "tenant", "action": "read", "archivedAt": null }]`. A client renders
-`tenant:read` from the two halves it was handed, with no second call to `GET /permissions`.
+Both `GET /roles/{id}` and the listing `GET /roles` answer
+`"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…", "permission": "tenant:read" }]`.
+The client reads ONE token, with no second call to `GET /permissions` and no two halves to
+join — the same shape the catalog's own endpoint serves.
 
-The row still holds **only the id**. `resource`, `action` and `archivedAt` are a **read
-join** — declared once on the repository, traversed at load time, never written. That
-distinction is the whole point: denormalizing the `resource:action` pair into each grant was
-rejected, because a retired permission comes back as a **new row with a new id**, so a grant
-holding the *string* would silently re-attach to the recreated row. A grant holding the
-**id** cannot, and reading the string across the FK costs nothing that a copy would cost.
+The row still holds **only the id**. `resource` and `action` are a **read join** — declared
+once on the repository, traversed at load time, never written — and they are `hidden`: they
+feed the rendered token and reach no response body, no listing row and no export. That is
+the whole point: denormalizing the `resource:action` pair into each grant was rejected,
+because a retired permission comes back as a **new row with a new id**, so a grant holding
+the *string* would silently re-attach to the recreated row. A grant holding the **id**
+cannot, and reading the string across the FK costs nothing that a copy would cost.
 
-`archivedAt` is the half an access review actually needs: `Permission` archives one-way, so a
-non-null value says *this role still grants a permission the platform has retired* — a
-long-lived state, not an edge case, and one a bare id could never surface. It renders the
-state; it never decides anything. Granting still asks the domain whether the id is in the
-catalog and still active, because an entry a request is **adding** carries no joined value at
-all — its `archivedAt` reads `null` exactly like a live one's.
+The traversal also reports nothing about the catalog row's own state. An earlier build
+surfaced the permission's archive stamp here; it was removed on 2026-08-24 because nothing
+consumed it and because `Permission` deliberately keeps `deletedAt` off its own reads —
+republishing the same column through a join was a back door to a decision the owning
+aggregate had already made the other way.
+
+**1b. A role also carries its tenant's handle and status, by the same mechanism.**
+`tenantWorkspace` and `tenantStatus` are a root join into `Tenant`, so a listing shows which
+customer a role belongs to without a second call. Two consequences worth knowing:
+
+- **They are filterable and sortable**, unlike anything inside `permissions[]`. A root
+  join's fields are addressable in a criteria; a child join's are not, because narrowing a
+  root by a field of a 1:N collection is a pushdown one root `SELECT` cannot express.
+- **`tenantStatus` is a plain string, never the `TenantStatus` enum.** A join field carries
+  no domain type: the value belongs to `Tenant`, arrives read-only and is never validated
+  here, so reconstructing the enum would hand back an instance no rule of the owning
+  aggregate ever approved.
+
+This traversal became expressible only when the derived tenant key was removed. A join's
+predicate is always `fk = target.id`, and while `roles.tenant_id` pointed at a second,
+derived column, the declaration would have been accepted and matched nothing.
 
 **2. You can only grant what you hold.** A caller may add a permission to a role only if
 their own token carries it — the standard defence against a tenant admin minting themselves
@@ -402,7 +408,7 @@ of it, and three of them are the interesting part.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or attach |
-| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.tenant_id` — the PUBLIC derived key, not the surrogate row id |
+| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.id` — the tenant's only identifier, and the value the `tenant_id` token claim carries |
 | `key` | string(64) | the stable machine handle (`engineering`). Immutable, and unique **per tenant**, not globally. Stored in `group_key` |
 | `name` | string(120) | the display name. Not unique — two groups in one tenant may share a label; the `key` is what disambiguates |
 | `description` | string(500) | required, and validated for substance |
@@ -414,6 +420,12 @@ of it, and three of them are the interesting part.
 one level down. The entry still stores only the id, because an entry holding the role's
 *key* would silently re-attach to a retired-and-recreated role and one holding the **id**
 cannot. A non-null `archivedAt` says the group still confers a role the tenant has retired.
+
+> **Open, for whoever builds this.** `Role` carried the equivalent field on its own grants
+> and it was **removed** on 2026-08-24 — nothing consumed it, and it republished a column
+> its owning aggregate deliberately keeps off its own reads. `Group`'s model still declares
+> it because that spec was approved before the removal and has not been re-opened. Decide it
+> at the gate rather than inheriting it.
 
 So the forward walk is two complete reads: `GET /groups/{id}` names the roles,
 `GET /roles/{id}` names the permissions. Neither needs a third listing joined by hand.

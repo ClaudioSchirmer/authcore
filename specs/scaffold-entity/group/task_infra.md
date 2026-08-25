@@ -53,7 +53,7 @@ too. The three fields are read-only, carry no domain type (`RoleKey` is a plain 
 never `vos.RoleKey`), and are absent from the `TableSchema`, so none of them reaches an
 INSERT or an UPDATE. `ArchivedAt` is `*time.Time` because the target's `deleted_at` is
 nullable. **No traversal to `Tenant`** — spec §2 names the trap: `groups.tenant_id` points at
-`tenants.tenant_id`, not `tenants.id`, so the declaration would be accepted and would match
+`tenants.id` since 2026-08-24 (the derived key was removed), so the traversal IS expressible now; what follows is the record of why it was refused while that key existed — it would have been accepted and would have matched
 nothing.
 
 **Domain service implementation** — the six facts of spec §7, request-scoped so it reads the

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:e2da36c73cd0c9c7584db536d3e918acdbf2dc4d59c4d7275daf7a9f86e62fc5
+// checksum:   sha256:192d6b4b0de13c46acb6ea3ffb8aaa051d89ad4bf1584dfad4e9b87a8bfccc7d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -79,7 +79,6 @@ func (stubTenantService) WorkspaceTaken(_ string, _ domain.ID) bool { return fal
 // points at the rule under test rather than at unrelated invalid state.
 func validTenant() *Tenant {
 	return &Tenant{
-		TenantID:    domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"),
 		Name:        vos.DisplayName("Acme Comércio e Serviços Ltda"),
 		Workspace:   vos.TenantWorkspace("acme-comercio"),
 		Description: vos.Description("Retail operations of the Acme group in Brazil."),
@@ -119,15 +118,12 @@ func TestTenantNotificationSemantics(t *testing.T) {
 		want domain.NotificationSemantic
 	}{
 		{"TenantWorkspaceAlreadyExistsNotification", TenantWorkspaceAlreadyExistsNotification{}.Semantic(), domain.SemanticConflict},
-		{"TenantIDAlreadyExistsNotification", TenantIDAlreadyExistsNotification{}.Semantic(), domain.SemanticConflict},
 		{"UnknownTenantStatusNotification", vos.UnknownTenantStatusNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidDisplayNameNotification", vos.InvalidDisplayNameNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidDescriptionNotification", vos.InvalidDescriptionNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidTenantWorkspaceNotification", vos.InvalidTenantWorkspaceNotification{}.Semantic(), domain.SemanticValidation},
 		{"ReservedTenantWorkspaceNotification", vos.ReservedTenantWorkspaceNotification{}.Semantic(), domain.SemanticValidation},
 		{"TenantWorkspaceIsImmutableNotification", TenantWorkspaceIsImmutableNotification{}.Semantic(), domain.SemanticValidation},
-		{"TenantIDIsImmutableNotification", TenantIDIsImmutableNotification{}.Semantic(), domain.SemanticValidation},
-		{"TenantIDDerivationMismatchNotification", TenantIDDerivationMismatchNotification{}.Semantic(), domain.SemanticValidation},
 		{"TenantDescriptionMustDifferNotification", TenantDescriptionMustDifferNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidTenantStatusTransitionNotification", InvalidTenantStatusTransitionNotification{}.Semantic(), domain.SemanticValidation},
 	} {
@@ -152,23 +148,5 @@ func TestTenant_Workspace_IsImmutable(t *testing.T) {
 	}
 	if !tenantBlames(err, "Workspace") {
 		t.Errorf("the rejection should name Workspace, it named %v", tenantRejectedFields(err))
-	}
-}
-
-// TenantID cannot change once set.
-//
-// It is driven through the update path because the rule reads the previous
-// value, and on an insert there is no previous value to read.
-func TestTenant_TenantID_IsImmutable(t *testing.T) {
-	e := validTenant()
-	_, err := domain.GetUpdatable(e, func(x *Tenant) error {
-		x.TenantID = domain.NewID("00000000-0000-0000-0000-000000000002")
-		return nil
-	}, &stubTenantService{}, "GetUpdatable")
-	if err == nil {
-		t.Fatal("changing TenantID was accepted")
-	}
-	if !tenantBlames(err, "TenantID") {
-		t.Errorf("the rejection should name TenantID, it named %v", tenantRejectedFields(err))
 	}
 }

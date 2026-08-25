@@ -1,0 +1,724 @@
+# Role — a tenant's own cut of the global permission catalog.
+#
+# Model authority: scaffold-entity/role/spec.md (Status: APPROVED). Nothing here
+# re-decides the model; where this file and that spec disagree, the spec wins.
+#
+# The one idea to hold while reading: ONE COLUMN GOES IN, FOUR COME OUT.
+#   permission_id   stored on role_permissions — the catalog row's id, and nothing else
+#   resource        NOT stored — read across the foreign key on every load
+#   action          NOT stored — same
+#   deleted_at      NOT stored — the counterpart's archive stamp, read the same way
+#
+# Storing the id and not the string is what keeps the README's Permission rule 3 true: a
+# retired permission comes back as a NEW row with a NEW id, so a grant holding the string
+# would silently re-attach and one holding the id cannot.
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: Role
+plural: Roles
+language: en-US
+
+storage:
+  kind: flat
+  table: roles
+  description: >-
+    A tenant's own bundle of catalog permissions — the unit a user or a group is granted.
+    Owned by exactly one tenant; the platform's own roles live in the reserved platform
+    tenant rather than in a null scope.
+  managed:
+    revision: revision
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+
+fields:
+  # The owning tenant, by PRIMARY KEY. Tenant has exactly one identifier: the derived
+  # UUIDv5 that used to be its public key was removed on 2026-08-24, because a tenant's id
+  # is pinned inside every other microservice that stores it and was a public key in
+  # practice regardless. The tenant_id JWT claim therefore carries this same value, and the
+  # Layer 3 isolation filter compares a plain local column with no translation step.
+  #
+  # The FK itself is appended to the migration by hand: a reference to ANOTHER aggregate is
+  # outside this language.
+  - name: TenantID
+    type: id
+    column: tenant_id
+    livesOn: root
+    # ON THE WIRE, deliberately — assignedFrom: identity-claim was tried and is
+    # WRONG for this entity, in two ways that only showed up against a running
+    # bench. It removes the field from every write DTO, so (1) a super-admin can
+    # never create a role in a tenant other than their own, which §10 of the
+    # approved model explicitly promises, and (2) on a dev bench with
+    # auth.mode disabled nothing fills it and the write dies on an empty id.
+    #
+    # The row scope is not lost by putting it back: refuseForeignTenant already
+    # refuses a value that is not the caller's claim (403), and the super-admin
+    # bypass already crosses it. The claim decides what you MAY write; it does
+    # not have to be the only thing that CAN write it.
+    example: a3f1c07e-2b58-5d94-8e61-4f2093ab77d5
+    description: >-
+      The tenant that owns this role. Immutable after creation — a role never moves between
+      tenants.
+    labelKey: RoleTenantIDField
+    text:
+      eng: Tenant
+      ptbr: Inquilino
+      esp: Inquilino
+      fra: Locataire
+      deu: Mandant
+      ita: Tenant
+      nld: Tenant
+
+  # `key` is a reserved word across the engine set, so the physical column is role_key.
+  # Only the STORAGE name moves: the exposed name stays Key everywhere — filters, ?orderBy,
+  # OpenAPI, GraphQL, JSON. The same move permission made for resource -> resource_name.
+  #
+  # unique WITHIN the tenant, not globally: two customers may both have `administrator`.
+  # active-only, because with no unarchive verb re-inserting is the only way back.
+  - name: Key
+    type: string
+    column: role_key
+    length: 64
+    livesOn: root
+    vo: {kind: manual, ref: RoleKey}
+    unique:
+      enforce: service-precheck+constraint
+      notification: RoleKeyAlreadyExistsNotification
+      scope: active-only
+      within: [TenantID]
+    example: billing-manager
+    description: >-
+      Stable machine handle of the role, unique within its tenant and immutable. What an API
+      caller and an audit line reference; never the display name.
+    labelKey: RoleKeyField
+    text:
+      eng: Key
+      ptbr: Chave
+      esp: Clave
+      fra: Clé
+      deu: Schlüssel
+      ita: Chiave
+      nld: Sleutel
+
+  - name: Name
+    type: string
+    column: name
+    length: 120
+    livesOn: root
+    vo: {kind: reuse, ref: DisplayName}
+    example: Billing Manager
+    description: >-
+      Human-readable name of the role as operators and end users see it. Not unique — two
+      tenants, or two roles, may share a label.
+    labelKey: RoleNameField
+    text:
+      eng: Name
+      ptbr: Nome
+      esp: Nombre
+      fra: Nom
+      deu: Name
+      ita: Nome
+      nld: Naam
+
+  - name: Description
+    type: string
+    column: description
+    length: 500
+    livesOn: root
+    vo: {kind: reuse, ref: Description}
+    example: >-
+      Grants read access to the tenant registry and the permission catalog, without any
+      write verb.
+    description: What holding this role actually lets a user do, in the tenant's own words.
+    labelKey: RoleDescriptionField
+    text:
+      eng: Description
+      ptbr: Descrição
+      esp: Descripción
+      fra: Description
+      deu: Beschreibung
+      ita: Descrizione
+      nld: Beschrijving
+
+valueObjects:
+  # kind: manual — a scalar the generator does not write. It has to be: the anti-junk
+  # predicates this project already shares (a distinct-rune floor, no long run of identical
+  # runes) are not a regex, and reusing TenantWorkspace instead would drag the platform's
+  # reserved-route list and DeriveTenantID onto a role, which belong to neither.
+  - name: RoleKey
+    kind: manual
+    backing: string
+    description: >-
+      A role's stable machine handle: a lowercase slug of 2-64 runes, groups separated by
+      single hyphens so a hyphen can never lead, trail or double. Reuses this project's
+      shared anti-junk predicates. No reserved list and no derivation — those two rules
+      belong to the tenant handle. No normalization: a value that does not already comply is
+      refused, never repaired.
+
+notifications:
+  - name: InvalidRoleKeyNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A role key that is not a lowercase slug of 2-64 runes in hyphen-separated groups, or
+      that reads as keyboard junk under this project's shared anti-junk predicates.
+    text:
+      eng: The role key is not valid.
+      ptbr: A chave do papel não é válida.
+      esp: La clave del rol no es válida.
+      fra: La clé du rôle n'est pas valide.
+      deu: Der Rollenschlüssel ist ungültig.
+      ita: La chiave del ruolo non è valida.
+      nld: De rolsleutel is ongeldig.
+
+  - name: RoleKeyAlreadyExistsNotification
+    semantic: conflict
+    description: >-
+      An ACTIVE role in this tenant already holds this key. Archived rows do not block it —
+      re-inserting is how a retired role comes back.
+    text:
+      eng: A role with this key already exists in this tenant.
+      ptbr: Já existe um papel com esta chave neste inquilino.
+      esp: Ya existe un rol con esta clave en este inquilino.
+      fra: Un rôle avec cette clé existe déjà dans ce locataire.
+      deu: In diesem Mandanten existiert bereits eine Rolle mit diesem Schlüssel.
+      ita: Esiste già un ruolo con questa chiave in questo tenant.
+      nld: Er bestaat al een rol met deze sleutel in deze tenant.
+
+  - name: RoleKeyIsImmutableNotification
+    semantic: validation
+    description: >-
+      An attempt to change the key after creation, which every API caller and every audit
+      line references.
+    text:
+      eng: The role key cannot be changed.
+      ptbr: A chave do papel não pode ser alterada.
+      esp: La clave del rol no se puede modificar.
+      fra: La clé du rôle ne peut pas être modifiée.
+      deu: Der Rollenschlüssel kann nicht geändert werden.
+      ita: La chiave del ruolo non può essere modificata.
+      nld: De rolsleutel kan niet worden gewijzigd.
+
+  - name: RoleTenantIsImmutableNotification
+    semantic: validation
+    description: An attempt to move a role from one tenant to another after creation.
+    text:
+      eng: The owning tenant cannot be changed.
+      ptbr: O inquilino proprietário não pode ser alterado.
+      esp: El inquilino propietario no se puede modificar.
+      fra: Le locataire propriétaire ne peut pas être modifié.
+      deu: Der besitzende Mandant kann nicht geändert werden.
+      ita: Il tenant proprietario non può essere modificato.
+      nld: De eigenaar-tenant kan niet worden gewijzigd.
+
+  - name: RoleTenantDoesNotExistNotification
+    semantic: validation
+    description: >-
+      The owning tenant does not exist, has been archived, or is commercially
+      suspended. A TRIAL tenant is a live customer and is accepted.
+    text:
+      eng: The owning tenant does not exist, is archived or is suspended.
+      ptbr: O inquilino proprietário não existe, está arquivado ou está suspenso.
+      esp: El inquilino propietario no existe, está archivado o está suspendido.
+      fra: Le locataire propriétaire n'existe pas, est archivé ou est suspendu.
+      deu: Der besitzende Mandant existiert nicht, ist archiviert oder ist gesperrt.
+      ita: Il tenant proprietario non esiste, è archiviato o è sospeso.
+      nld: De eigenaar-tenant bestaat niet, is gearchiveerd of is opgeschort.
+
+  - name: PermissionNotInCatalogNotification
+    semantic: validation
+    description: >-
+      A granted permission id is not in the catalog, or points at a permission that has been
+      retired. A retired permission comes back as a new row with a new id and must be
+      granted explicitly.
+    text:
+      eng: This permission is not in the catalog or is no longer active.
+      ptbr: Esta permissão não está no catálogo ou não está mais ativa.
+      esp: Este permiso no está en el catálogo o ya no está activo.
+      fra: Cette permission n'est pas au catalogue ou n'est plus active.
+      deu: Diese Berechtigung ist nicht im Katalog oder nicht mehr aktiv.
+      ita: Questo permesso non è nel catalogo o non è più attivo.
+      nld: Dit recht staat niet in de catalogus of is niet meer actief.
+
+  - name: RoleAlreadyGrantsPermissionNotification
+    semantic: conflict
+    description: The role already grants this permission; the pair is never stored twice.
+    text:
+      eng: This role already grants this permission.
+      ptbr: Este papel já concede esta permissão.
+      esp: Este rol ya concede este permiso.
+      fra: Ce rôle accorde déjà cette permission.
+      deu: Diese Rolle gewährt diese Berechtigung bereits.
+      ita: Questo ruolo concede già questo permesso.
+      nld: Deze rol verleent dit recht al.
+
+  - name: TooManyPermissionsInRoleNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      The role would carry more permissions than one role may hold. The cap is sized to this
+      platform, and it is also a claim-size budget.
+    text:
+      eng: A role may grant at most {max} permissions.
+      ptbr: Um papel pode conceder no máximo {max} permissões.
+      esp: Un rol puede conceder como máximo {max} permisos.
+      fra: Un rôle peut accorder au maximum {max} permissions.
+      deu: Eine Rolle darf höchstens {max} Berechtigungen gewähren.
+      ita: Un ruolo può concedere al massimo {max} permessi.
+      nld: Een rol mag maximaal {max} rechten verlenen.
+
+  - name: CannotGrantUnheldPermissionNotification
+    semantic: forbidden
+    description: >-
+      No privilege escalation: a caller may only grant a permission they themselves hold. A
+      *:* superadmin passes for everything, by construction.
+    text:
+      eng: You cannot grant a permission you do not hold.
+      ptbr: Você não pode conceder uma permissão que não possui.
+      esp: No puede conceder un permiso que usted no posee.
+      fra: Vous ne pouvez pas accorder une permission que vous ne détenez pas.
+      deu: Sie können keine Berechtigung gewähren, die Sie nicht besitzen.
+      ita: Non è possibile concedere un permesso che non si possiede.
+      nld: U kunt geen recht verlenen dat u zelf niet heeft.
+
+  - name: CannotGrantWildcardPermissionNotification
+    semantic: forbidden
+    description: >-
+      A permission with a wildcard in either part cannot be granted on any role through the
+      API. The platform's own *:* role is seeded by migration beside the reserved platform
+      tenant.
+    text:
+      eng: A wildcard permission cannot be granted on a role.
+      ptbr: Uma permissão curinga não pode ser concedida a um papel.
+      esp: Un permiso comodín no puede concederse a un rol.
+      fra: Une permission joker ne peut pas être accordée à un rôle.
+      deu: Eine Platzhalter-Berechtigung kann keiner Rolle gewährt werden.
+      ita: Un permesso jolly non può essere concesso a un ruolo.
+      nld: Een jokerrecht kan niet aan een rol worden verleend.
+
+children:
+  # The grants. Per-child GRANT / REVOKE, never a replace-all: an omitted permission on a
+  # wholesale PUT would be a silent mass-revocation, and a revocation is the one write here
+  # that must never happen by omission.
+  #
+  # operations: [add, remove] and NOT change — the entry's single stored column IS its
+  # business identity, so "change this grant" turns grant A into grant B while keeping A's
+  # row id, which an audit trail reads as one grant BECOMING another instead of as two
+  # events. Re-granting a revoked permission is a fresh add with a fresh child id.
+  - name: RolePermission
+    plural: Permissions
+    table: role_permissions
+    parentColumn: role_id
+    ownedBy: root
+    editStrategy: per-child
+    operations: [add, remove]
+    # A revoke is a SOFT removal: the row lingers with a stamp and the per-child verb mounts
+    # as PATCH .../archive rather than DELETE. A DELETE that soft-removes is a lying
+    # contract, and an access review needs to read what a past grant meant.
+    softRemove: true
+    archivedAt: deleted_at
+    businessIdentity: [PermissionID]
+    duplicateNotification: RoleAlreadyGrantsPermissionNotification
+    # The rendered resource:action token, ONE PER GRANT. Sources are the entry's
+    # own join fields, named bare. The body rebuilds vos.PermissionKey and calls
+    # String() rather than joining two strings — the separator keeps exactly one
+    # home in this service, which is what ../permission/spec.md requires.
+    computed:
+      - name: Permission
+        type: string
+        from: [Resource, Action]
+        labelKey: RolePermissionPermissionField
+        example: tenant:read
+        description: >-
+          The permission as a token carries it and a route compares it: resource:action.
+        text:
+          eng: Permission
+          ptbr: Permissão
+          esp: Permiso
+          fra: Permission
+          deu: Berechtigung
+          ita: Permesso
+          nld: Recht
+    description: >-
+      The permissions a role grants. One row per permission in the bundle, holding nothing
+      but the catalog row's id — so a retired-and-recreated permission is never silently
+      re-granted, and the pair is never stored twice.
+    fields:
+      - name: PermissionID
+        type: id
+        column: permission_id
+        # The RACE BACKSTOP for the duplicate-grant rule. The rule itself
+        # compares the entries this write carries, in memory; two concurrent
+        # grants of the same permission each pass that check and only the index
+        # stops the second. active-only, because a REVOKED grant must not block
+        # re-granting — there is no per-entry unarchive, so a fresh add is the
+        # only way back.
+        unique:
+          enforce: constraint-only
+          notification: RoleAlreadyGrantsPermissionNotification
+          scope: active-only
+        example: 9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3
+        description: >-
+          The catalog row this grant points at — the id and not the string, so a
+          retired-and-recreated permission needs an explicit re-grant.
+        labelKey: RolePermissionPermissionIDField
+        text:
+          eng: Permission
+          ptbr: Permissão
+          esp: Permiso
+          fra: Permission
+          deu: Berechtigung
+          ita: Permesso
+          nld: Recht
+
+joins:
+  # The traversal into the OWNER. Expressible only since 2026-08-24: a join's predicate is
+  # always fk = target.id, and roles.tenant_id used to point at a derived key beside the PK,
+  # so this declaration would have been accepted and matched nothing. With that key gone the
+  # foreign key targets tenants.id and the traversal is ordinary.
+  #
+  # inner is correct because tenant_id is NOT NULL and FK-backed. Unlike a child join, a
+  # ROOT join's fields are addressable in a criteria — so these two are filterable and
+  # sortable like any column of this table, which is what makes "roles of acme-comercio"
+  # answerable without a second call.
+  #
+  # Neither carries a domain type, by construction: the value belongs to Tenant, arrives
+  # read-only and is never validated here. Status is the plain string the column stores, not
+  # vos.TenantStatus — reconstructing the enum would hand back an instance no rule of the
+  # owning aggregate ever approved.
+  - kind: inner
+    to: Tenant
+    on: tenant_id
+    fields:
+      - name: TenantWorkspace
+        column: workspace
+        example: acme-comercio
+        description: >-
+          The owning tenant's immutable handle — what URLs, logs and support conversations
+          say. Read-only, filled on every load, never written through this aggregate.
+        labelKey: RoleTenantWorkspaceField
+        text:
+          eng: Workspace
+          ptbr: Workspace
+          esp: Workspace
+          fra: Espace de travail
+          deu: Workspace
+          ita: Workspace
+          nld: Workspace
+      - name: TenantStatus
+        column: status
+        example: active
+        description: >-
+          The owning tenant's commercial lifecycle — trial, active or suspended. Read-only,
+          filled on every load, never written through this aggregate.
+        labelKey: RoleTenantStatusField
+        text:
+          eng: Tenant status
+          ptbr: Situação do inquilino
+          esp: Situación del inquilino
+          fra: Statut du locataire
+          deu: Mandantenstatus
+          ita: Stato del tenant
+          nld: Tenantstatus
+
+  # The traversal into the catalog, hung off the grants collection. Declared ONCE here and
+  # inherited by every consumer of the loader: FindByID (the load the write-side auto
+  # handlers go through), ScopedReader, the relational view, and any OTHER aggregate's
+  # service reading through RoleRepository.Loader — which is what lets Group resolve a role
+  # to its permission keys in ONE read.
+  #
+  # inner is correct ONLY because permission_id is NOT NULL and FK-backed. Inside a child an
+  # inner join drops the ENTRY, not the aggregate; referential integrity means there is no
+  # such row, which is exactly why the requirement is enforced.
+  #
+  # Both HIDDEN: they exist to feed the composed `permission` token and nothing else, so the
+  # caller reads one string instead of two halves.
+  #
+  # The catalog's archive stamp used to ride along here too. It was removed on 2026-08-24:
+  # nothing in this service read it, and republishing it was inconsistent with its OWNER —
+  # `Permission` deliberately keeps `deletedAt` off its own reads, reaching archived state
+  # through ?includeArchived instead. Surfacing the same column through a join was the back
+  # door to a decision the owning aggregate had already made the other way.
+  - kind: inner
+    to: Permission
+    inChild: RolePermission
+    on: permission_id
+    fields:
+      - name: Resource
+        column: resource_name
+        # OFF THE WIRE: it exists to feed the composed token below, and nothing
+        # else. The caller receives `permission`, never the two halves.
+        hidden: true
+        example: tenant
+        description: >-
+          What the granted permission protects. Read-only, filled on load, never written
+          through this aggregate.
+        labelKey: RolePermissionResourceField
+        text:
+          eng: Resource
+          ptbr: Recurso
+          esp: Recurso
+          fra: Ressource
+          deu: Ressource
+          ita: Risorsa
+          nld: Resource
+      - name: Action
+        column: action_name
+        hidden: true
+        example: read
+        description: >-
+          What the granted permission allows on that resource. Read-only, filled on load,
+          never written through this aggregate.
+        labelKey: RolePermissionActionField
+        text:
+          eng: Action
+          ptbr: Ação
+          esp: Acción
+          fra: Action
+          deu: Aktion
+          ita: Azione
+          nld: Actie
+
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+
+delete:
+  root: soft
+
+rules:
+  list:
+    # Pull the owner's OWN validation forward, and make it the barrier.
+    #
+    # Everything after this depends on the owner being a usable id — most
+    # sharply the uniqueness pre-check, which is scoped BY it and hands it
+    # straight to a criterion. The automatic value-object pass runs AFTER the
+    # rules, so without this the owner was still unchecked here: "" and "tatu"
+    # both sailed through, bound to a UUID column, and died as a 500 instead of
+    # the 422 they deserve.
+    #
+    # It replaces a `required` rule rather than joining one: domain.ID validates
+    # itself, uuid.Parse refuses the empty string and the junk alike, and a
+    # required rule beside it would tell the caller the same thing twice.
+    - id: tenant-is-a-usable-id
+      kind: valueObject
+      scope: [insertOrUpdate]
+      fields: [TenantID]
+      guard: true
+
+    - id: key-immutable
+      kind: immutable
+      scope: [update]
+      fields: [Key]
+      notification: RoleKeyIsImmutableNotification
+      description: >-
+        The key IS what API callers and audit lines reference. Editing it would rewrite the
+        meaning of every reference to this role, retroactively and invisibly. Name and
+        description stay editable.
+
+    - id: tenant-immutable
+      kind: immutable
+      scope: [update]
+      fields: [TenantID]
+      notification: RoleTenantIsImmutableNotification
+      description: A role never moves between tenants.
+
+    - id: permission-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [RolePermission]
+      cap: 200
+      notification: TooManyPermissionsInRoleNotification
+      description: >-
+        At most 200 permissions in one role. Sized to this platform rather than to GCP's
+        3000 or Azure's 2000, and it doubles as a claim-size budget.
+
+    - id: duplicate-grant
+      kind: childDuplicate
+      scope: [insertOrUpdate]
+      fields: [RolePermission]
+      notification: RoleAlreadyGrantsPermissionNotification
+      description: >-
+        No duplicate permission within one role. The business identity is the catalog
+        reference and that alone — the join fields are blank on a freshly added entry, so
+        comparing them would answer "different" for a grant that duplicates a stored one.
+
+  manual:
+    - id: tenant-must-exist
+      description: >-
+        The owning tenant must exist and must not be archived. Ask TenantIsUnavailable; a
+        read join cannot answer this — the predicate is always fk = target.id and
+        roles.tenant_id now points at tenants.id, so a traversal IS expressible — but on an
+        insert a joined field is
+        blank anyway.
+      scope: [insert]
+      notification: RoleTenantDoesNotExistNotification
+      attachTo: TenantID
+
+    - id: granted-permissions-are-in-the-catalog
+      description: >-
+        Every permission this write ADDS must exist in the catalog and still be active. Walk
+        the ADDED entries only (GetAddedItemsOf, not GetCurrentItemsOf) and ask
+        PermissionIsNotInCatalog per entry. Do NOT read the entry's ArchivedAt join field:
+        an added entry carries nil there, which is the same nil a live permission carries,
+        so that test would wave through every entry being added — fail-open on exactly the
+        path this rule exists to close. Judging only ADDED entries is deliberate: a
+        permission retired AFTER a grant must not make the role impossible to rename.
+      scope: [insertOrUpdate]
+      notification: PermissionNotInCatalogNotification
+      attachTo: Permissions
+
+    - id: no-wildcard-grant
+      description: >-
+        A permission with a wildcard in either part cannot be granted on any role. Runs
+        BEFORE the no-escalation rule and that order is load-bearing: Identity.HasPermission
+        PANICS on any argument containing '*', so this rule is what removes the input that
+        would crash the request into a 500 — on exactly the case the escalation rule exists
+        to stop. Over the ADDED entries only; ask PermissionIsWildcard per entry.
+      scope: [insertOrUpdate]
+      notification: CannotGrantWildcardPermissionNotification
+      attachTo: Permissions
+
+    - id: no-privilege-escalation
+      description: >-
+        A caller may only grant a permission they themselves hold. Over the ADDED entries
+        only; ask CallerDoesNotHoldPermission per entry, which runs AFTER the wildcard
+        refusal so every key reaching it is concrete. The *:* superadmin exemption is free:
+        HasPermission returns true for any concrete permission when the claim set contains
+        *:*. Two states, not one — ctx.Identity() nil (auth disabled, dev only, and the
+        framework's own boot guard refuses that profile anywhere else) means NO identity
+        gate; an identity present with an insufficient claim REFUSES. Collapsing them makes
+        the entity unusable in dev.
+      scope: [insertOrUpdate]
+      notification: CannotGrantUnheldPermissionNotification
+      attachTo: Permissions
+
+service:
+  required: true
+  facts:
+    # The pre-check half of unique.enforce on Key. Filtered by the tenant as well as the
+    # key, because the uniqueness is per tenant.
+    - name: RoleKeyTaken
+      kind: exists
+      filters: [TenantID, Key]
+      excludeSelf: true
+      activeOnly: true
+      description: >-
+        Reports whether another ACTIVE role in the same tenant already holds this key.
+        Excludes the row being updated.
+
+    # Named for the PROBLEM, never for the healthy state: the generated suite stubs the
+    # service so every probe answers "nothing found". TenantIsActive would read false under
+    # that stub and mean "the tenant is gone", turning a correct spec red on the day it is
+    # written.
+    - name: TenantIsUnavailable
+      kind: manual
+      returns: bool
+      filters: [TenantID]
+      description: >-
+        Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
+        the tenants table by its primary key. A trial tenant is a live customer and is
+        available.
+
+    # Three per-entry facts. A fact about a collection is asked ONCE PER ENTRY, the entry's
+    # field arriving as the argument. All three ask about the catalog rows behind the
+    # granted ids, and all three are asked only about the entries a write ADDS.
+    #
+    # The implementation funnels all three through ONE cached catalog lookup per entry,
+    # memoised on the request-scoped store, so three questions about one id cost one query:
+    # a role at the cap pays 200 round trips inside the write transaction, not 600.
+    - name: PermissionIsNotInCatalog
+      kind: manual
+      returns: bool
+      filters: [Permissions.PermissionID]
+      description: >-
+        Whether this permission id is absent from the catalog or points at an archived
+        permission.
+
+    - name: PermissionIsWildcard
+      kind: manual
+      returns: bool
+      filters: [Permissions.PermissionID]
+      description: >-
+        Whether the catalog row behind this id carries a wildcard in either part. Answers
+        true when the id is unknown, so an unresolvable grant never reaches the escalation
+        probe.
+
+    - name: CallerDoesNotHoldPermission
+      kind: manual
+      returns: bool
+      filters: [Permissions.PermissionID]
+      description: >-
+        Whether the requesting caller lacks the permission behind this id. Reads
+        ctx.Identity() through the request-scoped service. It GUARDS THE WILDCARD ITSELF and
+        answers "does not hold" rather than calling through — defence in depth behind the
+        wildcard rule, because a panic on a security rule is a 500.
+
+    - name: CallerIsSuperAdmin
+      kind: manual
+      returns: bool
+      description: >-
+        Whether the caller holds *:*. ctx.Identity().IsSuperAdmin() and nothing else — never
+        HasPermission("*:*"), which panics by design, and never a hand-read of the claim,
+        whose NAME is configurable via authorization.permissionsClaim. Note a resource
+        wildcard is NOT a superadmin grant: role:* reports false.
+
+read:
+  backing: relational
+  view:
+    name: roles
+  managed: [CreatedAt, UpdatedAt]
+  byId: true
+  byParams:
+    filters:
+      - {field: TenantID, ops: [eq, in]}
+      - {field: Key, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: Name, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: Description, ops: [contains, icontains]}
+      - {field: CreatedAt, ops: [gte, lte]}
+      - {field: UpdatedAt, ops: [gte, lte]}
+    sort: [Key, Name, TenantID, CreatedAt, UpdatedAt]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      # A retired role must stay auditable, and with no unarchive verb this listing is the
+      # only way to see one.
+      includeArchived: true
+      # search is deliberately absent — a relational-served view answers free text with a
+      # typed 400, and declaring it would promise what this posture cannot serve.
+
+surfaces:
+  rest: true
+  graphql:
+    enabled: true
+    connection: true
+    mutations: [insert, update, archive]
+  # No CSV/XLSX exports: operator-facing and small, the call Permission already made.
+
+authz:
+  resource: role
+  # Every row is tenant-scoped, on READS and on WRITES both. A *:* superadmin bypasses it —
+  # which is what lets a platform operator support a customer. A by-id read of another
+  # tenant's role answers 404 rather than 403: it does not exist for this caller, which
+  # leaks nothing about who else exists.
+  dataAccess: tenant
+  tenantField: TenantID
+  # WHO crosses the row scope: the platform operator supporting a customer. A *:* holder
+  # reads and repairs rows that are not theirs; a resource wildcard (role:*) does NOT.
+  bypass: "*:*"
+  # Q5, and it is a POLICY: two states, not one. ctx.Identity() nil happens only under
+  # auth.mode: disabled, which the framework's own boot guard allows ONLY in dev — so a
+  # stand-down here cannot reach prd. Collapsing it into `refuse` would make the entity
+  # unusable in the dev profile, where there are no tokens at all. An identity that IS
+  # present with an empty or insufficient claim still refuses.
+  noIdentity: stand-down
+  permissions:
+    insert: role:insert
+    patch: role:update
+    archive: role:archive
+    read: role:read

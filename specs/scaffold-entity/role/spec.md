@@ -8,11 +8,15 @@
   Q4 → isolation on reads AND writes, with the service-wide `auth.authorization` switch
   left to `/omnicore:configure` · Q5 → absent identity ≠ absent claim. The `(proposed)`
   picks stand
-- **Pin:** omnicore **`v0.57.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
-  relational-served views
+- **Pin:** omnicore **`v0.59.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
+  relational-served views. Built with `omnicore-gen` **`0.37.0`**; the framework facts
+  verified below were read at `v0.57.0` and re-confirmed unchanged at `v0.57.1`
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
 - **Generation:** omnicore-gen — chosen by the maintainer at gate 1d
+- **Amended:** 2026-08-24 — §2 and §9, the per-grant `permission` token (see §2); and
+  §2/§10, how `TenantID` reaches the entity (see §2's "How the owner arrives"). The model is
+  otherwise unchanged and every other `(proposed)` pick stands as approved
 
 A **tenant's own cut of the global permission catalog**. `Permission` says what the
 platform can enforce; `Role` says which of those a given customer has decided to bundle
@@ -134,17 +138,19 @@ UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
 - **The two cross-aggregate foreign keys are written into the migration BY HAND.** The
   generator writes the PARENT key only — `role_permissions.role_id` → `roles.id` — because a
   collection's owner is part of the aggregate that declares it. A reference to *another*
-  aggregate is outside the spec language, so `roles.tenant_id` → `tenants.tenant_id` and
+  aggregate is outside the spec language, so `roles.tenant_id` → `tenants.id` and
   `role_permissions.permission_id` → `permissions.id` are appended by whoever writes the
   migration. That is the designed path and not an adoption: the migration is a hook file,
   written once and never regenerated. Both are load-bearing — §2's `inner` join is only safe
   because `permission_id` is `NOT NULL` and FK-backed.
 
-- **The FK target is `tenants.tenant_id`, not `tenants.id`.** The public derived key is what
-  the `tenant_id` JWT claim carries, and Layer 3 writes that claim straight onto
-  `crit.Filter["tenant_id"]`. Pointing the FK at the surrogate `id` would make the isolation
-  filter need a lookup on every read. `tenants_tenant_id_key` is a unique index, so Postgres
-  accepts it as an FK target.
+- **The FK target is `tenants.id`** *(corrected 2026-08-24)*. Tenant has exactly one
+  identifier: the derived UUIDv5 that used to sit beside the PK was removed, because a
+  tenant's id is pinned inside every other microservice that stores it and was therefore a
+  public key in practice regardless. The `tenant_id` JWT claim now carries this same value,
+  so Layer 3 writes the claim straight onto the filter with no translation step — the
+  property the earlier two-key model was reaching for, reached by having one key instead of
+  two.
 
 - If sharedbase-role: `N/A — flat`.
 
@@ -152,7 +158,7 @@ UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
 
 | Field | Go type | VO? | Nullable | Unique | Lives on | example: | Description |
 |---|---|---|---|---|---|---|---|
-| `TenantID` | `domain.ID` | plain (an id) | no | no (part of the composite unique) | root | `a3f1c07e-2b58-5d94-8e61-4f2093ab77d5` | The tenant that owns this role. Immutable after creation — a role never moves between tenants |
+| `TenantID` | `domain.ID` | plain (an id) | no | no (part of the composite unique) | root | `a3f1c07e-2b58-5d94-8e61-4f2093ab77d5` | The tenant that owns this role. **Sent in the request body**, not taken from the claim (see below). Immutable after creation — a role never moves between tenants. Declared `required`: it is a plain id, so nothing validates its presence by type |
 | `Key` | `vos.RoleKey` | **new-raw** `vos.RoleKey` | no | **yes, per tenant** | root | `billing-manager` | Stable machine handle of the role, unique within its tenant and immutable. What an API caller and an audit line reference; never the display name |
 | `Name` | `vos.DisplayName` | **reuse** `vos.DisplayName` | no | no | root | `Billing Manager` | Human-readable name of the role as operators and end users see it. Not unique — two tenants, or two roles, may share a label |
 | `Description` | `vos.Description` | **reuse** `vos.Description` | no | no | root | `Grants read access to the tenant registry and the permission catalog, without any write verb.` | What holding this role actually lets a user do, in the tenant's own words |
@@ -165,7 +171,79 @@ Child `RolePermission` (`internal/domain/aggregatevos/`):
 | `PermissionID` | `domain.ID` | **stored column** `permission_id` | no | yes, within the role | `9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3` | The catalog row this grant points at — the id and not the string, so a retired-and-recreated permission needs an explicit re-grant |
 | `Resource` | `string` | **read join** → `permissions.resource_name` | no | — | `tenant` | What the granted permission protects. Read-only, filled on load, never written through this aggregate |
 | `Action` | `string` | **read join** → `permissions.action_name` | no | — | `read` | What the granted permission allows on that resource. Same read-only contract |
-| `ArchivedAt` | `*time.Time` | **read join** → `permissions.deleted_at` | **yes** | — | `null` | When the catalog row this grant points at was archived, `null` while it is live. `Permission` archives one-way, so a non-null value here is a normal long-lived state — this grant points at a retired permission — and not an edge case. Read-only, filled on load, never written through this aggregate |
+*(`ArchivedAt` was declared here and REMOVED 2026-08-24. Nothing in this service read it,
+and republishing it contradicted its owner: `Permission` deliberately keeps `deletedAt` off
+its own reads, reaching archived state through `?includeArchived`. Surfacing the same column
+through a join was a back door to a decision the owning aggregate had already made the other
+way. The question it answered — "does this role still grant something retired?" — becomes
+real when `User → Role` lands, and is a fresh decision then.)*
+
+The ROOT also traverses into its OWNER *(added 2026-08-24, expressible only since the
+derived tenant key was removed — see §1)*:
+
+| Field | Go type | Source | Description |
+|---|---|---|---|
+| `TenantWorkspace` | `string` | **read join** → `tenants.workspace` | The owning tenant's handle. **Filterable and sortable** — a root join's fields are addressable in a criteria, unlike a child's |
+| `TenantStatus` | `string` | **read join** → `tenants.status` | The owning tenant's commercial lifecycle. Plain `string`, never `vos.TenantStatus`: a join field carries no domain type |
+
+### How the owner arrives — corrected after a live bench found it
+
+*(Amended 2026-08-24, after a `POST /roles` on a dev bench answered 500.)*
+
+`TenantID` is **carried in the request body**. An earlier build declared it
+server-assigned from the `tenant_id` claim, and that was wrong in two ways that only a
+running service showed:
+
+1. **The super-admin case became inexpressible.** A server-assigned field is absent from
+   every write DTO, so a platform operator had no way to say WHICH tenant — while §10 of
+   this very spec promises "a superadmin may create anywhere".
+2. **A dev bench could not create a role at all.** With `auth.mode: disabled` there is no
+   identity, so nothing filled the field and the write died on an empty id.
+
+**The row scope is not weakened by this.** The claim decides what a caller MAY write; it
+never had to be the only thing that CAN write it. `refuseForeignTenant` already refuses a
+value that is not the caller's own claim (403), and the super-admin bypass already crosses
+it — both were written before this correction and needed no change. What the correction
+restores is the ability to SAY the value.
+
+**And it is `required`.** The framework's by-type validation reaches value-object-backed
+fields only, and a plain `domain.ID` is not one — so before this rule nothing refused an
+empty owner and it travelled all the way into the uniqueness pre-check, where it became a
+500 rather than a 422. The rule is declared, and the manual `tenant-must-exist` rule's
+early return on an empty owner is only correct because it is.
+
+**The barrier that makes this safe.** The owner carries a `valueObject` rule with
+`guard: true`, which emits three lines before anything else in the verb:
+
+```go
+e.TenantID.IsValid("TenantID", r.Context())   // domain.ID validates itself
+r.IgnoreValueObject("TenantID")               // so the automatic pass does not repeat it
+r.StopIfInvalid()                             // and nothing below runs on a bad owner
+```
+
+Without it the owner was still UNCHECKED at that point — the framework's value-object pass
+runs AFTER the rules — so it travelled into the uniqueness pre-check, which is scoped BY the
+owner and hands it straight to a criterion. A value a UUID column refuses made the probe's
+query error and the probe panic: a 500 on a request whose problem is plain validation.
+
+**It replaces a `required` rule rather than joining one.** `uuid.Parse` refuses the empty
+string and a non-UUID alike, so one call covers both; a `required` rule beside it would tell
+the caller the same thing twice. That ordering matters more than it looks: an earlier fix
+used `required` alone and closed only the empty case — a non-empty non-UUID still reached the
+probe whenever the row-scope guard had nothing to reject, which is every request on a dev
+bench. Both shapes are pinned by a regression test.
+
+Two consequences of the barrier, both deliberate:
+
+- **It ends the whole pass**, including the automatic value-object validation and every
+  collection of the aggregate. An insert with a bad owner AND a junk description reports the
+  owner only — the point of a barrier is that nothing after it is meaningful.
+- **It fires on anything already rejected**, not only on this rule. `refuseForeignTenant`
+  runs earlier in the same verb, so a caller writing into somebody else's tenant also stops
+  here and learns about the mismatch alone.
+
+Needs `omnicore-gen` ≥ 0.38.0 (`kind: valueObject`, `guard`) and framework ≥ v0.59.0
+(`Rules.StopIfInvalid`).
 
 **One STORED field, and three read across the foreign key (Q2).** The `(resource, action)`
 pair is still **not copied** into `role_permissions` — that denormalization is what §A
@@ -192,12 +270,25 @@ time. Four consequences:
   counterpart, so no entry is ever dropped. Referential integrity for the *existence* half
   of R6 comes free; the rule still earns its keep for the *active* half, and for turning a
   violation into a readable 422 instead of a raw constraint error.
-- **The rendered `resource:action` string is not served as one field, deliberately.** A
-  computed read field lands on the aggregate's ROOT result, not on each entry of a
-  collection, so "one `permission` string per grant" is not expressible. The two halves
-  are, and the client concatenates them. Nothing inside this service concatenates
-  anything: `vos.PermissionKey.String()` remains the only place that knows the separator
-  is a colon, exactly as `../permission/spec.md` requires.
+- **The rendered `resource:action` string IS served, one per grant — and the two halves
+  are NOT.** *(Amended 2026-08-24, maintainer's decision: "só o ID + `role:read`".)* Each
+  entry carries `permissionID` and `permission`, and `resource` / `action` are declared
+  `hidden` — they exist to feed the derivation and reach no response body, no listing row
+  and no export. A caller reads one token here and one token on the catalog's own endpoint,
+  instead of joining two halves in every client.
+
+  **This reverses an earlier position in this spec, and the reason it reversed is worth
+  keeping.** The original text said a per-grant token was "not expressible", because
+  `read.computed` lands on the aggregate's ROOT result and one value per root derived from
+  N entries means nothing. That was true of omnicore-gen `0.35.0`. It also uncovered three
+  generator defects — `check` accepted a collection-path source, the emitter dropped it
+  with a bare `continue`, and the hook name was not qualified by entity — all fixed at
+  `0.36.0`, which added `children[].computed`: the per-entry seat, whose `from:` names the
+  entry's own fields bare and reaches its join fields.
+
+  What did NOT change is where the separator lives. The derivation rebuilds
+  `vos.PermissionKey` and calls `String()`; nothing in this service concatenates a resource
+  and an action, exactly as `../permission/spec.md` requires.
 
 ### The read join into the catalog — the declaration and its four properties
 
@@ -248,7 +339,10 @@ Four properties that are the framework's, not this model's, and that every layer
 
 **No traversal to `Tenant` is declared, and the reason is a trap worth naming.** A join's
 predicate is always `fk = target.id`. `roles.tenant_id` does not point at `tenants.id` — it
-points at `tenants.tenant_id`, the derived public key (§1). A declaration reaching Tenant
+pointed at `tenants.tenant_id`, a derived key that no longer exists (§1) — **a traversal
+into Tenant IS expressible now**, and §7 R4 notes what it would and would not answer. The
+paragraph below is kept as the record of why it was refused while that key existed. A
+declaration reaching Tenant
 would therefore be *accepted* (the column is an id) and would render
 `roles.tenant_id = tenants.id`, which matches nothing: a `left` join would fill every field
 with NULL and an `inner` one would drop every role from every read, `FindByID` included.
@@ -375,7 +469,7 @@ exactly what an access review needs to read. Per-child revocation is
 | R1 | `Key` | Immutable after creation — it is what API callers and audit lines reference | `IfUpdate` | `RoleKeyIsImmutableNotification` | 422 |
 | R2 | `TenantID` | Immutable after creation — a role never moves between tenants | `IfUpdate` | `RoleTenantIsImmutableNotification` | 422 |
 | R3 | `Key`, `TenantID` | Unique **per tenant**, over active rows. Service pre-check with exclude-self + partial unique index as backstop | `IfInsertOrUpdate` | `RoleKeyAlreadyExistsNotification` | 409 |
-| R4 | `TenantID` | The owner tenant must exist and not be archived | `IfInsert` | `RoleTenantDoesNotExistNotification` | 422 |
+| R4 | `TenantID` | The owner tenant must exist, not be archived, and not be **suspended**. A `trial` tenant is a live customer and passes — "unavailable" is not "not active" | `IfInsert` | `RoleTenantDoesNotExistNotification` | 422 |
 | R5 | `TenantID` | **Tenant isolation.** The row's tenant must equal the caller's `tenant_id` claim, unless the caller is a `*:*` superadmin | `IfInsertOrUpdate` + `IfArchive` | `domain.TenantMismatchNotification` (framework-owned, already translated) | 403 |
 | R6 | `Permissions[].PermissionID` | Every granted permission must exist in the catalog **and be active** | `IfInsertOrUpdate`, over the entries this write ADDS | `PermissionNotInCatalogNotification` | 422 |
 | R7 | `Permissions[]` | No duplicate permission within one role — `IsSameBusinessIdentity` on the GRANT path, plus the explicit guard on the by-id path, plus the partial unique index as backstop | `IfInsertOrUpdate` | `RoleAlreadyGrantsPermissionNotification` | 409 |
@@ -383,6 +477,27 @@ exactly what an access review needs to read. Per-child revocation is
 | **R9a** | `Permissions[]` | **No privilege escalation** — a caller may only grant a permission they themselves hold. A `*:*` superadmin passes for everything, by construction | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantUnheldPermissionNotification` | 403 |
 | **R9b** | `Permissions[]` | **No wildcard grant through the API** — a permission with `*` in either part cannot be granted on any role | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantWildcardPermissionNotification` | 403 |
 | — | `Key`, `Name`, `Description` | format, length, substance, anti-junk | — | **not declared here** — `vos.RoleKey`, `vos.DisplayName` and `vos.Description` validate by type on every write. Declaring `required` beside a VO makes the caller read the same complaint twice | 422 |
+
+### R4 — why the commercial status counts, and why `trial` does not
+
+*(Corrected 2026-08-24. An earlier build of this rule checked existence and archiving only,
+on the reading that the commercial status is "orthogonal to archiving" — which the Tenant
+model does say. That reading was wrong for THIS rule.)*
+
+`Tenant` carries a commercial lifecycle (`trial` · `active` · `suspended`) beside its
+archive stamp, and the two really are independent: archiving forces `suspended`, but a
+tenant can be suspended while perfectly un-archived — a customer who stopped paying. What
+the earlier reading missed is what a role IS. A role is the unit that grants access, so
+minting one inside a suspended tenant hands out exactly what the commercial state says to
+withhold. Existence and archiving are not enough.
+
+**`trial` passes, and that is not an oversight.** "Unavailable" is not "not `active`": a
+trial is a live customer being onboarded, and roles are the first thing they need. Only
+`suspended` withholds. A rule written as `Status != active` would refuse every trial
+signup — the plausible-looking mistake this paragraph exists to prevent.
+
+The probe answers all three in ONE query: the active scope excludes an archived row by
+default, and a status predicate excludes a suspended one.
 
 ### R5 — how the identity reaches the rule
 
@@ -594,11 +709,12 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
   **yes** · **`?search=` no** — the relational backing answers it with a typed 400
   (`UnsupportedCapabilityNotification`, `SemanticSchema`), so declaring it would advertise
   a capability the server refuses.
-- **Computed read fields: none.** The obvious candidate — one rendered `resource:action`
-  string per grant — is not expressible: a computed field lands on the ROOT result, and
-  this one would have to land on each entry of a collection. §2 serves the two halves
-  through the read join instead and lets the client concatenate them. Nothing else in this
-  model is derived.
+- **Computed read fields: one, on the GRANT and not on the root.** `permission` —
+  `resource:action` rendered per entry, from the two join fields, through
+  `vos.PermissionKey.String()`. Declared under `children[].computed` (the per-entry seat,
+  `omnicore-gen` ≥ `0.36.0`); its body is in
+  `internal/application/queries/role_computed_manual.go`, written once and never
+  regenerated. Nothing on the ROOT is derived, and nothing else in this model is.
 - **Field-level read authz (`ReadCriteria.Restrict`): none.** Every field a caller may see
   the row at all for, they may see entirely. Row-level isolation does the work here. (Noted
   because the backing matters: on a relational view a restricted column is still read from

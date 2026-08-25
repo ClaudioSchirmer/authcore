@@ -45,13 +45,17 @@ func (e *Permission) customRules(actionName string, service domain.Service, r *d
 		// It catches the lazy paste and nothing more: a description that
 		// merely restates the key teaches an operator nothing the listing
 		// did not already show them.
-		if e.Description == "" {
-			// An empty description is the Description value object's
-			// complaint to make, not this rule's. Saying it twice would have
-			// the caller read one problem in two places.
-			return
-		}
-		if normalizeForEcho(e.Description.Value()) == normalizeForEcho(e.Key.String()) {
+		// The emptiness test is part of the CONDITION, never an early return.
+		// A return here would skip whatever is added to this clause later, and
+		// it would do it invisibly — the spec would show one rule and the code
+		// would run something else. `guard: true` is how a rule stops a pass on
+		// purpose; a bare return is how one stops it by accident.
+		//
+		// An empty description is the Description value object's complaint to
+		// make, so this rule stays quiet about it rather than saying the same
+		// thing twice. (Tenant's own description rule reads exactly this way.)
+		description := normalizeForEcho(e.Description.Value())
+		if description != "" && description == normalizeForEcho(e.Key.String()) {
 			r.AddNotification("Description", PermissionDescriptionEchoesKeyNotification{}, e.Description.Value())
 		}
 	})

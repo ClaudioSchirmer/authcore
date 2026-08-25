@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:1d05beb317e0af77a9577683a6c7a3a71da49d3c5cd186a29198da4df579326b
+// checksum:   sha256:380e791f768e831668da58fadb855eb59b99499ea40bffa0c527128827339ab1
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -56,6 +56,13 @@ func TestInsertPermissionMapsEveryField(t *testing.T) {
 // The round trip is the point: the same command builds the entity and then
 // projects it, so a field that survives one direction and not the other fails
 // here rather than in a caller's response.
+//
+// A SHARED-BASE role reaches the entity through ApplyTo rather than ToEntity
+// — its insert is an upsert, because another role may already have created
+// the identity — and this test used to skip that shape entirely. The result
+// mapper is the same mapper either way, and on a role it is also where a
+// computed field's derivation is called, so skipping it left the one seat
+// whose body is hand-written with no generated coverage at all.
 func TestInsertPermissionCommandResultCarriesWhatWasWritten(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	c := &InsertPermissionCommand{

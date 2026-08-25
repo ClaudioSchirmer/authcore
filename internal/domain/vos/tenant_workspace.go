@@ -1,10 +1,13 @@
-// Hand-written: declared in the spec as `kind: manual`. Two things put it
-// beyond a regex — the reserved list, and DeriveTenantID, which is the reason
-// this type is NOT shared with anything.
+// Hand-written: declared in the spec as `kind: manual`. What puts it beyond a
+// regex is the reserved list — the handles the platform keeps for itself.
 //
 // DisplayName and Description are shared because every rule they carry is about
-// human-typed text. This one carries rules about THIS SERVICE: the routes it
-// serves, and the derivation of its public key. It stays specific.
+// human-typed text. This one carries a rule about THIS SERVICE: the routes it
+// serves. It stays specific.
+//
+// It used to also derive the tenant's public key (a UUIDv5 over the handle).
+// That key was removed on 2026-08-24 — the row id is the tenant's only
+// identifier now — and the derivation went with it.
 
 package vos
 
@@ -12,22 +15,7 @@ import (
 	"regexp"
 
 	"github.com/ClaudioSchirmer/omnicore/domain"
-	"github.com/google/uuid"
 )
-
-// TenantIDNamespace is the UUIDv5 namespace every tenant_id in this platform is
-// derived under.
-//
-// IT MUST NEVER CHANGE. Changing it re-derives every tenant_id in existence,
-// which invalidates every issued token and every foreign key pointing at one,
-// with no migration path short of reissuing the whole platform's tokens. It is
-// deliberately a project constant and not configuration, so that it cannot be
-// moved by a deployment.
-//
-// It is service-specific rather than one of the standard DNS/URL namespaces so
-// that no other system deriving from the same handle can mint a colliding
-// value.
-var TenantIDNamespace = uuid.MustParse("e2937874-80cb-4b5f-b113-21741931ac1a")
 
 const (
 	tenantWorkspaceMinRunes = 3
@@ -72,21 +60,6 @@ var reservedTenantWorkspaces = map[string]struct{}{
 type TenantWorkspace string
 
 func (v TenantWorkspace) Value() string { return string(v) }
-
-// DeriveTenantID produces the tenant's PUBLIC key: UUIDv5 over the handle,
-// under this service's own namespace.
-//
-// It lives here, on the handle, because that is the one place the relationship
-// between the two values is a property of the type rather than a step somebody
-// has to remember. It is a pure function, so calling it twice is free and
-// calling it late is safe.
-//
-// It does NOT validate: derivation and validation are separate passes, and the
-// framework has already run IsValid on this field by the time any rule asks for
-// the derived value.
-func (v TenantWorkspace) DeriveTenantID() domain.ID {
-	return domain.NewIDFromUUID(uuid.NewSHA1(TenantIDNamespace, []byte(string(v))))
-}
 
 // IsReserved reports whether the handle is one the platform keeps for itself.
 // Exported so the reserved list can be asserted directly by a test and read by
