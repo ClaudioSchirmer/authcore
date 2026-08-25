@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:5b9bf7758da1b02aa52aa4bd0764900fdf81fc844d2b142aafe22e7fb23527af
+// checksum:   sha256:b28dbc77e05f32c4a4a0ab042d86002c5f250f87ed7fc07bcfae70fa1d704641
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -85,7 +85,7 @@ func (stubRoleService) CallerIsSuperAdmin() bool                             { r
 // points at the rule under test rather than at unrelated invalid state.
 func validRole() *Role {
 	return &Role{
-		TenantID:    domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"),
+		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         vos.RoleKey("billing-manager"),
 		Name:        vos.DisplayName("Billing Manager"),
 		Description: vos.Description("Grants read access to the tenant registry and the permission catalog, without any write verb."),
@@ -95,7 +95,7 @@ func validRole() *Role {
 		// running — which is how a negative case passes while proving nothing.
 		RequestingIdentityPresent: true,
 		// The row is in the caller's own TenantID.
-		RequestingTenant: "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+		RequestingTenant: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 	}
 }
 

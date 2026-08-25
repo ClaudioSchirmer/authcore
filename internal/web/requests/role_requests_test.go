@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:24864e111920c13352f622093fa12ce575d11c8817f79cc08452033235cc7c2c
+// checksum:   sha256:951c0b289c2012ad28da1059eab10a8a26de627e4f222c914305d47ea5c6a957
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -31,13 +31,13 @@ import (
 // and the value the caller sent is not in the row.
 func TestInsertRoleRequest_CarriesEveryField(t *testing.T) {
 	r := InsertRoleRequest{
-		TenantID:    domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"),
+		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
 	}
 	r.Permissions = []RolePermissionRequest{{
-		PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+		PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 	}}
 	cmd := r.ToCommand()
 	if cmd == nil {
@@ -75,7 +75,7 @@ func TestInsertRoleResponse_CarriesTheResult(t *testing.T) {
 // and the value the caller sent is not in the row.
 func TestPatchRoleRequest_CarriesEveryField(t *testing.T) {
 	r := PatchRoleRequest{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5")); return &v }(),
+		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Key:      func() *string { v := string("billing-manager"); return &v }(),
 		Name:     func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
@@ -160,10 +160,10 @@ func TestFindRolesResponse_IsFilledFromTheResult(t *testing.T) {
 // forgotten here is saved as missing on a request that answered 201.
 func TestAddRolePermissionRequest_CarriesEveryField(t *testing.T) {
 	r := AddRolePermissionRequest{RolePermissionRequest: RolePermissionRequest{
-		PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+		PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 	}}
 	cmd := r.ToCommand()
-	if cmd.PermissionID != domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3") {
+	if cmd.PermissionID != domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8") {
 		t.Errorf("PermissionID did not reach the command")
 	}
 }
@@ -179,7 +179,7 @@ func TestAddRolePermissionResponse_CarriesTheStoredEntry(t *testing.T) {
 	res := AddRolePermissionResponse{}.FromResult(commands.AddRolePermissionResult{
 		RoleID: ownerID,
 		RolePermission: commands.RolePermissionResult{ID: entryID,
-			PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+			PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 		},
 	})
 	if res.RoleID != ownerID {
@@ -188,7 +188,7 @@ func TestAddRolePermissionResponse_CarriesTheStoredEntry(t *testing.T) {
 	if res.RolePermission.ID != entryID {
 		t.Error("the entry id the server minted did not reach the response")
 	}
-	if res.RolePermission.PermissionID != domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3") {
+	if res.RolePermission.PermissionID != domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8") {
 		t.Errorf("PermissionID did not reach the response")
 	}
 }

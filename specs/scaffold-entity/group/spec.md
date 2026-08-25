@@ -11,10 +11,31 @@
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md` rule 3
   and the maintainer's invocation
 - **Generation:** `omnicore-gen` — chosen by the maintainer at gate 1d
-- **Pin:** omnicore **`v0.57.0`** · dialect postgres · Postgres SoR, no Mongo, no broker →
-  relational-served views. The framework facts `../role/spec.md` verifies at this pin carry
-  over unchanged; the two this entity leans on hardest — read joins on a collection, and a
-  relational view inheriting them from the loader — are re-verified below.
+- **REVIEWED 2026-08-24, after `Role` was built.** This spec was approved on 2026-08-21 and
+  `Role` — the entity it mirrors — was built afterwards. Building it moved four things and
+  found one bug; all five are folded in below rather than left for whoever runs the gate to
+  rediscover:
+  1. **The owner FK targets `tenants.id`.** Tenant's derived key was removed; there is one
+     value to point at, and the `tenant_id` claim carries it. §1.
+  2. **G0, a barrier rule** (`kind: valueObject` + `guard: true`, both newer than this
+     spec). Without it an unusable owner reaches the uniqueness pre-check and answers **500**
+     instead of 422 — a bug `Role` shipped and this entity would have inherited. §7.
+  3. **`TenantID` travels in the request body**, never server-assigned from the claim.
+     `Role` did the latter first and it made the super-admin case inexpressible and the dev
+     bench unusable. §7.
+  4. **G4 also refuses a SUSPENDED tenant**, not just a missing or archived one — while a
+     `trial` tenant passes. §7.
+  5. **The grants no longer carry the conferred role's archive stamp**, matching `Role`. §2.
+
+  Two openings the same work created, listed as opportunities rather than corrections: a
+  traversal into `Tenant` is now declarable (§2), and `CallerIsSuperAdmin` may be dead
+  surface (§7).
+- **Pin:** omnicore **`v0.59.0`** · `omnicore-gen` **0.38.0** · dialect postgres · Postgres
+  SoR, no Mongo, no broker → relational-served views. The framework facts `../role/spec.md`
+  verifies carry over unchanged; the two this entity leans on hardest — read joins on a
+  collection, and a relational view inheriting them from the loader — are re-verified below.
+  **Two capabilities landed AFTER this spec was approved and change it — see the review
+  block below:** `rules.list[].kind: valueObject` and `rules.list[].guard`.
 
 The **second node** of the graph the README draws — `User → Group → Role → Permission`. A
 group mirrors the customer's own org structure ("Engineering", "Finance / AP") and bundles
@@ -199,9 +220,11 @@ INDEX  (group_id)                                         -- group_roles, the pa
 | `groups` | A tenant's own org unit — the bundle of roles a member inherits by belonging to it. Owned by exactly one tenant; groups never nest, and membership lives in its own aggregate. |
 | `group_roles` | The roles a group confers on its members. One row per role in the bundle, holding nothing but the role's id — so a retired-and-recreated role is never silently re-conferred, and the pair is never stored twice. |
 
-- **The `tenant_id` FK targets `tenants.id`** *(corrected 2026-08-24 — the derived key was removed)*, the PK the JWT claim
-  carries — not the surrogate `tenants.id` — so the Layer 3 isolation filter compares the
-  claim directly instead of paying a lookup on every read. `NO ACTION`, deliberately, for
+- **The `tenant_id` FK targets `tenants.id`, the primary key** *(corrected 2026-08-24)*.
+  Tenant used to carry a second, derived key beside its PK and this FK pointed there; that
+  key was removed, so there is exactly one value to point at. The `tenant_id` JWT claim
+  carries the same value, so the Layer 3 isolation filter compares the claim directly with
+  no translation step. `NO ACTION`, deliberately, for
   the reason written into `0003_role_manual.up.sql`: a tenant is archived and never purged.
   Verbatim mirror of the `roles` FK, verified by reading that migration.
 - **`group_roles.role_id` FKs to `roles.id`, the PK.** Not to any of the partial unique
@@ -219,7 +242,7 @@ INDEX  (group_id)                                         -- group_roles, the pa
 
 | Field | Go type | VO? | Nullable | Unique | Lives on | `example:` | Description |
 |---|---|---|---|---|---|---|---|
-| `TenantID` | `domain.ID` | plain (an id) | no | no (part of the composite unique) | root | `a3f1c07e-2b58-5d94-8e61-4f2093ab77d5` | The tenant that owns this group. Immutable after creation — a group never moves between tenants |
+| `TenantID` | `domain.ID` | plain (an id) | no | no (part of the composite unique) | root | `0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410` | The tenant that owns this group. **Carried in the request body** — never server-assigned from the claim (see below). Immutable after creation — a group never moves between tenants |
 | `Key` | `vos.GroupKey` | **new-raw** `vos.GroupKey` | no | **yes, per tenant** | root | `engineering` | Stable machine handle of the group, unique within its tenant and immutable. What an API caller, an audit line and a directory mapping reference; never the display name |
 | `Name` | `vos.DisplayName` | **reuse** `vos.DisplayName` | no | no — two groups in one tenant may share a label; the `key` is what disambiguates | root | `Engineering` | Human-readable name of the group as operators and end users see it |
 | `Description` | `vos.Description` | **reuse** `vos.Description` | no | no | root | `Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.` | What belonging to this group actually lets a member do, in the tenant's own words |
@@ -229,10 +252,16 @@ Child `GroupRole` (`internal/domain/aggregatevos/`):
 
 | Field | Go type | Source | Nullable | Unique | `example:` | Description |
 |---|---|---|---|---|---|---|
-| `RoleID` | `domain.ID` | **stored column** `role_id` | no | yes, within the group | `7c2e9b41-5a83-4f16-9d02-8b6f31c0ae57` | The role this entry confers — the id and not the key, so a retired-and-recreated role needs an explicit re-attach |
+| `RoleID` | `domain.ID` | **stored column** `role_id` | no | yes, within the group | `0198f3e0-9c25-7a1f-b73d-5e08c4a29f61` | The role this entry confers — the id and not the key, so a retired-and-recreated role needs an explicit re-attach |
 | `RoleKey` | `string` | **read join** → `roles.role_key` | no | — | `billing-manager` | The conferred role's stable machine handle. Read-only, filled on load, never written through this aggregate |
 | `RoleName` | `string` | **read join** → `roles.name` | no | — | `Billing Manager` | The conferred role's display name. Same read-only contract |
-| `ArchivedAt` | `*time.Time` | **read join** → `roles.deleted_at` | **yes** | — | `null` | When the role this entry confers was archived, `null` while it is live. `Role` archives one-way, so a non-null value here is a normal long-lived state — this group still confers a retired role — and not an edge case. Read-only, filled on load, never written through this aggregate |
+*(An `ArchivedAt` field — the conferred role's `deleted_at`, read across the same join — was
+declared here and is REMOVED. `Role` carried the equivalent on its own grants and dropped it
+on 2026-08-24: nothing in the service read it, and it republished a column the OWNING
+aggregate deliberately keeps off its own reads. The question it answered — "does this group
+still confer something retired?" — is real, and belongs to whoever builds the access-review
+surface, decided on its own merits rather than inherited from a join that happened to reach
+it.)*
 
 **One STORED field, and three read across the foreign key.** Inherited from
 `../role/spec.md` §2 and for the same reason one level up: `Role`'s archive is
@@ -266,7 +295,6 @@ read.InnerJoinInChild(schemas.RoleSchema())        -- shape; the repository decl
   GroupRole.role_id  =  roles.id
     → RoleKey     ← roles.role_key
     → RoleName    ← roles.name
-    → ArchivedAt  ← roles.deleted_at              -- managed column; arrives *time.Time
 ```
 
 Declared **once on `GroupRepository` with `WithJoins`**, beside `WithSchema`, and inherited
@@ -283,28 +311,31 @@ Four properties that are the framework's, not this model's:
    choice safe here rather than merely defensible.
 2. **Load-only: not filterable, not sortable.** `?filter[roles.roleKey][eq]=…` is a typed
    400. §9 says what that still costs.
-3. **Not gated on the role's archived state — and it reports that state instead of hiding
-   it.** A group that confers a role the tenant later archived keeps showing that role's key
-   and name. Wanted: an access review must be able to read what a past attachment meant,
-   which is the whole reason `Role` never hard-deletes. Mapping the role's `deleted_at` onto
-   `ArchivedAt` is the other half of the same intent — the entry is served either way, and
-   the reader is told which it is. `Role` archives one-way, so this is not a transient: a
-   group can confer a retired role for the rest of its life, and the read says so on every
-   load. The line the field does not cross: it renders, it never judges — §7 decides "is
-   that role still live", and it decides it with a probe.
-4. **Filled on load, empty on an added entry.** The entry a request just attached exists only
-   in memory; nothing traversed a foreign key for it. `RoleKey`, `RoleName` and `ArchivedAt`
-   are populated for the entries **loaded from the row** and empty for the one this write is
-   adding — and note the direction `ArchivedAt` fails in: an attached entry reads `nil`,
-   which is indistinguishable from "the role is live". §7 depends on this and states it
-   again where it bites.
+3. **Not gated on the role's archived state — and it does NOT report that state.** A group
+   that confers a role the tenant later archived keeps showing that role's key and name; the
+   inner join keeps matching it. That is wanted — an access review must be able to read what
+   a past attachment meant, which is the whole reason `Role` never hard-deletes. What the
+   traversal deliberately does NOT bring is the role's `deleted_at`: `../role/spec.md`
+   removed the equivalent field from its own grants on 2026-08-24, because republishing a
+   column its owning aggregate keeps off its own reads is a back door to a decision already
+   made the other way. So the join renders the attachment and says nothing about whether the
+   role is retired. §7 decides "is that role still live", and it decides it with a probe.
 
-**No traversal to `Tenant` is declared, and the reason is the same trap `../role/spec.md`
-§2 names.** A join's predicate is always `fk = target.id`, and `groups.tenant_id` points at
-`tenants.id` since 2026-08-24, so a traversal into Tenant IS expressible; the paragraph below is the record of why it was refused while the derived key existed. The declaration would be
-*accepted* (the column is an id) and would render `groups.tenant_id = tenants.id`, matching
-nothing: `left` fills every field with NULL, `inner` drops every group from every read,
-`FindByID` included. **Do not declare it.**
+4. **Filled on load, empty on an added entry.** The entry a request just attached exists only
+   in memory; nothing traversed a foreign key for it. `RoleKey` and `RoleName`
+   are populated for the entries **loaded from the row** and empty for the one this write is
+   adding — both read `""`, which is indistinguishable from a role whose key is genuinely
+   empty (there is no such role, but the TYPE cannot say so). §7 depends on this and states
+   it again where it bites.
+
+**A traversal to `Tenant` IS declarable, and `../role/spec.md` now declares one.** While
+`groups.tenant_id` pointed at Tenant's derived key this was impossible — a join's predicate
+is always `fk = target.id`, so the declaration would have been *accepted* and matched
+nothing, filling every field with NULL on a left join or dropping every group from every
+read on an inner one. That derived key was removed on 2026-08-24 and the FK targets
+`tenants.id`, so the trap is gone. `Role` carries the owner's `workspace` and `status` this
+way, and a root join's fields are filterable and sortable, unlike a collection's. **Mirror
+it here** unless the gate decides otherwise.
 
 Notes on the decisions above:
 
@@ -411,10 +442,11 @@ which is exactly what an access review reads. Per-child detach is
 
 | # | Field(s) | Rule | Verb scope | Notification | HTTP |
 |---|---|---|---|---|---|
+| **G0** | `TenantID` | **BARRIER.** Pull `domain.ID`'s own validation forward and END THE PASS if anything has already been rejected — `kind: valueObject`, `guard: true`. Declared FIRST, so nothing below runs on an owner that is empty or not a UUID | `IfInsertOrUpdate` | the value object's own (`InvalidIDUUIDNotification`) | 422 |
 | G1 | `Key` | Immutable after creation — it is what API callers, audit lines and directory mappings reference | `IfUpdate` | `GroupKeyIsImmutableNotification` | 422 |
 | G2 | `TenantID` | Immutable after creation — a group never moves between tenants | `IfUpdate` | `GroupTenantIsImmutableNotification` | 422 |
 | G3 | `Key` + `TenantID` | Unique **per tenant**, over active rows. Service pre-check with exclude-self + partial unique index as backstop | `IfInsertOrUpdate` | `GroupKeyAlreadyExistsNotification` | 409 |
-| G4 | `TenantID` | The owner tenant must exist and not be archived | `IfInsert` | `GroupTenantDoesNotExistNotification` | 422 |
+| G4 | `TenantID` | The owner tenant must exist, not be archived, and not be **suspended**. A `trial` tenant is a live customer and passes — "unavailable" is not "not active" | `IfInsert` | `GroupTenantDoesNotExistNotification` | 422 |
 | G5 | `TenantID` | **Tenant isolation.** The row's tenant must equal the caller's `tenant_id` claim, unless the caller is a `*:*` superadmin | `IfInsertOrUpdate` + `IfArchive` | `domain.TenantMismatchNotification` (framework-owned, already translated) | 403 |
 | G6 | `Roles[].RoleID` | Every attached role must exist, be **active**, and belong to **this group's tenant** — one rule, one message, see below | `IfInsertOrUpdate`, over the entries this write ADDS | `RoleNotAvailableInTenantNotification` | 422 |
 | G8 | `Roles[]` | No duplicate role within one group — `IsSameBusinessIdentity` on the ATTACH path, plus the explicit guard on the by-id path, plus the partial unique index as backstop | `IfInsertOrUpdate` | `GroupAlreadyGrantsRoleNotification` | 409 |
@@ -425,6 +457,40 @@ which is exactly what an access review reads. Per-child detach is
 
 *(There is no G7: the numbering is kept aligned with `../role/spec.md`'s R-series so the
 two specs can be read side by side, and `Role`'s R7 duplicate rule is G8 here.)*
+
+### G0 — the barrier, and why it is rule ZERO
+
+*(Added 2026-08-24, from a 500 the `Role` entity actually shipped.)*
+
+`GroupKeyTaken(tenantID, key, selfID)` is scoped BY the owner and hands it straight to a
+criterion against a UUID column. An owner that is empty, or non-empty and not a UUID, makes
+that query error and the probe panic — a 500 on a request whose problem is plain validation.
+
+Three things make the barrier the fix rather than a `required` rule:
+
+- **`domain.ID` validates itself.** `uuid.Parse` refuses `""` and `"tatu"` alike, so one
+  `kind: valueObject` rule covers both shapes. A `required` rule beside it would tell the
+  caller the same thing twice, and it would cover only the empty case — `Role` tried exactly
+  that and a non-UUID still reached the probe.
+- **The framework's own value-object pass runs AFTER the rules**, so without pulling it
+  forward the owner is still unchecked at the point the probe runs.
+- **Rules do not short-circuit.** Raising a notification does not stop the clauses below;
+  only `guard: true` (which emits `Rules.StopIfInvalid`) ends the pass.
+
+It must be declared FIRST in the verb's rule list: the barrier is positional, landing after
+the rule that carries it.
+
+### Where `TenantID` comes from
+
+**The request body, and NOT `assignedFrom: identity-claim`.** `Role` was built the other way
+first and it was wrong twice over: a server-assigned field is absent from every write DTO, so
+(1) a super-admin could never create inside another tenant, which §10 promises, and (2) on a
+dev bench with auth disabled nothing filled it and the write died on an empty id.
+
+The row scope is not weakened by carrying it in the body: G5 already refuses a value that is
+not the caller's claim, and the super-admin bypass already crosses it. The claim decides what
+a caller MAY write; it never had to be the only thing that CAN write it.
+
 
 ### G6 — three questions, one notification, on purpose
 
@@ -511,7 +577,7 @@ cannot occur in production — a prd deployment that tried it aborts at boot.
 
 ### Why the read join does NOT answer G6, G10a or G10b
 
-§2 just put `RoleKey`, `RoleName` and `ArchivedAt` on the entry, and the obvious next
+§2 just put `RoleKey` and `RoleName` on the entry, and the obvious next
 thought is that the
 probes are now redundant. **They are not**, and the reason is one sentence: these three
 rules judge the entries a write ATTACHES, and an attached entry has no joined value —
@@ -525,13 +591,11 @@ Two further reasons the join could not carry these rules even if the values were
 - **It reaches `roles`, not `permissions`.** G10a and G10b are questions about the
   permissions *behind* the role — two hops out. A traversal is one predicate onto one
   table.
-- **It renders availability, it does not enforce it.** A join is not gated on the target's
-  archived state: `ArchivedAt` reports that the role is retired, and the entry is served all
-  the same. Reading it in a rule would be worse than not having it — an attached entry
-  carries `nil`, exactly what a live role carries, so `ArchivedAt == nil` would wave through
-  **every** entry this write is attaching, fail-open on the path G6 exists to close. G6's
-  *active* half stays with the probe, and its *same-tenant* half is outside what any
-  traversal can answer at all.
+- **It renders the attachment, it says nothing about availability.** A join is not gated on
+  the target's archived state, and this one does not even carry that state — the role's
+  `deleted_at` is deliberately not traversed (see §2, property 3). So there is nothing here
+  a rule could mistake for an answer. G6's *active* half stays with the probe, and its
+  *same-tenant* half is outside what any traversal can answer at all.
 
 What the join changes is the **cost of the probes**, not their existence — see below.
 
@@ -540,12 +604,18 @@ What the join changes is the **cost of the probes**, not their existence — see
 ```
 GroupService (internal/domain/group_service.go) — plain values, no error, per the local pattern
   GroupKeyTaken(tenantID domain.ID, key string, selfID domain.ID) bool   // G3
-  TenantIsUnavailable(tenantID domain.ID) bool                           // G4
+  TenantIsUnavailable(tenantID domain.ID) bool                           // G4 — missing, archived OR suspended
   RoleIsUnavailableInTenant(tenantID, roleID domain.ID) bool             // G6
   RoleGrantsWildcard(roleID domain.ID) bool                              // G10b
   CallerLacksAnyPermissionOf(roleID domain.ID) bool                      // G10a
-  CallerIsSuperAdmin() bool                                              // G5, G10a
+  CallerIsSuperAdmin() bool                                              // G5, G10a — see note
 ```
+
+**Check `CallerIsSuperAdmin` before declaring it.** On `Role` the identical fact ended up
+with NO caller: the generator answers the super-admin question itself wherever it is asked,
+from `authz.bypass`, both in the command mappers and in `ToCriteria`. If the same holds here,
+the fact is dead surface — decide it at the gate rather than carrying it because `Role`'s
+spec listed one.
 
 Every fact is **named for the problem, never for the healthy state** — the generated suite
 stubs the service so each probe answers "nothing found", which is what lets a valid fixture
@@ -587,24 +657,19 @@ all. Both facts share that one resolution, so a write attaching N roles pays N r
 rather than calling `HasPermission` with a `*` — defence in depth behind G10b, because a
 panic on a security rule is a 500.
 
-**Decision, named rather than absorbed: the keys these two facts judge are every key the
-role GRANTS, archived catalog rows included.** The narrower reading is available — `Role`'s
-grant entries carry `ArchivedAt`, and a role resolved through `RoleRepository.Loader` is a
-*loaded* aggregate, so that stamp is filled and the facts could skip the retired keys in the
-same single read. It is rejected on merit, not for lack of a way to do it. Judging all of
-them is the fail-closed reading: a role whose bundle contains a retired `tenant:export` is
-refused to a caller who does not hold `tenant:export`, where the narrower reading would have
-let it through. Strictly more restrictive, never more permissive, and consistent with
+**Decision, and since 2026-08-24 it is the only one available: the keys these two facts
+judge are every key the role GRANTS, archived catalog rows included.** A narrower reading
+used to be reachable — `Role`'s grant entries carried the catalog row's archive stamp, so a
+role resolved through `RoleRepository.Loader` arrived with it filled and the facts could
+have skipped the retired keys in the same single read. That field was removed, so the
+narrow reading is no longer expressible without a second query.
+
+**It was the reading to reject anyway, so nothing was lost.** Judging every key is the
+fail-closed direction: a role whose bundle contains a retired `tenant:export` is refused to
+a caller who does not hold `tenant:export`, where the narrower reading would have let it
+through. Strictly more restrictive, never more permissive, and consistent with
 `../permission/spec.md` §6 — a retired permission's grants "stay dead", so refusing to
 propagate one costs nobody anything real.
-
-**And a trap that makes the narrower reading worse than it looks.** `ArchivedAt` is filled on
-a loaded entry and `nil` on one a write just added — the same `nil` a live permission
-carries. The rule here reads loaded roles, so it would work; the identical-looking rule one
-level down, inside `../role/spec.md` §7, judges the grants a write is ADDING and would
-therefore treat every one of them as live. Two rules that look the same fail in opposite
-directions, which is the kind of asymmetry that ships. `ArchivedAt` renders; it does not
-judge, on either level.
 
 ## 8. Update shape                                      [required]
 
@@ -645,7 +710,7 @@ body.
   out of step, and it carries no `Version`, no registry row, no rebuild and no Mongo
   collection — adding a read join to it needs no version bump and no backfill.
 - **The view inherits the read join and declares nothing.** `RoleKey`, `RoleName` and
-  `ArchivedAt` reach the served document because `GroupRepository` declared the traversal, not because the view
+  reach the served document because `GroupRepository` declared the traversal, not because the view
   asked for it — so a service reading through `repo.Loader` sees exactly what the endpoint
   sees.
 - **`?fields=` reaches the joined values under `roles.roleKey`, `roles.roleName` and

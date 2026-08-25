@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:638b7b65b5c48cba613c7d6eaabb41b4e64321b2b2189996b3b1ed74101fbb09
+// checksum:   sha256:f74328a7ae5de1795bfcd2d500ba82d83cfef12c560240beda47505fe873bc27
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -59,7 +59,7 @@ func rulesForRoleRolePermission(v RolePermission) *domain.NotificationContext {
 // validRolePermission is one entry every rule accepts.
 func validRoleRolePermission() RolePermission {
 	return RolePermission{
-		PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+		PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 	}
 }
 

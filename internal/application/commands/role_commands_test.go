@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:d585fa1e87af8263d881405da2297f763af526f2cc2234880067606ec8299319
+// checksum:   sha256:c184ea79ad21cbc2a12e2201d2927c890c274d7a0ededcca7cd457fe348d1920
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -36,26 +36,26 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	c := &InsertRoleCommand{
-		TenantID:    domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"),
+		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
 		Permissions: []dtos.RolePermissionInput{{
-			PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+			PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 		}},
 	}
 	e, err := c.ToEntity(ctx)
 	if err != nil {
 		t.Fatalf("ToEntity: %v", err)
 	}
-	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.TenantID != domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5") {
+	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
 		t.Errorf("TenantID did not survive the mapper")
 	}
 	if e.Key.Value() != "billing-manager" {
@@ -84,12 +84,12 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 func TestInsertRoleCommandResultCarriesWhatWasWritten(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	c := &InsertRoleCommand{
-		TenantID:    domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"),
+		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
 		Permissions: []dtos.RolePermissionInput{{
-			PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+			PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 		}},
 	}
 	e, err := c.ToEntity(ctx)
@@ -101,7 +101,7 @@ func TestInsertRoleCommandResultCarriesWhatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
 	}
-	if res.TenantID != domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5") {
+	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
 		t.Errorf("TenantID did not reach the result")
 	}
 	if res.Key != "billing-manager" {
@@ -129,11 +129,11 @@ func TestPatchRoleLeavesAbsentFieldsAlone(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	e := &appdomain.Role{}
-	orig := domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5")
+	orig := domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")
 	e.TenantID = orig
 	c := &PatchRoleCommand{} // nothing sent
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
@@ -155,12 +155,12 @@ func TestPatchRoleAppliesWhatItCarries(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	e := &appdomain.Role{}
 	c := &PatchRoleCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5")); return &v }(),
+		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Key:      func() *string { v := string("billing-manager"); return &v }(),
 		Name:     func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
@@ -171,7 +171,7 @@ func TestPatchRoleAppliesWhatItCarries(t *testing.T) {
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
 	}
-	if e.TenantID != domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5") {
+	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
 		t.Errorf("TenantID was sent and not applied")
 	}
 	if e.Key.Value() != "billing-manager" {
@@ -194,7 +194,7 @@ func TestPatchRoleCommandResultCarriesWhatWasApplied(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	e := &appdomain.Role{}
 	c := &PatchRoleCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5")); return &v }(),
+		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Key:      func() *string { v := string("billing-manager"); return &v }(),
 		Name:     func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
@@ -210,7 +210,7 @@ func TestPatchRoleCommandResultCarriesWhatWasApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
 	}
-	if res.TenantID != domain.NewID("a3f1c07e-2b58-5d94-8e61-4f2093ab77d5") {
+	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
 		t.Errorf("TenantID was applied and did not reach the result")
 	}
 	if res.Key != "billing-manager" {
@@ -236,7 +236,7 @@ func TestArchiveRoleCommandApplies(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	e := &appdomain.Role{}
@@ -247,7 +247,7 @@ func TestArchiveRoleCommandApplies(t *testing.T) {
 	if err := c.ApplyTo(ctx, e); err != nil {
 		t.Fatalf("the mapper failed: %v", err)
 	}
-	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if _, err := c.FromEntity(ctx, e); err != nil {
@@ -264,16 +264,16 @@ func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	e := &appdomain.Role{}
 	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
-	cmd := &AddRolePermissionCommand{PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")}
+	cmd := &AddRolePermissionCommand{PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8")}
 	if err := cmd.ApplyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyTo: %v", err)
 	}
-	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)
@@ -283,7 +283,7 @@ func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	if out.RoleID.Value() != "019ffd00-0000-7000-8000-000000000000" {
 		t.Error("the result does not carry the owner id")
 	}
-	if out.RolePermission.PermissionID != domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3") {
+	if out.RolePermission.PermissionID != domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8") {
 		t.Errorf("the projected entry lost PermissionID")
 	}
 }
@@ -297,13 +297,13 @@ func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
 		Claims: map[string]any{
-			"tenant_id": "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5",
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
 	})
 	e := &appdomain.Role{}
 	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
 	seeded := domain.WithID(
-		dtos.RolePermissionInput{PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")}.ToRolePermission(),
+		dtos.RolePermissionInput{PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8")}.ToRolePermission(),
 		domain.NewID("019ffd00-0000-7000-8000-0000000000a1"),
 	)
 	e.AggregateConstructor([]domain.AggregateValueObject{seeded})
@@ -312,7 +312,7 @@ func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	if err := cmd.ApplyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyTo: %v", err)
 	}
-	if e.RequestingTenant != "a3f1c07e-2b58-5d94-8e61-4f2093ab77d5" {
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)

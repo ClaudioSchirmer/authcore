@@ -57,7 +57,7 @@ fields:
     # refuses a value that is not the caller's claim (403), and the super-admin
     # bypass already crosses it. The claim decides what you MAY write; it does
     # not have to be the only thing that CAN write it.
-    example: a3f1c07e-2b58-5d94-8e61-4f2093ab77d5
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
     description: >-
       The tenant that owns this role. Immutable after creation — a role never moves between
       tenants.
@@ -359,7 +359,7 @@ children:
           enforce: constraint-only
           notification: RoleAlreadyGrantsPermissionNotification
           scope: active-only
-        example: 9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3
+        example: 0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8
         description: >-
           The catalog row this grant points at — the id and not the string, so a
           retired-and-recreated permission needs an explicit re-grant.

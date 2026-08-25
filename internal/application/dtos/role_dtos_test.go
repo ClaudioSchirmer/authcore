@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:1b6a2bc2833d99a69f96bf361ce45027910cd50e9a9dbe4841468ec0cee5c270
+// checksum:   sha256:a3de9cfaf9e5eb12f76de60b154bd1a88f7df38b3ab0a565893dfa2d88697c69
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -27,10 +27,10 @@ import (
 // the wire, saved without it, and reported nowhere.
 func TestRoleRolePermissionInputCarriesEveryField(t *testing.T) {
 	in := RolePermissionInput{
-		PermissionID: domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"),
+		PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 	}
 	got := in.ToRolePermission()
-	if got.PermissionID != domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3") {
+	if got.PermissionID != domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8") {
 		t.Errorf("PermissionID did not survive the mapper")
 	}
 }

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:3a6a9b6ab439ee8448f49d3eb1f4b545194eab1a9906a600f94573402323ef34
+// checksum:   sha256:13ae139298df6fd746bb6c60dd548e864aa2a328b14460b809112efa8d89d4b3
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,7 +22,7 @@ import "github.com/ClaudioSchirmer/omnicore/domain"
 // returns it.
 type RolePermissionRow struct {
 	ID           *string    `json:"id,omitempty"`
-	PermissionID *domain.ID `json:"permissionID,omitempty" exportLabelKey:"RolePermissionPermissionIDField" example:"9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"`
+	PermissionID *domain.ID `json:"permissionID,omitempty" exportLabelKey:"RolePermissionPermissionIDField" example:"0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"`
 	// The permission as a token carries it and a route compares it:
 	// resource:action.
 	Permission *string `json:"permission,omitempty" exportLabelKey:"RolePermissionPermissionField" computed:"Resource,Action" example:"tenant:read"`
@@ -38,11 +38,11 @@ type RolePermissionRow struct {
 // recurses into it by field name, so the entry travels without a seat here.
 // The marker rides the type at the TOP of each walk.
 type RolePermissionRequest struct {
-	PermissionID domain.ID `json:"permissionID" example:"9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"`
+	PermissionID domain.ID `json:"permissionID" example:"0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"`
 }
 
 // RolePermissionResponse is one entry as stored, with the id it was given.
 type RolePermissionResponse struct {
 	ID           domain.ID `json:"id"`
-	PermissionID domain.ID `json:"permissionID" example:"9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"`
+	PermissionID domain.ID `json:"permissionID" example:"0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"`
 }

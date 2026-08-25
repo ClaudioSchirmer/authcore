@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:04e81bce08fe1341e89ec86a13dbd2a1fad2213d1a1410176fc024fad5fb22f1
+// checksum:   sha256:7604e45b81c9c6133934507a6cec66328d13932328253ea5bd127537817f04c7
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -68,7 +68,7 @@ type FindRolesResponse struct {
 	fwresponses.Auto
 
 	ID              *string             `json:"id,omitempty" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID        *domain.ID          `json:"tenantID,omitempty" exportLabelKey:"RoleTenantIDField" example:"a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"`
+	TenantID        *domain.ID          `json:"tenantID,omitempty" exportLabelKey:"RoleTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
 	Key             *string             `json:"key,omitempty" exportLabelKey:"RoleKeyField" example:"billing-manager"`
 	Name            *string             `json:"name,omitempty" exportLabelKey:"RoleNameField" example:"Billing Manager"`
 	Description     *string             `json:"description,omitempty" exportLabelKey:"RoleDescriptionField" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
