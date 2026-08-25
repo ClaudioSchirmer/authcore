@@ -1,6 +1,349 @@
 {
   "version": 1,
   "entities": {
+    "Group": {
+      "spec": "specs/omnicore-gen/group.omnicore.yaml",
+      "specHash": "b1e2c9762260552b8c49dcd28988bceb388a27a86b8d26713dcf6a23cc07dd60",
+      "framework": "v0.59.0",
+      "files": {
+        "bootstrap/groups_feature.go": {
+          "class": "owned",
+          "hash": "4563d0bb2762090576a80f3a680752c879e2c75df1b3bc482d9258bc6f908f1a"
+        },
+        "internal/application/commands/archive_group_command.go": {
+          "class": "owned",
+          "hash": "3f89e0661edcb9c9189456bd04b7e10e17c7b4aa9bf7906bad1610f1362f1f4d"
+        },
+        "internal/application/commands/group_child_results.go": {
+          "class": "owned",
+          "hash": "259eaec7f3cde9b1709e3a4b05c8aa82546db69813122cd1d8f2ac27482ba554"
+        },
+        "internal/application/commands/group_commands_test.go": {
+          "class": "owned",
+          "hash": "9c882d6d945cc8ca1a32f774672cb74ec14c1f486ff67dbc2a2dde5e4ed923cf"
+        },
+        "internal/application/commands/group_role_commands.go": {
+          "class": "owned",
+          "hash": "0582361239517a3b36162c1c873bc5a92cf95c01bfd97025074f1c6616268370"
+        },
+        "internal/application/commands/insert_group_command.go": {
+          "class": "owned",
+          "hash": "a4a37d282dba23f488c3f77a1a511355e8f1cb07fecf73ce1612c6a8b91812a6"
+        },
+        "internal/application/commands/patch_group_command.go": {
+          "class": "owned",
+          "hash": "2dd5b3e441fa0b39a1b0914eb9828b79e7cf78b996f20d3ad349e3165ae5461c"
+        },
+        "internal/application/dtos/group_dtos_test.go": {
+          "class": "owned",
+          "hash": "1a287c22e98ed4b9481575b554e7d80ff57268a4c604a19a514cfba0bec361fe"
+        },
+        "internal/application/dtos/group_role_input.go": {
+          "class": "owned",
+          "hash": "89f38e78c77d4439258d5845aeae077fce2d5298e9b961407a9220c2a4d0652f"
+        },
+        "internal/application/queries/find_group_by_id_query.go": {
+          "class": "owned",
+          "hash": "3cb15f7925d96bb8ca006e01760f0cec2affae4fdf3da333db1c07342c17b662"
+        },
+        "internal/application/queries/find_groups_by_params_query.go": {
+          "class": "owned",
+          "hash": "0e53b84eef708a2c4cb50d10ae68614ce5d66dd6d367df5db8058e085879c13f"
+        },
+        "internal/application/queries/group_queries_test.go": {
+          "class": "owned",
+          "hash": "9d81ec2df710957909e2b6cb26a69d9d981a482e5b8f68b78bfe255814ca1abb"
+        },
+        "internal/application/queries/group_row_results.go": {
+          "class": "owned",
+          "hash": "662918feeed1c440fb69ffca20f2e455cd168a51ccdab87613af50efc24dec1b"
+        },
+        "internal/application/translations/group_translations_test.go": {
+          "class": "owned",
+          "hash": "86f87bed2913914978cf3501faa84d9af197b5b274ba854961bd69c8baec42d1"
+        },
+        "internal/domain/aggregatevos/group_children_test.go": {
+          "class": "owned",
+          "hash": "8c1f1502406b4654b201977dc5d54822242257f2bd92412cb5dfa352a9b12552"
+        },
+        "internal/domain/aggregatevos/group_role.go": {
+          "class": "owned",
+          "hash": "91811a75bf3f8337d34423c32095ee69725f36d9bc7982d3154e7742c4d1b1f8"
+        },
+        "internal/domain/group.go": {
+          "class": "owned",
+          "hash": "2578a260a3aa99722cb30b5fdfdd785a9a429db5943573a217089e7c01ed9026"
+        },
+        "internal/domain/group_rules_manual.go": {
+          "class": "hook",
+          "hash": "952dcd346216bd3151a1c27602d922d40053774eea65f4e7821b590a3ad1bc70"
+        },
+        "internal/domain/group_service.go": {
+          "class": "owned",
+          "hash": "ff0f2d9b137436bee4af163b69b4e11198593e9984ce233e1aca2475c5c38d66"
+        },
+        "internal/domain/group_test.go": {
+          "class": "owned",
+          "hash": "9735531f8e76e0128c2ed312740eba843223682301eb68491486aac28f129713"
+        },
+        "internal/domain/vos/doc.go": {
+          "class": "owned",
+          "hash": "94f9639f86d244b66927c8fd2c28fe7efd030abfeb073c99d5d0c4cb0fac2f5f"
+        },
+        "internal/infra/group_repository.go": {
+          "class": "owned",
+          "hash": "d5ec537cbf34d66535d47344c6dacb19474ab5bba3d0bdc230031efc390eebb8"
+        },
+        "internal/infra/group_service.go": {
+          "class": "owned",
+          "hash": "68926aac93964ef59f3ec922167e8caa1907d891d3037ec01423dec29792308d"
+        },
+        "internal/infra/group_service_manual.go": {
+          "class": "hook",
+          "hash": "00ce15fba643be766777f4652dbe58e437c048eedffbf13b8e29eac63a690266"
+        },
+        "internal/infra/schemas/group_role_schema.go": {
+          "class": "owned",
+          "hash": "05361bb1dc8a7daf461c7b26651d83f78ded4bde2c70f2a5d6288224df0c2698"
+        },
+        "internal/infra/schemas/group_schema.go": {
+          "class": "owned",
+          "hash": "fdfb35f19e9e60533e65d9848e1fead4a448063679c853fe8c42122a55c1ed55"
+        },
+        "internal/infra/schemas/group_schemas_test.go": {
+          "class": "owned",
+          "hash": "d99f1707449c66af4b762173e9c47da4c607147ee11a5140b32d93e0cd941479"
+        },
+        "internal/infra/views/group_view.go": {
+          "class": "owned",
+          "hash": "2883158a40b4c96ce31ab23aa58332497ce0113fcfeaaec7965d5960c13ca91c"
+        },
+        "internal/infra/views/group_view_test.go": {
+          "class": "owned",
+          "hash": "19df957245117f782bd00c13e563b19536699439b5273e4528f50e2e394e2ef1"
+        },
+        "internal/web/group_routes.go": {
+          "class": "owned",
+          "hash": "72a6064b5320a80a1dc00f74bd5cd013d9a93c3a05c6db467f9661596eacd48e"
+        },
+        "internal/web/requests/find_group_by_id.go": {
+          "class": "owned",
+          "hash": "eb4ba6501c568fcdd6bec0ba9c71f32bd5fd949f7b9569ff525ec09865b153e2"
+        },
+        "internal/web/requests/find_groups_by_params.go": {
+          "class": "owned",
+          "hash": "5f2ebfb4a3df079b956dc0c17a273664381115d70f1d2d676a223d3be1e0c015"
+        },
+        "internal/web/requests/group_children.go": {
+          "class": "owned",
+          "hash": "83dc966cfa9c4504a357642a9850578aef55f1f2402c0b9d40d91e98b0c8ea5c"
+        },
+        "internal/web/requests/group_requests_test.go": {
+          "class": "owned",
+          "hash": "1847df5827693dec8fcec154f38f92eeef58ec115f97c9608d25ea2dd1ad8c67"
+        },
+        "internal/web/requests/group_role_requests.go": {
+          "class": "owned",
+          "hash": "fd890dc501f66615493a95bac3b8b2563e37e7657bd047201564b5747efd748a"
+        },
+        "internal/web/requests/insert_group.go": {
+          "class": "owned",
+          "hash": "3196430a70af7b23d6e886dcc0b6a17d0b9e904ddf91d03bd8cfee0da62e5b94"
+        },
+        "internal/web/requests/patch_group.go": {
+          "class": "owned",
+          "hash": "583b30c5c9f73b4e72c15110aa1d915a4772a506398687a6ceb9faa41ccbe487"
+        }
+      },
+      "ordinals": {
+        "postgres": 4
+      },
+      "viewShape": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "registrations": {
+        "internal/application/translations/deu.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5c84f3b256c48d2a94bf26a80528c484f20cf49bed310488813ddbe8436f7cb6",
+          "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "6b1182dc65c8729cb33e14de7cbb725cfa22a56d5ba8c55b25a3bba32819855a",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
+          "GroupKeyAlreadyExistsNotification": "c6c1f4097c06baf3a5e4499dff1a5db19bb11057efa340d45d26acc3b5849426",
+          "GroupKeyField": "1fbd7a00cacba0b89a31bb00cd29e60d3f86c08dd7806bbe891642214672af0c",
+          "GroupKeyIsImmutableNotification": "0993f82d81ab5ea25a0c1730d5e5b89d8287c716e1efaa8c592c45ec892e6edb",
+          "GroupNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "GroupRoleRoleIDField": "0038a9cf86613cec04ae936ef71b55a4dac1ab4d040925108269518736abf85c",
+          "GroupRoleRoleKeyField": "8fc29999905b6df190ed5ceaa37f6d1e3b9a962e3b8ff8431a841b35ded74a0e",
+          "GroupRoleRoleNameField": "6f348aa45edf274e38b2068dd33d1d41dfb5875185af01d3d8e8d6842764994c",
+          "GroupTenantDoesNotExistNotification": "11f7c6598ec212dd94450c911a8e2bcc301f3c7dbb603893594f28aa3312271b",
+          "GroupTenantIDField": "9837fb6af947b2f590f0d9301a00c28b7f65a934a4e3cde4bbad8294e3d94020",
+          "GroupTenantIsImmutableNotification": "e50af0e24b2aca1cd64292f505d09d9478e9ae04d3a3f0f86f83d7270a33b702",
+          "GroupTenantStatusField": "90a910bd236ff152ee2d5fafe20599b0c2cc0169d3e20169383feefd1d81a05c",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "564d65d16dfc38a67e9edbc1a8175bba590ca82141dba52fe622d0815a8febf6",
+          "RoleNotAvailableInTenantNotification": "e3ed12bfd66e664d09bede99885e1667699739451e85b683f740c7fd26bfdece",
+          "TooManyRolesInGroupNotification": "b140b759c06f729245f7be410314173d56792ee0c10559fb9e7af37ea1416455"
+        },
+        "internal/application/translations/eng.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "d59dceb6caf9b684c2720e17a2f66f5ff81425ff7178436ba962b50969219725",
+          "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "2df842b04ba1c417163f86586df02022f12daaf377562b5ad89782d34b687dd4",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "GroupKeyAlreadyExistsNotification": "292f6a977483e33993ea52e374e67f3879d78387d3164464625c42856b310eb2",
+          "GroupKeyField": "99a52df3ff3d499488e2fa28150c4106a2cb5e928891a830a9aa3922b2d32160",
+          "GroupKeyIsImmutableNotification": "9fa08fc7665088565d3d3a17e042d6794288227eef545e10992e0ce9531e4af1",
+          "GroupNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "GroupRoleRoleIDField": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
+          "GroupRoleRoleKeyField": "e2db287a07351f071f36c63dcca25bcbafe3e470781f557f97a7206218867165",
+          "GroupRoleRoleNameField": "82c784ca1c4ccf6592d4e8daa8b4d2f004800ee04ef0670abb0808c5fe050c1d",
+          "GroupTenantDoesNotExistNotification": "ef939e231c43131912319b60fcd59196e397a670e57a3e1f9e1d487430e4b1ea",
+          "GroupTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "GroupTenantIsImmutableNotification": "aef1ad42c9af36e976352cd5cacb20e5061f7f5bc1466c19c3a01bf3c6d54ba4",
+          "GroupTenantStatusField": "cec93f5fbbb8635cd976c122a7eba98a8b222bcf78634ffdad0b2af745b36cfe",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "4af02f98e86ac8012d9cc7987d742f8f9b5af14873e14a5961dbfca044b8e1ec",
+          "RoleNotAvailableInTenantNotification": "8222431633cde7211925e8a8640822521f9232ae7f6c444489681eddd5a1530c",
+          "TooManyRolesInGroupNotification": "954b6a1b2b974fee7be70439a29e911e27ebb25255a86ca84e03d79f5ec8a4cf"
+        },
+        "internal/application/translations/esp.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "e3f6cad92d4a19a1533fb9e39d23679832b026064ac123a8a2b0b00c56d17e9f",
+          "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "4e4c806c55fcb892cb26d957fc8da4b17ea53bbb812998c9ff2da2ad2c42c087",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
+          "GroupKeyAlreadyExistsNotification": "38856b906d935196d02912b1c71a45dc87d633c29fa9711bb540380f1a203b12",
+          "GroupKeyField": "e0da0a07e0419695c0878abb9f1feff08cfabd6d0dea509486f4dbe883cb3be6",
+          "GroupKeyIsImmutableNotification": "7a20e4a335156661fd579f9c29aacf17024cd4271fb6af86eb293a603b1c4e9e",
+          "GroupNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
+          "GroupRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "GroupRoleRoleKeyField": "e7522ee12a3c167ddaec99b2a3dce65189cab73c5d097766eeb9e7b5b144cf8b",
+          "GroupRoleRoleNameField": "7d5629f31ad81b0f13322a86016ac2393800a9ebc1160e6dc0a67274583f170d",
+          "GroupTenantDoesNotExistNotification": "b281fcb73a2017ecad404658c7a3b8de927d3b301f9bf49319d5c1d667b8d8c7",
+          "GroupTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "GroupTenantIsImmutableNotification": "3efb8236657b243ea82d83c5cdd43a20266a7fa48c2391dd16f01981d9ab8356",
+          "GroupTenantStatusField": "3285afe20627992bd89a40aa92a1f465776ce099ea2c4c2028a1d0be36c6270b",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "a4e3492cdff1fb68d9ac8a40ab03e875d0d0499579d652db916a531d54a96c78",
+          "RoleNotAvailableInTenantNotification": "09ada259b3fd2edf555da524d6a8c528ccdd2ceb5652d3d29d8ceef75692dd5a",
+          "TooManyRolesInGroupNotification": "1bd2b74f4a1039a4010ce99b6b26c33b60e7547205786bee8706df3792438913"
+        },
+        "internal/application/translations/fra.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "df5184c5ac362065f4997f1864ae9e0052f1a9c1230593ecb7fc358f47c716eb",
+          "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "27722baec4f9b10f5c1d87064a05ae169aa635b1d62a7a69252956fe443109eb",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "GroupKeyAlreadyExistsNotification": "67bb7dcc26bed51307f9941759cceefb79669be8a33880bd31796618afffd799",
+          "GroupKeyField": "51dcb443ce8062e536d22d775344e02a0ad3810502a71b432ad812b721fe0e81",
+          "GroupKeyIsImmutableNotification": "84eac492d2224f7bd5b6d301c90328b7abebadf284da85dce0ac72089e4e871a",
+          "GroupNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
+          "GroupRoleRoleIDField": "a1fc967c558796933832ebe6eb716a7eb69d4ac48349d05366c22531d0b0df66",
+          "GroupRoleRoleKeyField": "9ed80be4cd3c19fa8ff6bcaaa6ae1ebf4abb816fd46c32ee2ba6ce7acb50a0ba",
+          "GroupRoleRoleNameField": "07ddf0695e6897db9ddd08d3ac06e637541090d0d0a3ceab6f2843e31d67b6d9",
+          "GroupTenantDoesNotExistNotification": "3ecea699b3b9d8b00817f657e47dc657066d3e4b420f0ed838e60b7616f6b1c6",
+          "GroupTenantIDField": "36d6aac11c524ff1bb47724bec546e0bbcb3896c39b5003af5f72792209bc915",
+          "GroupTenantIsImmutableNotification": "ed228c429941226b06ab057f954af255814d0bc7f817cc502b60debf97bcb210",
+          "GroupTenantStatusField": "6ea758e951621202ab91271e3e2bc14bbcad69c41269d1af017384f1e5e6c84d",
+          "GroupTenantWorkspaceField": "3f680c5fc8ca2079f7cee2ad9df2a6dd5923fa8d17607fb9c84f43859efdee93",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "5dfa5f19a2294ed16d35c13bdd7c55239f7fca366f75d29e893a35e82703270f",
+          "RoleNotAvailableInTenantNotification": "54535d4f1ca973aa1d764e060bef390085d52057945f785867293e1dc39d941a",
+          "TooManyRolesInGroupNotification": "40e723dd6acc997f23638bc5bee62347084c18c6a786a26bd02c441f90500499"
+        },
+        "internal/application/translations/ita.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "8917e6fb47bcb8ab27cee787d5695f7fe11bfa21725c72cf62c0bffb5a9a6d45",
+          "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "4a80a9754e1f0d82237ae1fe3b2d6d3ee33bd93003ac8f38bb78c6a74e98f8bb",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
+          "GroupKeyAlreadyExistsNotification": "3e7dbd36f02de38cbde6694762ff7a4e9a1b0b231b6e3d76d6debc845e16dced",
+          "GroupKeyField": "9d56366d9b9893ea7edbf416b95af8acee3fc688cb822733f116c5c8e6e51211",
+          "GroupKeyIsImmutableNotification": "90c967fbd85e9305222c03d736870f99cb674f27062cf8508e03f58047ffb9cb",
+          "GroupNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "GroupRoleRoleIDField": "7a972bbc14808919bbd655b3a1452084434445d65aff8ad58958f7d04a1c2762",
+          "GroupRoleRoleKeyField": "de7b1fa6f48d3675cc844b12775ebaee55797c49486fd170f84c83dde77f0c12",
+          "GroupRoleRoleNameField": "7aa73acc84b709dea6e189fc03ed97d58de2df5dec214f2619218dd336b0cd40",
+          "GroupTenantDoesNotExistNotification": "ee227a22449a06cdd3e36184a6236887beb3a12bdd304321a6b6715ef9d516e7",
+          "GroupTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "GroupTenantIsImmutableNotification": "2b037caf7c2a672c44a31706d6e8cb40a74d6788a3358bf6036ed80349c11bd1",
+          "GroupTenantStatusField": "0644892045be838bf66fdca4ee54bae73efb464e3ffc91a36e7cd35b723b58dc",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "61b81ef4edd9a81249eb7150aefea96e77365f52f7e56897f84a4ed0fa51a981",
+          "RoleNotAvailableInTenantNotification": "a504ebcf11acf1320e96ad96cae899c8d3cd3cc346960ca21a61ae31a2118741",
+          "TooManyRolesInGroupNotification": "cb907a449607ca15d8e8f6ee7bc8fb7f908f6d1a7437804fdc4d83173ccf71c4"
+        },
+        "internal/application/translations/nld.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5aaa53203d630b13a253d7809e228f0ccfda3fc90dc2d33ab2c498f4f9c99fe4",
+          "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "4093af764603f8ddfa16adaf60daf06eaab84290143b1d956ab099f22832ce6a",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
+          "GroupKeyAlreadyExistsNotification": "7bea9e68687768e771251667c7411a396c87222aeb927f7eeb4577660f709d5c",
+          "GroupKeyField": "1dcc011996ad83331da8adb65704dfa7ea6a11d80d400878b17b016a90910254",
+          "GroupKeyIsImmutableNotification": "381d2451e188c34aaac89a3412de6c456aef6a80dac36f481c15f60a94da27b8",
+          "GroupNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
+          "GroupRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "GroupRoleRoleKeyField": "1b4b9d98966cfdd6161f2e6dbbbabe8adc7f1450cf97c89f2666f4b8bf958b4a",
+          "GroupRoleRoleNameField": "e820a6c2b82d9df7f0fd9ffd23bebfa59ac9dfa3a17d5e62319c1df03ef717c1",
+          "GroupTenantDoesNotExistNotification": "e39134718ce226b5604f0c872afd098a5f920e147fa0be2298f59ad8b48e9839",
+          "GroupTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "GroupTenantIsImmutableNotification": "d61d438d0484c8459dc26aca1afff1f55a2fe2584f16f2ef78182f84dd972dc4",
+          "GroupTenantStatusField": "450e805433042116dd1688a3a0964163324052973bb18ceb8151cfb90229067c",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "90e1604224ba1b6b438945f47ca1d2f9d5e2f389a6e95f1e8e96592e7800d51e",
+          "RoleNotAvailableInTenantNotification": "d1ff23480947e06746a163dad3464ec8183e73b91529c58b3746111463e69dab",
+          "TooManyRolesInGroupNotification": "b275793a98c37938b26eea36567a52e7746ad7eeb920add5f894f0e92c607100"
+        },
+        "internal/application/translations/ptbr.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "ede20bef362340500e4bef973568e6b11c381f5648933e6f7b03c680a6899ece",
+          "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
+          "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "GroupAlreadyGrantsRoleNotification": "c2c233d6b8f2f0cb2c52e104c2bc4a85624072b74caf8b937d59e8b663f8e853",
+          "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "GroupDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
+          "GroupKeyAlreadyExistsNotification": "8580631314a6af4b446628779de9af1ce10a9be7929163bec19e1e0b5a147c55",
+          "GroupKeyField": "01966c51593afa085f19b1f1c364d8582ed1cdd1db66b820d74681c908d40645",
+          "GroupKeyIsImmutableNotification": "35cbb6e53f17b52f5ca3e34cb7d662d8774bc8a683576803f0bc4dc1f8d02dfe",
+          "GroupNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "GroupRoleRoleIDField": "e0165d8a6de1b4e2ed0eff3a2c23366ddb907a5a3420d5a51e4c9af07c65b5a8",
+          "GroupRoleRoleKeyField": "e2c3d45a9df20c6ea3e72a95f3285c120349ed105f507c9fa6385d86d8ebf293",
+          "GroupRoleRoleNameField": "8ec37951ad70acfed151996741f845e33ea7a7cc444cc127884859a7ba76fed5",
+          "GroupTenantDoesNotExistNotification": "4c36805a7917234e0f011965f4a5ead3549287a8c4aac0103aed2af7ed12c228",
+          "GroupTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "GroupTenantIsImmutableNotification": "63372b84e386d614d98d714dc198e28e6f21dd0cf8b0a0e3628db4fe835a7eaa",
+          "GroupTenantStatusField": "e231aa5fa3f16369ceeddffbdae31020f1289148197aa49a6573555210f3b776",
+          "GroupTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "GroupUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidGroupKeyNotification": "0af3ac97062559ac54227237aa2617303860992e5b1a3edf62ba1714cca1f057",
+          "RoleNotAvailableInTenantNotification": "8310c646c18bd3744fa415b87ced63c54870656b6636e2c923a447dba50af665",
+          "TooManyRolesInGroupNotification": "f22b4471c91e7c00207d348263d8a22d0d05179ab8aa11bf68c7f60187b7576a"
+        },
+        "internal/domain/notifications.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "cc8cd97e7eb17840a5c05d9b2a0cf9d829cd6432d7315bd57ead872f43399b2c",
+          "CannotGrantWildcardRoleNotification": "d355145da4cea2a0f64df3aa1134355d5e61b1015aefa678f3cd08564643a09d",
+          "GroupAlreadyGrantsRoleNotification": "69bfab59d8059e1404e7317d4d69eda951ddf97df02ded1c54ae668294aea884",
+          "GroupKeyAlreadyExistsNotification": "bcbff2435eb4e59438deea3bffcb7294ef1ada46b25f3fd635aab5a920a06f28",
+          "GroupKeyIsImmutableNotification": "c1d2627b6e79514c8ac06ef20425337aa4c8239accbdeb453e58e85f05d7d87d",
+          "GroupTenantDoesNotExistNotification": "e50d64c13613acfe203d88f83c04052ea5fbeded9f070e97337b99a1e958da21",
+          "GroupTenantIsImmutableNotification": "8679773586499fcd2dda4df53f288804db70983f06dc027942385fdcf13b2e88",
+          "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",
+          "TooManyRolesInGroupNotification": "d784b2f08a24b1fc9772745578da6da80745aea6bc72ce741dba315772065239"
+        },
+        "internal/domain/vos/notifications.go": {
+          "InvalidGroupKeyNotification": "c7c420afb43b92ad699eb6bc2d8cc460657225ccac81049591ba961a532459e6"
+        }
+      }
+    },
     "Permission": {
       "spec": "specs/omnicore-gen/permission.omnicore.yaml",
       "specHash": "c9193a1283a9407b52396e97fa6cfee8cf65177e4f2b463a6767b8af1853fe43",

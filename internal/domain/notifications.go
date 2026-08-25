@@ -132,3 +132,76 @@ type CannotGrantWildcardPermissionNotification struct {
 func (CannotGrantWildcardPermissionNotification) Semantic() domain.NotificationSemantic {
 	return domain.SemanticForbidden
 }
+
+// GroupKeyAlreadyExistsNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type GroupKeyAlreadyExistsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (GroupKeyAlreadyExistsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// GroupKeyIsImmutableNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type GroupKeyIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// GroupTenantIsImmutableNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type GroupTenantIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// GroupTenantDoesNotExistNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type GroupTenantDoesNotExistNotification struct{ domain.DomainNotificationBase }
+
+// RoleNotAvailableInTenantNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type RoleNotAvailableInTenantNotification struct{ domain.DomainNotificationBase }
+
+// GroupAlreadyGrantsRoleNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type GroupAlreadyGrantsRoleNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (GroupAlreadyGrantsRoleNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// TooManyRolesInGroupNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type TooManyRolesInGroupNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// CannotGrantRoleWithUnheldPermissionsNotification reaches the caller as 403.
+// The struct NAME is the translation key, so renaming it here without renaming
+// it in the seven catalogs leaves the message untranslated.
+type CannotGrantRoleWithUnheldPermissionsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (CannotGrantRoleWithUnheldPermissionsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}
+
+// CannotGrantWildcardRoleNotification reaches the caller as 403. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type CannotGrantWildcardRoleNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (CannotGrantWildcardRoleNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}

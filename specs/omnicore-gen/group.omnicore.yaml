@@ -1,0 +1,782 @@
+# Group — a tenant's own org unit, and the bundle of roles a member inherits by belonging.
+#
+# Model authority: scaffold-entity/group/spec.md (Status: APPROVED). Nothing here
+# re-decides the model; where this file and that spec disagree, the spec wins.
+#
+# Structurally this is Role ONE LEVEL UP, and deliberately so: tenant-owned flat root, one
+# owned collection holding nothing but the referenced aggregate's id, per-child
+# attach/detach, one-way archive, tenant isolation on reads and writes. The FOUR places it
+# is not a copy of Role are the interesting part:
+#
+#   1. G6 asks a THIRD question Role never had — same tenant. Role is tenant-scoped where
+#      Permission was global, so an attached role from another tenant is a cross-tenant leak.
+#   2. group:grant is a FIFTH verb. The two collection ops do NOT ride group:update.
+#   3. G10a is TRANSITIVE — it resolves a role to its permission keys and requires the
+#      caller to hold every one of them. Not one key: a set.
+#   4. One-way archive hurts more here — unarchiving would re-authorize a whole team at once.
+#
+# The idea to hold while reading the collection: ONE COLUMN GOES IN, THREE COME OUT.
+#   role_id     stored on group_roles — the role's id, and nothing else
+#   role_key    NOT stored — read across the foreign key on every load
+#   name        NOT stored — same
+#
+# Storing the id and not the key is what keeps Role's one-way archive true: a retired role
+# comes back as a NEW row with a NEW id, so an entry holding the key would silently
+# re-attach to the recreated row and one holding the id cannot.
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: Group
+plural: Groups
+language: en-US
+
+storage:
+  kind: flat
+  table: groups
+  description: >-
+    A tenant's own org unit — the bundle of roles a member inherits by belonging to it.
+    Owned by exactly one tenant; groups never nest, and membership lives in its own
+    aggregate.
+  managed:
+    revision: revision
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+
+fields:
+  # The owning tenant, by PRIMARY KEY. Tenant's derived UUIDv5 public key was removed on
+  # 2026-08-24, so there is exactly one value to point at and the tenant_id JWT claim
+  # carries that same value — the Layer 3 isolation filter compares a plain local column
+  # with no translation step.
+  #
+  # The FK itself is appended to the migration by hand: a reference to ANOTHER aggregate is
+  # outside this language.
+  - name: TenantID
+    type: id
+    column: tenant_id
+    livesOn: root
+    # ON THE WIRE, deliberately — assignedFrom: identity-claim was tried on Role and is
+    # WRONG, in two ways that only showed up against a running bench. It removes the field
+    # from every write DTO, so (1) a super-admin can never create a group in a tenant other
+    # than their own, which the approved model's §10 explicitly promises, and (2) on a dev
+    # bench with auth.mode disabled nothing fills it and the write dies on an empty id.
+    #
+    # The row scope is not lost by putting it back: the generated tenant guard already
+    # refuses a value that is not the caller's claim (403), and the super-admin bypass
+    # already crosses it. The claim decides what you MAY write; it does not have to be the
+    # only thing that CAN write it.
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
+    description: >-
+      The tenant that owns this group. Immutable after creation — a group never moves
+      between tenants.
+    labelKey: GroupTenantIDField
+    text:
+      eng: Tenant
+      ptbr: Inquilino
+      esp: Inquilino
+      fra: Locataire
+      deu: Mandant
+      ita: Tenant
+      nld: Tenant
+
+  # `key` is a reserved word across the engine set, so the physical column is group_key —
+  # exactly as Role stores role_key. Only the STORAGE name moves: the exposed name stays Key
+  # everywhere — filters, ?orderBy, OpenAPI, GraphQL, JSON.
+  #
+  # unique WITHIN the tenant, not globally: two customers may both have `engineering`.
+  # active-only, because with no unarchive verb re-inserting is the only way back.
+  - name: Key
+    type: string
+    column: group_key
+    length: 64
+    livesOn: root
+    vo: {kind: manual, ref: GroupKey}
+    unique:
+      enforce: service-precheck+constraint
+      notification: GroupKeyAlreadyExistsNotification
+      scope: active-only
+      within: [TenantID]
+    example: engineering
+    description: >-
+      Stable machine handle of the group, unique within its tenant and immutable. What an
+      API caller, an audit line and a directory mapping reference; never the display name.
+    labelKey: GroupKeyField
+    text:
+      eng: Key
+      ptbr: Chave
+      esp: Clave
+      fra: Clé
+      deu: Schlüssel
+      ita: Chiave
+      nld: Sleutel
+
+  - name: Name
+    type: string
+    column: name
+    length: 120
+    livesOn: root
+    vo: {kind: reuse, ref: DisplayName}
+    example: Engineering
+    description: >-
+      Human-readable name of the group as operators and end users see it. Not unique — two
+      groups in one tenant may share a label; the key is what disambiguates.
+    labelKey: GroupNameField
+    text:
+      eng: Name
+      ptbr: Nome
+      esp: Nombre
+      fra: Nom
+      deu: Name
+      ita: Nome
+      nld: Naam
+
+  - name: Description
+    type: string
+    column: description
+    length: 500
+    livesOn: root
+    vo: {kind: reuse, ref: Description}
+    example: >-
+      Everyone in the product engineering org: read access to the tenant registry and the
+      permission catalog, plus deploy rights.
+    description: >-
+      What belonging to this group actually lets a member do, in the tenant's own words.
+    labelKey: GroupDescriptionField
+    text:
+      eng: Description
+      ptbr: Descrição
+      esp: Descripción
+      fra: Description
+      deu: Beschreibung
+      ita: Descrizione
+      nld: Beschrijving
+
+valueObjects:
+  # kind: manual — a scalar the generator does not write. It has to be: the anti-junk
+  # predicates this project already shares (a distinct-rune floor, no long run of identical
+  # runes) are not a regex.
+  #
+  # NOT a reuse of vos.RoleKey, though the RULE is identical. A Group.Key field typed
+  # vos.RoleKey reads as a bug in every file it appears in, and InvalidRoleKeyNotification
+  # would tell a caller their ROLE key is malformed while they were creating a group.
+  # Recorded as a known duplication: a later vos.Handle taking the field name would collapse
+  # the two, and that is an evolve-entity change on Role, out of scope here.
+  - name: GroupKey
+    kind: manual
+    backing: string
+    description: >-
+      A group's stable machine handle: a lowercase slug of 2-64 runes, groups separated by
+      single hyphens so a hyphen can never lead, trail or double. Reuses this project's
+      shared anti-junk predicates. No reserved list and no derivation — those two rules
+      belong to the tenant handle. No normalization: a value that does not already comply is
+      refused, never repaired.
+
+notifications:
+  - name: InvalidGroupKeyNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A group key that is not a lowercase slug of 2-64 runes in hyphen-separated groups, or
+      that reads as keyboard junk under this project's shared anti-junk predicates.
+    text:
+      eng: The group key is not valid.
+      ptbr: A chave do grupo não é válida.
+      esp: La clave del grupo no es válida.
+      fra: La clé du groupe n'est pas valide.
+      deu: Der Gruppenschlüssel ist ungültig.
+      ita: La chiave del gruppo non è valida.
+      nld: De groepssleutel is ongeldig.
+
+  - name: GroupKeyAlreadyExistsNotification
+    semantic: conflict
+    description: >-
+      An ACTIVE group in this tenant already holds this key. Archived rows do not block it —
+      re-inserting is how a retired group comes back.
+    text:
+      eng: A group with this key already exists in this tenant.
+      ptbr: Já existe um grupo com esta chave neste inquilino.
+      esp: Ya existe un grupo con esta clave en este inquilino.
+      fra: Un groupe avec cette clé existe déjà dans ce locataire.
+      deu: In diesem Mandanten existiert bereits eine Gruppe mit diesem Schlüssel.
+      ita: Esiste già un gruppo con questa chiave in questo tenant.
+      nld: Er bestaat al een groep met deze sleutel in deze tenant.
+
+  - name: GroupKeyIsImmutableNotification
+    semantic: validation
+    description: >-
+      An attempt to change the key after creation, which every API caller, every audit line
+      and every directory mapping references.
+    text:
+      eng: The group key cannot be changed.
+      ptbr: A chave do grupo não pode ser alterada.
+      esp: La clave del grupo no se puede modificar.
+      fra: La clé du groupe ne peut pas être modifiée.
+      deu: Der Gruppenschlüssel kann nicht geändert werden.
+      ita: La chiave del gruppo non può essere modificata.
+      nld: De groepssleutel kan niet worden gewijzigd.
+
+  - name: GroupTenantIsImmutableNotification
+    semantic: validation
+    description: An attempt to move a group from one tenant to another after creation.
+    text:
+      eng: The owning tenant cannot be changed.
+      ptbr: O inquilino proprietário não pode ser alterado.
+      esp: El inquilino propietario no se puede modificar.
+      fra: Le locataire propriétaire ne peut pas être modifié.
+      deu: Der besitzende Mandant kann nicht geändert werden.
+      ita: Il tenant proprietario non può essere modificato.
+      nld: De eigenaar-tenant kan niet worden gewijzigd.
+
+  - name: GroupTenantDoesNotExistNotification
+    semantic: validation
+    description: >-
+      The owning tenant does not exist, has been archived, or is commercially suspended. A
+      TRIAL tenant is a live customer and is accepted.
+    text:
+      eng: The owning tenant does not exist, is archived or is suspended.
+      ptbr: O inquilino proprietário não existe, está arquivado ou está suspenso.
+      esp: El inquilino propietario no existe, está archivado o está suspendido.
+      fra: Le locataire propriétaire n'existe pas, est archivé ou est suspendu.
+      deu: Der besitzende Mandant existiert nicht, ist archiviert oder ist gesperrt.
+      ita: Il tenant proprietario non esiste, è archiviato o è sospeso.
+      nld: De eigenaar-tenant bestaat niet, is gearchiveerd of is opgeschort.
+
+  # THREE questions, ONE message, on purpose. Separating "that role is in another tenant"
+  # from "that role does not exist" confirms to a caller in tenant A that a specific UUID is
+  # a live role in some other tenant — an existence oracle over a competitor's org chart.
+  # Same reasoning that makes a cross-tenant by-id read answer 404 rather than 403.
+  - name: RoleNotAvailableInTenantNotification
+    semantic: validation
+    description: >-
+      An attached role id is not in this tenant's catalog of roles, points at a role that
+      has been archived, or belongs to ANOTHER tenant. All three collapse into one message
+      deliberately: a distinct cross-tenant answer would be an existence oracle.
+    text:
+      eng: This role is not available in your tenant, or is no longer active.
+      ptbr: Este papel não está disponível no seu inquilino, ou não está mais ativo.
+      esp: Este rol no está disponible en su inquilino, o ya no está activo.
+      fra: Ce rôle n'est pas disponible dans votre locataire, ou n'est plus actif.
+      deu: Diese Rolle ist in Ihrem Mandanten nicht verfügbar oder nicht mehr aktiv.
+      ita: Questo ruolo non è disponibile nel tuo tenant, o non è più attivo.
+      nld: Deze rol is niet beschikbaar in uw tenant, of is niet meer actief.
+
+  - name: GroupAlreadyGrantsRoleNotification
+    semantic: conflict
+    description: The group already confers this role; the pair is never stored twice.
+    text:
+      eng: This group already confers this role.
+      ptbr: Este grupo já confere este papel.
+      esp: Este grupo ya confiere este rol.
+      fra: Ce groupe confère déjà ce rôle.
+      deu: Diese Gruppe gewährt diese Rolle bereits.
+      ita: Questo gruppo conferisce già questo ruolo.
+      nld: Deze groep verleent deze rol al.
+
+  - name: TooManyRolesInGroupNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      The group would confer more roles than one group may hold. The cap is sized to this
+      platform, and it is also a claim-size budget: a member inherits every permission of
+      every role in the bundle.
+    text:
+      eng: A group may confer at most {max} roles.
+      ptbr: Um grupo pode conferir no máximo {max} papéis.
+      esp: Un grupo puede conferir como máximo {max} roles.
+      fra: Un groupe peut conférer au maximum {max} rôles.
+      deu: Eine Gruppe darf höchstens {max} Rollen gewähren.
+      ita: Un gruppo può conferire al massimo {max} ruoli.
+      nld: Een groep mag maximaal {max} rollen verlenen.
+
+  - name: CannotGrantRoleWithUnheldPermissionsNotification
+    semantic: forbidden
+    description: >-
+      No privilege escalation, TRANSITIVELY: a caller may attach a role only if they
+      themselves hold EVERY permission that role grants — a set, not one key. A *:*
+      superadmin passes for everything, by construction.
+    text:
+      eng: You cannot confer a role that grants permissions you do not hold.
+      ptbr: Você não pode conferir um papel que concede permissões que você não possui.
+      esp: No puede conferir un rol que concede permisos que usted no posee.
+      fra: Vous ne pouvez pas conférer un rôle qui accorde des permissions que vous ne détenez pas.
+      deu: Sie können keine Rolle gewähren, die Berechtigungen erteilt, die Sie nicht besitzen.
+      ita: Non è possibile conferire un ruolo che concede permessi che non si possiedono.
+      nld: U kunt geen rol verlenen die rechten geeft die u zelf niet heeft.
+
+  - name: CannotGrantWildcardRoleNotification
+    semantic: forbidden
+    description: >-
+      A role granting a permission with a wildcard in either part cannot be attached to any
+      group through the API. The platform's own *:* role — and the superadmin group carrying
+      it — are seeded by migration beside the reserved platform tenant.
+    text:
+      eng: A role that grants a wildcard permission cannot be conferred by a group.
+      ptbr: Um papel que concede uma permissão curinga não pode ser conferido por um grupo.
+      esp: Un rol que concede un permiso comodín no puede ser conferido por un grupo.
+      fra: Un rôle accordant une permission joker ne peut pas être conféré par un groupe.
+      deu: Eine Rolle mit einer Platzhalter-Berechtigung kann von keiner Gruppe gewährt werden.
+      ita: Un ruolo che concede un permesso jolly non può essere conferito da un gruppo.
+      nld: Een rol die een jokerrecht verleent, kan niet door een groep worden verleend.
+
+children:
+  # The bundle. Per-child ATTACH / DETACH, never a replace-all: an omitted role on a
+  # wholesale PUT would de-authorize a whole TEAM at once, which is strictly worse than the
+  # same mistake one level down on Role.
+  #
+  # operations: [add, remove] and NOT change — a GroupRole has NO editable field, its single
+  # stored column IS its identity. "Change this entry" would turn entry A into entry B while
+  # keeping A's row id, which an audit trail reads as one grant BECOMING another instead of
+  # as two events. Re-attaching a detached role is a fresh add with a fresh child id.
+  - name: GroupRole
+    plural: Roles
+    table: group_roles
+    parentColumn: group_id
+    ownedBy: root
+    editStrategy: per-child
+    operations: [add, remove]
+    # A detach is a SOFT removal: the row lingers with a stamp and the per-child verb mounts
+    # as PATCH .../archive rather than DELETE. A DELETE that soft-removes is a lying
+    # contract, and an access review needs to read what a past attachment meant.
+    softRemove: true
+    archivedAt: deleted_at
+    # Over RoleID ALONE, and writing it explicitly is load-bearing rather than stylistic.
+    # The entry carries three fields, two of which are read-only join fields that are BLANK
+    # on a freshly attached entry — comparing all three would answer "different" for an
+    # attachment that duplicates a stored one, which is the duplicate guard failing open.
+    businessIdentity: [RoleID]
+    duplicateNotification: GroupAlreadyGrantsRoleNotification
+    # The FIFTH verb, and the one place this taxonomy diverges from Role's. Entra guards a
+    # role-assignable group behind Privileged Role Administrator rather than Groups
+    # Administrator; AWS spells iam:AttachGroupPolicy as its own action rather than part of
+    # UpdateGroup. "May rename the group" and "may change what the group confers" are
+    # different jobs, and the second is the escalation surface.
+    #
+    # It does NOT replace the domain rules below: Layer 1 asks whether this principal may
+    # touch the edge at all, G10a asks whether they may confer THIS role.
+    permissions:
+      add: group:grant
+      remove: group:grant
+    description: >-
+      The roles a group confers on its members. One row per role in the bundle, holding
+      nothing but the role's id — so a retired-and-recreated role is never silently
+      re-conferred, and the pair is never stored twice.
+    fields:
+      - name: RoleID
+        type: id
+        column: role_id
+        # The RACE BACKSTOP for the duplicate rule. The rule itself compares the entries
+        # this write carries, in memory; two concurrent attaches of the same role each pass
+        # that check and only the index stops the second. active-only, because a DETACHED
+        # entry must not block re-attaching — there is no per-entry unarchive, so a fresh
+        # add is the only way back.
+        unique:
+          enforce: constraint-only
+          notification: GroupAlreadyGrantsRoleNotification
+          scope: active-only
+        example: 0198f3e0-9c25-7a1f-b73d-5e08c4a29f61
+        description: >-
+          The role this entry confers — the id and not the key, so a retired-and-recreated
+          role needs an explicit re-attach.
+        labelKey: GroupRoleRoleIDField
+        text:
+          eng: Role
+          ptbr: Papel
+          esp: Rol
+          fra: Rôle
+          deu: Rolle
+          ita: Ruolo
+          nld: Rol
+
+joins:
+  # The traversal into the OWNER, mirroring Role. TAKEN at the generation gate on
+  # 2026-08-24: while groups.tenant_id pointed at Tenant's derived key this was impossible
+  # — a join's predicate is always fk = target.id, so the declaration would have been
+  # ACCEPTED and matched nothing. That key was removed and the FK targets tenants.id, so the
+  # trap is gone.
+  #
+  # inner is correct because tenant_id is NOT NULL and FK-backed. Unlike a child join, a
+  # ROOT join's fields ARE addressable in a criteria — so these two are filterable and
+  # sortable like any column of this table, which is what makes "the groups of
+  # acme-comercio" answerable by handle rather than by UUID.
+  #
+  # Neither carries a domain type, by construction: the value belongs to Tenant, arrives
+  # read-only and is never validated here.
+  - kind: inner
+    to: Tenant
+    on: tenant_id
+    fields:
+      - name: TenantWorkspace
+        column: workspace
+        example: acme-comercio
+        description: >-
+          The owning tenant's immutable handle — what URLs, logs and support conversations
+          say. Read-only, filled on every load, never written through this aggregate.
+        labelKey: GroupTenantWorkspaceField
+        text:
+          eng: Workspace
+          ptbr: Workspace
+          esp: Workspace
+          fra: Espace de travail
+          deu: Workspace
+          ita: Workspace
+          nld: Workspace
+      - name: TenantStatus
+        column: status
+        example: active
+        description: >-
+          The owning tenant's commercial lifecycle — trial, active or suspended. Read-only,
+          filled on every load, never written through this aggregate.
+        labelKey: GroupTenantStatusField
+        text:
+          eng: Tenant status
+          ptbr: Situação do inquilino
+          esp: Situación del inquilino
+          fra: Statut du locataire
+          deu: Mandantenstatus
+          ita: Stato del tenant
+          nld: Tenantstatus
+
+  # The traversal into the role catalog, hung off the bundle. Declared ONCE here and
+  # inherited by every consumer of the loader: FindByID (the load the write-side auto
+  # handlers go through), ScopedReader, and the relational view of the read side.
+  #
+  # inner is correct ONLY because role_id is NOT NULL and FK-backed. Inside a child an inner
+  # join drops the ENTRY, not the aggregate — a silent hole in the array rather than a
+  # missing group; referential integrity is what makes it safe.
+  #
+  # NOT hidden, unlike Role's pair: these ARE the payload. GET /groups/:id answers the
+  # group's bundle with the role's key and label on each entry, so a client renders it with
+  # no second call to GET /roles.
+  #
+  # The role's deleted_at is deliberately NOT traversed. Role keeps its archive stamp off
+  # its own grants' reads for a reason, and republishing a column the OWNING aggregate keeps
+  # off its own reads is a back door to a decision already made the other way. So the join
+  # renders the attachment and says nothing about whether the role is retired — G6 decides
+  # that, and it decides it with a probe.
+  - kind: inner
+    to: Role
+    inChild: GroupRole
+    on: role_id
+    fields:
+      - name: RoleKey
+        column: role_key
+        example: billing-manager
+        description: >-
+          The conferred role's stable machine handle. Read-only, filled on load, never
+          written through this aggregate.
+        labelKey: GroupRoleRoleKeyField
+        text:
+          eng: Role key
+          ptbr: Chave do papel
+          esp: Clave del rol
+          fra: Clé du rôle
+          deu: Rollenschlüssel
+          ita: Chiave del ruolo
+          nld: Rolsleutel
+      - name: RoleName
+        column: name
+        example: Billing Manager
+        description: >-
+          The conferred role's display name. Read-only, filled on load, never written
+          through this aggregate.
+        labelKey: GroupRoleRoleNameField
+        text:
+          eng: Role name
+          ptbr: Nome do papel
+          esp: Nombre del rol
+          fra: Nom du rôle
+          deu: Rollenname
+          ita: Nome del ruolo
+          nld: Rolnaam
+
+# ONE-WAY archive, no unarchive. A group is granted to USERS, and those memberships point at
+# the group's id, which does not change — so a single PATCH /groups/:id/unarchive would
+# silently re-authorize EVERY MEMBER OF THE TEAM at once, with no re-approval and an audit
+# line reading "restored". A retired group comes back as a new row whose members must be
+# re-added. Named honestly as the cost: Entra soft-deletes with a 30-day restore window
+# precisely because losing a 50-member group to a fat-finger is brutal.
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+
+delete:
+  root: soft
+
+rules:
+  list:
+    # G0 — THE BARRIER, and it is rule ZERO. Added from a 500 the Role entity actually
+    # shipped: GroupKeyTaken(tenantID, key, selfID) is scoped BY the owner and hands it
+    # straight to a criterion against a UUID column, so an owner that is empty — or
+    # non-empty and not a UUID — makes that query error and the probe panic. A 500 on a
+    # request whose problem is plain validation.
+    #
+    # It replaces a `required` rule rather than joining one: domain.ID validates itself,
+    # uuid.Parse refuses "" and "tatu" alike, and a required rule beside it would tell the
+    # caller the same thing twice AND would cover only the empty case — Role tried exactly
+    # that and a non-UUID still reached the probe.
+    #
+    # Declared FIRST because the barrier is POSITIONAL: it lands after the rule carrying it.
+    - id: tenant-is-a-usable-id
+      kind: valueObject
+      scope: [insertOrUpdate]
+      fields: [TenantID]
+      guard: true
+      description: >-
+        The uniqueness pre-check below is scoped BY the owner and binds it to a UUID column;
+        everything after this depends on it being a usable id. The framework's own
+        value-object pass runs AFTER the rules, so without pulling it forward the owner is
+        still unchecked at the point the probe runs.
+
+    - id: key-immutable
+      kind: immutable
+      scope: [update]
+      fields: [Key]
+      notification: GroupKeyIsImmutableNotification
+      description: >-
+        The key IS what API callers, audit lines and directory mappings reference. Editing
+        it would rewrite the meaning of every reference to this group, retroactively and
+        invisibly. Name and description stay editable.
+
+    - id: tenant-immutable
+      kind: immutable
+      scope: [update]
+      fields: [TenantID]
+      notification: GroupTenantIsImmutableNotification
+      description: A group never moves between tenants.
+
+    - id: role-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [GroupRole]
+      cap: 50
+      notification: TooManyRolesInGroupNotification
+      description: >-
+        At most 50 roles in one group. Sized to this platform, and it doubles as a
+        claim-size budget — a member inherits every permission of every role in the bundle,
+        so this cap multiplies against Role's own 200.
+
+    - id: duplicate-attachment
+      kind: childDuplicate
+      scope: [insertOrUpdate]
+      fields: [GroupRole]
+      notification: GroupAlreadyGrantsRoleNotification
+      description: >-
+        No duplicate role within one group. The business identity is the role reference and
+        that alone — the join fields are blank on a freshly attached entry, so comparing
+        them would answer "different" for an attachment that duplicates a stored one.
+
+  # All four need a cross-aggregate probe the rule DSL cannot phrase. The ATTACH WALK RUNS
+  # G6 -> G10b -> G10a, and the order is load-bearing in both links:
+  #   G6 first, because RoleGrantsWildcard deliberately answers TRUE for an id it cannot
+  #     resolve, and would otherwise report an unknown role as an escalation attempt — a 403
+  #     blaming the caller where the honest answer is a 422 saying the role is not there.
+  #   G10b before G10a, because Identity.HasPermission PANICS on any argument containing '*',
+  #     so G10b is what removes the input that would crash the request into a 500 — on
+  #     exactly the case the escalation rule exists to stop.
+  manual:
+    - id: tenant-must-be-available
+      description: >-
+        The owning tenant must exist, must not be archived, and must not be SUSPENDED. Ask
+        TenantIsUnavailable. A trial tenant is a live customer and passes — "unavailable" is
+        not "not active". A read join cannot answer this: on an insert a joined field is
+        blank, because nothing traversed a foreign key for a struct the mapper built from a
+        request body a millisecond ago.
+      scope: [insert]
+      notification: GroupTenantDoesNotExistNotification
+      attachTo: TenantID
+
+    - id: attached-roles-are-available-in-this-tenant
+      description: >-
+        Every role this write ATTACHES must exist, still be active, AND belong to THIS
+        GROUP'S TENANT. Walk the ADDED entries only (GetAddedItemsOf, not
+        GetCurrentItemsOf) and ask RoleIsUnavailableInTenant per entry, passing the group's
+        own TenantID. The same-tenant half is the first thing in this entity that Role did
+        not need: Permission is a global catalog, Role is tenant-scoped, so a group in
+        tenant A attaching tenant B's role would confer another customer's permissions on
+        A's members. Do NOT read the entry's RoleKey/RoleName join fields to decide this:
+        an added entry carries "" in both, which is indistinguishable from a role whose key
+        is genuinely empty — a security rule that passes on a blank field is the worst
+        possible failure direction. Judging only ADDED entries is deliberate: a role
+        archived AFTER it was attached must not make the group impossible to rename, and a
+        detach must stay reachable.
+      scope: [insertOrUpdate]
+      notification: RoleNotAvailableInTenantNotification
+      attachTo: Roles
+
+    - id: no-wildcard-role-attach
+      description: >-
+        A role granting a permission with a wildcard in either part cannot be attached to
+        any group. Runs AFTER the availability rule and BEFORE the escalation rule, and both
+        halves of that order are load-bearing — see the block comment above. Over the ADDED
+        entries only; ask RoleGrantsWildcard per entry, which answers TRUE for an
+        unresolvable role id so an unknown id never falls through to the escalation
+        question. What it costs, stated plainly: the platform's own superadmin group cannot
+        be created through this API, and is seeded by migration beside the reserved platform
+        tenant and the *:* role.
+      scope: [insertOrUpdate]
+      notification: CannotGrantWildcardRoleNotification
+      attachTo: Roles
+
+    - id: no-privilege-escalation
+      description: >-
+        TRANSITIVE no-escalation: a caller may attach a role only if they hold EVERY
+        permission that role grants — a set, not one key. Over the ADDED entries only; ask
+        CallerLacksAnyPermissionOf per entry, which runs after the wildcard refusal so every
+        key reaching it is concrete. The *:* superadmin exemption is free: HasPermission
+        returns true for any concrete permission when the claim set contains *:*. Two
+        states, not one — ctx.Identity() nil (auth disabled, dev only, and the framework's
+        own boot guard refuses that profile anywhere else) means NO identity gate; an
+        identity present with an insufficient claim REFUSES. Collapsing them makes the
+        entity unusable in dev.
+      scope: [insertOrUpdate]
+      notification: CannotGrantRoleWithUnheldPermissionsNotification
+      attachTo: Roles
+
+service:
+  required: true
+  facts:
+    # The pre-check half of unique.enforce on Key. Filtered by the tenant as well as the
+    # key, because the uniqueness is per tenant.
+    - name: GroupKeyTaken
+      kind: exists
+      filters: [TenantID, Key]
+      excludeSelf: true
+      activeOnly: true
+      description: >-
+        Reports whether another ACTIVE group in the same tenant already holds this key.
+        Excludes the row being updated.
+
+    # Every fact is named for the PROBLEM, never for the healthy state: the generated suite
+    # stubs the service so each probe answers "nothing found", which is what lets a valid
+    # fixture through. A fact spelled RoleIsAvailable would read false under that stub and
+    # mean "the role is gone", turning a correct spec red on the day it is written.
+    - name: TenantIsUnavailable
+      kind: manual
+      returns: bool
+      filters: [TenantID]
+      description: >-
+        Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
+        the tenants table by its primary key. A trial tenant is a live customer and is
+        available.
+
+    # Three per-entry facts. A fact about a collection is asked ONCE PER ENTRY, the entry's
+    # field arriving as an argument, and all three are asked only about the entries a write
+    # ADDS.
+    #
+    # The last two resolve in ONE read each, and the saving is not on this repository's
+    # loader — it is on Role's. RoleRepository declares the traversal into permissions, so
+    # loading a role through RoleRepository.Loader hands back every grant with its resource
+    # and action already filled: role id -> the role's grants, keys included -> the claim.
+    # No second query into the catalog, and no PermissionRepository on this service at all.
+    # Memoise the resolution per request so a write attaching N roles pays N reads, not 2N.
+    - name: RoleIsUnavailableInTenant
+      kind: manual
+      returns: bool
+      filters: [TenantID, Roles.RoleID]
+      description: >-
+        Whether this role id is absent from the roles table, points at an archived role, or
+        belongs to a tenant OTHER than the one passed. One answer for all three questions —
+        the caller-facing message must not distinguish them, because a distinct
+        "belongs to another tenant" reply is an existence oracle over a competitor's org
+        chart.
+
+    - name: RoleGrantsWildcard
+      kind: manual
+      returns: bool
+      filters: [Roles.RoleID]
+      description: >-
+        Whether the role behind this id grants any permission carrying a wildcard in either
+        part. Resolve the role through RoleRepository.Loader, whose declared read join fills
+        every grant's resource and action. Answers TRUE when the id is unknown, so an
+        unresolvable attachment never reaches the escalation probe.
+
+    - name: CallerLacksAnyPermissionOf
+      kind: manual
+      returns: bool
+      description: >-
+        Whether the requesting caller fails to hold at least one of the permissions this
+        role grants — the TRANSITIVE half of the escalation rule. Resolves the role through
+        the same single read RoleGrantsWildcard uses, then asks the caller's claim for every
+        key it found. Judges EVERY key the role grants, archived catalog rows included:
+        that is the fail-closed direction, and since the grants no longer carry the catalog
+        row's archive stamp it is also the only reading expressible without a second query.
+        It GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through —
+        defence in depth behind the wildcard rule, because a panic on a security rule is a
+        500. Reads ctx.Identity() through the request-scoped service.
+      filters: [Roles.RoleID]
+
+    # NOTE — CallerIsSuperAdmin is deliberately NOT declared. On Role the identical fact was
+    # declared, implemented and tested, and NO rule ever called it: the generator answers the
+    # super-admin question itself from authz.bypass, in every command mapper
+    # (RequestingMayCrossScope = id.IsSuperAdmin()) and in both queries. Declaring it here
+    # would put a second, hand-written answer beside the generated one, free to disagree.
+
+read:
+  backing: relational
+  view:
+    name: groups
+  managed: [CreatedAt, UpdatedAt]
+  byId: true
+  byParams:
+    filters:
+      - {field: TenantID, ops: [eq, in]}
+      - {field: Key, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: Name, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      # description is filterable but deliberately NOT sortable: ordering a listing by a
+      # 500-char free-text column is a blocking sort nobody asks for on purpose.
+      - {field: Description, ops: [contains, icontains]}
+      # The owner's handle and lifecycle, reached through the ROOT join — addressable in a
+      # criteria precisely because it is a root join and not a collection's.
+      - {field: TenantWorkspace, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: TenantStatus, ops: [eq, in]}
+      - {field: CreatedAt, ops: [gte, lte]}
+      - {field: UpdatedAt, ops: [gte, lte]}
+    sort: [Key, Name, TenantID, TenantWorkspace, TenantStatus, CreatedAt, UpdatedAt]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      # A retired group must stay auditable, and with no unarchive verb this listing is the
+      # only way to see one.
+      includeArchived: true
+      # search is deliberately absent — a relational-served view answers free text with a
+      # typed 400, and declaring it would promise what this posture cannot serve.
+
+surfaces:
+  rest: true
+  graphql:
+    enabled: true
+    connection: true
+    # Root verbs only. The two collection verbs are REST-only, exactly as Role ships them.
+    mutations: [insert, update, archive]
+  # No CSV/XLSX exports: operator-facing and small, the call all three existing entities
+  # made. An access-review export is the plausible reason to want one; it is one flag.
+
+authz:
+  resource: group
+  # Every row is tenant-scoped, on READS and on WRITES both. A by-id read of another
+  # tenant's group answers 404 rather than 403: it does not exist for this caller, which
+  # leaks nothing about who else exists. A group listing IS the customer's org chart, so
+  # writes-only isolation would be worse here than it would have been on Role.
+  dataAccess: tenant
+  tenantField: TenantID
+  # WHO crosses the row scope: the platform operator supporting a customer. A *:* holder
+  # reads and repairs rows that are not theirs; a resource wildcard (group:*) does NOT.
+  bypass: "*:*"
+  # A POLICY, and two states rather than one. ctx.Identity() nil happens only under
+  # auth.mode: disabled, which the framework's own boot guard allows ONLY in dev — so a
+  # stand-down here cannot reach prd. Collapsing it into `refuse` would make the entity
+  # unusable in the dev profile, where there are no tokens at all. An identity that IS
+  # present with an empty or insufficient claim still refuses.
+  noIdentity: stand-down
+  permissions:
+    insert: group:insert
+    patch: group:update
+    archive: group:archive
+    # The FIFTH verb, group:grant, is not here: it gates the two COLLECTION operations and
+    # is declared on the child (children[].permissions), because riding group:update is
+    # exactly what this model refuses.
+    read: group:read

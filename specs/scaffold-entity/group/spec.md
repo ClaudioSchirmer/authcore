@@ -29,7 +29,13 @@
 
   Two openings the same work created, listed as opportunities rather than corrections: a
   traversal into `Tenant` is now declarable (§2), and `CallerIsSuperAdmin` may be dead
-  surface (§7).
+  surface (§7). **Both are now CLOSED, at the generation gate on 2026-08-24:**
+  - **The `Tenant` traversal is TAKEN, mirroring `Role` in full** — `TenantWorkspace` and
+    `TenantStatus`, on the wire, filterable and sortable. §2 and §9.
+  - **`CallerIsSuperAdmin` is NOT declared** — verified dead on `Role`: the fact is
+    implemented and tested there and no rule calls it, because the generator answers the
+    question itself (`RequestingMayCrossScope = id.IsSuperAdmin()` in every command mapper,
+    `IsSuperAdmin()` in both queries). §7 and §D.
 - **Pin:** omnicore **`v0.59.0`** · `omnicore-gen` **0.38.0** · dialect postgres · Postgres
   SoR, no Mongo, no broker → relational-served views. The framework facts `../role/spec.md`
   verifies carry over unchanged; the two this entity leans on hardest — read joins on a
@@ -334,8 +340,11 @@ is always `fk = target.id`, so the declaration would have been *accepted* and ma
 nothing, filling every field with NULL on a left join or dropping every group from every
 read on an inner one. That derived key was removed on 2026-08-24 and the FK targets
 `tenants.id`, so the trap is gone. `Role` carries the owner's `workspace` and `status` this
-way, and a root join's fields are filterable and sortable, unlike a collection's. **Mirror
-it here** unless the gate decides otherwise.
+way, and a root join's fields are filterable and sortable, unlike a collection's. **TAKEN
+at the generation gate (2026-08-24): mirrored in full** — both fields, on the wire,
+filterable and sortable, so "the groups of `acme-comercio`" is answerable by handle rather
+than by UUID. It costs nothing on the write side: a join field is not part of the
+`TableSchema`, so it never enters an INSERT or an UPDATE.
 
 Notes on the decisions above:
 
@@ -740,6 +749,9 @@ body.
 | `key` | `eq,ne,in,startswith,istartswith,contains,icontains` | `asc,desc` |
 | `name` | `eq,ne,in,startswith,istartswith,contains,icontains` | `asc,desc` |
 | `description` | `contains,icontains` | — |
+| `tenantWorkspace` *(join)* | `eq,in,startswith,istartswith,contains,icontains` | `asc,desc` |
+| `tenantStatus` *(join)* | `eq,in` | `asc,desc` |
+| `createdAt` · `updatedAt` *(managed)* | `gte,lte` | `asc,desc` |
 
 `description` is deliberately not sortable: ordering a listing by a 500-char free-text
 column is a blocking sort nobody asks for on purpose. `name` carries `ne` anyway — it costs
