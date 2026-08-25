@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:3e00ff3d9ae0d34f5b599edb45ab2cbc7f17fac7f6a19f1ade611eafdb588857
+// checksum:   sha256:48e60b78af0cf18c4287be789c06fbd7311b938b95c3f2d6575920219e4efab5
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -48,7 +48,6 @@ func NewTenantRepository(engine core.RelationalEngine) *TenantRepository {
 	// differently, so every target dialect's key form is bound.
 	r.Constraints = map[string]write.ConstraintBinding{
 		"tenants_pkey":          {Notification: domain.EntityAlreadyAddedNotification{}, Field: "id"},
-		"tenants_tenant_id_key": {Notification: appdomain.TenantIDAlreadyExistsNotification{}, Field: "tenantID"},
 		"tenants_workspace_key": {Notification: appdomain.TenantWorkspaceAlreadyExistsNotification{}, Field: "workspace"},
 	}
 

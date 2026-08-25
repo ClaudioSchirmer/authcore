@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:efce8875dbdecb63e9faf1b6d93333a23e35f1b300654978c711e89edd7230c9
+// checksum:   sha256:6fb87c86ad5f5d9e7e3c71131949a90368dfeef22a16dcd420e4042c619115c4
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,10 +21,9 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
-// Isolation partitions of the platform. tenant_id is the public key —
-// derived from workspace, issued as the tenant_id token claim, and the target
-// of every foreign key; the id column is a framework surrogate and is never
-// issued to anyone.
+// Isolation partitions of the platform. The row id IS the tenant's key —
+// issued as the tenant_id token claim and the target of every tenant-scoped
+// foreign key. There is no second, derived identifier.
 //
 // It embeds BaseEntity: this entity owns no child collection, so it is not an
 // aggregate root and does not implement AggregateRootProvider — which is
@@ -36,9 +35,8 @@ import (
 // snapshot the framework takes to compare old and new state.
 type Tenant struct {
 	domain.BaseEntity
-	TenantID    domain.ID           `labelKey:"TenantTenantIDField"`    // Public key of the tenant, derived from workspace. Issued as the tenant_id claim of every token and referenced by every tenant-scoped aggregate
 	Name        vos.DisplayName     `labelKey:"TenantNameField"`        // Human-readable display name of the tenant organization, as operators and end users see it. Not unique — two genuinely different customers may share a name
-	Workspace   vos.TenantWorkspace `labelKey:"TenantWorkspaceField"`   // Immutable handle of the tenant; reaches URLs, logs and external configuration, and is the input the public tenant_id is derived from. Never reused, archived rows included
+	Workspace   vos.TenantWorkspace `labelKey:"TenantWorkspaceField"`   // Immutable handle of the tenant; reaches URLs, logs and external configuration, and is what URLs, logs and external configuration carry. Never reused, archived rows included
 	Description vos.Description     `labelKey:"TenantDescriptionField"` // What this tenant is, in the platform operators' own words
 	Status      vos.TenantStatus    `labelKey:"TenantStatusField"`      // Commercial lifecycle of the tenant. Orthogonal to archiving — a suspended tenant is still listed and still authenticates for billing
 }
@@ -73,17 +71,11 @@ func (e *Tenant) RequiresService() bool { return true }
 // again would only report the same problem twice.
 func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
 	r.IfUpdate(func() {
-		// A changed workspace changes tenant_id, orphaning every live token
-		// and FK.
+		// The handle reaches URLs, logs and external configuration; changing
+		// it breaks all three.
 		if old := domain.Old(e); old != nil {
 			if old.Workspace != e.Workspace {
 				r.AddNotification("Workspace", TenantWorkspaceIsImmutableNotification{}, e.Workspace)
-			}
-		}
-		// The public key is derived once, at creation, and never moves.
-		if old := domain.Old(e); old != nil {
-			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", TenantIDIsImmutableNotification{}, e.TenantID)
 			}
 		}
 		// A trial is a beginning — no tenant returns to it.

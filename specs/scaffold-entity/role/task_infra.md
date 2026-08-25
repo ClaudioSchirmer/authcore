@@ -69,19 +69,23 @@ downstream can repair them:
   decides whether a permission may be granted stays in the domain service below — see the
   next block for why reading `ArchivedAt` there would be fail-open.
 
-**The service implementation.** It answers the four facts of the domain port and is bound to
+**The service implementation.** It answers the **six** facts of the domain port and is bound to
 the request through the framework's scoping hook, exactly as the two existing services are.
 **The read join does not replace any of them, and one of them must not read it.** These facts
 judge the grants a write is ADDING, and an added entry has no joined value: `Resource` reads
 `""` and `ArchivedAt` reads `nil` — the same `nil` a live permission carries. A probe that
 tested `ArchivedAt == nil` would therefore pass every entry being added, fail-open on exactly
 the check it exists to make. The facts query the catalog; they never read the join.
-Three of its facts are database probes; the fourth reads the request identity, and **must
-refuse a wildcard argument itself** rather than calling through to the framework helper,
-which panics on one. A failed probe panics rather than inventing an answer — the local
+**Four** of its facts are database probes — the key-taken probe, the tenant probe, and the
+two per-entry catalog probes (in-catalog and wildcard). **Two** read the request identity: the
+no-escalation probe, which **must refuse a wildcard argument itself** rather than calling
+through to the framework helper, which panics on one; and the superadmin question, which is
+`ctx.Identity().IsSuperAdmin()` and nothing else — never a hand-read of the claim, whose NAME
+is configurable. A failed probe panics rather than inventing an answer — the local
 pattern, and the reason is that a plausible answer here skips the invariant.
 
-**Cross-aggregate reach:** two of the probes query the catalog and the tenant tables, so this
+**Cross-aggregate reach:** three of the probes query the catalog and one queries the tenant
+table, so this
 implementation holds those repositories beside its own. Confirm the shape against the
 service-to-service section before writing it.
 

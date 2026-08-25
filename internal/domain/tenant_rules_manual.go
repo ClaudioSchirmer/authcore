@@ -34,33 +34,7 @@ import (
 // rule that appears under two gates is still ONE rule: write it as a method
 // and call it from both, rather than as two copies that can drift apart.
 func (e *Tenant) customRules(actionName string, service domain.Service, r *domain.Rules) {
-	r.IfInsert(func() {
-		// ── derive-tenant-id ──
-		// On insert, set TenantID to Workspace.DeriveTenantID() — the
-		// UUIDv5 of the service's TenantIDNamespace over the workspace
-		// handle. The field is server-derived and reaches no write DTO, so
-		// this is the only place the value is ever produced.
-		//
-		// This is an ASSIGNMENT, not a validation, and it is safe here for two
-		// reasons. It is a pure function of an immutable field, so running it
-		// more than once cannot produce a second answer — which matters because
-		// BuildRules is a validation pass and the framework may run it again.
-		// And it runs BEFORE the IfInsertOrUpdate gate below, because the
-		// framework's IfXxx closures execute in declaration order, so the check
-		// that confirms the derivation always sees the value this line wrote.
-		e.TenantID = e.Workspace.DeriveTenantID()
-	})
-
 	r.IfInsertOrUpdate(func() {
-		// ── tenant-id-matches-workspace ──
-		// TenantID must equal Workspace.DeriveTenantID(). The value is
-		// computed by the rule above, so this can only fail through a bug in
-		// that derivation or a hand-written row — which is exactly what it
-		// guards.
-		if e.TenantID != e.Workspace.DeriveTenantID() {
-			r.AddNotification("TenantID", TenantIDDerivationMismatchNotification{}, e.TenantID)
-		}
-
 		// ── description-differs-from-name-and-workspace ──
 		// The description must differ from both Name and Workspace under a
 		// normalized comparison — case-folded, with whitespace and hyphens

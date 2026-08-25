@@ -31,7 +31,7 @@ import (
 // cannot detect that: as far as it is concerned the derivation ran and
 // produced nothing.
 
-// ComputePermission derives Permission from Resource, Action.
+// ComputePermissionPermission derives Permission from Resource, Action.
 //
 // The permission as a token carries it and a route compares it:
 // resource:action.
@@ -43,7 +43,7 @@ import (
 // An error here fails the whole read, so return one only when the derivation
 // genuinely cannot produce a value — a missing source is absence, not a
 // failure.
-func ComputePermission(ctx *configuration.AppContext, resource string, action string) (string, error) {
+func ComputePermissionPermission(ctx *configuration.AppContext, resource string, action string) (string, error) {
 	// Rebuild the value object and ASK it, rather than joining two strings
 	// here. The separator has exactly one home in this service, and this is a
 	// consumer of the format, not a second definition of it — the write

@@ -37,7 +37,7 @@ This file already exists and is YOURS — the generator did not open it and cann
 > The permission as a token carries it and a route compares it: resource:action.
 
 ```go
-func ComputePermission(ctx *configuration.AppContext, resource string, action string) (string, error)
+func ComputePermissionPermission(ctx *configuration.AppContext, resource string, action string) (string, error)
 ```
 
 **Until a body is written the field renders absent, and nothing says so** — unlike a manual fact, which panics. The read answers 200, the other columns are correct, and this one is empty on REST, on GraphQL and in the export at once. What the declaration already bought needs no code: `?fields=` on the field fetches its sources instead, `?orderBy=` on it is a typed 400, and the export keeps the column under its label.
@@ -96,18 +96,11 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Storage | flat table `permissions` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
-| Unique | `Resource` — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `PermissionAlreadyExistsNotification`. |
+| Unique | `PermissionKey` (`Resource` + `Action`) — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `PermissionAlreadyExistsNotification`. Unique as a TUPLE: the parts identify together, so a row differing in either one is a different value — a constraint over a single part would refuse rows the domain accepts. |
 | Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 
 ## What was generated
-
-| What | File |
-|---|---|
-| the patch command and result | `internal/application/commands/patch_permission_command.go` |
-| tests for the command mappers | `internal/application/commands/permission_commands_test.go` |
-| the patch request and response | `internal/web/requests/patch_permission.go` |
-| the request mapper tests | `internal/web/requests/permission_requests_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -116,7 +109,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-21 file(s) were already up to date.
+25 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -131,9 +124,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.57.1)
+Verdict: **exact** (project pins v0.59.0)
 
-framework v0.57.1 meets the required v0.57.0
+framework v0.59.0 meets the required v0.59.0
 
 Verify what was generated:
 

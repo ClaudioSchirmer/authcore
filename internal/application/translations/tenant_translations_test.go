@@ -7,7 +7,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:dde24d1d13baa36b283df59e014af90305a893ce04f5fdf49e947e0398850597
+// checksum:   sha256:4a8daa1ca15a038da557eae116fb3840269a620015f9cb2c45b39f8d3ab447bd
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -32,15 +32,12 @@ import (
 func TestTenantNotificationsAreTranslated(t *testing.T) {
 	keys := []string{
 		"TenantWorkspaceAlreadyExistsNotification",
-		"TenantIDAlreadyExistsNotification",
 		"UnknownTenantStatusNotification",
 		"InvalidDisplayNameNotification",
 		"InvalidDescriptionNotification",
 		"InvalidTenantWorkspaceNotification",
 		"ReservedTenantWorkspaceNotification",
 		"TenantWorkspaceIsImmutableNotification",
-		"TenantIDIsImmutableNotification",
-		"TenantIDDerivationMismatchNotification",
 		"TenantDescriptionMustDifferNotification",
 		"InvalidTenantStatusTransitionNotification",
 	}

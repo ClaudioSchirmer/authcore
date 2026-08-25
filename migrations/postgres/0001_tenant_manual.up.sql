@@ -23,7 +23,6 @@
 
 CREATE TABLE "tenants" (
   "id" UUID NOT NULL,
-  "tenant_id" UUID NOT NULL,
   "name" VARCHAR(120) NOT NULL,
   "workspace" VARCHAR(63) NOT NULL,
   "description" VARCHAR(500) NOT NULL,
@@ -34,11 +33,10 @@ CREATE TABLE "tenants" (
   "deleted_at" TIMESTAMPTZ NULL,
   CONSTRAINT "tenants_pkey" PRIMARY KEY ("id")
 );
-COMMENT ON TABLE "tenants" IS 'Isolation partitions of the platform. tenant_id is the public key — derived from workspace, issued as the tenant_id token claim, and the target of every foreign key; the id column is a framework surrogate and is never issued to anyone.';
+COMMENT ON TABLE "tenants" IS 'Isolation partitions of the platform. The row id IS the tenant''s key — issued as the tenant_id token claim and the target of every tenant-scoped foreign key. There is no second, derived identifier.';
 COMMENT ON COLUMN "tenants"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
-COMMENT ON COLUMN "tenants"."tenant_id" IS 'Public key of the tenant, derived from workspace. Issued as the tenant_id claim of every token and referenced by every tenant-scoped aggregate.';
 COMMENT ON COLUMN "tenants"."name" IS 'Human-readable display name of the tenant organization, as operators and end users see it. Not unique — two genuinely different customers may share a name.';
-COMMENT ON COLUMN "tenants"."workspace" IS 'Immutable handle of the tenant; reaches URLs, logs and external configuration, and is the input the public tenant_id is derived from. Never reused, archived rows included.';
+COMMENT ON COLUMN "tenants"."workspace" IS 'Immutable handle of the tenant; reaches URLs, logs and external configuration. Never reused, archived rows included.';
 COMMENT ON COLUMN "tenants"."description" IS 'What this tenant is, in the platform operators'' own words.';
 COMMENT ON COLUMN "tenants"."status" IS 'Commercial lifecycle of the tenant. Orthogonal to archiving — a suspended tenant is still listed and still authenticates for billing.';
 COMMENT ON COLUMN "tenants"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
@@ -47,7 +45,6 @@ COMMENT ON COLUMN "tenants"."updated_at" IS 'When the row was last written, main
 COMMENT ON COLUMN "tenants"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 -- the repository binds this constraint's violation to a clean 409.
-CREATE UNIQUE INDEX "tenants_tenant_id_key" ON "tenants" ("tenant_id");
 
 -- the repository binds this constraint's violation to a clean 409.
 CREATE UNIQUE INDEX "tenants_workspace_key" ON "tenants" ("workspace");

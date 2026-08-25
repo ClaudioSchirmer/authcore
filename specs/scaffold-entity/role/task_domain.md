@@ -68,10 +68,14 @@ the duplicate guard (reusing the business-identity method rather than writing a 
 check), the revoke path carries the by-id guard and its 404. A method that would only
 delegate to a primitive is not written.
 
-**The service port** — four facts, plain values, no error, matching the local pattern
-already set by the two existing services. Two of them reach other aggregates; one of them
-reads the caller's identity and must refuse a wildcard argument itself rather than calling
-through.
+**The service port** — **six** facts, plain values, no error, matching the local pattern
+already set by the two existing services. `spec.md` §7 is the authoritative list; count them
+there before writing the interface, because an earlier draft of this task file said four.
+**Four** reach other aggregates (the key-taken probe and the tenant probe, plus the two
+per-entry catalog probes); **two** read the caller's identity — one of which must refuse a
+wildcard argument itself rather than calling through to the framework helper, which panics on
+one, and the other of which is the superadmin question, answered with the framework's own
+`Identity.IsSuperAdmin()` and never by hand-parsing a claim.
 
 **Notifications** — the new ones listed in §7, added to the shared domain notifications
 file. The two tenant-isolation ones are **framework-owned and already translated**; they are

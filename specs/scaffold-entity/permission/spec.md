@@ -136,7 +136,7 @@ entity:
   (`../role/spec.md` §7) — the join renders the catalog, the probe judges it.
 
 - **Public key: none** (alternative: a derived `permission_id` UUIDv5 mirroring
-  `tenants.tenant_id`). Tenant needed one because its PK is a UUIDv7 whose embedded
+  `tenants.tenant_id`, since removed — see that spec's amendment). Tenant was given one because its PK is a UUIDv7 whose embedded
   timestamp would have leaked creation order to every token holder. Nothing here is issued
   to a token: **the JWT carries the rendered string `tenant:read`, not an id**, and the only
   id consumer is a future internal join table. A derived column would add a column with no

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:418aa4609eda7e16616fbd1da9e76ab16143f81f7390a1eefb6f57051675ef4b
+// checksum:   sha256:708c1be889562c14cb1bcbf4765fb623599c77eb95cce673db7374b2f7e144f2
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -60,6 +60,13 @@ func TestInsertTenantMapsEveryField(t *testing.T) {
 // The round trip is the point: the same command builds the entity and then
 // projects it, so a field that survives one direction and not the other fails
 // here rather than in a caller's response.
+//
+// A SHARED-BASE role reaches the entity through ApplyTo rather than ToEntity
+// — its insert is an upsert, because another role may already have created
+// the identity — and this test used to skip that shape entirely. The result
+// mapper is the same mapper either way, and on a role it is also where a
+// computed field's derivation is called, so skipping it left the one seat
+// whose body is hand-written with no generated coverage at all.
 func TestInsertTenantCommandResultCarriesWhatWasWritten(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	c := &InsertTenantCommand{

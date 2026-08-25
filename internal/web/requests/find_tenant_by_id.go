@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:3f607b1f1e59f60be40c65e110b85338134fa638dc84ba6b058762dec39eb4a9
+// checksum:   sha256:18f0460ee91475c7bfb57a7d73ff70cce296376f0d16c114798658f9d8ee3001
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,9 +17,9 @@
 package requests
 
 import (
-	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 	"time"
+
+	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
@@ -59,7 +59,6 @@ type FindTenantByIDResponse struct {
 	fwresponses.Auto
 
 	ID          string    `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    domain.ID `json:"tenantID" exportLabelKey:"TenantTenantIDField" example:"a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"`
 	Name        string    `json:"name" exportLabelKey:"TenantNameField" example:"Acme Comércio e Serviços Ltda"`
 	Workspace   string    `json:"workspace" exportLabelKey:"TenantWorkspaceField" example:"acme-comercio"`
 	Description string    `json:"description" exportLabelKey:"TenantDescriptionField" example:"Retail operations of the Acme group in Brazil."`

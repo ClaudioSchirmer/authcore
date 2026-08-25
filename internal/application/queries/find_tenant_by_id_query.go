@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:d48ba01834a0d54b8595af5f2c2e52e8b5f3c3b51241c3441efc2cc35611dfa4
+// checksum:   sha256:c13bd977890f8f5ef7f7be0666346091b62d480510743d8931f37f69c97a7426
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,7 +21,6 @@ import (
 
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
 // FindTenantByIDQuery is the application-side transport for the by-id read.
@@ -68,7 +67,6 @@ func (q FindTenantByIDQuery) ContextName() string { return "Tenant" }
 // — an absent key fills as the zero value.
 type FindTenantByIDResult struct {
 	ID          string
-	TenantID    domain.ID
 	Name        string
 	Workspace   string
 	Description string

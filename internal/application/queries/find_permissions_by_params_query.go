@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:09beeded11bbd5283ed743bf91967f376579ef17dd68bb4170f8fd9b4109e280
+// checksum:   sha256:2cab5453a3ac11c11d92b0fc049852b37e263262d1107c4f6572ae150950cb8d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -47,7 +47,7 @@ func (q FindPermissionsByParamsQuery) ToCriteria(ctx *configuration.AppContext) 
 // generator wrote once and never touches again.
 func (q FindPermissionsByParamsQuery) FromQueryResult(ctx *configuration.AppContext, r FindPermissionsByParamsResult) (FindPermissionsByParamsResult, error) {
 	if r.Resource != nil && r.Action != nil {
-		v, err := ComputePermission(ctx, *r.Resource, *r.Action)
+		v, err := ComputePermissionPermission(ctx, *r.Resource, *r.Action)
 		if err != nil {
 			return r, err
 		}

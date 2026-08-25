@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:afdd64d661df52de930ac819513ff9e9e0f4fe0b2b40a858eb62e52fd96cb488
+// checksum:   sha256:8455c25d5cc4e8999c0b8d6686fd39ce5afc294e6e7299d84d8f800dcfec8dc7
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -47,7 +47,6 @@ func (c *InsertTenantCommand) ToEntity(ctx *configuration.AppContext) (*appdomai
 // InsertTenantResult is the write response, projected from the entity.
 type InsertTenantResult struct {
 	ID          domain.ID
-	TenantID    domain.ID
 	Name        string
 	Workspace   string
 	Description string
@@ -62,7 +61,6 @@ type InsertTenantResult struct {
 func (c *InsertTenantCommand) FromEntity(_ *configuration.AppContext, e *appdomain.Tenant) (InsertTenantResult, error) {
 	return InsertTenantResult{
 		ID:          *e.GetID(),
-		TenantID:    e.TenantID,
 		Name:        e.Name.Value(),
 		Workspace:   e.Workspace.Value(),
 		Description: e.Description.Value(),

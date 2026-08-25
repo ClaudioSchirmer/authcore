@@ -2,11 +2,10 @@
 //
 // The vos package documentation.
 //
-// entity:     Permission
-// spec:       specs/omnicore-gen/permission.omnicore.yaml
+// shared:     the whole project — no single spec owns this file
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:841d8959483564911160ebd0f88e46abe85637b1ad20d6d57545827b043273da
+// checksum:   sha256:b6fb3d8be8381211127c931e48773e649a43cdb75370ae341735fe547550f729
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file

@@ -12,29 +12,13 @@ Written by hand — `kind: manual`, or a composite with `written: manual` — an
 
 - **`DisplayName`** — `internal/domain/vos/display_name.go`. A human-typed display name of a thing (not a person): 2 to 120 runes, at least one letter, at least min(3, length) distinct runes, no run of 4 or more identical runes, trimmed and single-spaced. No word count — single-word company names are ordinary.
 - **`Description`** — `internal/domain/vos/description.go`. A human-typed description: 15 to 500 runes, at least two words (a word is a run of 2 or more Unicode letters), at least 5 distinct runes, no run of 4 or more identical runes, and at least one vowel — where any letter outside the Latin script counts as one, so a non-Latin description is never rejected as junk.
-- **`TenantWorkspace`** — `internal/domain/vos/tenant_workspace.go`. The tenant's DNS-label handle: 3 to 63 runes matching ^[a-z0-9]+(-[a-z0-9]+)*$, at least 3 distinct runes, no run of 4 or more identical runes, and not a member of the reserved list (platform routes and phishing-prone words). No normalization — a value that does not already comply is refused, never quietly repaired. It also carries DeriveTenantID(), the UUIDv5 derivation that produces the tenant's public key.
+- **`TenantWorkspace`** — `internal/domain/vos/tenant_workspace.go`. The tenant's DNS-label handle: 3 to 63 runes matching ^[a-z0-9]+(-[a-z0-9]+)*$, at least 3 distinct runes, no run of 4 or more identical runes, and not a member of the reserved list (platform routes and phishing-prone words). No normalization — a value that does not already comply is refused, never quietly repaired. It also carries the platform's reserved-handle list, which no other text type has.
 
 The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec.
-
-### Fields declared DERIVED, which nothing here computes
-
-- **`TenantID`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
 
 ### `internal/domain/tenant_rules_manual.go`
 
 This file already exists and is YOURS — the generator did not open it and cannot tell whether these are implemented. It lists them so you can check the file still covers what the spec declares, which is where a rule added to the spec later goes unnoticed.
-
-**`derive-tenant-id`**
-
-> On insert, set TenantID to Workspace.DeriveTenantID() — the UUIDv5 of the service's TenantIDNamespace over the workspace handle. The field is server-derived and reaches no write DTO, so this is the only place the value is ever produced.
-
-- fires under `IfInsert`
-
-**`tenant-id-matches-workspace`**
-
-> TenantID must equal Workspace.DeriveTenantID(). The value is computed by the rule above, so this can only fail through a bug in that derivation or a hand-written row — which is exactly what it guards.
-
-- fires under `IfInsertOrUpdate` · raise `TenantIDDerivationMismatchNotification{}` · attach it to `TenantID`
 
 **`description-differs-from-name-and-workspace`**
 
@@ -72,7 +56,6 @@ The shape the regenerated code expects, for `tenants`:
 | Column | Type | Null | Note |
 |---|---|---|---|
 | `id` | id | no | primary key |
-| `tenant_id` | id | no |  |
 | `name` | string(120) | no |  |
 | `workspace` | string(63) | no |  |
 | `description` | string(500) | no |  |
@@ -84,16 +67,12 @@ The shape the regenerated code expects, for `tenants`:
 
 Indexes it expects:
 
-- `tenants_tenant_id_key` — UNIQUE on (tenant_id), over every row; a duplicate is reported as TenantIDAlreadyExistsNotification
 - `tenants_workspace_key` — UNIQUE on (workspace), over every row; a duplicate is reported as TenantWorkspaceAlreadyExistsNotification
 
 
 A new pair goes in every dialect this service targets (postgres), numbered after the highest existing one. Every `.up.sql` needs its `.down.sql` or the service refuses to boot.
 
 If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
-
-### Fields the server fills
-
 
 ## What to check
 
@@ -104,16 +83,11 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Storage | flat table `tenants` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `unarchive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
-| Unique | `TenantID` — across the whole table, scope `all` (constraint-only) | an archived row keeps holding it, so the value is never free again; a duplicate is refused at the database and reported as `TenantIDAlreadyExistsNotification`. |
 | Unique | `Workspace` — across the whole table, scope `all` (service-precheck+constraint) | an archived row keeps holding it, so the value is never free again; a duplicate is refused at the database and reported as `TenantWorkspaceAlreadyExistsNotification`. |
 | Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 
 ## What was generated
-
-| What | File |
-|---|---|
-| the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
 
 **Left untouched** (yours, by design):
 
@@ -121,7 +95,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-27 file(s) were already up to date.
+28 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -136,9 +110,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.57.0)
+Verdict: **exact** (project pins v0.59.0)
 
-framework v0.57.0 meets the required v0.57.0
+framework v0.59.0 meets the required v0.59.0
 
 Verify what was generated:
 

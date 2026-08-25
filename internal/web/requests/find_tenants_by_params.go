@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:abe0f4439147e818ba93576cfb57b6abdd329c01b53e8075b5aa1a4b516c3cae
+// checksum:   sha256:4d40fd85d1205d6e3a34f49174c1544c10e9c3758064956c40d2164d68887cfb
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,9 +17,9 @@
 package requests
 
 import (
-	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 	"time"
+
+	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
@@ -34,7 +34,6 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindTenantsRequest struct {
-	TenantID        *domain.ID `query:"tenantID" filter:"eq,in"`
 	Name            *string    `query:"name" filter:"eq,in,startswith,contains,istartswith,icontains" sort:"asc,desc"`
 	Workspace       *string    `query:"workspace" filter:"eq,in,startswith,istartswith" sort:"asc,desc"`
 	Description     *string    `query:"description" filter:"contains,icontains"`
@@ -70,7 +69,6 @@ type FindTenantsResponse struct {
 	fwresponses.Auto
 
 	ID          *string    `json:"id,omitempty" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    *domain.ID `json:"tenantID,omitempty" exportLabelKey:"TenantTenantIDField" example:"a3f1c07e-2b58-5d94-8e61-4f2093ab77d5"`
 	Name        *string    `json:"name,omitempty" exportLabelKey:"TenantNameField" example:"Acme Comércio e Serviços Ltda"`
 	Workspace   *string    `json:"workspace,omitempty" exportLabelKey:"TenantWorkspaceField" example:"acme-comercio"`
 	Description *string    `json:"description,omitempty" exportLabelKey:"TenantDescriptionField" example:"Retail operations of the Acme group in Brazil."`

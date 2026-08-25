@@ -3,12 +3,17 @@
 # Model authority: scaffold-entity/tenant/spec.md (Status: APPROVED). Nothing here
 # re-decides the model; where this file and that spec disagree, the spec wins.
 #
-# Three identifiers, each with exactly one job:
-#   id         UUIDv7, framework-minted. Internal. Referenced by nothing.
+# TWO identifiers, each with exactly one job:
+#   id         UUIDv7, framework-minted. THE key: the tenant_id token claim carries it
+#              and every tenant-scoped aggregate points a foreign key at it.
 #   workspace  the human-facing handle — URLs, logs, support. Immutable, never reused.
-#   tenant_id  UUIDv5(namespace, workspace). The PUBLIC key: the tenant_id token claim
-#              and the FK target of every future aggregate. Server-derived, so it is
-#              absent from every write DTO.
+#
+# There used to be a third — a UUIDv5 derived from the workspace — kept so the row id
+# would never leave the service. It was removed (2026-08-24) because it could not keep
+# that promise: the id a tenant is known by is pinned inside every OTHER microservice
+# that stores it, so it is a public key in practice whatever this service calls it.
+# Deriving a second one bought a hop, a lookup on every isolation filter and a whole
+# class of "which UUID is this?" bugs, and protected nothing.
 #
 # Discovered from the project: dialect postgres · read backing relational.
 
@@ -21,9 +26,9 @@ storage:
   kind: flat
   table: tenants
   description: >-
-    Isolation partitions of the platform. tenant_id is the public key — derived from
-    workspace, issued as the tenant_id token claim, and the target of every foreign key;
-    the id column is a framework surrogate and is never issued to anyone.
+    Isolation partitions of the platform. The row id IS the tenant's key — issued as the
+    tenant_id token claim and the target of every tenant-scoped foreign key. There is no
+    second, derived identifier.
   managed:
     revision: revision
     createdAt: created_at
@@ -31,32 +36,6 @@ storage:
     archivedAt: deleted_at
 
 fields:
-  # The public key. assignedFrom: derived keeps it out of every write request, command
-  # and OpenAPI request schema — a caller never proposes it. The derivation itself is
-  # owed as a rules.manual entry scoped to insert (see rules.manual below).
-  - name: TenantID
-    type: id
-    column: tenant_id
-    livesOn: root
-    assignedFrom: derived
-    unique:
-      enforce: constraint-only
-      notification: TenantIDAlreadyExistsNotification
-      scope: all
-    example: a3f1c07e-2b58-5d94-8e61-4f2093ab77d5
-    description: >-
-      Public key of the tenant, derived from workspace. Issued as the tenant_id claim of
-      every token and referenced by every tenant-scoped aggregate.
-    labelKey: TenantTenantIDField
-    text:
-      eng: Tenant ID
-      ptbr: ID do tenant
-      esp: ID de tenant
-      fra: ID de locataire
-      deu: Mandanten-ID
-      ita: ID tenant
-      nld: Tenant-ID
-
   - name: Name
     type: string
     column: name
@@ -87,12 +66,12 @@ fields:
       enforce: service-precheck+constraint
       notification: TenantWorkspaceAlreadyExistsNotification
       # all, never active-only: an archived remnant MUST keep blocking the handle,
-      # because tenant_id is a pure function of it and reuse would mint a colliding key.
+      # because it is what URLs, logs and support conversations carry.
       scope: all
     example: acme-comercio
     description: >-
       Immutable handle of the tenant; reaches URLs, logs and external configuration, and
-      is the input the public tenant_id is derived from. Never reused, archived rows
+      is what URLs, logs and external configuration carry. Never reused, archived rows
       included.
     labelKey: TenantWorkspaceField
     text:
@@ -147,7 +126,7 @@ valueObjects:
   # distinct-rune counts, no run of 4 identical runes, Unicode word and vowel tests —
   # which no regex in RE2 can say (no backreferences) and no member list can close.
   # DisplayName and Description are SHARED (Group/Role will reuse them); TenantWorkspace
-  # is entity-specific because it carries the reserved list and DeriveTenantID().
+  # is entity-specific because it carries the platform's reserved-handle list.
   - name: DisplayName
     kind: manual
     backing: string
@@ -173,7 +152,7 @@ valueObjects:
       least 3 distinct runes, no run of 4 or more identical runes, and not a member of the
       reserved list (platform routes and phishing-prone words). No normalization — a value
       that does not already comply is refused, never quietly repaired. It also carries
-      DeriveTenantID(), the UUIDv5 derivation that produces the tenant's public key.
+      the platform's reserved-handle list, which no other text type has.
 
   - name: TenantStatus
     kind: enum
@@ -203,18 +182,6 @@ notifications:
       deu: Dieser Workspace ist bereits vergeben.
       ita: Questo workspace è già in uso.
       nld: Deze workspace is al in gebruik.
-
-  - name: TenantIDAlreadyExistsNotification
-    semantic: conflict
-    description: The derived public key already exists — structurally implied by the workspace conflict.
-    text:
-      eng: A tenant with this tenant ID already exists.
-      ptbr: Já existe um tenant com este ID de tenant.
-      esp: Ya existe un tenant con este ID de tenant.
-      fra: Un locataire avec cet ID existe déjà.
-      deu: Ein Mandant mit dieser Mandanten-ID existiert bereits.
-      ita: Esiste già un tenant con questo ID.
-      nld: Er bestaat al een tenant met dit tenant-ID.
 
   - name: UnknownTenantStatusNotification
     package: vos
@@ -283,7 +250,10 @@ notifications:
 
   - name: TenantWorkspaceIsImmutableNotification
     semantic: validation
-    description: An attempt to change the workspace handle, which derives the public key.
+    description: >-
+      An attempt to change the workspace handle. It reaches URLs, logs, support
+      conversations and external configuration, so changing it breaks every one of them and
+      makes a tenant's own history unsearchable.
     text:
       eng: The workspace cannot be changed.
       ptbr: O workspace não pode ser alterado.
@@ -292,30 +262,6 @@ notifications:
       deu: Der Workspace kann nicht geändert werden.
       ita: Il workspace non può essere modificato.
       nld: De workspace kan niet worden gewijzigd.
-
-  - name: TenantIDIsImmutableNotification
-    semantic: validation
-    description: An attempt to change the derived public key.
-    text:
-      eng: The tenant ID cannot be changed.
-      ptbr: O ID do tenant não pode ser alterado.
-      esp: El ID de tenant no se puede modificar.
-      fra: L'ID de locataire ne peut pas être modifié.
-      deu: Die Mandanten-ID kann nicht geändert werden.
-      ita: L'ID del tenant non può essere modificato.
-      nld: Het tenant-ID kan niet worden gewijzigd.
-
-  - name: TenantIDDerivationMismatchNotification
-    semantic: validation
-    description: The stored public key does not match the one the workspace derives.
-    text:
-      eng: The tenant ID does not match the one derived from the workspace.
-      ptbr: O ID do tenant não corresponde ao derivado do workspace.
-      esp: El ID de tenant no coincide con el derivado del workspace.
-      fra: L'ID de locataire ne correspond pas à celui dérivé du workspace.
-      deu: Die Mandanten-ID stimmt nicht mit der aus dem Workspace abgeleiteten überein.
-      ita: L'ID del tenant non corrisponde a quello derivato dal workspace.
-      nld: Het tenant-ID komt niet overeen met het uit de workspace afgeleide ID.
 
   - name: TenantDescriptionMustDifferNotification
     semantic: validation
@@ -351,7 +297,7 @@ update:
 
 delete:
   # Soft only. No DELETE verb: purging a tenant would orphan live tokens and every
-  # future foreign key, and would release the workspace that reserves the public key.
+  # future foreign key, and would release a workspace handle that must never be reused.
   root: soft
 
 rules:
@@ -363,14 +309,7 @@ rules:
       scope: [update]
       fields: [Workspace]
       notification: TenantWorkspaceIsImmutableNotification
-      description: A changed workspace changes tenant_id, orphaning every live token and FK.
-
-    - id: tenant-id-immutable
-      kind: immutable
-      scope: [update]
-      fields: [TenantID]
-      notification: TenantIDIsImmutableNotification
-      description: The public key is derived once, at creation, and never moves.
+      description: The handle reaches URLs, logs and external configuration; changing it breaks all three.
 
     - id: status-transition
       kind: transition
@@ -384,22 +323,6 @@ rules:
       description: A trial is a beginning — no tenant returns to it.
 
   manual:
-    - id: derive-tenant-id
-      description: >-
-        On insert, set TenantID to Workspace.DeriveTenantID() — the UUIDv5 of the service's
-        TenantIDNamespace over the workspace handle. The field is server-derived and reaches
-        no write DTO, so this is the only place the value is ever produced.
-      scope: [insert]
-
-    - id: tenant-id-matches-workspace
-      description: >-
-        TenantID must equal Workspace.DeriveTenantID(). The value is computed by the rule
-        above, so this can only fail through a bug in that derivation or a hand-written row —
-        which is exactly what it guards.
-      scope: [insertOrUpdate]
-      notification: TenantIDDerivationMismatchNotification
-      attachTo: TenantID
-
     - id: description-differs-from-name-and-workspace
       description: >-
         The description must differ from both Name and Workspace under a normalized
@@ -427,8 +350,8 @@ service:
       # An update must not collide with itself.
       excludeSelf: true
       # activeOnly is deliberately OFF: an ARCHIVED tenant still holds its workspace
-      # forever, because tenant_id is a pure function of it and reuse would mint a
-      # byte-identical public key.
+      # forever: the handle reaches URLs, logs and support conversations, so reusing one
+      # would make a new tenant answer to a retired tenant's history.
       activeOnly: false
       description: >-
         Whether any tenant, archived ones included, already holds this workspace handle.
@@ -458,7 +381,6 @@ read:
   byId: true
   byParams:
     filters:
-      - {field: TenantID, ops: [eq, in]}
       - {field: Name, ops: [eq, in, startswith, contains, istartswith, icontains]}
       - {field: Workspace, ops: [eq, in, startswith, istartswith]}
       - {field: Description, ops: [contains, icontains]}
@@ -475,7 +397,7 @@ read:
     # Three paths: the display name and the handle an operator scans a listing by, plus
     # the creation instant. UpdatedAt is deliberately NOT among them — it still FILTERS
     # (below), so "changed since" is answerable, but ordering by it is not offered.
-    # TenantID, Description and Status are likewise filterable and not orderable.
+    # Description and Status are likewise filterable and not orderable.
     sort: [Name, Workspace, CreatedAt]
     controls:
       pagination: true
@@ -498,7 +420,7 @@ surfaces:
 authz:
   resource: tenant
   # A platform registry: tenant:insert is already a platform-level operation, and the
-  # tenant_id claim the alternatives would filter on does not exist yet.
+  # tenant claim the alternatives would filter on is not issued yet.
   dataAccess: anyone-with-permission
   permissions:
     insert: tenant:insert

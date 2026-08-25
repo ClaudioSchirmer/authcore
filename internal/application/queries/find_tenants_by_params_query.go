@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-24
-// checksum:   sha256:767a189a7e61fd5bed2ac9e35ddf0e6ea8373d9dbef6bbffccb2bbabc5da4b59
+// checksum:   sha256:691370008a0763f54a068296ad9f4699e05f09cb12688bc2cf83ef9d8832aa8b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,7 +21,6 @@ import (
 
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
 // FindTenantsByParamsQuery is the application-side transport for the paged
@@ -63,7 +62,6 @@ func (q FindTenantsByParamsQuery) ContextName() string { return "Tenant" }
 // Response.
 type FindTenantsByParamsResult struct {
 	ID          *string
-	TenantID    *domain.ID
 	Name        *string
 	Workspace   *string
 	Description *string
