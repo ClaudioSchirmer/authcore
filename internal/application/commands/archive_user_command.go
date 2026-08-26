@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:45d5c03f8d447fd5155544220f38974cfe828a48ee68667996988d58c3ebd0d3
+// checksum:   sha256:379025da4ac877365e5c57d6be1cea15ed55e7b2746806dd9e1fcba8b83f8464
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -35,11 +35,13 @@ func (c *ArchiveUserCommand) ApplyTo(ctx *configuration.AppContext, e *appdomain
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
+		e.RequestingUserID = id.Subject
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil

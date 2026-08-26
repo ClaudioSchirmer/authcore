@@ -7,8 +7,8 @@
 // It no longer has an ordering constraint. It used to mount a PUBLIC
 // `PATCH /users/password` beside the generated `PATCH /users/:id`, which are the
 // same shape to a router, so registration order decided which one answered. That
-// route was removed on 2026-08-26 and the hazard went with it; the remaining
-// route carries a distinct suffix and collides with nothing.
+// route was removed on 2026-08-26 and the hazard went with it; both remaining
+// routes carry a distinct suffix under `/users/:id` and collide with nothing.
 
 package main
 
@@ -19,7 +19,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// UserCredentialsFeature mounts the change-password and reset-password routes.
+// UserCredentialsFeature mounts the two credential routes: the self-service
+// change and the helpdesk reset.
 //
 // It builds its OWN repository and service rather than reaching into
 // UsersFeature: a feature that borrowed another feature's fields would couple
@@ -37,7 +38,7 @@ func NewUserCredentialsFeature(d bootstrap.Deps) *UserCredentialsFeature {
 
 // Mount delegates to the web layer, like every other feature here.
 //
-// It contributes NO read model: the route writes and answers 204. A credential
+// It contributes NO read model: both routes write and answer 204. A credential
 // operation that returned the user's row would turn a password reset into a
 // profile read.
 func (f *UserCredentialsFeature) Mount(app *fiber.App, d bootstrap.Deps) {

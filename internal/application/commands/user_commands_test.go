@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:b5a332a3f2443e4fc06f8bc34277c89751325788c2cfc932750602ce0cd7aea6
+// checksum:   sha256:cccf1344e1eadb6792bf03b4db6b971745ed6406f59f2c06ec6b110e384cac46
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -36,6 +36,7 @@ func TestInsertUserMapsEveryField(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -61,6 +62,9 @@ func TestInsertUserMapsEveryField(t *testing.T) {
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	if e.Name.Given != "Maria" {
 		t.Errorf("GivenName did not survive the mapper")
@@ -156,6 +160,7 @@ func TestPatchUserLeavesAbsentFieldsAlone(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -182,6 +187,7 @@ func TestPatchUserAppliesWhatItCarries(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -249,6 +255,7 @@ func TestArchiveUserCommandApplies(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -264,6 +271,9 @@ func TestArchiveUserCommandApplies(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
+	}
 	if _, err := c.FromEntity(ctx, e); err != nil {
 		t.Errorf("projecting the result failed: %v", err)
 	}
@@ -277,6 +287,7 @@ func TestAddUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -289,6 +300,9 @@ func TestAddUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {
@@ -310,6 +324,7 @@ func TestRemoveUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -329,6 +344,9 @@ func TestRemoveUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
+	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
@@ -346,6 +364,7 @@ func TestAddUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -358,6 +377,9 @@ func TestAddUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {
@@ -379,6 +401,7 @@ func TestRemoveUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -397,6 +420,9 @@ func TestRemoveUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {

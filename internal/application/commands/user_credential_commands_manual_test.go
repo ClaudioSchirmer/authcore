@@ -15,6 +15,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -255,5 +256,282 @@ func TestASuperAdminCrossesTheRowScope(t *testing.T) {
 	}
 	if !hasher.Matches(newPassword, store.user.PasswordHash) {
 		t.Fatal("the operator's reset did not rotate the credential")
+	}
+}
+
+// ── the change ──────────────────────────────────────────────────────────────
+
+// credentialRefusals names the notifications a refusal raised, by type.
+//
+// Asserting on the TYPE and not on the field is what tells a failing test which
+// rule actually refused: "an error came back" is satisfied by every rule in the
+// aggregate, and several of them blame the same field. The field itself travels
+// in Path rather than in FieldName for a rule that names it positionally, which
+// is what these rules do.
+func credentialRefusals(err error) []string {
+	var carrier domain.NotificationCarrier
+	if !errors.As(err, &carrier) {
+		return nil
+	}
+	var out []string
+	for _, ctx := range carrier.NotificationContexts() {
+		for _, msg := range ctx.Messages() {
+			out = append(out, fmt.Sprintf("%T", msg.Notification))
+		}
+	}
+	return out
+}
+
+// raised reports whether the refusal carries the given notification type, named
+// the way it is declared in the domain package.
+func raised(err error, notification string) bool {
+	want := "domain." + notification
+	for _, got := range credentialRefusals(err) {
+		if got == want {
+			return true
+		}
+	}
+	return false
+}
+
+const someOperatorID = "2c9e1f44-8a7b-4d61-b0c3-5f1e7a9d3b28"
+
+func changeFixture(t *testing.T) (*fakeStore, appdomain.PasswordHasher, *ChangePasswordHandler) {
+	t.Helper()
+
+	hasher := infra.NewArgon2idHasher()
+	user := &appdomain.User{
+		TenantID:           domain.NewID(ownTenant),
+		Email:              vos.Email("maria@acme.com"),
+		Name:               vos.PersonName{Given: "Maria", Family: "Souza Lima"},
+		Status:             vos.UserStatus("active"),
+		PasswordHash:       hasher.Hash(oldPassword),
+		MustChangePassword: true,
+	}
+	user.SetID(domain.NewID(targetUserID))
+
+	store := &fakeStore{user: user}
+	return store, hasher, &ChangePasswordHandler{
+		Store:   store,
+		Service: &credentialService{hasher: hasher},
+	}
+}
+
+// selfCtx is the caller acting on their OWN row: the subject on the token is
+// the id the path carries.
+func selfCtx() *configuration.AppContext {
+	ctx := testCtx()
+	ctx.SetIdentity(&configuration.Identity{
+		Subject: targetUserID,
+		Claims:  map[string]any{"tenant_id": ownTenant},
+	})
+	return ctx
+}
+
+// operatorCtx is a caller in the SAME tenant acting on somebody else's row —
+// so the tenant guard stands down and the only thing left to refuse is the row
+// decision each operation makes.
+func operatorCtx() *configuration.AppContext {
+	ctx := testCtx()
+	ctx.SetIdentity(&configuration.Identity{
+		Subject: someOperatorID,
+		Claims:  map[string]any{"tenant_id": ownTenant},
+	})
+	return ctx
+}
+
+func changeCmd(current, next string) *ChangePasswordCommand {
+	cmd := &ChangePasswordCommand{
+		CurrentPassword:      current,
+		Password:             next,
+		PasswordConfirmation: next,
+	}
+	cmd.SetPathID(targetUserID)
+	return cmd
+}
+
+func TestTheChangeRotatesTheCredentialAndClearsTheFlag(t *testing.T) {
+	store, hasher, h := changeFixture(t)
+
+	if _, err := h.Handle(selfCtx(), changeCmd(oldPassword, newPassword)); err != nil {
+		t.Fatalf("the owner was refused their own change: %v", err)
+	}
+	if !hasher.Matches(newPassword, store.user.PasswordHash) {
+		t.Fatal("the change did not rotate the credential")
+	}
+	// The password is the caller's own choice, so there is nothing for the next
+	// sign-in to rotate. This is the ONLY operation that clears the flag.
+	if store.user.MustChangePassword {
+		t.Fatal("the change left the must-change flag standing on a password the caller chose")
+	}
+}
+
+// TestTheChangeRefusesARowThatIsNotTheCallers is the row decision the route's
+// permission cannot make. The caller here is in the right tenant and holds the
+// door, so the tenant guard says nothing — the refusal has to come from the
+// aggregate comparing the id on the token with the id on the row.
+func TestTheChangeRefusesARowThatIsNotTheCallers(t *testing.T) {
+	store, hasher, h := changeFixture(t)
+
+	_, err := h.Handle(operatorCtx(), changeCmd(oldPassword, newPassword))
+	if err == nil {
+		t.Fatal("a caller changed a password on a row that was not theirs")
+	}
+	if !raised(err, "PasswordChangeRequiresSelfNotification") {
+		t.Fatalf("the refusal did not come from the row decision: %v", credentialRefusals(err))
+	}
+	if !hasher.Matches(oldPassword, store.user.PasswordHash) {
+		t.Fatal("a refused change rotated the credential anyway")
+	}
+}
+
+func TestTheChangeRefusesAWrongCurrentPassword(t *testing.T) {
+	store, hasher, h := changeFixture(t)
+
+	_, err := h.Handle(selfCtx(), changeCmd("N0tTheOne!Really", newPassword))
+	if err == nil {
+		t.Fatal("a change went through without the current password")
+	}
+	if !raised(err, "InvalidCurrentPasswordNotification") {
+		t.Fatalf("the refusal did not come from the current-password proof: %v", credentialRefusals(err))
+	}
+	if !hasher.Matches(oldPassword, store.user.PasswordHash) {
+		t.Fatal("a refused change rotated the credential anyway")
+	}
+}
+
+// TestTheChangeRefusesAnEmptyCurrentPassword covers the short circuit: an empty
+// value is answered without spending ~100 ms of Argon2id, and says no more than
+// the wrong-password case does.
+func TestTheChangeRefusesAnEmptyCurrentPassword(t *testing.T) {
+	_, _, h := changeFixture(t)
+
+	_, err := h.Handle(selfCtx(), changeCmd("", newPassword))
+	if err == nil {
+		t.Fatal("a change went through with an empty current password")
+	}
+	if !raised(err, "InvalidCurrentPasswordNotification") {
+		t.Fatalf("the refusal did not come from the current-password proof: %v", credentialRefusals(err))
+	}
+}
+
+func TestTheChangeRefusesTheCurrentPasswordAsTheNewOne(t *testing.T) {
+	_, _, h := changeFixture(t)
+
+	_, err := h.Handle(selfCtx(), changeCmd(oldPassword, oldPassword))
+	if err == nil {
+		t.Fatal("the current password was accepted as the new one")
+	}
+	if !raised(err, "PasswordUnchangedNotification") {
+		t.Fatalf("the refusal did not come from the must-differ rule: %v", credentialRefusals(err))
+	}
+}
+
+// TestTheChangeStillEnforcesThePolicy is the case the value object would MISS
+// on its own: Password declares modes: [insert], so the generated update gate
+// ignores it, and without credentialValueRules asking IsValid directly a
+// five-character password would sail through this endpoint.
+func TestTheChangeStillEnforcesThePolicy(t *testing.T) {
+	store, hasher, h := changeFixture(t)
+
+	_, err := h.Handle(selfCtx(), changeCmd(oldPassword, "short"))
+	if err == nil {
+		t.Fatal("a password below the policy was accepted by the change")
+	}
+	if !hasher.Matches(oldPassword, store.user.PasswordHash) {
+		t.Fatal("a refused change rotated the credential anyway")
+	}
+}
+
+func TestTheChangeComparesTheConfirmation(t *testing.T) {
+	_, _, h := changeFixture(t)
+
+	cmd := changeCmd(oldPassword, newPassword)
+	cmd.PasswordConfirmation = "An0ther!Passphrase.typo"
+
+	_, err := h.Handle(selfCtx(), cmd)
+	if err == nil {
+		t.Fatal("a mismatched confirmation was accepted by the change")
+	}
+	if !raised(err, "PasswordConfirmationMismatchNotification") {
+		t.Fatalf("the refusal did not come from the confirmation rule: %v", credentialRefusals(err))
+	}
+}
+
+// TestTheChangeStandsDownWithoutAnIdentity is the development bench: auth.mode
+// disabled, which the framework only permits under APP_PROFILE=dev. The row
+// decision asks whether an identity was PRESENT before it compares anything, so
+// a tokenless bench can still exercise the endpoint.
+func TestTheChangeStandsDownWithoutAnIdentity(t *testing.T) {
+	store, hasher, h := changeFixture(t)
+
+	if _, err := h.Handle(testCtx(), changeCmd(oldPassword, newPassword)); err != nil {
+		t.Fatalf("a tokenless bench could not exercise the change: %v", err)
+	}
+	if !hasher.Matches(newPassword, store.user.PasswordHash) {
+		t.Fatal("the change did not rotate the credential")
+	}
+}
+
+// ── the reset's own row decision ────────────────────────────────────────────
+
+// TestTheResetRefusesTheCallersOwnRow is what keeps the two operations
+// disjoint. Without it a holder of user:reset-password could point the reset at
+// their OWN row and replace the credential without proving the previous one —
+// defeating the change endpoint's currentPassword by choosing the other URL.
+func TestTheResetRefusesTheCallersOwnRow(t *testing.T) {
+	store, hasher, h := resetFixture(t)
+
+	_, err := h.Handle(selfCtx(), resetCmd())
+	if err == nil {
+		t.Fatal("a caller reset their own password without proving the current one")
+	}
+	if !raised(err, "PasswordResetRequiresAnotherUserNotification") {
+		t.Fatalf("the refusal did not come from the row decision: %v", credentialRefusals(err))
+	}
+	if !hasher.Matches(oldPassword, store.user.PasswordHash) {
+		t.Fatal("a refused reset rotated the credential anyway")
+	}
+}
+
+// TestTheResetStillServesAnOperatorInTheSameTenant is the other half: the guard
+// above must refuse the caller's OWN row and nothing else.
+func TestTheResetStillServesAnOperatorInTheSameTenant(t *testing.T) {
+	store, hasher, h := resetFixture(t)
+
+	if _, err := h.Handle(operatorCtx(), resetCmd()); err != nil {
+		t.Fatalf("an operator in the same tenant was refused: %v", err)
+	}
+	if !hasher.Matches(newPassword, store.user.PasswordHash) {
+		t.Fatal("the operator's reset did not rotate the credential")
+	}
+	// Somebody else chose this password, so the next sign-in has to replace it.
+	if !store.user.MustChangePassword {
+		t.Fatal("the reset did not force a change on the next sign-in")
+	}
+}
+
+// ── the row that is not there ───────────────────────────────────────────────
+
+// A missing user answers the framework's own not-found and NOT a credential
+// refusal: the caller is authenticated and already holds the permission, so
+// there is no enumeration to protect against and a 404 is the honest answer.
+// Both handlers load before they judge, so both have this path.
+
+func TestTheChangeAnswersNotFoundForAMissingUser(t *testing.T) {
+	store, _, h := changeFixture(t)
+	store.user = nil
+
+	if _, err := h.Handle(selfCtx(), changeCmd(oldPassword, newPassword)); err == nil {
+		t.Fatal("the change accepted a user that does not exist")
+	}
+}
+
+func TestTheResetAnswersNotFoundForAMissingUser(t *testing.T) {
+	store, _, h := resetFixture(t)
+	store.user = nil
+
+	if _, err := h.Handle(operatorCtx(), resetCmd()); err == nil {
+		t.Fatal("the reset accepted a user that does not exist")
 	}
 }

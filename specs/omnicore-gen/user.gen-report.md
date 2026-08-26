@@ -146,6 +146,18 @@ func ComputeUserFullName(ctx *configuration.AppContext, givenName string, family
 
 **Until a body is written the field renders absent, and nothing says so** — unlike a manual fact, which panics. The read answers 200, the other columns are correct, and this one is empty on REST, on GraphQL and in the export at once. What the declaration already bought needs no code: `?fields=` on the field fetches its sources instead, `?orderBy=` on it is a typed 400, and the export keeps the column under its label.
 
+### Fields nothing generated fills
+
+Declared `runtime: true` with `source: manual`. Each one is on the aggregate so your rules can read it, and on nothing else: no write request DTO, no command, no mapper, no OpenAPI schema — and no column, so no migration, `TableSchema`, outbox payload, audit event or response either. **No generated code puts a value there.** That is the declaration, not an omission.
+
+| field | type | what it is for |
+|---|---|---|
+| `CurrentPassword` | `string` | The password the caller currently holds, proved by the change and never stored. |
+
+Write the assignment in the operation that owns it — the hand-written command whose mapper has both the request and the entity. The shape this exists for is an operation that dispatches the same mode a generated verb does and is told apart by its action name: it needs the value on the aggregate, and the ordinary write bodies must not grow a field for it.
+
+**Until something assigns it, the field is the zero value on every write, and nothing says so.** A rule reading it does not fail — it judges `""` (or `false`, or `0`) and answers accordingly, which for a possession check is the answer that looks like a pass. Value objects are the one part already handled: the automatic pass would judge this field on every generated write, so its validation is excluded under every gate, and what checks the value is the rule you write.
+
 ### The migration — already yours
 
 The SQL for this entity was written on an earlier run and **was not touched**:
@@ -246,6 +258,16 @@ Declared `runtime: true` with `source: body`. Each one crosses the write request
 
 Two consequences worth reading twice. **Nothing compares it for you**: the value object on the field checks the value's SHAPE, and "the confirmation matches the password" is a rule — declare it (`kind: comparison`) or the field is collected and ignored. And **the verbs it does not name skip its value object entirely**, because a write that never carried the field has nothing to judge; if a verb must require it, name that verb under the field's `modes`.
 
+### What this entity asks about the caller
+
+Declared `runtime: true` with an identity `source`. The domain is handed no request and no `ctx`, so each of these rides onto the aggregate in the command mapper — `if id := ctx.Identity(); id != nil { … }` — and the rules read it from there. None of them is stored: no column, no migration, no `TableSchema`, no outbox payload, no audit event, no response.
+
+| field | asks | answered by |
+|---|---|---|
+| `RequestingUserID` | who the caller is | `Identity().Subject` |
+
+The claim NAMES behind these are the framework's to resolve, not this code's: the tenant claim is `authorization.tenant.claim` and the permissions claim is `authorization.permissionsClaim`. The generated feed calls the accessor and never spells either name — the generated unit tests build their fixture Identity under the framework's DEFAULTS, which is the only name a test with no yaml can honestly use.
+
 ### The tenant is server-assigned, and the insert accepts one anyway
 
 `TenantID` is declared `assignedFrom: identity-claim` with `bypassMaySet: true`, so it is filled from the caller's identity on every insert and is in no update or patch body. The INSERT body carries it as an OPTIONAL value, for one reason: a super-admin (`*:*`) crosses the row scope, and without a field to name the tenant in they could repair a customer's records and never create one.
@@ -295,17 +317,6 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the insert command and result | `internal/application/commands/insert_user_command.go` |
-| the patch command and result | `internal/application/commands/patch_user_command.go` |
-| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
-| the User aggregate root, its modes and its rules | `internal/domain/user.go` |
-| tests for User's rules | `internal/domain/user_test.go` |
-| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
-| the insert request and response | `internal/web/requests/insert_user.go` |
-| the patch request and response | `internal/web/requests/patch_user.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/user_computed_manual.go` — hand-written rules live here, by design
@@ -314,7 +325,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-35 file(s) were already up to date.
+43 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -329,9 +340,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.60.0)
+Verdict: **ahead** (project pins v0.61.0)
 
-framework v0.60.0 meets the required v0.60.0
+the project pins framework v0.61.0, ahead of the v0.60.0 this generator targets. Generating anyway. Read the changelog of the pinned version and ask two questions: was there a breaking change, and does it touch what the generator emits? Then build — go vet and go build settle it faster than reading can. A small fix is fine (adopt it with `omnicore-gen adopt <path>` so the next run keeps it); a capability that changed shape entirely is a generator bump, not a patch
 
 Verify what was generated:
 
