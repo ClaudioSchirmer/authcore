@@ -1229,6 +1229,579 @@
           "UnknownTenantStatusNotification": "c14c9e5f8671de68adbde5c0caf98f6c4bae82bc222e7f1e20033a46cea7676a"
         }
       }
+    },
+    "User": {
+      "spec": "specs/omnicore-gen/user.omnicore.yaml",
+      "specHash": "6818fa1b773e6b78a25b9752b0fcf59b8c1227f971f06f81487d09722ddca0ee",
+      "framework": "v0.60.0",
+      "files": {
+        "bootstrap/users_feature.go": {
+          "class": "owned",
+          "hash": "220932bd7612c43d2beffe6cd36e73b1850eb197d10a668b702449f0854993fa"
+        },
+        "internal/application/commands/archive_user_command.go": {
+          "class": "owned",
+          "hash": "58dcf213ce3898531311a6bf4cb3232a6b63432f8d0f59526c036973605fc6db"
+        },
+        "internal/application/commands/insert_user_command.go": {
+          "class": "owned",
+          "hash": "02de147cd2fab8c688ce65c27ce0966d9df7602eb838d6136cfc135d4bf7eead"
+        },
+        "internal/application/commands/patch_user_command.go": {
+          "class": "owned",
+          "hash": "1c72dfd1c4e12a5ea8f8dec61aac6d22de74c6086fc86aa849ae10a2cf9c727b"
+        },
+        "internal/application/commands/user_child_results.go": {
+          "class": "owned",
+          "hash": "7bf7c8b9bf904ad96d7a0afbf0682ec4fbd1b34714f0fec1c9da538dafb87717"
+        },
+        "internal/application/commands/user_commands_test.go": {
+          "class": "owned",
+          "hash": "01e20945c9aa57d408a9c9ee17a6f605aa8d49d615d2920c80d05b265e5cd9c8"
+        },
+        "internal/application/commands/user_group_commands.go": {
+          "class": "owned",
+          "hash": "3259a672ad8538decb5f690aaf9f09541b781a9df3f4984d58c976cc2886d795"
+        },
+        "internal/application/commands/user_role_commands.go": {
+          "class": "owned",
+          "hash": "3dd6ecfac6481df755860c3a40e225cea24bcd561ff36905749feca256619fc9"
+        },
+        "internal/application/dtos/user_dtos_test.go": {
+          "class": "owned",
+          "hash": "1bd16edf9aaee4dd34ef1c963930d74297783a7b10990e574a676304ffa692cf"
+        },
+        "internal/application/dtos/user_group_input.go": {
+          "class": "owned",
+          "hash": "d61e8cb803bee793cd6ca5e032f4f9a0bcb70eb6b6932c42dbda0c963daceff0"
+        },
+        "internal/application/dtos/user_role_input.go": {
+          "class": "owned",
+          "hash": "8dd4d6783a2a2eb315ef10bac904583739f6b33f3356e78f248be5288eff03fe"
+        },
+        "internal/application/queries/find_user_by_id_query.go": {
+          "class": "owned",
+          "hash": "2cffce04bd8387a772ed27de8267c05bea770070c422fba64f6695898638c1eb"
+        },
+        "internal/application/queries/find_users_by_params_query.go": {
+          "class": "owned",
+          "hash": "a700b2b11ef5edf089425441c800e0e00e2a6dcba68b85ce5d5bbd06d4eb609f"
+        },
+        "internal/application/queries/user_computed_manual.go": {
+          "class": "hook",
+          "hash": "19f7474415f9d2060d42641135b7e0326d364c155a7ed81bf4aad676ad4478e6"
+        },
+        "internal/application/queries/user_queries_test.go": {
+          "class": "owned",
+          "hash": "400ad46e269a3a49f48a99923ae1d877b2e4d46b28533d3b3a57b3a3d4443742"
+        },
+        "internal/application/queries/user_row_results.go": {
+          "class": "owned",
+          "hash": "1d263ea5db35c62f4edf010a015e8893aceedfb76883b83ac2fdf58ad19418cc"
+        },
+        "internal/application/translations/user_translations_test.go": {
+          "class": "owned",
+          "hash": "e6240ef1e6d87db238a94906791625993b4ce59dc87dab9edcf90a4eac3337ee"
+        },
+        "internal/domain/aggregatevos/user_children_test.go": {
+          "class": "owned",
+          "hash": "2a9f819b897a96cb285735ab84462ba721b38da7478a6a054bcf2459b09081b4"
+        },
+        "internal/domain/aggregatevos/user_group.go": {
+          "class": "owned",
+          "hash": "a32a5062378dca451e87b25f3b6320761463603a0610b2f819b97cf0fa2814a1"
+        },
+        "internal/domain/aggregatevos/user_role.go": {
+          "class": "owned",
+          "hash": "e34e828bd6f3dd93c39062424035dc251d372d7efde7cf7c2168fedb0cb6677a"
+        },
+        "internal/domain/user.go": {
+          "class": "owned",
+          "hash": "dd321c96c03657801e6d05d1addd90abaf1ccfc7b1856df5772218b1950bcf99"
+        },
+        "internal/domain/user_rules_manual.go": {
+          "class": "hook",
+          "hash": "aca1e291cb62cb2bd80cda0b75abf123ee71e8da60a373815c3dffd62740973a"
+        },
+        "internal/domain/user_service.go": {
+          "class": "owned",
+          "hash": "2c2cc570b8a733855a37e3734220d912c3c941189961def122316c7fb0a00df5"
+        },
+        "internal/domain/user_test.go": {
+          "class": "owned",
+          "hash": "6008976e7e92cb74cecb87c1302e55bf879b4eb7fef6b163b02b74a2404587c0"
+        },
+        "internal/domain/vos/doc.go": {
+          "class": "owned",
+          "hash": "94f9639f86d244b66927c8fd2c28fe7efd030abfeb073c99d5d0c4cb0fac2f5f"
+        },
+        "internal/domain/vos/email.go": {
+          "class": "owned",
+          "hash": "c05b10b5ed1d7355e6fcf25ac9986049a645fa570a2f28d9e21313e236c18ac3"
+        },
+        "internal/domain/vos/user_status.go": {
+          "class": "owned",
+          "hash": "27135cff7bc3587d34fdb6d26254ef9912996120dd69e2a91cf8741f11ea7733"
+        },
+        "internal/domain/vos/user_vos_test.go": {
+          "class": "owned",
+          "hash": "edca4c1f526e0531d385b9cb507fae96fac8534ee97bfac3593e7eb6a3295e96"
+        },
+        "internal/infra/schemas/user_group_schema.go": {
+          "class": "owned",
+          "hash": "6497a1974fd27df56a0649c6cab1da60f43dfe2c52f4f85b57506fe0e1d07117"
+        },
+        "internal/infra/schemas/user_role_schema.go": {
+          "class": "owned",
+          "hash": "4d9a26a5acf7af991ce3e318f4709408ce4b16b88f7cf332221cb154f1428feb"
+        },
+        "internal/infra/schemas/user_schema.go": {
+          "class": "owned",
+          "hash": "f8d67091d76e825faead901b8cecde9ad162f7f9272ddfc64efb639b714be93e"
+        },
+        "internal/infra/schemas/user_schemas_test.go": {
+          "class": "owned",
+          "hash": "99f4852b3b74ebb08c828a8d623f16efe1eba83ee6a025bdb9092806f8e1c8b9"
+        },
+        "internal/infra/user_repository.go": {
+          "class": "owned",
+          "hash": "2dbe3eddac14be337bd1990b6e9c19bf6349b102ed2558a7b6ae3538bddf7e97"
+        },
+        "internal/infra/user_service.go": {
+          "class": "owned",
+          "hash": "7a08f577a1b2867b84d98af408756698c8d6e8b2c2ed7a8f413b34526926e1e1"
+        },
+        "internal/infra/user_service_manual.go": {
+          "class": "hook",
+          "hash": "b54aa84553241e906172d1fcd13f7fb4e3d4ed7f0af8afc6bc96fda0fdda2e0a"
+        },
+        "internal/infra/views/user_view.go": {
+          "class": "owned",
+          "hash": "a1e860129d2b0006e65ef77f0652f0667a1c1e0c0ab5f1377f887c197f3a66f8"
+        },
+        "internal/infra/views/user_view_test.go": {
+          "class": "owned",
+          "hash": "542bf9b2ccbea6ff86704c667a0bc42ed8a6a5babcae5fdfb6dcd4387c2d322b"
+        },
+        "internal/web/requests/find_user_by_id.go": {
+          "class": "owned",
+          "hash": "bfb425e03bff7129fc3edeed7918394c54ecb8e85dd392dc2e49881c012d09fc"
+        },
+        "internal/web/requests/find_users_by_params.go": {
+          "class": "owned",
+          "hash": "921947c10aa02f45f275b4ed4c344472b0f047ada6d0883c7ba737cc6bd87f78"
+        },
+        "internal/web/requests/insert_user.go": {
+          "class": "owned",
+          "hash": "e99ebc2a1b0e3837bd085d39988baa28a773f6bc1e019e7620c6a1200aa5e6aa"
+        },
+        "internal/web/requests/patch_user.go": {
+          "class": "owned",
+          "hash": "063c0b34f96b9650e9b5dcad104414f6cc5408b823b962f86bfe17aac31cb976"
+        },
+        "internal/web/requests/user_children.go": {
+          "class": "owned",
+          "hash": "2dde1e41bbf4f7947bbdd5436f4d778d8eb413baf26f8d3f8f1e803ef3cd4c2c"
+        },
+        "internal/web/requests/user_group_requests.go": {
+          "class": "owned",
+          "hash": "5a82fa57d1ccc7656e4d9d99054291d1c064ac9f2c1987b5da4b5bdb881e1e3a"
+        },
+        "internal/web/requests/user_requests_test.go": {
+          "class": "owned",
+          "hash": "17104329a367dd529f69a60b7841b8c5b77f0122ebb8d973851e5e661e698eda"
+        },
+        "internal/web/requests/user_role_requests.go": {
+          "class": "owned",
+          "hash": "4832ed91ce0f96c6dfd6207a86adc4e3d157acb3f11178cc0623d9663949e3cc"
+        },
+        "internal/web/user_routes.go": {
+          "class": "owned",
+          "hash": "7f06b22b3cebfd2add0e70d3597d85c42791b739689bcfa7f5fa8aff789630d8"
+        }
+      },
+      "ordinals": {
+        "postgres": 5
+      },
+      "viewShape": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "registrations": {
+        "internal/application/translations/deu.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5c84f3b256c48d2a94bf26a80528c484f20cf49bed310488813ddbe8436f7cb6",
+          "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "e42545e05d61408597db61c41015d462d61c367706b5b5ce7f377931de861c58",
+          "CannotJoinWildcardGroupNotification": "02f40b1d99eba3f18fbbe4efc25f8e1d2b197a5cf74011b573f5d4a6a457c9db",
+          "GroupNotAvailableInTenantNotification": "6904f245f7aeb10055f19a413720ea3f27b4e645e7f46b760a2d5eaf5cebc389",
+          "InvalidEmailNotification": "52e4f470f6efdcf7cd68f7241aa7ad645174672e837120c406873b3c6793a2ef",
+          "InvalidPersonNameNotification": "2f0c241ab39c2250f4f059c8055b9bddabc0d1fe8c149b9a33a87c9565c21627",
+          "InvalidUserStatusTransitionNotification": "8654610a22c4a2170b701976a6e0d19eff3ed73f66b82e4166be5bbbf0c378db",
+          "PasswordConfirmationMismatchNotification": "80181b26b5eb34ce94013f9e1d3d0052d7feafe72eb81d0da1efe7e410f321ea",
+          "PasswordEchoesIdentityNotification": "e555b9eff848a27e8a48f26b16f53e275f4393c728caa1ed43b4e8de835a6744",
+          "PasswordUnchangedNotification": "f676dee86e5d1f9c27242d34a82cd16f8b48e2cb1f1dc4b18b5d89a126612abc",
+          "RoleNotAvailableInTenantNotification": "e3ed12bfd66e664d09bede99885e1667699739451e85b683f740c7fd26bfdece",
+          "TooManyGroupsForUserNotification": "f535983c6858fd32faf072cd99471e683a6ae7ca8dcecedad97c7508630712b7",
+          "TooManyRolesForUserNotification": "224b16d70bd9cf0e7837c47bbf824dcc01b82ffcbf12afc46028599040b236fd",
+          "UnknownUserStatusNotification": "44c07a9f096d06aa23d291e48e4029a44b6e9c111f3a6569630fbefe3ab9cda2",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "0e2d6d60d4048d3971c347d7dc0f50bf9a77856f9ce919f68d1d25d596d642ed",
+          "UserAlreadyInGroupNotification": "cc354803a744150beee8f02ee3ca1f109c060db6e72410da7f3b63831e572074",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "a3bf3541a27ab0465e0f5d97e8290e161d8e52e3228aadc757fd8ef43c1b3650",
+          "UserEmailField": "2fae6fb30b0d0077f771923d6d037d8e43c45e6078e2b3c31637a489c029cee5",
+          "UserEmailIsImmutableNotification": "67805635ae3501599f9179513293d158ed480e2e53c3cae3e3a4928b071de961",
+          "UserEmailVerifiedAtField": "68f2e17c4dd106f3aff3ac9256c45ac945ff4557e5a12c7095ef033f09117411",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "b4c0226585b5b04709ff49817a224d909d1fec0e9466884ce994be6f994554ed",
+          "UserGroupGroupKeyField": "54c08ae0892cd9d787c07bba9249a2f7128275336175faf4642522bf95837aae",
+          "UserGroupGroupNameField": "1f155d97469ee1fadd1d71fc18d9fbed070ec2b7d5d6f1f5a7b1e59f192882cf",
+          "UserMustChangePasswordField": "b9af2b956c80dd756ae50c0caa377aa12c8ebcc3be21ae8b6f3ad0540591258b",
+          "UserNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "UserPasswordChangedAtField": "aea68a22a0066b008a3fbe1a69a78de37451b23938affb4614eaa799612da6ee",
+          "UserPasswordConfirmationField": "3a4d7b82b668c115e44b4fd4f1e41914c08245e3db364f1d0cfbdabf897be6b7",
+          "UserPasswordField": "a36c101570cc4410993de5385ad7034adb2dae6a05139ac7672577803084634d",
+          "UserPasswordPlainField": "a36c101570cc4410993de5385ad7034adb2dae6a05139ac7672577803084634d",
+          "UserRoleRoleIDField": "0038a9cf86613cec04ae936ef71b55a4dac1ab4d040925108269518736abf85c",
+          "UserRoleRoleKeyField": "8fc29999905b6df190ed5ceaa37f6d1e3b9a962e3b8ff8431a841b35ded74a0e",
+          "UserRoleRoleNameField": "6f348aa45edf274e38b2068dd33d1d41dfb5875185af01d3d8e8d6842764994c",
+          "UserStatus.active": "8163454f378f0814a0911afc75bb63814643a45803a0460003800e1c6b9be636",
+          "UserStatus.suspended": "45f96e916050cd8a6465b8b36bea037d0b5e3642a13b253a23298fb1a67feb46",
+          "UserStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "UserTenantDoesNotExistNotification": "4e152456b247d4bd551a22d9f85104ccfbb30fa0859965cf76b5abced5620e8c",
+          "UserTenantIDField": "9837fb6af947b2f590f0d9301a00c28b7f65a934a4e3cde4bbad8294e3d94020",
+          "UserTenantIsImmutableNotification": "4f71c73002f6f1aaecf2566e9c17312bde64dc48dee529079e3906825dde2c96",
+          "UserTenantStatusField": "90a910bd236ff152ee2d5fafe20599b0c2cc0169d3e20169383feefd1d81a05c",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "d1474e1d2f4da788c33af60d41699cfb13c839d08ec9de138f5de7fad15d1cc5"
+        },
+        "internal/application/translations/eng.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "d59dceb6caf9b684c2720e17a2f66f5ff81425ff7178436ba962b50969219725",
+          "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "89de2913ed5f4324994a2d21ef9e7d5a2fff97fd181404d99b41816164e39156",
+          "CannotJoinWildcardGroupNotification": "754b835db1bfc94b4e90861274b5b706e08374feab03fe179c35ce5a1b775db6",
+          "GroupNotAvailableInTenantNotification": "21005e510e6efbdd02dd7b1c75ce4365c0277b381ecd8f1e7869421cd31851f4",
+          "InvalidEmailNotification": "56f8d9ad988aafa3c9fcffa010136475df065e867f4edca1c68c21bb06066355",
+          "InvalidPersonNameNotification": "2c938047bc75f4d97974e2821b13336dc67e459478ab62c06f28824ad9dee657",
+          "InvalidUserStatusTransitionNotification": "663bbe4d1abce0dbe9c181995d6d7488d9f82789e54d7719a1451f6d6bcc8ad3",
+          "PasswordConfirmationMismatchNotification": "61a0d837fd5b9656400430bfa4e9fd4bf352b3362f915a57a23fcf5c6f50355b",
+          "PasswordEchoesIdentityNotification": "806bf13e45325ec550a7c54aeeab1112f2a37fa72ab78a9314f9c84869bca71d",
+          "PasswordUnchangedNotification": "7e9f3b594f829f20c8f3ebc3d923c4864762adb73114a59fd4cac5c6247a92bd",
+          "RoleNotAvailableInTenantNotification": "8222431633cde7211925e8a8640822521f9232ae7f6c444489681eddd5a1530c",
+          "TooManyGroupsForUserNotification": "6950aef5eeb997aff02dc7793f57fd3ba84eec2b1fcb6d8a059509ca884edcee",
+          "TooManyRolesForUserNotification": "2ba3f212df5c7a8f700859ebc4e8079be51a0e4cbcb56458fee0d7c158952d7a",
+          "UnknownUserStatusNotification": "3094db9eab42675675de7ef9eb8479e215124a3ed5ffa4fced4fdfe73913282c",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "38701cd9d8535bca5a2d42e367b5820690bacf726f83234616dec1080bcb5040",
+          "UserAlreadyInGroupNotification": "163260aa1f237a17cf6082b624da38f2584a83857908f103eda793a871caad61",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "177c6e66be69cdca73089bddc72ad532662d1f0001280492954e7c77c4ea4c01",
+          "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
+          "UserEmailIsImmutableNotification": "11a698b102ed082cae792fbf27dace0226c3a75031615fcde2a02a71286e2c79",
+          "UserEmailVerifiedAtField": "f84c8383da0eb7b344c3211880a0cc88ac910d6df710c2c3eb160acdd47ae5a5",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
+          "UserGroupGroupKeyField": "0f410a7f3ad4a3fe0a4aaa0df8d3b1c1132ed4696137b3f6d8a6e7dfc965e299",
+          "UserGroupGroupNameField": "762ebb70ef0ea2e80a41035e91a5f95ec35b0b03d2f2acc5c5b4f4c09213c8c5",
+          "UserMustChangePasswordField": "ff0566c25225bc6efeebb2200e15167d02aa58aa2646004cf6e0475ebb3ff27f",
+          "UserNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "UserPasswordChangedAtField": "4b4b03563953ca1698523fc060591511f85c5dd350daf3ce0bec89e3b5fb006d",
+          "UserPasswordConfirmationField": "f26981217e04f18953ba6d993dc2647a93c94302aa938bd5d6a4733d065c0f8a",
+          "UserPasswordField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserPasswordPlainField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserRoleRoleIDField": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
+          "UserRoleRoleKeyField": "e2db287a07351f071f36c63dcca25bcbafe3e470781f557f97a7206218867165",
+          "UserRoleRoleNameField": "82c784ca1c4ccf6592d4e8daa8b4d2f004800ee04ef0670abb0808c5fe050c1d",
+          "UserStatus.active": "92340695899bd2d86223e4a007620e0d6502fc0e08809773634c7e0743764a9c",
+          "UserStatus.suspended": "e392a3891c070abe312d9c08bb6a4a9f5342424dd15c80f1d5cf67d14b79650a",
+          "UserStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "UserTenantDoesNotExistNotification": "ad4ed130512f56cb7fe6bbbfd7f282a47c72a60da0ce4323ca219553f13f5383",
+          "UserTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "UserTenantIsImmutableNotification": "7b3342520255a2c2f7aa4d063c811eea7dfdd3df9da34906fb8f59fa4ab1b89a",
+          "UserTenantStatusField": "cec93f5fbbb8635cd976c122a7eba98a8b222bcf78634ffdad0b2af745b36cfe",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "717d6193bdd55fd1850658bf09c49ddad720a95d6f4154108ecf98e936512d3a"
+        },
+        "internal/application/translations/esp.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "e3f6cad92d4a19a1533fb9e39d23679832b026064ac123a8a2b0b00c56d17e9f",
+          "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "bf2ba987fdcc034d1a126913a121ea1912779c5ae408a3b51d98e1d9a2fe62e1",
+          "CannotJoinWildcardGroupNotification": "a3aacb7c9137f3771436857fa4a513317381ce2937da57f2051ba8d166ae0bb4",
+          "GroupNotAvailableInTenantNotification": "922af761a6ba4bfa2009f3b58c8cb07c8b152defa18922fa8b64ee464426d2db",
+          "InvalidEmailNotification": "88b05da8e83a9b1d581055ecf7280b4b1033f41bba682b0a052c83dd3525afeb",
+          "InvalidPersonNameNotification": "b36b2b5f4b367e91f186b774f825cb2e38a4e2b4b5c758b72bd91d933b96f10d",
+          "InvalidUserStatusTransitionNotification": "ddcfe9f5ad8372550d39eb6d4c7d1545aa4ac1c990edd0abb8ce0d03bd925b7e",
+          "PasswordConfirmationMismatchNotification": "5e09de1303e2b7c8d46de5e4ec644ff4a97062eb479cdd4a5872f16976a7539f",
+          "PasswordEchoesIdentityNotification": "155b83f36bb0ed240ba65709ecfa6e3f4949f7fc722c46b52d5a293340c25a29",
+          "PasswordUnchangedNotification": "7b106ea8dc8ee0b9d3f07c4cb62adea72223f2b753115af9be4cf4f05876cbb2",
+          "RoleNotAvailableInTenantNotification": "09ada259b3fd2edf555da524d6a8c528ccdd2ceb5652d3d29d8ceef75692dd5a",
+          "TooManyGroupsForUserNotification": "cb41e02b131d55b17276fa118e41e5e5e880af7107d6ffbbeb55a18dc3d9a96a",
+          "TooManyRolesForUserNotification": "cde547252972e5a9f3586e40a5d58afd44c37c29fb9c45e646382876ad02864f",
+          "UnknownUserStatusNotification": "1e1b3741ac36e4a050f0557eb311823aa7f77204d55da2b88913685916085312",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "cf417fdec1770eda0482e7d6bb79164f6d01826398787db73c964ccf4cbac55e",
+          "UserAlreadyInGroupNotification": "64ed17dad09bb62600a487b35363f5aa7d2cbd396e7c24704e9452504687bc43",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "13c1b25a7e481a7564b298b2bb68a900ce1f6393de370cb4ba1e7148b95c5050",
+          "UserEmailField": "ec64dc30a483cdcfaf24992c5aaec20a4ae391af91ada725f886fc3270b669ac",
+          "UserEmailIsImmutableNotification": "c0441c657db3d121e9d0b1d352c9732927bad8b26b58faa894ca8255f03a28db",
+          "UserEmailVerifiedAtField": "4cb20c3c0aeb40c0f956e70c3579b44725bc15df94f5a15362e703c01e08d0f3",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "399b037dab0f8a847147f864831616a27147104f43ddcbce8cd0f087b1a5328f",
+          "UserGroupGroupKeyField": "be52e42e2c6f80ae57d6624e24ed953f9412835c6d416f970f567f7d8e8ad423",
+          "UserGroupGroupNameField": "1a95ca916c209551dcf3458fa2c187068e5c2c679a87a7a5ed354d6e69efbc65",
+          "UserMustChangePasswordField": "e6095bb19bf8bd1c728c304d53ff097e9809e70dc17c7fefa41d92cbadb44293",
+          "UserNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
+          "UserPasswordChangedAtField": "48d65eb99f9533c0247e7b84574752c8ec947dd13b5971b3ef3a948563a6b1aa",
+          "UserPasswordConfirmationField": "fd6ef9a376f405755a152da57d660221a45e5b1d58b6c499d0ec3744c3b50977",
+          "UserPasswordField": "a389a638dec32538f55b0c8dc5c84f84aad65bcd5aacd5f05d36f30b71271a6b",
+          "UserPasswordPlainField": "a389a638dec32538f55b0c8dc5c84f84aad65bcd5aacd5f05d36f30b71271a6b",
+          "UserRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "UserRoleRoleKeyField": "e7522ee12a3c167ddaec99b2a3dce65189cab73c5d097766eeb9e7b5b144cf8b",
+          "UserRoleRoleNameField": "7d5629f31ad81b0f13322a86016ac2393800a9ebc1160e6dc0a67274583f170d",
+          "UserStatus.active": "723858144bd5482d4ad8ae46e5fbbcca18061cf39e453730e025a286f1c0ea7f",
+          "UserStatus.suspended": "6d0de22751da62efda46926fd1c772886e300a2a045f342d62d88b78f2b76b8b",
+          "UserStatusField": "1ceab505f656f53495e2ef33fac2293649724207cff9530ea5c2fd0ba4f0fe4e",
+          "UserTenantDoesNotExistNotification": "6ce60ae59c36af09aa091ffe618e8085145b01519abecaee47de57543c0aeaf1",
+          "UserTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "UserTenantIsImmutableNotification": "82842c9d571519f8df17a7358d231f57a5fa6956f7e84b750885b510704b863f",
+          "UserTenantStatusField": "3285afe20627992bd89a40aa92a1f465776ce099ea2c4c2028a1d0be36c6270b",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "4fcf1e1481cd80301a29fec3c506b291f6021ba9cf52be05801365e2ad53d787"
+        },
+        "internal/application/translations/fra.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "df5184c5ac362065f4997f1864ae9e0052f1a9c1230593ecb7fc358f47c716eb",
+          "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "756ec10d2f39ea88b7deca134d3757bdbb2169c5d9a82c025d3e0eeb3013075d",
+          "CannotJoinWildcardGroupNotification": "23e3601468ed8ca98fba1476d9f8364fbe56ba6c53c3a215114ed0f585ed4bc2",
+          "GroupNotAvailableInTenantNotification": "140bf899d11a4b6edcbd288dd7c14b35b8bbeff7eaf14a7dd2f7caac81362550",
+          "InvalidEmailNotification": "fff540d4318de83b149e5aa2a102a6413c793084173dd9be3b40776ffc233047",
+          "InvalidPersonNameNotification": "ede9e2e4729b99f855fc422393071786abfd4fe46c151e6be86c43e995855ba4",
+          "InvalidUserStatusTransitionNotification": "d3558e9cd20ab4df97c665be93c5f7d0055d584a20b31e959d0e92b1a7c50a00",
+          "PasswordConfirmationMismatchNotification": "2191d9292a398bf1978a2c1aa40df066a27fa1a3edf0a345518adea86c79b44c",
+          "PasswordEchoesIdentityNotification": "a0cbffc15abb7ce10cdbe7b6d948aa1a36998efea423222dfe71d72925197e0f",
+          "PasswordUnchangedNotification": "4ad2480bbaa85ee7f9d9c1aa93da6be8c35a7bb68c3baa4cc4b0ec1218730907",
+          "RoleNotAvailableInTenantNotification": "54535d4f1ca973aa1d764e060bef390085d52057945f785867293e1dc39d941a",
+          "TooManyGroupsForUserNotification": "1ed58fd9d39462e99cc81aae7ab102c2462f5495616c399c040dc730cf5f5bec",
+          "TooManyRolesForUserNotification": "c8f54bc4df9ec930678d2dfe04f7dbe7a3d8bda0b63f2c031b3eb9976b9ef2d4",
+          "UnknownUserStatusNotification": "79bcccf89c279da881587e9f1198a42b822f65a0a3d5341185eef87ab325f9d6",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "6c03b6de97361ce7ac16b1671c5f4bffb28c76d8f707c3bcaabbc9635a1f0a92",
+          "UserAlreadyInGroupNotification": "521b0a2034d0fe6c66c146f214a8c97c389141bf3adbca364d2fda7f00ef46c1",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "385f1af72c6feb3b541921890c7efa2e758ee8627f15c6ec2192ee7ce16b1099",
+          "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
+          "UserEmailIsImmutableNotification": "96fcd19c5488eeb6c35baecea027cc5fab8597cc26802001566b2d07639cdc2e",
+          "UserEmailVerifiedAtField": "ba9765cf75b25516122635eb4e49e2ea69fdae5c7957dd075b983ffbb052172f",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "c524a4f48df251865b47f067cd6f6073bb8c3302083c01d601ab2a8dca1e5ddf",
+          "UserGroupGroupKeyField": "b1b23f31afaa7caf47b6019db90116b236df845c51f5fc77228bd05051067656",
+          "UserGroupGroupNameField": "aa160595aa51d7b9568470496bddc67bec3b01bcc7b5b397bb7ee7b756765f70",
+          "UserMustChangePasswordField": "1f9e78248c1ffe95b27dcfcc97090af57a1c51bbf3e5a7f2df09b6c4099120d5",
+          "UserNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
+          "UserPasswordChangedAtField": "52d2c13f7a07d58615884eeda7090e85cb03ad97f16c5ad93b48f995024fb5ee",
+          "UserPasswordConfirmationField": "07992c3b56fbc87aa1ca908ecc3619ca0ba1e8121dd93544a6bfa08b0e4212cc",
+          "UserPasswordField": "ff9c8b8c0677c3d05a018508b29783af6de561164b9f8ecd64a6cdbdcf3e48f5",
+          "UserPasswordPlainField": "ff9c8b8c0677c3d05a018508b29783af6de561164b9f8ecd64a6cdbdcf3e48f5",
+          "UserRoleRoleIDField": "a1fc967c558796933832ebe6eb716a7eb69d4ac48349d05366c22531d0b0df66",
+          "UserRoleRoleKeyField": "9ed80be4cd3c19fa8ff6bcaaa6ae1ebf4abb816fd46c32ee2ba6ce7acb50a0ba",
+          "UserRoleRoleNameField": "07ddf0695e6897db9ddd08d3ac06e637541090d0d0a3ceab6f2843e31d67b6d9",
+          "UserStatus.active": "ad26287ab66ba05cce95d869b68d61cc706c2dc4804ee819c9600a805fce59cd",
+          "UserStatus.suspended": "ff129984f4a1c75543abb0b74a03fb0e608124346ce4eaf10738eabad3b2b94f",
+          "UserStatusField": "dee377cfd8cddfb8db49d63a6f80174955c594a7cb995d4a70c2f6f305286786",
+          "UserTenantDoesNotExistNotification": "8a723ea4354bda1b8b31d95ff2a28f7ef3524c28b1f0816fb1442d50be1cf12a",
+          "UserTenantIDField": "36d6aac11c524ff1bb47724bec546e0bbcb3896c39b5003af5f72792209bc915",
+          "UserTenantIsImmutableNotification": "41e466efad0a2523c6eb02db859d0abe3920c04e27f985b2e7a8518599c6cc0e",
+          "UserTenantStatusField": "6ea758e951621202ab91271e3e2bc14bbcad69c41269d1af017384f1e5e6c84d",
+          "UserTenantWorkspaceField": "3f680c5fc8ca2079f7cee2ad9df2a6dd5923fa8d17607fb9c84f43859efdee93",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "9ab724dd5434721ac9087cd21fc3730365e33998e9db19f8b11173046ccbc2ba"
+        },
+        "internal/application/translations/ita.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "8917e6fb47bcb8ab27cee787d5695f7fe11bfa21725c72cf62c0bffb5a9a6d45",
+          "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "461cc81113a5c214c4c82585df6e6eb983508dca252591732021ee5394417d4e",
+          "CannotJoinWildcardGroupNotification": "6c72ed6e9f18acb5c481f55d6f24037d5d01a1eaa1214900d795f42737d3012f",
+          "GroupNotAvailableInTenantNotification": "214e9c73058502b23d4c9706304ef182c70ade3eaefe9242b521842b1d1598fc",
+          "InvalidEmailNotification": "3bfc10d9c70649461886919ba87c46de8d06f02cce62163ddad87446c27c3cd2",
+          "InvalidPersonNameNotification": "2f84e70a341142da72f905fecf43942303e8574d0cf01edf33a166e916a16f3d",
+          "InvalidUserStatusTransitionNotification": "0b3a6d3fb3a9aec8bf1e33b4885a07e39cef16497e876245823fc298049d1a60",
+          "PasswordConfirmationMismatchNotification": "56ee626cef09d99acad2c53eabd4ea220526d903efd93edc082aec2d33b07096",
+          "PasswordEchoesIdentityNotification": "ef571925f11c99213e9693afc4cc8151db27fa887c8ae1db581e43efc59ab683",
+          "PasswordUnchangedNotification": "56d4f3a221febd3a790514eb76580420b38800e5e0c8115c2a34cbb8834ae8b4",
+          "RoleNotAvailableInTenantNotification": "a504ebcf11acf1320e96ad96cae899c8d3cd3cc346960ca21a61ae31a2118741",
+          "TooManyGroupsForUserNotification": "1a44064ae49428f3f41948c4c722f0219bead438fe23c80573caa1f3869d4ab5",
+          "TooManyRolesForUserNotification": "4bf071700771bc443f402a346296728db367fc4a57cfeff3e42d83eb4ed0b8de",
+          "UnknownUserStatusNotification": "2359a4b2dc407fcdd76df3fb422905fa4f07d7b831757fb1d44f3d513c1f8ce3",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "f344519f77f3b6189ebfb54f36d502980a7d3a53db57691c90c29da2ec657555",
+          "UserAlreadyInGroupNotification": "703734d89a16c7b7af1b5ebb3bf2e2b2b6e7a1dbc0e66644a6163fe274d496b4",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "ac0068261b02fb988d3eaf3d6c5ac7e134353aff0ac5f817272cdba7a4d1280d",
+          "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
+          "UserEmailIsImmutableNotification": "6b1278d34fccb83a33d2a35561100cbadd19d3204fd80be5611c26b380d624c8",
+          "UserEmailVerifiedAtField": "2f5419f79ebdc28a5ec6bd4197823f1ce3cfbe9e134bfb889cb0ef75c48ec4c9",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "b9bb40edbe6efeb8dd2a1b09637a1b8b663935616fbcd520a950646ee946d312",
+          "UserGroupGroupKeyField": "48b36a95d2068e2c27ddfc6e4e9347b733bcac55ce237bd2f95beaee12744bc3",
+          "UserGroupGroupNameField": "135e942cab1c912231ed1383c60ddee4d4f26d7eaa4ad4f5949670327d14fe46",
+          "UserMustChangePasswordField": "67bbc771b52132862137c94aa15c47196a8a48cefc2b2df402c4e9eedb0d306b",
+          "UserNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "UserPasswordChangedAtField": "12f374493e4ff7e1f70d82c8646ff581a23915cf392051b0915442caa5cabf45",
+          "UserPasswordConfirmationField": "44d09ab8e50d457a911adc1977b4b1261846429d432d93b3fdefc5ce66fa2f4b",
+          "UserPasswordField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserPasswordPlainField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserRoleRoleIDField": "7a972bbc14808919bbd655b3a1452084434445d65aff8ad58958f7d04a1c2762",
+          "UserRoleRoleKeyField": "de7b1fa6f48d3675cc844b12775ebaee55797c49486fd170f84c83dde77f0c12",
+          "UserRoleRoleNameField": "7aa73acc84b709dea6e189fc03ed97d58de2df5dec214f2619218dd336b0cd40",
+          "UserStatus.active": "39df52d249a64fe99319f2051da0de0ad9e7a4c5abad198d50dbb84589868973",
+          "UserStatus.suspended": "743f8e855e9f490781ca32b1c1c08ed5ca47c2ac77c7857e8ebcdf1eeac393ae",
+          "UserStatusField": "5d788017bfe473fd869501b6fab47c5f70558acd54e8edb5fb4be9ef7d2459c7",
+          "UserTenantDoesNotExistNotification": "284504fcce06c0a9b32fce7ba9b37e06fa08944f67ffda2d84b64c94213da7c9",
+          "UserTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "UserTenantIsImmutableNotification": "ba162a3fd5e065f7f544215653ee10336c81b55032f736a7270f2c4de1767e35",
+          "UserTenantStatusField": "0644892045be838bf66fdca4ee54bae73efb464e3ffc91a36e7cd35b723b58dc",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "fe89bd47fff4984d01b52683fb02f46f380fb131a03e079377e634ad7cf56293"
+        },
+        "internal/application/translations/nld.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5aaa53203d630b13a253d7809e228f0ccfda3fc90dc2d33ab2c498f4f9c99fe4",
+          "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "5127086be31099c1528efc2869b4827dc2453419c10d8241ccdb1237b9a6bb81",
+          "CannotJoinWildcardGroupNotification": "1783f9a0a20c36748bc5b60f516aa13262dcca57a897d04fe4bff6939f59c9f3",
+          "GroupNotAvailableInTenantNotification": "b9b2d8e24c3da831046047bab24f87cdebb549b6baefdc1459c0cc4bce6cc157",
+          "InvalidEmailNotification": "19b7b9a5a63e791252779079762ff04aa1910c14bb05a464490532f9ba63e677",
+          "InvalidPersonNameNotification": "dbdd7b5f11ad44249d99e50769ca81d10bccd569604b586cbb125f088740e91d",
+          "InvalidUserStatusTransitionNotification": "335ec7d897220105ab632109fc00a5a069faf3c826fbfeb1a7821578ea8e770a",
+          "PasswordConfirmationMismatchNotification": "b25d280a8300df3bc5348baa1762b6d88fa53f1cb228ec4ea7aa998a5f98dfdd",
+          "PasswordEchoesIdentityNotification": "3c5bdb5274a782a0407f38b6eecd8686ef51908b1d724764b26f35a15885306c",
+          "PasswordUnchangedNotification": "14dd4f80746587e722d52287be464953c15eea76692c714cff8066518c0451f6",
+          "RoleNotAvailableInTenantNotification": "d1ff23480947e06746a163dad3464ec8183e73b91529c58b3746111463e69dab",
+          "TooManyGroupsForUserNotification": "48299ff837044d2bd441cd40509c94e8a822ece5e13aa6602983ba65c4aaa74f",
+          "TooManyRolesForUserNotification": "d0ab949ec490c058a2e7549967398797c544cc38cafcc14a02ec4e3114af8fe1",
+          "UnknownUserStatusNotification": "29ab4c99b2aa8168d9f6513ecaec440ae62593730fd6fac83f7dd50ebd8c2be5",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "d7d6b48743a1888a0d97beafd47d964efd41c2556d1a118790facb93fcd36e38",
+          "UserAlreadyInGroupNotification": "ef2527ad772de28bed023e6cbeede605ca8746bb81f80e6181b5494009c76505",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "29209603faab44e8e2cd502cf2537fea6fbaf0b68ac005dd82f4eb5b2ebc1d40",
+          "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
+          "UserEmailIsImmutableNotification": "46bea914a6ac7de9dabec495e6a8e80e1b495005caaabc8b6d044b48988822a9",
+          "UserEmailVerifiedAtField": "82d4b7e4bb15555c7d6bca1d20f27d8184651956f19d299d9f94862e8de6b474",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "8dfe502550609be300bf00e1eb4d78eda82243e06459a9f6987e8fc3fff219ed",
+          "UserGroupGroupKeyField": "56359e443be43794ffa9acb12ec1686a552f0786d4a874f31862b2ab3693471a",
+          "UserGroupGroupNameField": "78a281711d2e111e67add0a0ebbaf4d0481e97e65d7d3b73ee97f356c0e1e80b",
+          "UserMustChangePasswordField": "c72e4b4db7acaea8d303773f975095b4d3fa81f7614b3bdfb8d119749f60b824",
+          "UserNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
+          "UserPasswordChangedAtField": "25b5ff70f913212d38cd8c8f1fd16e0eae25030b827dcce9cfe318e787ca710e",
+          "UserPasswordConfirmationField": "d6aa9d60c727c4bdb744102b09fe8aee2e78a0c25846f7cc66c7d31b870fa39f",
+          "UserPasswordField": "9a2bca3b828e24f91baa5dd22a49919c14d60efa1375cbdf28ac7b6ff585c2b8",
+          "UserPasswordPlainField": "9a2bca3b828e24f91baa5dd22a49919c14d60efa1375cbdf28ac7b6ff585c2b8",
+          "UserRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "UserRoleRoleKeyField": "1b4b9d98966cfdd6161f2e6dbbbabe8adc7f1450cf97c89f2666f4b8bf958b4a",
+          "UserRoleRoleNameField": "e820a6c2b82d9df7f0fd9ffd23bebfa59ac9dfa3a17d5e62319c1df03ef717c1",
+          "UserStatus.active": "de9f5d2dd16fa56bc228c7c994b1f3fec75c74d49f83e7927f72ca99866a8ced",
+          "UserStatus.suspended": "88fcf0f2a26bf868f18bbacefccd997b4eb1b7d57f79bf521a52cd57a3a9519e",
+          "UserStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "UserTenantDoesNotExistNotification": "4463c354f68143ea934da9025c6a47796c13046dde0e109cc4bc9165137e1c5f",
+          "UserTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "UserTenantIsImmutableNotification": "5ba409ae81cb464d0b0c66d15749ad329978ca7507f69e49170c0c825ad0b88b",
+          "UserTenantStatusField": "450e805433042116dd1688a3a0964163324052973bb18ceb8151cfb90229067c",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "af79ab2845b93800e1c9182570cbd1f9ceefe2e238e785e499e65b18fd0748e3"
+        },
+        "internal/application/translations/ptbr.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "ede20bef362340500e4bef973568e6b11c381f5648933e6f7b03c680a6899ece",
+          "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "f89594b26e9f1a6e7d92b6bf5a1e959507e1eeb189276ca8e47657dff69dc311",
+          "CannotJoinWildcardGroupNotification": "b3d6eeae1918c6192f7a5e097f4bd1d5a11ad24bd809a70c559282b023013dba",
+          "GroupNotAvailableInTenantNotification": "536da32aeee1c04f8adb7ee5d680d5771cf6bddf47ebec67d7a3f450f7f39a39",
+          "InvalidEmailNotification": "e15c5f7edc66bcf1a1ea30b316c0c9b1168993592f9a18af375b06096914b7dc",
+          "InvalidPersonNameNotification": "251fd4db8acae502160971cc10aadf716292ef29281099a1b814a90b8b778b99",
+          "InvalidUserStatusTransitionNotification": "e30fe178a7841ccfa4e98f47ff3da736824fc6c6c07d30c053cc2afe0bfe2c00",
+          "PasswordConfirmationMismatchNotification": "399630f63b714c05fe0f42a468642a5d3311f0cd918a1104d6394663da4926c1",
+          "PasswordEchoesIdentityNotification": "f46214c5171862631286276491c7e90ca5516d154ff859b2cec879f92423c666",
+          "PasswordUnchangedNotification": "2ca819df9b2c221eb2b52b1716027ff5524c9ee61f9b44ed950a5b3b03cc24c2",
+          "RoleNotAvailableInTenantNotification": "8310c646c18bd3744fa415b87ced63c54870656b6636e2c923a447dba50af665",
+          "TooManyGroupsForUserNotification": "453beab14d93b07ad236d64be67d83615537521526f1d3bea67c407c6efe094d",
+          "TooManyRolesForUserNotification": "044b83a14603d2b95f3794c5a8182493082be3eb73b1e42536b8f088c17f365e",
+          "UnknownUserStatusNotification": "602c6e2eb0d49c3589a424676ac93463c4523f290cc84f3c22e51efb18cad411",
+          "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "UserAlreadyGrantsRoleNotification": "6ec4d47e5fdd6c7e4303d00c6c1439fcf967de8eaea90ab30571f7479bc6b87b",
+          "UserAlreadyInGroupNotification": "eff8abb233bc3eb405e537e06cb6b12d56d3b56ea454169176697b22904f8727",
+          "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserEmailAlreadyExistsNotification": "0acee3000c1a49d028d0ddf849ba31e472be58d44ebede913817f71a97b007a7",
+          "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
+          "UserEmailIsImmutableNotification": "84c4366010b16b39b73cdb272baed8dbbabcaa94d9109e046c186c1d48a90072",
+          "UserEmailVerifiedAtField": "a952fea66d210d4d0b81e2e90348f9ad38c0bc831360e32e5cbb7bda4aed2cb9",
+          "UserFamilyNameField": "54dee42feb43dc2ad9ead199c05e4f5a3b34865477f2156793d1cbf448883078",
+          "UserFullNameField": "8e00cdf71fa7cc76882846b180305bb5bc1d658057630d4f87bb12c07754c30b",
+          "UserGivenNameField": "39b8df680df59c17f9d1b1fbe248f7c604f199bc1009a3af53a59859e194ddf5",
+          "UserGroupGroupIDField": "399b037dab0f8a847147f864831616a27147104f43ddcbce8cd0f087b1a5328f",
+          "UserGroupGroupKeyField": "defc3b928a81eea569ea3e60b4289143c6a3d4d5558ac26d2bfc3054177a9070",
+          "UserGroupGroupNameField": "ee564313c7f3b3b4fce8cb591619853a212fb5b83d632ee9ae7577203b2752bb",
+          "UserMustChangePasswordField": "e9a6756557b8d96c39a1ea1eb2eaeb551476de9d975de4276bb26bfc53375f0a",
+          "UserNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "UserPasswordChangedAtField": "152db6f7accd2e618543cb6de7ed8b99837246172b053c9cc975ebc4e17f8ddb",
+          "UserPasswordConfirmationField": "4e8532b4fd8ace99419a8ccd75a55f0a21e8865f10f264e3288bd167801ca0c8",
+          "UserPasswordField": "d482c10b3d4d2a198042e6c042e7a6d292dd4d4abd4bf7820813fcc316135063",
+          "UserPasswordPlainField": "d482c10b3d4d2a198042e6c042e7a6d292dd4d4abd4bf7820813fcc316135063",
+          "UserRoleRoleIDField": "e0165d8a6de1b4e2ed0eff3a2c23366ddb907a5a3420d5a51e4c9af07c65b5a8",
+          "UserRoleRoleKeyField": "e2c3d45a9df20c6ea3e72a95f3285c120349ed105f507c9fa6385d86d8ebf293",
+          "UserRoleRoleNameField": "8ec37951ad70acfed151996741f845e33ea7a7cc444cc127884859a7ba76fed5",
+          "UserStatus.active": "499ee302f6884f271c02454123715953dc245991fead15d51ee12c5e4f405bc6",
+          "UserStatus.suspended": "2d605a7bf3e4a32cc87091f76ece58ba653df84dc410be4286ca7e97e0f73b80",
+          "UserStatusField": "cf7d46ded085ce31f8c37c963b3504f6f56d9ef089b926c25f5bf12b5aa313ee",
+          "UserTenantDoesNotExistNotification": "8b837b2ae98073466d7e58290f00500b7815cc932a477d5622b9668b37132c30",
+          "UserTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "UserTenantIsImmutableNotification": "0fdb757ffb9355011fb7eb347f060a3219729504ad44a6d245558ca4babb2918",
+          "UserTenantStatusField": "e231aa5fa3f16369ceeddffbdae31020f1289148197aa49a6573555210f3b776",
+          "UserTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "UserUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "WeakPasswordNotification": "692c55f6a46159fdabc6895babc0430c173718cb7704fa6bb4a471d5ddbc6c0d"
+        },
+        "internal/domain/notifications.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "cc8cd97e7eb17840a5c05d9b2a0cf9d829cd6432d7315bd57ead872f43399b2c",
+          "CannotGrantWildcardRoleNotification": "d355145da4cea2a0f64df3aa1134355d5e61b1015aefa678f3cd08564643a09d",
+          "CannotJoinGroupWithUnheldPermissionsNotification": "e8b65afb780527d292822f83f72173d70dc469f0f9dbc8f364efd48a9a007ebd",
+          "CannotJoinWildcardGroupNotification": "47f897c6584e876f1600e81d3c4e7196c708c4683c0837068bc3afb3f850a706",
+          "GroupNotAvailableInTenantNotification": "253f2f97ac59cb4041ebcdfd55829371a590a4d51d241d7888148ef0dbbb4945",
+          "InvalidUserStatusTransitionNotification": "6f86f4ccc9461da7c1c1189c573116414cdd5009ac5a66bf2a188c600ee193f1",
+          "PasswordConfirmationMismatchNotification": "2db50190347ac3d620ceb60200bf7f1a0f2cf9de34c1c8a1758590fcffd592a0",
+          "PasswordEchoesIdentityNotification": "4243c6b070b97558ae32bad2b16bd01d77efa26edfb407db5cfe27431d178620",
+          "PasswordUnchangedNotification": "f074f1cbc7e3c001a06a8197d6687e5fa2042e311bc3e7df176ff7dca12fe3ae",
+          "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",
+          "TooManyGroupsForUserNotification": "c3af6af4297cb8e2b3d5150d936a13e7b469ae09c404f8cfbe1eabd8994da72f",
+          "TooManyRolesForUserNotification": "d55408f3972b7797d7c4377c06cb50622d9e8b69d066164daed6ea5c97467da8",
+          "UserAlreadyGrantsRoleNotification": "c65026bb169504e9e69e4f4edbacaab10317139bce797ac0b0db2c9057909e7e",
+          "UserAlreadyInGroupNotification": "c6597275d515824635250b9efcc30474617db7945099afaaf74c9686f1625463",
+          "UserEmailAlreadyExistsNotification": "28c2e3e6b239055bb832375f89c1630073b4e73fa6ccfbe9b3b88c06304a07ac",
+          "UserEmailIsImmutableNotification": "b1fc86c8f1e048604074a85baad7c56276fd7c2d989afc7b9afca227118dbdfc",
+          "UserTenantDoesNotExistNotification": "f55973de111b89157ea0f8cd823d860965bd390b1c9888398751cb1cb3957dec",
+          "UserTenantIsImmutableNotification": "8bcf420379444b7a659c66327d5fb6e0989353ccd403f2d5719a82f164d712d6"
+        },
+        "internal/domain/vos/notifications.go": {
+          "InvalidEmailNotification": "0a12c87889a0e4a7cb9c23711cbe1bd03e1d3bbedc0aded1a585514b8249bd24",
+          "InvalidPersonNameNotification": "724c6f0c11934f354fe3320ad4276b95d01adb6380ceb367d79f49a0a76ddac0",
+          "UnknownUserStatusNotification": "1dce2d6e9cbd6800ef05b165c3bd92fdbbd45ae27f869c8450e3fcc6cdb81b06",
+          "WeakPasswordNotification": "fd456b004264682f377912c10d26d78251b4189fddff155c32642e479e3fc7ad"
+        }
+      }
     }
   }
 }

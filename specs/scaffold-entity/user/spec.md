@@ -10,10 +10,11 @@
   sides so a future reader sees a decision rather than an oversight
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
-- **Generation:** `<pending>` — gate 1d, and **read §D first**: this is the first entity in
-  the service whose central field (the password) has **no spelling in the generator's spec
-  language** today
-- **Pin:** omnicore **`v0.60.0`** · `omnicore-gen` **0.39.0** · dialect postgres · Postgres
+- **Generation:** `omnicore-gen` **0.40.0** — chosen by the maintainer at gate 1d, 2026-08-26:
+  *"usar o omnicore-gen para tudo que for possível; o que não for possível, faz a mão."* The
+  two gaps that made this choice awkward were reported upstream and fixed before it was made
+  (§D); what remains hand-written is the boundary §D's own table names, not a workaround.
+- **Pin:** omnicore **`v0.60.0`** · `omnicore-gen` **0.40.0** · dialect postgres · Postgres
   SoR, no Mongo, no broker → relational-served views. Same posture every existing entity
   was built under
 - **AMENDED 2026-08-25, at the model gate, before approval** — two maintainer instructions,
@@ -48,20 +49,21 @@
 |---|---|---|
 | **Q0** Storage | **flat `users`** | §1 stands as proposed |
 | **Q1** Membership | **two collections on `User`** | `user_groups` + `user_roles`, §3. The reverse question ("who is in Engineering?") waits for Mongo — accepted |
-| **Q2** Password at create | **yes** | the transient pair is needed → §D's generator gap is live |
+| **Q2** Password at create | **yes** | the transient pair is needed. **The gap that made this expensive was fixed upstream at `omnicore-gen` 0.40.0** — §D |
 | **Q3** Password policy | **composition rules, as asked — 8+ runes and ALL FOUR classes** | `vos.Password`. NIST-4 says the opposite; the maintainer's call, made knowingly. §B Q3 keeps the record |
 | **Q4** Hashing | **Argon2id, OWASP baseline, NO pepper** | m=19 MiB, t=2, p=1, PHC in `VARCHAR(255)` |
 | **Q5** Extra fields | **`status` · `passwordChangedAt` · `mustChangePassword` · `emailVerifiedAt` · `givenName` · `familyName`** | `externalId` stays out. ⚠️ `emailVerifiedAt` has **no writer in this model** — see the note under §2 |
 | **Name shape** | **a COMPOSITE `vos.PersonName` over `given_name` + `family_name`, no standalone `name` column, and the full-name method lives INSIDE the value object** *(maintainer: "não precisa do name solto" → "faz um VO composto e coloca o método para pegar o nome lá dentro, aí seguimos os padrões")* | exactly `Permission`'s shape (`PermissionKey` over two columns + the rendered token as a computed read field). `name` is served as a **computed read field**, both parts stay filterable and sortable on their own. §2 |
 | **Q6** `email` | **IMMUTABLE** | U2 becomes insert-only; a new immutability rule; §8's patchable set shrinks; the open endpoint's lookup key is now permanently stable |
 | Password ops | **redesigned** — open CHANGE by e-mail, identity-gated RESET | §B Q2, §E |
-| `TenantID` source | **conditional (U1b)** | superadmin names it; a tenant caller inherits it from the claim |
+| `TenantID` source | **conditional (U1b)** | superadmin names it; a tenant caller inherits it from the claim. **Declarative since `omnicore-gen` 0.40.0** (`bypassMaySet: true`) |
 | Read joins | **all three** | root→`tenants`, child→`groups`, child→`roles` |
 | Archive | **forces `suspended`** (U15) | mirrors `Tenant` |
 
+| **The public change-password route** | ⚠️ **REMOVED 2026-08-26.** §B Q2 and §E describe it; it no longer exists. The premise it was built on — a caller who cannot obtain a token — does not hold in a service with no login route. It duplicated the reset without a token, and what it was reaching for is a forgot-password flow nobody has started. Read §E as the record of a decision that was reversed, not as a description of the code | tasks.md deviation 8 |
 | **Route naming** | **as proposed** — the OPEN one is the CHANGE (`PATCH /users/password`, verifies the current password); the JWT one is the RESET (`PATCH /users/{id}/password-reset`, does not) | §B Q2 |
 | **Public route path** | **`PATCH /users/password`**, kept inside the `/users` resource | ⚠️ it **collides** with `PATCH /users/{id}` — `password` matches `:id` — so it MUST be registered first, and that ordering is now a hard acceptance check, not a comment. §E |
-| **Reset posture** | **self (`sub` == `:id`) · `*:*` · OR `user:reset-password`** | the sixth verb is BACK. A tenant can run its own helpdesk without whoever edits a name being able to take an account. §10 |
+| **Reset posture** | ~~self · `*:*` · OR `user:reset-password`~~ → **`user:reset-password` alone** *(amended 2026-08-26)* | `*:*` satisfies it for free. The self acceptor was removed once it was PROVEN — by booting with `auth.authorization.enabled: true` — that the framework refuses a non-public route with no declared permission, and that `RequirePermission` expresses exactly one. The security reading agrees: a user who knows their password uses the CHANGE endpoint; one who does not is who needs a helpdesk, and a session replacing a credential without proving the previous one is the attack `currentPassword` exists to stop. §10 |
 | **Brute force** | **`failedLoginAttempts` + `lockedUntil` taken NOW** | §C-4 is no longer deferred — the open endpoint is the writer it was waiting for. New fields in §2, new rules U7h/U7i in §7, and lockout answers the SAME generic 401. §E |
 
 **No ⚠️ OPEN slot remains.**
@@ -498,12 +500,12 @@ INDEX  (group_id) · INDEX (role_id)                   -- the reverse walk, when
 | `TenantID` | `domain.ID` | plain (an id) | no | no | root | `0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410` | The tenant this user belongs to. **Conditional source (U1b): a `*:*` superadmin names it in the body; a tenant caller INHERITS it from their own `tenant_id` claim.** Immutable after creation — a user never moves between tenants |
 | `Name` | `vos.PersonName` | **new-COMPOSITE** `vos.PersonName` | no | no | root (**2 columns**) | — | The person's name. **ONE value across two columns** — see the parts below |
 | `Email` | `vos.Email` | **new-raw** `vos.Email` | no | **yes, GLOBALLY, active-only** | root | `maria@acme.com` | The address this person signs in with. Unique across the whole platform; **immutable after creation** (U2b); archiving the user releases it |
-| `EmailVerifiedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the address was proven reachable. ⚠️ **Nothing in this model writes it** — see the note below |
+| `EmailVerifiedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the address was proven reachable. ⚠️ **Nothing in this model writes it**, so it reads `null` — see the note below. It was briefly forced non-nullable by a generator rule, fixed upstream at 0.42.0 (`tasks.md` deviation 1) |
 | `PasswordHash` | `string` (255) | plain | no *(nullable under Q2-B)* | no | root | *(never shown — see below)* | The irreversible hash of the password, PHC-encoded so its parameters travel with it. `assignedFrom: derived` + `hidden` + **`redact` on both axes** — absent from every write request, from every response body, from the audit event and from the sync payload |
 | `PasswordChangedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the credential was last set. NULL only for a user who has never had one |
 | `MustChangePassword` | `bool` | plain | no | no | root | `true` | Whether the next sign-in must rotate the password. Set by create and by the reset, cleared by the open change |
-| `FailedLoginAttempts` | `int` | plain | no | no | root | `0` | Consecutive credential failures on the open endpoint. Incremented by U7h, zeroed on success. **Never on the wire** — `hidden` |
-| `LockedUntil` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:18:00Z` | When the lockout expires; NULL means not locked. Set by U7h, honoured by U7i. **Never on the wire** — `hidden` |
+| ~~`FailedLoginAttempts`~~ ⚠️ *(removed with §E)* | `int` | plain | no | no | root | `0` | Consecutive credential failures on the open endpoint. Incremented by U7h, zeroed on success. **Never on the wire** — `hidden` |
+| ~~`LockedUntil`~~ ⚠️ *(removed with §E)* | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:18:00Z` | When the lockout expires; NULL means not locked. Set by U7h, honoured by U7i. **Never on the wire** — `hidden` |
 | `Status` | `vos.UserStatus` | **new-enum** `vos.UserStatus` | no | no | root | `active` | `active` \| `suspended`. Suspension blocks sign-in and keeps the row listed; it is **not** archiving |
 
 Parts of the composite `Name` — written as a nested list, never as two `§2` rows, because
@@ -955,9 +957,9 @@ irreversible purge and nothing else.
 | U5 | `Password`, `PasswordConfirmation` | **The two typings must match.** The invocation's confirmation requirement | `IfInsert` + both password operations | `PasswordConfirmationMismatchNotification` | 422 |
 | U6 | `Password` | The policy of §B Q3 — length floor/ceiling, classes if Q3-B, no leading/trailing whitespace | — | **not declared here** — `vos.Password` validates by type on every write that carries one. Declaring `required` beside it would tell the caller the same thing twice | 422 |
 | U6b | `Password`, `Email`, `Name` | **Context rule.** The password must not contain the e-mail's local part, nor any ≥4-rune word of `Name.Given` or `Name.Family`, case-insensitively | `IfInsert` + both password operations | `PasswordEchoesIdentityNotification` | 422 |
-| **U7g** | `Email`, `CurrentPassword` | **CREDENTIAL BARRIER, on the open CHANGE only.** The address must resolve to a live user **and** the current password must verify — and the two are ONE question with ONE answer: *"usuário ou senha inválido"*. `guard: true`, declared FIRST, so nothing below it runs and no second notification can leak which half failed | the open change operation | `InvalidCredentialsNotification` | **401** |
-| **U7i** | `LockedUntil` | **Runs INSIDE U7g, before the hash comparison.** A locked account is refused — and refused with the **same generic answer**, so a lockout is not a signal either | the open change operation | `InvalidCredentialsNotification` (the same one) | **401** |
-| **U7h** | `FailedLoginAttempts`, `LockedUntil` | **On every U7g failure: increment; at 5, set `LockedUntil = now + 15 min` and reset the counter. On success: zero both.** A write that happens on a request that FAILED — the one place in this entity where that is true | the open change operation | — (a mutation) | — |
+| ~~U7g~~ ⚠️ *(gone with §E)* | `Email`, `CurrentPassword` | **CREDENTIAL BARRIER, on the open CHANGE only.** The address must resolve to a live user **and** the current password must verify — and the two are ONE question with ONE answer: *"usuário ou senha inválido"*. `guard: true`, declared FIRST, so nothing below it runs and no second notification can leak which half failed | the open change operation | `InvalidCredentialsNotification` | **401** |
+| ~~U7i~~ ⚠️ *(gone with §E)* | `LockedUntil` | **Runs INSIDE U7g, before the hash comparison.** A locked account is refused — and refused with the **same generic answer**, so a lockout is not a signal either | the open change operation | `InvalidCredentialsNotification` (the same one) | **401** |
+| ~~U7h~~ ⚠️ *(gone with §E)* | `FailedLoginAttempts`, `LockedUntil` | **On every U7g failure: increment; at 5, set `LockedUntil = now + 15 min` and reset the counter. On success: zero both.** A write that happens on a request that FAILED — the one place in this entity where that is true | the open change operation | — (a mutation) | — |
 | U7b | `Password` | On both password operations: the new password must not verify against the stored hash | both password operations | `PasswordUnchangedNotification` | 422 |
 | U8 | `Groups[].GroupID` | Every joined group must exist, be **active**, and belong to **this user's tenant** — one rule, one message | `IfInsertOrUpdate`, over the entries this write ADDS | `GroupNotAvailableInTenantNotification` | 422 |
 | U9 | `Roles[].RoleID` | Every directly granted role must exist, be **active**, and belong to **this user's tenant** | `IfInsertOrUpdate`, over the entries this write ADDS | `RoleNotAvailableInTenantNotification` — **reused**, already declared and translated for `Group` | 422 |
@@ -1378,7 +1380,7 @@ user themselves and a platform operator can reset a password once `auth.authoriz
 | grant a role | `POST /users/:id/roles` | **`user:grant`** |
 | revoke a role | `PATCH /users/:id/roles/:childId/archive` | **`user:grant`** |
 | **change own password** | `PATCH /users/password` | **PUBLIC — no token, no permission.** `auth.publicRoutes`; the current password is the credential. §E |
-| **reset a password** | `PATCH /users/:id/password-reset` | **`sub` == `:id` · OR `*:*` · OR `user:reset-password`** |
+| **reset a password** | `PATCH /users/:id/password-reset` | **`user:reset-password`** (a `*:*` claim satisfies it) |
 
 **`user:grant` covers both collections, and that is a decision.** Splitting it into
 `user:grant-group` and `user:grant-role` would let a deployment delegate the two edges
@@ -1450,7 +1452,20 @@ identity in production.
 
 ---
 
-## §E — The open change-password endpoint
+## §E — ~~The open change-password endpoint~~ · ⚠️ REVERSED, THE ROUTE DOES NOT EXIST
+
+> **Read this section as a record, not as a description of the code.** The endpoint it
+> specifies was built and then REMOVED on 2026-08-26, with everything exclusive to it
+> (`tasks.md` deviation 5). Its whole premise — that somebody needing a new password might be
+> unable to obtain a token — does not hold in a service with no login route: nothing here
+> blocks authentication for a caller who knows their password, so the endpoint did what
+> `PATCH /users/{id}/password-reset` does, without a token. What it was reaching for is a
+> FORGOT-PASSWORD flow (e-mail, an expiring link), which nobody has started.
+>
+> Everything below about the generic answer, the timing guard, the lockout and the rule
+> order is therefore **the reasoning for a route that is gone**. It is kept because that
+> reasoning is what the forgot-password work will need, and because deleting the argument
+> would hide that the decision was reversed rather than never made.
 
 *(Its own section because an unauthenticated write into a credential table is a security
 surface, not a table row. Decided by the maintainer at the gate; everything below is the
@@ -1679,6 +1694,61 @@ to the schema file, which is the worst kind — a `TableSchema` is regenerated o
 
 The gap below is **unchanged** between the two builds; the wording is byte-identical:
 
+### ✅ CLOSED at `omnicore-gen` 0.40.0 — both asks landed
+
+*(2026-08-26. The maintainer took the report upstream and fixed it; the spelling is the one
+proposed, `claim` kept as the default so no existing spec moved.)*
+
+| Ask | Landed as | Verified |
+|---|---|---|
+| the body-fed, non-persisted field | **`runtime: true` + `source: body`**, with **`modes: [insert]`** naming which write verbs carry it (omitted = every write verb the entity has; `update` covers both update shapes, because the rule gates cannot tell them apart either) | a probe spec declaring one passes `check` with no blocker |
+| the conditional owner source (the secondary ask) | **`assignedFrom: identity-claim` + `bypassMaySet: true`** — the server reads it off the caller's identity, and *"the caller who crosses the ROW SCOPE states this value instead"* | `explain coverage` now lists *"a server-assigned scope that yields to the bypass"* |
+
+**And the guarantee this spec most wanted is now stated by the tool itself**, in
+`explain vocabulary`: a `source: body` field *"crosses the write DTO, the command and the
+entity for a rule to check, and **NO column, payload, audit event or response ever sees
+it**"*. That is §2's four-copies rule, enforced by the generator instead of by four separate
+declarations plus vigilance — the plaintext and the confirmation now cannot leak into a
+payload or a trail even by mistake, because there is no column for them to be redacted FROM.
+
+**What this changes in this spec: two rows leave the hand-written list, and U1b stops being
+a hand-written mapper.** Everything else below stands. The record of how the gap was
+established is kept, because it is what the fix was written from.
+
+### How the gap was established — by running the tool, not by reading its documentation
+
+*(The maintainer challenged this at the gate — "the idea is simple: put it on the entity, the
+DTO and the command, and just leave the confirmation out of the TableSchema; is THAT what the
+generator cannot do?" It is, and the first draft of this section argued it from the key
+documentation. Below is the same claim re-established from `omnicore-gen check` output on
+three probe specs. **The design he described is exactly what §2 specifies; what follows is
+only about whether the generator has a word for it.**)*
+
+| Probe | `omnicore-gen 0.39.0 check` answers |
+|---|---|
+| a field with `runtime: true` and no `claim` | ✗ blocker — *"a runtime-only field does not say which claim it comes from → name it, e.g. `claim: email`"* |
+| a field with neither `runtime` nor a column | ✗ blocker — *"the column name is required"* |
+| a field with `runtime: true` **and** a `claim` | ✓ accepted |
+
+**So the field model has exactly two states — persisted (a column is mandatory) or
+runtime (a claim is mandatory) — and no third.** The third is the one this entity needs:
+present on the entity, on the request DTO and on the command, absent from the
+`TableSchema`.
+
+**And a claim would not rescue it either.** A runtime field is filled *in the command mapper
+from the identity*, never from the body — verified against this project's own generated code:
+`Group`'s `RequestingTenant` appears on the domain entity and in every command mapper and in
+**no request DTO at all**. Giving the password an invented claim name would produce a field
+the caller cannot send.
+
+**There is no manual escape for a field.** `kind: manual` exists for a value object and
+`rules.manual` for a rule; `explain keys` has no equivalent for `fields[]`. So the three
+credential inputs have no hook file to live in, and a regeneration would erase them from any
+emitted file they were added to by hand — which is what makes option **iii** below the worst
+of the three rather than merely inelegant.
+
+### The gap in one sentence
+
 `omnicore-gen 0.39.0` has exactly one spelling for a field that is not persisted:
 
 > `fields[].runtime` — *"Runtime marks the field as runtime-only: never persisted, **fed from
@@ -1716,15 +1786,47 @@ They compose: ii today, and this entity re-generates cleanly once i lands.
 | **Both password operations** (§B Q2 / §E) | a custom command per `custom-command-handler.html`. Neither is a shape the generator has: the CHANGE is **routeless-by-id, public, and looks up by e-mail**; the RESET is gated on identity (`sub` == `:id` or `*:*`) rather than on a permission, and `authz.permissions` only maps operations to permission literals | `internal/application/commands/` + `internal/web/user_routes.go` |
 | The `publicRoutes` entry for the open endpoint | a boot-configuration line, not code — `auth.publicRoutes` in **both** `microservice.dev.yaml` and `microservice.prd.yaml`. **Omitting it in prd is a boot failure** once `authorization.enabled` is on, which is the good direction | the two profile yamls |
 | The **dummy-hash constant-time path** on an unknown e-mail (§E) | there is nothing to declare — it is a deliberate wasted Argon2id call, and no spec language has a word for "do useless work on purpose" | `internal/infra/` — the `PasswordHasher` adapter |
-| **U1b's conditional tenant source** (§7) | `assignedFrom: identity-claim` fills the field ALWAYS and, in the generator's own words, *"the server fills it, so no write request carries it"* — which removes it from every DTO and makes the superadmin case inexpressible, the exact failure `Role` shipped and `Group` documented. A source that depends on `authz.bypass` has no spelling. **Reported as a generator observation, not routed around** — the clean shape would be an `assignedFrom` that yields to the bypass | the command mapper hook + `internal/domain/user_rules_manual.go` |
-| **U7h / U7i — the lockout** | `rules.manual`, and it is the one shape no rule DSL has a word for: **U7h persists a counter on a request the domain REJECTED**. Every other write in this service happens because the domain accepted the operation | `internal/domain/user_rules_manual.go` + the open change command |
+| ~~U1b's conditional tenant source~~ (§7) | **CLOSED at `omnicore-gen` 0.40.0** — `assignedFrom: identity-claim` + `bypassMaySet: true`: the server reads it off the caller's identity, and the caller who crosses the row scope states it instead. Reported upstream rather than routed around, and fixed | generated |
+| **U7i — the lock check** | `rules.manual`. An ordinary probe, run inside the credential barrier | `internal/domain/user_rules_manual.go` |
+| **U7h — the failure counter** | **NOT a rule at all, and the first draft was wrong to file it as one.** It persists on a request the domain REJECTED, and a rejected aggregate write persists nothing — so it cannot live in `BuildRules` on any path. It is the custom handler's failure branch issuing **its own** write before returning the 401 | the open change command handler |
 | **U15** (archive forces `suspended`) — *listed above* | | |
 | The three cross-aggregate foreign keys | a reference to ANOTHER aggregate is outside the spec language — the generator writes the parent key only | the `users` migration's `_manual.up.sql` |
-| The **global** partial unique index on `email` | the generator scopes uniqueness by the fields the spec names; a global active-only index on a tenant-scoped entity is the exception this project has | same migration hook |
+| ~~The global partial unique index on `email`~~ | **CORRECTED — it IS generated.** `fields[].unique.within` is optional and names the fields uniqueness is scoped BY; omitting it gives a global index, and `scope: active-only` gives the partial predicate. The first draft listed this as hand-written from an assumption, not from the key documentation | generated |
 
 **The read joins are NOT in that list.** `joins:` is a first-class key of the spec language,
 so all three traversals of §2 are generated — declaration, entry-struct fields, DTOs and the
 `?fields=` vocabulary — with nothing adopted and nothing hand-written.
+
+### What stays hand-written EVEN AFTER the generator gains a body-fed field
+
+*(Asked at the gate while the generator fix is being written. Answered against
+`explain coverage` and `explain keys` at 0.39.0, not from memory. The `source: body` change
+removes exactly one row from the list below — the three credential inputs — and nothing
+else.)*
+
+| Still hand-written | Why the generator cannot, verified | Is it a designed escape or a gap? |
+|---|---|---|
+| **The two credential operations, end to end** — command, handler, request and response shapes, route, tests | `authz.permissions` keys are a **closed set**: insert, update, patch, delete, archive, unarchive, read. There is no key for a custom operation, so there is no way to declare one at all — let alone one that is **public**, one identified by **e-mail instead of the row id**, and one whose gate is **three acceptors** (self OR bypass OR a permission) where the language maps an operation to exactly one literal | **a gap**, but a much bigger one than the field — this is "custom operations" as a feature, and `custom-command-handler` is the framework's own answer to it. Not worth asking for |
+| **The password hasher port and its Argon2id adapter**, including the constant-cost path on a missing address | not a framework concept at all — the framework states it never sees a password | designed: it is ordinary consumer code |
+| **`vos.Password`** | a raw VO's declarative rules are `required · length · range · comparison · requiredIf` — **there is no pattern kind**, and a four-character-class rule would not be one regex even if there were: Go's regexp engine has no lookahead, so "contains at least one of each class" is not a single pattern | designed: `written: manual` |
+| **`vos.Email`** | same — a format check has no declarative kind | designed: `written: manual` |
+| **`vos.PersonName`** (the composite) | its length bounds ARE declarable via the composite's own rule list; the anti-junk predicates are not | designed: `written: manual`, though the length halves could be declared |
+| **The rules needing a cross-aggregate probe or the hasher** — U3, U6b, U7b, U7g, U7i, U8, U9, U12a/b, U13a/b | `rules.manual` is the designed hook for exactly this | designed |
+| **U15** (archive forces `suspended`) | the rule DSL states refusals; this is an assignment | designed: `rules.manual`, and `Tenant` already ships the identical shape |
+| **U7h** (the failure counter) | it persists on a **rejected** request. Not expressible anywhere, because a rejected write persists nothing — it belongs to the custom handler's failure branch | falls out of the custom-operation gap above |
+| **The bodies of the nine service facts** | `service.facts[].kind: manual` with a declared `returns` — the **port method and its signature are generated**, only the body is yours | designed, and cheaper than it looks |
+| ~~U1b's conditional owner source~~ | **CLOSED at 0.40.0** (`bypassMaySet: true`) | generated |
+| **The two cross-aggregate foreign keys** | the generator writes the parent key only | designed: the migration hook |
+| **The public-route declaration in both profiles** | boot configuration, not code | designed |
+| **The mount order** between the public route and the by-id route | one is generated and one is not; ordering between them is a wiring concern | designed |
+
+**What the `source: body` fix DOES buy**, so the change is not undersold: the entity struct,
+the request DTOs, the commands and their mappers, the whole read side, the schema, the three
+traversals, the migrations, the wiring, the seven catalogs and the generated tests all come
+out of the generator with **nothing adopted** — including the create operation, which is the
+one that carries the password. What is left by hand is the two credential operations and the
+list above, all of it in hook files and in ordinary consumer code that a regeneration never
+touches.
 
 ### Traps to check against the emitted code
 

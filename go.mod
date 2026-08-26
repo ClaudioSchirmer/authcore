@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/ClaudioSchirmer/omnicore v0.60.0
 	github.com/gofiber/fiber/v3 v3.3.0
+	golang.org/x/crypto v0.51.0
 )
 
 require (
@@ -82,7 +83,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect

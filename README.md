@@ -26,7 +26,7 @@ and a standing "which of these two UUIDs is this?" question, in exchange for hid
 creation timestamp. One key is the better trade.
 
 Go module: `github.com/ClaudioSchirmer/authcore` · Go 1.26.5 · built on
-[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.57.0** (DDD + CQRS framework).
+[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.60.0** (DDD + CQRS framework).
 
 ---
 
@@ -37,18 +37,20 @@ Honest scope, so nobody reads intent as delivery:
 | Capability | State |
 |---|---|
 | Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — six REST endpoints and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/tenant.omnicore.yaml` against the model in `specs/scaffold-entity/tenant/spec.md`. Build, vet and the unit suite are green, and the service has been booted against Postgres with a tenant registered through the API. The contract suite (`/omnicore:qa`) is still to come |
-| User entity | not started |
-| User ↔ tenant association | not started |
+| `User` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing), four collection ops (join/leave a group · grant/revoke a role), **one credential operation** (password reset) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/user.omnicore.yaml` against the model in `specs/scaffold-entity/user/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
+| User ↔ tenant association | **built** — `users.tenant_id` NOT NULL, FK to `tenants.id`, filled from the caller's `tenant_id` claim and nameable in the body only by a `*:*` operator crossing the scope |
+| Self-service password change | **not started** — and the endpoint that briefly pretended to be it was removed. It needs a forgot-password flow (e-mail, expiring link) or an authenticated change carrying the current password; neither exists |
+| User ↔ group / User → role membership | **built** — two owned collections with per-entry join/leave and grant/revoke, both gated on `user:grant` and both refusing an escalation the caller does not already hold |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
-| `Group` entity | **specified, not built** — a tenant's org unit and the bundle of roles its members inherit; model in `specs/scaffold-entity/group/spec.md` |
-| Effective-permission resolution (group path ∪ direct path) | not started |
+| `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
+| Effective-permission resolution (group path ∪ direct path) | not started — **and it is now the next thing worth building.** Both arrows exist in the data; nothing yet walks them into one set. It is what turns this model into a token |
 | Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
-| Token issuance with the `tenant_id` claim | not started — the value it must carry is `tenants.id`. Nothing in the code enforces that yet |
+| Token issuance with the `tenant_id` claim | not started — the value it must carry is `tenants.id`. Nothing in the code enforces that yet. **The subject it would mint for now exists**; the minting path does not |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Generated code | **Tenant, Permission and Role.** `internal/` holds all three aggregates end to end — domain, application, web, infra, migrations `0001` to `0003`, wiring and the seven catalogs. The `Group` section below still describes what its model says, not what a caller can hit |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) is still model-only. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant` is the one nobody will guess from the pattern |
+| Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential path: the password hasher, the two credential operations and the rules behind them are hand-written, and `specs/omnicore-gen/user.gen-report.md` lists every piece |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**six** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant` and `user:reset-password` are the three nobody will guess from the pattern. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -78,8 +80,9 @@ the posture in one pass.
 
 ### The shape we are building towards
 
-Nothing below exists in code yet. It is the agreed target, recorded here so a reader can
-see the destination without reverse-engineering it from a half-built service:
+**Every node and every arrow below now exists in code.** What does not exist yet is the
+walk itself — nothing resolves a user into one set of effective permissions, and nothing
+mints a token from it. The picture is the destination, and it is now also the schema:
 
 ```
                         ┌──> Group ──> Role ──> Permission     (inherited, via group)
@@ -90,7 +93,10 @@ User ───────────────────┤
 ```
 
 A user's **effective permissions** are the union of both paths — the roles reached through
-their groups, plus the roles granted to them directly. There is no precedence and no deny
+their groups, plus the roles granted to them directly. **Both paths are stored and served;
+neither is resolved.** `GET /users/{id}` answers with the groups and the direct roles, each
+carrying its key and label, and walking those into a permission set is the piece that comes
+next. There is no precedence and no deny
 rule: a permission is held or it is not.
 
 Every arrow between `User`, `Group`, `Role` and `Permission` is many-to-many. The one
@@ -125,6 +131,12 @@ own domain; if self-employed customers ever become normal here, the answer is no
 loosen this index but to split the credential from the membership — a global `Identity`
 holding e-mail, password and MFA, with `User` demoted to the per-tenant link. Recorded as
 the escape hatch, not as a plan.
+
+**The address is immutable.** A user cannot change their e-mail through this API at all —
+it is absent from the patch body, not merely refused by a rule — so the login handle, the
+global unique key and the lookup the public change-password route resolves by are all one
+value that never moves. The cost is stated where it lands: correcting a typo means
+archiving the user and creating them again, which loses every group and role they had.
 
 Uniqueness is over **active** rows: archiving a user releases the address, so a company
 that reassigns `joao@acme.com` to a new hire can register them. Unlike the tenant workspace,
@@ -509,6 +521,138 @@ claim. The rejected alternative is worth naming here specifically: reads-open is
 leak each customer's org chart to every other customer, and a group listing **is** the org
 chart.
 
+### User
+
+A person's account inside exactly one tenant: the thing a token is minted for, the thing
+`tenant_id` is read off, and the **only place in this service that holds a credential**. It
+is the first node of `User → Group → Role → Permission` and the last one built. Flat
+aggregate, table `users`, with two owned collections — `user_groups` and `user_roles`. Its
+approved model, with the alternatives that were rejected and why, is in
+`specs/scaffold-entity/user/spec.md`.
+
+Structurally it is **`Group` with two collections instead of one, plus a secret**. The
+tenant-owned flat root, the id-only child rows with the counterpart read across the foreign
+key, the per-child pair of verbs, the one-way archive and the tenant isolation are all
+inherited unchanged. Everything that is NOT a copy of `Group` is the credential.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive, grant or reset |
+| `tenantID` | UUID | the owning tenant. Immutable. **Filled from the caller's `tenant_id` claim**, and nameable in the create body only by a `*:*` operator crossing the row scope |
+| `name` | composite | **one value across two columns** — `givenName` + `familyName`, each 1–75 runes. There is no `name` column; the rendered form is a computed read field |
+| `email` | string(254) | the login handle. Unique across the **whole platform** over active rows, lowercase-only, and **immutable** |
+| `emailVerifiedAt` | timestamp | ⚠️ **nothing in this service writes it.** The column exists so the verification flow, when it arrives, is code only |
+| `password` | — | write-only, and it has **no column at all**. See below |
+| `passwordChangedAt` · `mustChangePassword` | timestamp · bool | credential state. The second is what forces a rotation after an admin-set or reset password |
+| `status` | enum | `active` · `suspended`. Suspension is **not** archiving — the same distinction `Tenant` draws |
+| `groups[]` · `roles[]` | collections | the inherited half and the direct half. Each entry carries `id`, the target's id, and the target's `key` and `name`, read across the foreign key |
+| `tenantWorkspace` · `tenantStatus` | string | the owning tenant's handle and commercial state, read across the foreign key. Filterable and sortable, unlike anything inside a collection |
+
+Five things a reader will otherwise get wrong.
+
+**1. The password has no column, and that is a language feature rather than a trick.** The
+plaintext and its confirmation are declared `runtime: true, source: body`: they cross the
+request, the command and the aggregate so the rules can judge them, and they reach no
+`TableSchema`, no migration, no outbox payload, no audit event and no response. There is
+nothing to redact because there is nothing stored. What IS stored is the Argon2id hash, and
+it takes **four** separate declarations to keep it out of four different copies —
+`assignedFrom: derived` (no write request can propose one), `hidden` (no response body
+carries it), and `redact` on **both** axes (the audit event and the sync payload). A fifth
+protection is not automatic at all: no filter and no `orderBy` names it, anywhere, because
+a filter over a password hash is an oracle walked one rune at a time.
+
+**2. The name is one value object across two columns**, exactly like `Permission`'s
+`resource:action`. "Maria" alone is not a person's name and "Souza Lima" alone is not
+either. Both halves are filterable and sortable in their own right — sorting a staff
+listing by family name is the query an operator actually runs — and the joined rendering is
+a **computed read field**, derived per row from the value object's own method. So
+`?orderBy=fullName` is a typed 400 and `?orderBy=familyName` is not, which is the trade the
+computed field makes everywhere in this service.
+
+**3. The owner is filled from the token, and a super-admin may still name one.** This is the
+one place `User` deliberately diverges from `Role` and `Group`. Both of those put
+`tenantID` in the body with a rule refusing anything but the caller's own, because the
+alternative available at the time removed the field from every write DTO — and with it the
+operator's ability to create a row inside a customer's tenant at all. `User` uses
+`bypassMaySet`: the field is filled from the claim for everybody, and rejoins the **create**
+body as an optional value that only a scope-crossing caller can use. It stays out of the
+patch entirely: a user does not change tenant by being edited.
+
+**4. Adding somebody to a group is a THREE-HOP grant, and it is checked as one.** A group
+confers roles and a role grants permissions, so joining a user to a group hands them the
+union of every bundle it carries. The caller must hold **every** one of those permissions —
+a set, not a key — and a group carrying any wildcard-bearing role cannot be joined through
+this API at all. The order is load-bearing and identical to `Group`'s: availability, then
+the wildcard refusal, then the escalation question, because `Identity.HasPermission` panics
+on a wildcard and the wildcard check is what removes that input. Granting a role directly is
+the same walk one hop shorter.
+
+**5. Archiving is one-way here for a reason the other entities do not have.** Archiving a
+user **releases their e-mail** — the unique index is over active rows — so between an
+archive and any hypothetical unarchive, a new hire may have been registered with it.
+Reversible deactivation has its own home: `status: suspended`, which keeps the row listed
+and stops the product. A user on leave is suspended; a user who left the company is
+archived, and archiving forces the status to `suspended` so archived-and-active is
+unrepresentable rather than merely refused.
+
+#### The password reset
+
+One operation, hand-written because the generator cannot express it — the spec language
+gates operations by a closed set of verbs and "reset a credential" is not one of them.
+
+```
+PATCH  /users/{id}/password-reset       user:reset-password  (a *:* claim satisfies it)
+```
+
+It carries **no current password**: not knowing it is the point of a reset. That is also why
+it does not accept the user themselves — somebody who knows their password does not need
+this route, and letting a session replace a credential without proving the previous one is
+the attack a current-password check exists to stop. `user:update` deliberately does not
+reach it either: whoever can fix a typo in a name must not be able to take over an account.
+
+The password it leaves is somebody else's choice, so it sets `mustChangePassword`. **Nothing
+clears that flag yet** — the operation that would is the self-service change this service
+does not have.
+
+**The permission answers WHO may attempt the verb and says nothing about WHOSE row.** The
+aggregate's own row-scope guard is what refuses a holder of `user:reset-password` in one
+tenant from resetting a password in another, and it only runs because the handler feeds it
+the caller's identity the way every generated command mapper does. A `*:*` operator crosses
+that scope, which is what lets the platform support a customer.
+
+**The password policy is 8–128 runes with all four character classes** — lowercase,
+uppercase, digit and symbol, judged by **Unicode** rather than ASCII — plus a context rule
+refusing a password that contains the e-mail's local part or any word of the name. That is a
+decision made knowingly against NIST SP 800-63B-4, which states a SHALL NOT on composition
+requirements and sets 15 runes as the floor for a single-factor secret. Both sides of the
+argument are in `specs/scaffold-entity/user/spec.md` §B Q3; it is one value object, and
+revisiting it changes about fifteen lines.
+
+⚠️ **One trap worth knowing before touching those rules.** The plaintext field declares
+`modes: [insert]`, so the framework excludes its value object from the automatic validation
+pass on every update — correctly, because a PATCH that renames somebody carries no password.
+This route DOES carry one, and the policy runs only because the rule calls `IsValid`
+directly. The obvious repair — `Rules.ValidateValueObject` — does not work and fails
+silently: the forced list honours the same ignore set, which is how a five-character
+password was accepted once.
+
+#### Tenant isolation
+
+Identical to `Role`'s and `Group`'s, applied unchanged — reads filtered by the claim with a
+by-id read of another tenant's user answering **404 rather than 403**; writes refused with
+403; a `*:*` super-admin crossing in both directions. The rejected alternative is worth
+naming here specifically: a user listing is the customer's staff directory **including
+e-mail addresses**, so reads-open isolation would leak more here than the org chart `Group`
+already refused to leak.
+
+**The public change-password route is the one place in this service where a request legitimately carries no
+identity in production.** Every other stand-down is confined to `auth.mode: disabled`, which
+the framework permits only under `APP_PROFILE=dev`. That route is exempt by design, and the
+global e-mail index is what makes it safe — there is no tenant to scope by, and there does
+not need to be. Nobody should "fix" it by requiring a claim the caller structurally cannot
+have.
+
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -560,6 +704,35 @@ PATCH  /roles/{id}/permissions/{entryId}/archive  revoke one — never DELETE
 ```
 
 ```
+GET    /users/                                     list, filter, paginate
+POST   /users/                                     create — carries the password and its confirmation
+GET    /users/{id}                                 read one
+PATCH  /users/{id}                                 partial update (givenName, familyName, status)
+PATCH  /users/{id}/archive                         removal — ONE-WAY, there is no unarchive
+POST   /users/{id}/groups                          join a group        — user:grant
+PATCH  /users/{id}/groups/{entryId}/archive        leave one           — user:grant
+POST   /users/{id}/roles                           grant a role        — user:grant
+PATCH  /users/{id}/roles/{entryId}/archive         revoke one          — user:grant
+
+PATCH  /users/{id}/password-reset                  reset — user:reset-password (or *:*)
+```
+
+`PATCH /users/{id}` carries **three** fields and no more: `givenName`, `familyName` and
+`status`. `email` and `tenantID` are not merely refused there — they are absent from the
+request shape, so there is no body in which a caller can propose one. Neither is any
+credential field: there is no shape reaching the ordinary update in which a password exists
+to be sent.
+
+**There is no self-service password change, and that is a gap rather than a decision
+against one.** A user who wants to rotate their own credential has no endpoint today: only
+a holder of `user:reset-password` can set one. A public change-password route existed
+briefly and was removed on 2026-08-26 — it did exactly what the reset does, without a
+token, on the premise that somebody needing a new password might be unable to obtain one.
+That premise does not hold here: there is no login route, so nothing blocks authentication
+for a caller who knows their password. What it was reaching for is a FORGOT-PASSWORD flow —
+e-mail, an expiring link, a one-time token — which is real work nobody has started.
+
+```
 GET    /groups/                              list, filter, paginate
 POST   /groups/                              create
 GET    /groups/{id}                          read one
@@ -583,6 +756,18 @@ listing by a 500-character free-text column is a blocking sort nobody asks for. 
 served, per field: `tenantId` (eq, in) · `key` (eq, ne, in, prefix, contains, and the
 case-insensitive twins) · `name` (eq, in, prefix, contains, and the twins) · `description`
 (contains, icontains).
+
+User serves the same five listing controls. Filters served, per field: `tenantId` (eq, in) ·
+`givenName` and `familyName` (eq, in, prefix, contains and the case-insensitive twins;
+`familyName` also `ne`) · `email` (the same set plus `ne`) · `status` (eq, in) ·
+`mustChangePassword` (eq) · `passwordChangedAt` (gte, lte) · `emailVerifiedAt` (eq, gte,
+lte) · `tenantWorkspace` and `tenantStatus` · `createdAt` and `updatedAt`. `?orderBy` admits
+`familyName`, `givenName`, `email`, `status`, `passwordChangedAt`, `emailVerifiedAt`,
+`tenantId`, `tenantWorkspace`, `tenantStatus`, `createdAt`, `updatedAt` and `id`.
+**`passwordHash`, `failedLoginAttempts` and `lockedUntil` appear in neither list, on any
+surface** — the silence is the policy, because a redacted field is still queryable by design
+and nothing else keeps it out. `?orderBy=fullName` is a typed 400: a computed field has no
+column to sort on.
 
 Group serves the same five listing controls and the same `?orderBy` vocabulary as Role
 (`tenantId`, `key`, `name`; `description` deliberately not sortable). Filters served, per
@@ -670,6 +855,19 @@ internal/web/       requests, responses, routes, authorization
 internal/infra/     table schemas, repositories, views
 migrations/postgres/   numbered up/down pairs, applied at boot in dev
 devops/             the local bench (Postgres)
+```
+
+Everything in `internal/` is generated from `specs/omnicore-gen/<entity>.omnicore.yaml`
+EXCEPT the files named `*_manual.go`, which the generator writes once and never touches
+again, and the credential path, which it cannot express at all:
+
+```
+internal/domain/password_hasher.go          the port — Hash · Matches · DummyMatches
+internal/infra/password_hasher.go           Argon2id, OWASP baseline, PHC-encoded
+internal/domain/user_credential_manual.go   the rules, entered by actionName
+internal/application/commands/…_manual.go   the two commands and their handlers
+internal/web/…_credential_routes_manual.go  the two routes
+internal/infra/role_probe.go                what "one role, resolved" means — shared by Group and User
 ```
 
 ## Where the decisions are written down
