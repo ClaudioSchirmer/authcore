@@ -1,0 +1,1274 @@
+# User — a person's account inside exactly one tenant.
+#
+# Model authority: scaffold-entity/user/spec.md (Status: APPROVED, 2026-08-25). Nothing here
+# re-decides the model; where this file and that spec disagree, the spec wins.
+#
+# The one idea to hold while reading: THE PLAINTEXT NEVER LANDS ANYWHERE. It arrives in the
+# body, a rule compares it against its confirmation, a hand-written rule hashes it into
+# password_hash, and it is gone. There is no column, so there is nothing to redact and
+# nothing to leak — which is what `runtime: true` + `source: body` buys, and what four
+# separate declarations used to have to buy for the HASH alone (they still do: hidden keeps
+# it out of every response, redact keeps it out of the audit event and the sync payload, and
+# not declaring a filter keeps it out of the query vocabulary).
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: User
+plural: Users
+language: en-US
+
+storage:
+  kind: flat
+  table: users
+  description: >-
+    A person's account inside exactly one tenant: who they are, the credential they sign in
+    with, and the state of that account. The e-mail is unique across the whole platform over
+    active rows — one address is one user, never two.
+  managed:
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+    revision: revision
+
+fields:
+  # The owner. assignedFrom: identity-claim fills it from the caller's token, so no ordinary
+  # caller can file a user under someone else's tenant; bypassMaySet lets the ONE caller
+  # authz.bypass admits — the platform operator supporting a customer — state which tenant a
+  # new user belongs to. Without that second key the operator could read and repair a
+  # customer's users and never create one, which is the trap Role and Group both fell into
+  # and escaped by putting the value in the body with a rule.
+  #
+  # It rejoins the INSERT body only, as an OPTIONAL value: absent means "mine". It stays out
+  # of the patch on purpose — a user does not change tenant by being edited.
+  - name: TenantID
+    type: id
+    column: tenant_id
+    livesOn: root
+    assignedFrom: identity-claim
+    claim: tenant_id
+    bypassMaySet: true
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
+    description: The tenant this user belongs to. Immutable — a user never moves between tenants.
+    labelKey: UserTenantIDField
+    text:
+      eng: Tenant
+      ptbr: Inquilino
+      esp: Inquilino
+      fra: Locataire
+      deu: Mandant
+      ita: Tenant
+      nld: Tenant
+
+  # The name is ONE value across TWO columns, which is exactly when several columns are one
+  # value object: "Maria" alone is not a person's name and "Souza Lima" alone is not either.
+  # Same shape Permission already ships for resource:action — and, like it, the rendered
+  # whole is a computed read field rather than a third column.
+  #
+  # `as:` is not decoration here: the default exposed name is the part's own, so without it
+  # the wire would carry `given` and `family`. Those exposed names are the ONLY names the
+  # outside world sees — the filter, ?fields=, orderBy, the JSON field — so renaming one
+  # later is a wire break.
+  - name: Name
+    livesOn: root
+    vo: {kind: composite, ref: PersonName}
+    description: The person's name, as they write it.
+    labelKey: UserNameField
+    text:
+      eng: Name
+      ptbr: Nome
+      esp: Nombre
+      fra: Nom
+      deu: Name
+      ita: Nome
+      nld: Naam
+    parts:
+      - {part: Given,  column: given_name,  as: GivenName,  length: 75, example: Maria}
+      - {part: Family, column: family_name, as: FamilyName, length: 75, example: Souza Lima}
+
+  # Unique across the WHOLE PLATFORM, not per tenant — the one uniqueness in this service
+  # that is not tenant-scoped, and the README's own decision. `within` is therefore absent,
+  # which is what makes the index global; active-only, so archiving a user releases the
+  # address for a new hire.
+  #
+  # It is also what lets the public change-password route resolve an address to exactly one
+  # user with no tenant claim to scope by.
+  - name: Email
+    type: string
+    column: email
+    length: 254
+    livesOn: root
+    vo: {kind: raw, ref: Email}
+    unique:
+      enforce: service-precheck+constraint
+      notification: UserEmailAlreadyExistsNotification
+      scope: active-only
+    example: maria@acme.com
+    description: >-
+      The address this person signs in with. Unique across the whole platform over active
+      rows, and immutable after creation.
+    labelKey: UserEmailField
+    text:
+      eng: E-mail
+      ptbr: E-mail
+      esp: Correo electrónico
+      fra: E-mail
+      deu: E-Mail
+      ita: E-mail
+      nld: E-mail
+
+  # Taken by decision at the model gate and NOTHING IN THIS MODEL WRITES IT: there is no
+  # verification flow and no outbound mail path in this service, so the column is created
+  # and stays NULL until one exists. It is server-written by definition, so nothing can set
+  # it by accident either. Filterable on purpose — "verified vs not" is answerable the day
+  # it starts being written.
+  - name: EmailVerifiedAt
+    type: time
+    column: email_verified_at
+    livesOn: root
+    assignedFrom: derived
+    example: "2026-08-25T14:03:11Z"
+    description: When the address was proven reachable; the zero instant until a verification flow exists.
+    labelKey: UserEmailVerifiedAtField
+    text:
+      eng: E-mail verified at
+      ptbr: E-mail verificado em
+      esp: Correo verificado el
+      fra: E-mail vérifié le
+      deu: E-Mail bestätigt am
+      ita: E-mail verificata il
+      nld: E-mail geverifieerd op
+
+  # The credential, and the field this whole entity is careful about. FOUR declarations keep
+  # it out of FOUR different copies, and each answers a different question:
+  #
+  #   assignedFrom: derived  — out of every write request, command and OpenAPI request
+  #                            schema. There is no shape in which a caller proposes a hash.
+  #   hidden: true           — out of every response body: the by-id read, each listing row,
+  #                            the write results, and the CSV/XLSX export.
+  #   redact.inAudit         — out of the audit event, which is PERMANENT, is read through an
+  #                            endpoint, and is echoed to the log aggregator by default. The
+  #                            mask is applied AFTER the delta, so the trail still records
+  #                            THAT the credential changed.
+  #   redact.inSync          — out of the outbox payload and everything downstream of it.
+  #                            Inert today (no broker) and mandatory anyway; the day
+  #                            /omnicore:configure adds Mongo, the projection inherits it.
+  #
+  # And a FIFTH thing nothing automatic does: no filter and no sort names it, anywhere. A
+  # redacted field is still served and still queryable by design — the framework masks its
+  # own copies and does not decide this service's policy — so the empty query vocabulary is
+  # the policy. A filter over a hash is an oracle walked one rune at a time.
+  #
+  # 255 is sized for a PHC string with room for raised Argon2id parameters, not for today's
+  # exact output. The generator does not hash: the derivation is a rules.manual entry.
+  - name: PasswordHash
+    type: string
+    column: password_hash
+    length: 255
+    livesOn: root
+    assignedFrom: derived
+    hidden: true
+    redact:
+      inSync: {kind: fixed, value: "***"}
+      inAudit: {kind: fixed, value: "***"}
+    example: "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$aGFzaA"
+    description: >-
+      The irreversible Argon2id hash of the password, PHC-encoded so its parameters travel
+      with it. Never sent by a caller, never returned, never copied.
+    labelKey: UserPasswordField
+    text:
+      eng: Password
+      ptbr: Senha
+      esp: Contraseña
+      fra: Mot de passe
+      deu: Passwort
+      ita: Password
+      nld: Wachtwoord
+
+  # The report that matters after an incident: "every user whose credential predates it".
+  # That is the only reason this column exists, and it is why it is filterable and sortable.
+  - name: PasswordChangedAt
+    type: time
+    column: password_changed_at
+    livesOn: root
+    assignedFrom: derived
+    example: "2026-08-25T14:03:11Z"
+    description: When the credential was last set — always, since a password is required at creation.
+    labelKey: UserPasswordChangedAtField
+    text:
+      eng: Password changed at
+      ptbr: Senha alterada em
+      esp: Contraseña cambiada el
+      fra: Mot de passe changé le
+      deu: Passwort geändert am
+      ita: Password modificata il
+      nld: Wachtwoord gewijzigd op
+
+  # What makes an admin-set initial password tolerable: the next sign-in has to rotate it.
+  # Set by the create and by the reset, cleared by the open change.
+  - name: MustChangePassword
+    type: bool
+    column: must_change_password
+    livesOn: root
+    assignedFrom: derived
+    example: "true"
+    description: Whether the next sign-in must rotate the password.
+    labelKey: UserMustChangePasswordField
+    text:
+      eng: Must change password
+      ptbr: Deve trocar a senha
+      esp: Debe cambiar la contraseña
+      fra: Doit changer le mot de passe
+      deu: Muss Passwort ändern
+      ita: Deve cambiare la password
+      nld: Moet wachtwoord wijzigen
+
+  # The lockout pair. The open change-password route is an unauthenticated
+  # password-guessing surface, so these two are what stop it — and both are hidden, because
+  # publishing how close an account is to locking hands an attacker the counter, and a
+  # listing that showed it would publish which accounts are under attack.
+  #
+  # They are written by the custom handler's FAILURE branch, which is why no rule here
+  # declares them: a rejected aggregate write persists nothing.
+  - name: FailedLoginAttempts
+    type: int
+    column: failed_login_attempts
+    livesOn: root
+    assignedFrom: derived
+    hidden: true
+    example: "0"
+    description: Consecutive credential failures on the public change-password route.
+    labelKey: UserFailedLoginAttemptsField
+
+  - name: LockedUntil
+    type: time
+    column: locked_until
+    livesOn: root
+    assignedFrom: derived
+    hidden: true
+    example: "2026-08-25T14:18:00Z"
+    description: When the lockout expires; the zero instant means the account is not locked.
+    labelKey: UserLockedUntilField
+
+  # Suspension is NOT archiving — the distinction Tenant already draws, applied here. A
+  # suspended user stays listed, keeps every membership, and stops signing in. A user on
+  # leave is suspended; a user who left the company is archived, and archiving forces this
+  # field to suspended (rules.manual: archive-forces-suspended).
+  - name: Status
+    type: string
+    column: status
+    length: 16
+    livesOn: root
+    vo: {kind: enum, ref: UserStatus}
+    example: active
+    description: The account's state — active or suspended. Orthogonal to archiving.
+    labelKey: UserStatusField
+    text:
+      eng: Status
+      ptbr: Situação
+      esp: Situación
+      fra: Statut
+      deu: Status
+      ita: Stato
+      nld: Status
+
+  # THE THIRD KIND OF FIELD. The caller sends it, a rule reads it, and no column holds it:
+  # it is in no migration, no TableSchema, no outbox payload, no audit event, no response,
+  # no filter. The plaintext exists in memory for the length of one request.
+  #
+  # modes: [insert] — only the create carries a password. A PATCH that renames somebody must
+  # not be answered with "the password is required" for a field it had no business sending,
+  # and the generator excludes the value object from that verb's automatic pass by itself.
+  #
+  # The two credential OPERATIONS (the public change and the reset) are hand-written custom
+  # commands and carry their own copies of this pair; they are outside what this language
+  # can declare, and scaffold-entity/user/spec.md §D says why.
+  - name: Password
+    type: string
+    runtime: true
+    source: body
+    modes: [insert]
+    livesOn: root
+    vo: {kind: manual, ref: Password}
+    example: "Str0ng!Passphrase"
+    description: The plaintext password, checked and hashed on the way in — never stored.
+    labelKey: UserPasswordPlainField
+    text:
+      eng: Password
+      ptbr: Senha
+      esp: Contraseña
+      fra: Mot de passe
+      deu: Passwort
+      ita: Password
+      nld: Wachtwoord
+
+  # Deliberately NOT typed as the Password value object. It exists to be compared, and
+  # running the policy over it too would answer a single typo with two complaints — the
+  # mismatch AND "the password is too weak" about a value the caller never meant to keep.
+  # Nothing compares the two for you: that is the password-confirmed rule below.
+  - name: PasswordConfirmation
+    type: string
+    runtime: true
+    source: body
+    modes: [insert]
+    livesOn: root
+    example: "Str0ng!Passphrase"
+    description: The password typed a second time at creation — compared, never stored.
+    labelKey: UserPasswordConfirmationField
+    text:
+      eng: Password confirmation
+      ptbr: Confirmação de senha
+      esp: Confirmación de contraseña
+      fra: Confirmation du mot de passe
+      deu: Passwortbestätigung
+      ita: Conferma password
+      nld: Wachtwoordbevestiging
+
+valueObjects:
+  # written: manual — the SHAPE stays declared (the schema decomposes the parts, the mappers
+  # fold them, the migration sizes them, the catalogs translate them) and the FILE is ours.
+  # The rule is the project's shared anti-junk composition — a distinct-rune floor and a
+  # run-of-identical-runes bound, in RUNES and Unicode — which is neither a regex nor a
+  # length, and the full-name rendering lives inside the type for the same reason: "given, a
+  # space, family" is a fact about names, not about User, and the day a locale wants the
+  # other order it is one method rather than every read.
+  #
+  # It must NOT declare Value(): that absence is what tells the framework to decompose the
+  # value instead of storing a rendering in one column.
+  #
+  # Explicitly not DisplayName: internal/domain/vos/display_name.go says in its own header
+  # that it is for THINGS and reserves PersonName for people. A half-name is routinely two
+  # runes (Ng, Wu, Li), which DisplayName's distinct-rune floor would reject outright.
+  - name: PersonName
+    kind: composite
+    written: manual
+    description: >-
+      A person's name in two halves, each human-typed rather than keyboard junk: 1-75 runes,
+      at least one letter, no run of four identical runes, trimmed and single-spaced. No word
+      count and no distinct-rune floor — a family name of two runes is an ordinary name. The
+      type also renders the two halves as one full name.
+    parts:
+      - name: Given
+        type: string
+        description: The person's given name.
+        labelKey: UserGivenNameField
+      - name: Family
+        type: string
+        description: The person's family name.
+        labelKey: UserFamilyNameField
+
+  # A shape, so a raw VO with a regex — and the regex carries three decisions. It is
+  # LOWERCASE-ONLY, which is what keeps the global unique index honest: if Maria@acme.com
+  # were storable, maria@acme.com would be a second user and the README's central invariant
+  # would break on case alone. Following Tenant.workspace, an uppercase address is REFUSED
+  # rather than silently lowercased — this project does not repair input.
+  #
+  # The consequence is named where it lands: the future POST /auth/login must lowercase what
+  # a human typed into the box BEFORE it looks the address up.
+  #
+  # The local part is capped at 64 by the counted repetition, and the domain admits no
+  # leading, trailing or doubled dot and no leading or trailing hyphen in a label.
+  - name: Email
+    kind: raw
+    backing: string
+    description: >-
+      A lowercase e-mail address: a local part of at most 64 runes, an @, and a dotted
+      domain. Uppercase is refused rather than folded, because the platform-wide uniqueness
+      is over the stored value.
+    regex: '^[a-z0-9._%+\-]{1,64}@[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$'
+    maxLength: 254
+    notification: InvalidEmailNotification
+
+  # kind: manual, and the reason is mechanical rather than stylistic: the policy decided at
+  # the model gate is 8-128 runes plus ALL FOUR character classes, and "contains at least one
+  # of each class" is not a regex Go can run — RE2 has no lookahead. The classes are also
+  # Unicode rather than ASCII, so a Portuguese or German password is judged by the same rule
+  # as an English one.
+  #
+  # Decided knowingly against NIST SP 800-63B-4, which states a SHALL NOT on composition
+  # requirements and a 15-rune floor for a single-factor secret. The record is in
+  # scaffold-entity/user/spec.md §B Q3.
+  - name: Password
+    kind: manual
+    backing: string
+    description: >-
+      A password of 8 to 128 runes carrying at least one lowercase letter, one uppercase
+      letter, one digit and one symbol, judged by Unicode classes rather than ASCII, with no
+      leading or trailing whitespace.
+
+  - name: UserStatus
+    kind: enum
+    backing: string
+    description: The state of a user's account, orthogonal to whether the row is archived.
+    unknownNotification: UnknownUserStatusNotification
+    members:
+      - name: Active
+        value: active
+        text: {ptbr: Ativo, eng: Active, esp: Activo, fra: Actif, deu: Aktiv, ita: Attivo, nld: Actief}
+      - name: Suspended
+        value: suspended
+        text: {ptbr: Suspenso, eng: Suspended, esp: Suspendido, fra: Suspendu, deu: Gesperrt, ita: Sospeso, nld: Opgeschort}
+
+notifications:
+  - name: UserEmailAlreadyExistsNotification
+    semantic: conflict
+    text:
+      ptbr: Este e-mail já está em uso por outro usuário.
+      eng: This e-mail address is already in use by another user.
+      esp: Este correo electrónico ya está en uso por otro usuario.
+      fra: Cette adresse e-mail est déjà utilisée par un autre utilisateur.
+      deu: Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.
+      ita: Questo indirizzo e-mail è già utilizzato da un altro utente.
+      nld: Dit e-mailadres is al in gebruik door een andere gebruiker.
+
+  - name: UserEmailIsImmutableNotification
+    semantic: validation
+    text:
+      ptbr: O e-mail não pode ser alterado.
+      eng: The e-mail address cannot be changed.
+      esp: El correo electrónico no se puede modificar.
+      fra: L'adresse e-mail ne peut pas être modifiée.
+      deu: Die E-Mail-Adresse kann nicht geändert werden.
+      ita: L'indirizzo e-mail non può essere modificato.
+      nld: Het e-mailadres kan niet worden gewijzigd.
+
+  - name: UserTenantIsImmutableNotification
+    semantic: validation
+    text:
+      ptbr: O inquilino do usuário não pode ser alterado.
+      eng: A user's tenant cannot be changed.
+      esp: El inquilino del usuario no se puede modificar.
+      fra: Le locataire de l'utilisateur ne peut pas être modifié.
+      deu: Der Mandant des Benutzers kann nicht geändert werden.
+      ita: Il tenant dell'utente non può essere modificato.
+      nld: De tenant van de gebruiker kan niet worden gewijzigd.
+
+  - name: UserTenantDoesNotExistNotification
+    semantic: validation
+    text:
+      ptbr: O inquilino informado não existe ou não está disponível.
+      eng: The given tenant does not exist or is not available.
+      esp: El inquilino indicado no existe o no está disponible.
+      fra: Le locataire indiqué n'existe pas ou n'est pas disponible.
+      deu: Der angegebene Mandant existiert nicht oder ist nicht verfügbar.
+      ita: Il tenant indicato non esiste o non è disponibile.
+      nld: De opgegeven tenant bestaat niet of is niet beschikbaar.
+
+  - name: PasswordConfirmationMismatchNotification
+    semantic: validation
+    text:
+      ptbr: A confirmação de senha não confere com a senha informada.
+      eng: The password confirmation does not match the password given.
+      esp: La confirmación de contraseña no coincide con la contraseña indicada.
+      fra: La confirmation du mot de passe ne correspond pas au mot de passe saisi.
+      deu: Die Passwortbestätigung stimmt nicht mit dem eingegebenen Passwort überein.
+      ita: La conferma della password non corrisponde alla password indicata.
+      nld: De wachtwoordbevestiging komt niet overeen met het opgegeven wachtwoord.
+
+  - name: PasswordEchoesIdentityNotification
+    semantic: validation
+    text:
+      ptbr: A senha não pode conter o seu e-mail nem o seu nome.
+      eng: The password must not contain your e-mail address or your name.
+      esp: La contraseña no puede contener su correo electrónico ni su nombre.
+      fra: Le mot de passe ne doit pas contenir votre adresse e-mail ni votre nom.
+      deu: Das Passwort darf weder Ihre E-Mail-Adresse noch Ihren Namen enthalten.
+      ita: La password non può contenere il suo indirizzo e-mail né il suo nome.
+      nld: Het wachtwoord mag uw e-mailadres of uw naam niet bevatten.
+
+  - name: InvalidUserStatusTransitionNotification
+    semantic: state-conflict
+    text:
+      ptbr: Esta mudança de situação não é permitida.
+      eng: This status change is not allowed.
+      esp: Este cambio de situación no está permitido.
+      fra: Ce changement de statut n'est pas autorisé.
+      deu: Dieser Statuswechsel ist nicht zulässig.
+      ita: Questo cambio di stato non è consentito.
+      nld: Deze statuswijziging is niet toegestaan.
+
+  - name: GroupNotAvailableInTenantNotification
+    semantic: validation
+    text:
+      ptbr: Este grupo não está disponível no seu inquilino, ou não está mais ativo.
+      eng: This group is not available in your tenant, or is no longer active.
+      esp: Este grupo no está disponible en su inquilino, o ya no está activo.
+      fra: Ce groupe n'est pas disponible dans votre locataire, ou n'est plus actif.
+      deu: Diese Gruppe ist in Ihrem Mandanten nicht verfügbar oder nicht mehr aktiv.
+      ita: Questo gruppo non è disponibile nel suo tenant, o non è più attivo.
+      nld: Deze groep is niet beschikbaar in uw tenant, of is niet langer actief.
+
+  - name: UserAlreadyInGroupNotification
+    semantic: conflict
+    text:
+      ptbr: Este usuário já pertence a este grupo.
+      eng: This user already belongs to this group.
+      esp: Este usuario ya pertenece a este grupo.
+      fra: Cet utilisateur appartient déjà à ce groupe.
+      deu: Dieser Benutzer gehört bereits zu dieser Gruppe.
+      ita: Questo utente appartiene già a questo gruppo.
+      nld: Deze gebruiker behoort al tot deze groep.
+
+  - name: UserAlreadyGrantsRoleNotification
+    semantic: conflict
+    text:
+      ptbr: Este usuário já possui este papel diretamente.
+      eng: This user already holds this role directly.
+      esp: Este usuario ya tiene este rol directamente.
+      fra: Cet utilisateur détient déjà ce rôle directement.
+      deu: Dieser Benutzer besitzt diese Rolle bereits direkt.
+      ita: Questo utente possiede già questo ruolo direttamente.
+      nld: Deze gebruiker heeft deze rol al rechtstreeks.
+
+  - name: TooManyGroupsForUserNotification
+    semantic: validation
+    tvars: [max]
+    text:
+      ptbr: Um usuário pode pertencer a no máximo {max} grupos.
+      eng: A user may belong to at most {max} groups.
+      esp: Un usuario puede pertenecer como máximo a {max} grupos.
+      fra: Un utilisateur peut appartenir à au plus {max} groupes.
+      deu: Ein Benutzer darf höchstens {max} Gruppen angehören.
+      ita: Un utente può appartenere ad al massimo {max} gruppi.
+      nld: Een gebruiker mag tot maximaal {max} groepen behoren.
+
+  - name: TooManyRolesForUserNotification
+    semantic: validation
+    tvars: [max]
+    text:
+      ptbr: Um usuário pode ter no máximo {max} papéis diretos.
+      eng: A user may hold at most {max} direct roles.
+      esp: Un usuario puede tener como máximo {max} roles directos.
+      fra: Un utilisateur peut détenir au plus {max} rôles directs.
+      deu: Ein Benutzer darf höchstens {max} direkte Rollen besitzen.
+      ita: Un utente può avere al massimo {max} ruoli diretti.
+      nld: Een gebruiker mag maximaal {max} directe rollen hebben.
+
+  - name: CannotJoinGroupWithUnheldPermissionsNotification
+    semantic: forbidden
+    text:
+      ptbr: Você não pode adicionar alguém a um grupo que concede permissões que você não possui.
+      eng: You cannot add someone to a group that grants permissions you do not hold.
+      esp: No puede añadir a alguien a un grupo que otorga permisos que usted no tiene.
+      fra: Vous ne pouvez pas ajouter quelqu'un à un groupe qui accorde des permissions que vous n'avez pas.
+      deu: Sie können niemanden zu einer Gruppe hinzufügen, die Berechtigungen gewährt, die Sie nicht besitzen.
+      ita: Non è possibile aggiungere qualcuno a un gruppo che concede permessi che lei non possiede.
+      nld: U kunt niemand toevoegen aan een groep die rechten verleent die u zelf niet heeft.
+
+  - name: CannotJoinWildcardGroupNotification
+    semantic: forbidden
+    text:
+      ptbr: Um grupo que concede permissões curinga não pode ser atribuído por esta API.
+      eng: A group granting wildcard permissions cannot be assigned through this API.
+      esp: Un grupo que otorga permisos comodín no puede asignarse mediante esta API.
+      fra: Un groupe accordant des permissions génériques ne peut pas être attribué via cette API.
+      deu: Eine Gruppe mit Platzhalter-Berechtigungen kann über diese API nicht zugewiesen werden.
+      ita: Un gruppo che concede permessi jolly non può essere assegnato tramite questa API.
+      nld: Een groep die jokertekenrechten verleent, kan niet via deze API worden toegewezen.
+
+  # Raised by the hand-written credential operations rather than by any rule declared here —
+  # declared so the type and its seven catalogs exist. ONE answer for every credential
+  # failure: an unregistered address, a wrong current password, an archived or suspended
+  # user, an unavailable tenant, and a locked account are indistinguishable on purpose.
+  # Distinguishing any of them turns the public route into an enumeration oracle over every
+  # tenant's staff directory.
+  #
+  # semantic: forbidden is the closest this vocabulary has; the hand-written handler answers
+  # 401, because a credential failure is an authentication failure rather than an
+  # authorization one. Recorded as a deviation in scaffold-entity/user/tasks.md.
+  - name: InvalidCredentialsNotification
+    semantic: forbidden
+    text:
+      ptbr: Usuário ou senha inválido.
+      eng: Invalid username or password.
+      esp: Usuario o contraseña inválidos.
+      fra: Identifiant ou mot de passe invalide.
+      deu: Ungültiger Benutzername oder ungültiges Passwort.
+      ita: Nome utente o password non validi.
+      nld: Ongeldige gebruikersnaam of wachtwoord.
+
+  - name: PasswordUnchangedNotification
+    semantic: validation
+    text:
+      ptbr: A nova senha deve ser diferente da senha atual.
+      eng: The new password must be different from the current one.
+      esp: La nueva contraseña debe ser distinta de la actual.
+      fra: Le nouveau mot de passe doit être différent de l'actuel.
+      deu: Das neue Passwort muss sich vom aktuellen unterscheiden.
+      ita: La nuova password deve essere diversa da quella attuale.
+      nld: Het nieuwe wachtwoord moet verschillen van het huidige.
+
+  - name: InvalidEmailNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: E-mail inválido. Informe um endereço em letras minúsculas.
+      eng: Invalid e-mail address. Enter it in lowercase.
+      esp: Correo electrónico inválido. Indíquelo en minúsculas.
+      fra: Adresse e-mail invalide. Saisissez-la en minuscules.
+      deu: Ungültige E-Mail-Adresse. Bitte in Kleinbuchstaben eingeben.
+      ita: Indirizzo e-mail non valido. Lo inserisca in minuscolo.
+      nld: Ongeldig e-mailadres. Voer het in kleine letters in.
+
+  - name: InvalidPersonNameNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: Nome inválido.
+      eng: Invalid name.
+      esp: Nombre inválido.
+      fra: Nom invalide.
+      deu: Ungültiger Name.
+      ita: Nome non valido.
+      nld: Ongeldige naam.
+
+  - name: WeakPasswordNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: A senha deve ter de 8 a 128 caracteres e conter letra minúscula, letra maiúscula, número e símbolo.
+      eng: The password must be 8 to 128 characters long and contain a lowercase letter, an uppercase letter, a digit and a symbol.
+      esp: La contraseña debe tener entre 8 y 128 caracteres e incluir minúscula, mayúscula, número y símbolo.
+      fra: Le mot de passe doit comporter de 8 à 128 caractères et contenir une minuscule, une majuscule, un chiffre et un symbole.
+      deu: Das Passwort muss 8 bis 128 Zeichen lang sein und einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.
+      ita: La password deve avere da 8 a 128 caratteri e contenere una minuscola, una maiuscola, una cifra e un simbolo.
+      nld: Het wachtwoord moet 8 tot 128 tekens lang zijn en een kleine letter, een hoofdletter, een cijfer en een symbool bevatten.
+
+  - name: UnknownUserStatusNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: Situação de usuário desconhecida.
+      eng: Unknown user status.
+      esp: Situación de usuario desconocida.
+      fra: Statut d'utilisateur inconnu.
+      deu: Unbekannter Benutzerstatus.
+      ita: Stato utente sconosciuto.
+      nld: Onbekende gebruikersstatus.
+
+  # THREE TYPES THIS ENTITY SHARES WITH Group, restated verbatim because a notification is
+  # declared per spec and there is no `reuse` for one. The texts below are byte-for-byte the
+  # ones already in the seven catalogs, so this run replaces each entry with itself and
+  # Group's messages do not move.
+  #
+  # ⚠️ ONE OF THEM READS WRONG HERE — see tasks.md: CannotGrantWildcardRoleNotification says
+  # "conferred by a GROUP", which is true of Group and false of a direct grant to a user.
+  # Left verbatim rather than neutralised, because neutralising it edits a BUILT entity's
+  # user-facing text and that is the maintainer's call, not this run's.
+  - name: RoleNotAvailableInTenantNotification
+    semantic: validation
+    text:
+      ptbr: Este papel não está disponível no seu inquilino, ou não está mais ativo.
+      eng: This role is not available in your tenant, or is no longer active.
+      esp: Este rol no está disponible en su inquilino, o ya no está activo.
+      fra: Ce rôle n'est pas disponible dans votre locataire, ou n'est plus actif.
+      deu: Diese Rolle ist in Ihrem Mandanten nicht verfügbar oder nicht mehr aktiv.
+      ita: Questo ruolo non è disponibile nel tuo tenant, o non è più attivo.
+      nld: Deze rol is niet beschikbaar in uw tenant, of is niet meer actief.
+
+  - name: CannotGrantRoleWithUnheldPermissionsNotification
+    semantic: forbidden
+    text:
+      ptbr: Você não pode conferir um papel que concede permissões que você não possui.
+      eng: You cannot confer a role that grants permissions you do not hold.
+      esp: No puede conferir un rol que concede permisos que usted no posee.
+      fra: Vous ne pouvez pas conférer un rôle qui accorde des permissions que vous ne détenez pas.
+      deu: Sie können keine Rolle gewähren, die Berechtigungen erteilt, die Sie nicht besitzen.
+      ita: Non è possibile conferire un ruolo che concede permessi che non si possiedono.
+      nld: U kunt geen rol verlenen die rechten geeft die u zelf niet heeft.
+
+  - name: CannotGrantWildcardRoleNotification
+    semantic: forbidden
+    text:
+      ptbr: Um papel que concede uma permissão curinga não pode ser conferido por um grupo.
+      eng: A role that grants a wildcard permission cannot be conferred by a group.
+      esp: Un rol que concede un permiso comodín no puede ser conferido por un grupo.
+      fra: Un rôle accordant une permission joker ne peut pas être conféré par un groupe.
+      deu: Eine Rolle mit einer Platzhalter-Berechtigung kann von keiner Gruppe gewährt werden.
+      ita: Un ruolo che concede un permesso jolly non può essere conferito da un gruppo.
+      nld: Een rol die een jokerrecht verleent, kan niet door een groep worden verleend.
+
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+  # The e-mail is IMMUTABLE (U2b), and the rule alone was not enough. A rule
+  # refuses a CHANGE; this refuses the FIELD. Without it `email` sits in the patch
+  # body, the OpenAPI page documents it as patchable, a caller may send it, and
+  # only a value that DIFFERS is answered — so re-sending the same address is
+  # accepted silently while the model says the field cannot be touched at all.
+  #
+  # The two together are the belt and the braces: nothing can propose an address
+  # on an update, and if some future shape ever could, the rule still refuses it.
+  patchExcludes: [Email]
+
+delete:
+  root: soft
+
+rules:
+  list:
+    # RULE ZERO — the barrier. Pull the owner's own validation forward and END THE PASS if
+    # anything has already been rejected. Three probes below are scoped BY the tenant and
+    # hand it straight to a criterion against a UUID column: an owner that is empty, or
+    # non-empty and not a UUID, makes that query error and the probe panic — a 500 on a
+    # request whose problem is plain validation. Role actually shipped that bug and Group
+    # inherited the fix.
+    #
+    # It raises nothing of its own: domain.ID owns its answer, which is why a `required`
+    # rule beside it would tell the caller the same thing twice.
+    - id: tenant-valid
+      kind: valueObject
+      scope: [insertOrUpdate, archive]
+      fields: [TenantID]
+      guard: true
+      description: the tenant probes and the row-scope guard below all read this owner.
+
+    # The e-mail is the login handle and, once verification exists, the delivery address.
+    # A caller who mistypes it archives and re-creates — which loses every membership, and
+    # is the cost the model gate accepted for a permanently stable lookup key.
+    - id: email-immutable
+      kind: immutable
+      scope: [update]
+      fields: [Email]
+      notification: UserEmailIsImmutableNotification
+
+    # What makes the two source: body fields above worth declaring. The value object says
+    # the password is strong enough; only this says the second typing is the SAME one.
+    # The scope matches the fields' modes — an update carries no password to compare.
+    - id: password-confirmed
+      kind: comparison
+      scope: [insert]
+      fields: [PasswordConfirmation]
+      other: Password
+      operator: eq
+      notification: PasswordConfirmationMismatchNotification
+
+    # Suspension is reversible and archiving is not, so the machine is deliberately tiny:
+    # the two states move to each other and nowhere else. Archiving forces `suspended`
+    # through a manual rule under IfArchive, which this gate never sees.
+    - id: status-transition
+      kind: transition
+      scope: [update]
+      fields: [Status]
+      transitions:
+        active: [suspended]
+        suspended: [active]
+      notification: InvalidUserStatusTransitionNotification
+
+    # Caps over what THIS WRITE carries, counted in Go — the entries are not in the table
+    # yet, so no query can see them. The bound reaches the message through tvars rather
+    # than being spelled into seven texts.
+    - id: groups-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [Groups]
+      cap: 50
+      notification: TooManyGroupsForUserNotification
+      description: at most 50 group memberships on one user, counted over the whole collection.
+
+    - id: roles-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [Roles]
+      cap: 50
+      notification: TooManyRolesForUserNotification
+      description: at most 50 direct role grants on one user, counted over the whole collection.
+
+  manual:
+    # The derivation the generator cannot write, and it covers FIVE server-assigned fields
+    # in one place: hash the plaintext into PasswordHash through the PasswordHasher port,
+    # stamp PasswordChangedAt, raise MustChangePassword, and start the lockout pair at rest.
+    # EmailVerifiedAt is left at the zero instant — nothing in this service verifies an
+    # address yet, and saying so here is what keeps that honest.
+    - id: credential-derivation
+      description: >-
+        Fill the server-assigned fields on creation. Hash Password with the PasswordHasher
+        port (Argon2id, OWASP baseline, PHC-encoded) into PasswordHash; set
+        PasswordChangedAt to now; set MustChangePassword to true, because the creator knows
+        the password they chose; set FailedLoginAttempts to 0 and LockedUntil to the zero
+        instant. Leave EmailVerifiedAt at the zero instant — no verification flow exists.
+        The plaintext must never be logged, on any path.
+      scope: [insert]
+
+    # NIST forbids composition requirements; it does not forbid context checks, and it
+    # recommends them. A password that is the user's own e-mail local part is the single
+    # most guessable credential this service can issue.
+    - id: password-echoes-identity
+      description: >-
+        Refuse a password that contains the e-mail's local part, or any word of four runes
+        or more from either half of the name, compared case-insensitively and over runes.
+      scope: [insert]
+      notification: PasswordEchoesIdentityNotification
+      attachTo: Password
+
+    - id: tenant-available
+      description: >-
+        Refuse a user whose owning tenant is missing, archived or commercially SUSPENDED.
+        A trial tenant is a live customer and passes — "unavailable" is not "not active".
+        Asks TenantIsUnavailable.
+      scope: [insert]
+      notification: UserTenantDoesNotExistNotification
+      attachTo: TenantID
+
+    # THE THREE-HOP CHECK, and the deepest reach in this service. Order is load-bearing and
+    # is not an implementation detail: availability first, then the wildcard refusal, then
+    # the escalation question. The wildcard probe answers TRUE for an id it cannot resolve,
+    # so without availability first an unknown group would be reported as an escalation
+    # attempt — a 403 blaming the caller where the honest answer is a 422 saying the group
+    # is not there. And the wildcard must precede the escalation because the framework's
+    # permission probe PANICS on any argument containing a wildcard.
+    - id: group-available-in-tenant
+      description: >-
+        For every group this write ADDS: refuse when the id is absent from the groups table,
+        points at an archived group, or belongs to a tenant other than this user's. ONE
+        answer for all three — a distinct "belongs to another tenant" reply is an existence
+        oracle over a competitor's org chart. Asks GroupIsUnavailableInTenant, and judges
+        domain.GetAddedItemsOf rather than the stored set.
+      scope: [insertOrUpdate]
+      notification: GroupNotAvailableInTenantNotification
+      attachTo: Groups
+
+    - id: group-wildcard-refused
+      description: >-
+        For every group this write ADDS: refuse when any role the group confers grants a
+        permission carrying a wildcard in either part. Runs BEFORE the escalation rule and
+        removes its panic input. Asks GroupGrantsWildcard, which answers true for an
+        unresolvable id. Consequence, accepted: the platform's own superadmin user is seeded
+        by migration, not created through this API.
+      scope: [insertOrUpdate]
+      notification: CannotJoinWildcardGroupNotification
+      attachTo: Groups
+
+    - id: group-no-escalation
+      description: >-
+        For every group this write ADDS: refuse unless the caller holds EVERY permission of
+        EVERY role that group confers — three hops, a set and not one key. A *:* superadmin
+        passes by construction. Asks CallerLacksAnyPermissionOfGroup, which guards the
+        wildcard itself and answers "lacks" rather than calling through, because a panic on
+        a security rule is a 500.
+      scope: [insertOrUpdate]
+      notification: CannotJoinGroupWithUnheldPermissionsNotification
+      attachTo: Groups
+
+    - id: role-available-in-tenant
+      description: >-
+        The same three questions one hop shorter, for every role this write ADDS directly:
+        absent, archived, or another tenant's. Asks RoleIsUnavailableInTenant. Reuses the
+        notification Group already declared and translated.
+      scope: [insertOrUpdate]
+      notification: RoleNotAvailableInTenantNotification
+      attachTo: Roles
+
+    - id: role-wildcard-refused
+      description: >-
+        For every role this write ADDS: refuse when it grants any permission carrying a
+        wildcard. Runs before the escalation rule, same interlock as the group pair. Asks
+        RoleGrantsWildcard.
+      scope: [insertOrUpdate]
+      notification: CannotGrantWildcardRoleNotification
+      attachTo: Roles
+
+    - id: role-no-escalation
+      description: >-
+        For every role this write ADDS: refuse unless the caller holds every permission it
+        grants. Asks CallerLacksAnyPermissionOfRole.
+      scope: [insertOrUpdate]
+      notification: CannotGrantRoleWithUnheldPermissionsNotification
+      attachTo: Roles
+
+    # A MUTATION, not a validation: set the field and raise nothing. An archived user is
+    # never active, so archived+active becomes unrepresentable rather than refused. It
+    # reaches the ROW and not merely the audit event, because archive is an ordinary
+    # full-field write at this pin. It cannot collide with status-transition: that rule is
+    # IfUpdate, this is IfArchive, and the two modes never run together.
+    - id: archive-forces-suspended
+      description: >-
+        Archiving forces Status to suspended. Set the field and raise nothing. Verbatim the
+        shape Tenant already ships.
+      scope: [archive]
+
+children:
+  # The INHERITED half of the user's effective permissions. Per-child JOIN / LEAVE, never a
+  # replace-all: an omitted group on a wholesale PUT would de-provision a person's access in
+  # a request whose only intent was a rename.
+  #
+  # operations: [add, remove] and NOT change — a membership has no editable field, its single
+  # stored column IS its identity.
+  - name: UserGroup
+    plural: Groups
+    table: user_groups
+    parentColumn: user_id
+    ownedBy: root
+    editStrategy: per-child
+    operations: [add, remove]
+    softRemove: true
+    archivedAt: deleted_at
+    # Over GroupID ALONE, explicitly. The entry carries three fields and two of them are
+    # read-only join values that are BLANK on a freshly added entry — comparing all three
+    # would answer "different" for an addition that duplicates a stored one, which is the
+    # duplicate guard failing open.
+    businessIdentity: [GroupID]
+    duplicateNotification: UserAlreadyInGroupNotification
+    # The edge, not the record. "May rename a user" and "may change what a user can do" are
+    # different jobs, and the second is the escalation surface — the same split Group already
+    # made, and it reaches further here because a group hands over every role it carries.
+    permissions:
+      add: user:grant
+      remove: user:grant
+    description: >-
+      The groups this user belongs to. One row per membership, holding nothing but the
+      group's id — so a retired-and-recreated group is never silently re-joined.
+    fields:
+      - name: GroupID
+        type: id
+        column: group_id
+        unique:
+          enforce: constraint-only
+          notification: UserAlreadyInGroupNotification
+          scope: active-only
+        example: 0198f3e0-9c25-7a1f-b73d-5e08c4a29f61
+        description: >-
+          The group this membership joins — the id and not the key, so a
+          retired-and-recreated group needs an explicit re-join.
+        labelKey: UserGroupGroupIDField
+        text:
+          eng: Group
+          ptbr: Grupo
+          esp: Grupo
+          fra: Groupe
+          deu: Gruppe
+          ita: Gruppo
+          nld: Groep
+
+  # The DIRECT half. Same shape one hop shorter — the README's second arrow.
+  - name: UserRole
+    plural: Roles
+    table: user_roles
+    parentColumn: user_id
+    ownedBy: root
+    editStrategy: per-child
+    operations: [add, remove]
+    softRemove: true
+    archivedAt: deleted_at
+    businessIdentity: [RoleID]
+    duplicateNotification: UserAlreadyGrantsRoleNotification
+    permissions:
+      add: user:grant
+      remove: user:grant
+    description: >-
+      The roles granted to this user directly, beside anything their groups confer. One row
+      per grant, holding nothing but the role's id.
+    fields:
+      - name: RoleID
+        type: id
+        column: role_id
+        unique:
+          enforce: constraint-only
+          notification: UserAlreadyGrantsRoleNotification
+          scope: active-only
+        example: 0198f3e0-1a44-7bb2-9c31-77c0d5e1b904
+        description: >-
+          The role granted directly to this user — the id and not the key, for the same
+          reason the membership stores one.
+        labelKey: UserRoleRoleIDField
+        text:
+          eng: Role
+          ptbr: Papel
+          esp: Rol
+          fra: Rôle
+          deu: Rolle
+          ita: Ruolo
+          nld: Rol
+
+joins:
+  # The traversal into the OWNER, mirroring Role and Group. A ROOT join's fields ARE
+  # addressable in a criteria, unlike a collection's — which is what makes "the users of
+  # acme-comercio" answerable by handle rather than by UUID.
+  #
+  # inner is correct because tenant_id is NOT NULL and FK-backed. Neither field carries a
+  # domain type: the value belongs to Tenant, arrives read-only, and is never validated here.
+  - kind: inner
+    to: Tenant
+    on: tenant_id
+    fields:
+      - name: TenantWorkspace
+        column: workspace
+        example: acme-comercio
+        description: The owning tenant's immutable handle. Read-only, filled on every load.
+        labelKey: UserTenantWorkspaceField
+        text:
+          eng: Workspace
+          ptbr: Workspace
+          esp: Workspace
+          fra: Espace de travail
+          deu: Workspace
+          ita: Workspace
+          nld: Workspace
+      - name: TenantStatus
+        column: status
+        example: active
+        description: The owning tenant's commercial lifecycle. Read-only, filled on every load.
+        labelKey: UserTenantStatusField
+        text:
+          eng: Tenant status
+          ptbr: Situação do inquilino
+          esp: Situación del inquilino
+          fra: Statut du locataire
+          deu: Mandantenstatus
+          ita: Stato del tenant
+          nld: Tenantstatus
+
+  # The forward walk, half one: GET /users/:id names the groups, with each one's handle and
+  # label, so a client renders the membership list with no second call.
+  #
+  # inner is safe ONLY because group_id is NOT NULL and FK-backed — inside a collection an
+  # inner join drops the ENTRY, which is a silent hole in the array rather than a missing
+  # user. LOAD-ONLY: a filter over these is a typed 400, which is the 1:N boundary and not
+  # the backing.
+  #
+  # The group's deleted_at is deliberately NOT traversed, matching Role and Group:
+  # republishing a column the OWNING aggregate keeps off its own reads is a back door to a
+  # decision already made the other way.
+  - kind: inner
+    to: Group
+    inChild: UserGroup
+    on: group_id
+    fields:
+      - name: GroupKey
+        column: group_key
+        example: engineering
+        description: The group's stable machine handle. Read-only, filled on load.
+        labelKey: UserGroupGroupKeyField
+        text:
+          eng: Group key
+          ptbr: Chave do grupo
+          esp: Clave del grupo
+          fra: Clé du groupe
+          deu: Gruppenschlüssel
+          ita: Chiave del gruppo
+          nld: Groepssleutel
+      - name: GroupName
+        column: name
+        example: Engineering
+        description: The group's display name. Read-only, filled on load.
+        labelKey: UserGroupGroupNameField
+        text:
+          eng: Group name
+          ptbr: Nome do grupo
+          esp: Nombre del grupo
+          fra: Nom du groupe
+          deu: Gruppenname
+          ita: Nome del gruppo
+          nld: Groepsnaam
+
+  # The forward walk, half two — the direct grants.
+  - kind: inner
+    to: Role
+    inChild: UserRole
+    on: role_id
+    fields:
+      - name: RoleKey
+        column: role_key
+        example: billing-manager
+        description: The granted role's stable machine handle. Read-only, filled on load.
+        labelKey: UserRoleRoleKeyField
+        text:
+          eng: Role key
+          ptbr: Chave do papel
+          esp: Clave del rol
+          fra: Clé du rôle
+          deu: Rollenschlüssel
+          ita: Chiave del ruolo
+          nld: Rolsleutel
+      - name: RoleName
+        column: name
+        example: Billing Manager
+        description: The granted role's display name. Read-only, filled on load.
+        labelKey: UserRoleRoleNameField
+        text:
+          eng: Role name
+          ptbr: Nome do papel
+          esp: Nombre del rol
+          fra: Nom du rôle
+          deu: Rollenname
+          ita: Nome del ruolo
+          nld: Rolnaam
+
+service:
+  required: true
+  facts:
+    # The pre-check half of unique.enforce on Email. NOT filtered by the tenant, and that is
+    # the point: the index is global, so scoping this fact would let the same address exist
+    # twice across two tenants and break the README's central invariant.
+    - name: EmailTaken
+      kind: exists
+      filters: [Email]
+      excludeSelf: true
+      activeOnly: true
+      description: >-
+        Reports whether another ACTIVE user anywhere on the platform already holds this
+        e-mail address. Excludes the row being updated.
+
+    # NOT a query, and the only fact here that is not. The domain must not import a
+    # crypto package — an aggregate that knew Argon2id would be a domain that changes when
+    # the parameters do — so the hash arrives the same way every other answer the rules
+    # cannot compute themselves arrives: through the port. The implementation is one call
+    # into the PasswordHasher adapter and no round trip at all.
+    - name: HashPassword
+      kind: manual
+      returns: string
+      filters: [Password]
+      description: >-
+        The irreversible Argon2id hash of the plaintext, PHC-encoded so the parameters
+        travel with the value. Pure CPU, no query. It must never log its input.
+
+    - name: TenantIsUnavailable
+      kind: manual
+      returns: bool
+      filters: [TenantID]
+      description: >-
+        Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
+        the tenants table by its primary key. A trial tenant is a live customer and is
+        available.
+
+    # Six per-entry facts, three per collection. A fact about a collection is asked ONCE PER
+    # ENTRY, the entry's field arriving as an argument, and all six are asked only about the
+    # entries a write ADDS.
+    #
+    # The group pair is the expensive one and it is still cheap: GroupRepository declares the
+    # traversal into roles and RoleRepository declares the one into permissions, so a group
+    # carrying N roles resolves in 1 + N reads with every grant's resource and action already
+    # filled. Memoise per request so the wildcard probe and the escalation probe share it.
+    - name: GroupIsUnavailableInTenant
+      kind: manual
+      returns: bool
+      filters: [TenantID, Groups.GroupID]
+      description: >-
+        Whether this group id is absent from the groups table, points at an archived group,
+        or belongs to a tenant OTHER than the one passed. One answer for all three — the
+        caller-facing message must not distinguish them.
+
+    - name: GroupGrantsWildcard
+      kind: manual
+      returns: bool
+      filters: [Groups.GroupID]
+      description: >-
+        Whether any role this group confers grants a permission carrying a wildcard in
+        either part. Answers TRUE when the id is unknown, so an unresolvable membership
+        never reaches the escalation probe.
+
+    - name: CallerLacksAnyPermissionOfGroup
+      kind: manual
+      returns: bool
+      filters: [Groups.GroupID]
+      description: >-
+        Whether the requesting caller fails to hold at least one permission conferred by any
+        role in this group — the transitive, three-hop half of the escalation rule. Shares
+        the single resolution GroupGrantsWildcard performs. GUARDS THE WILDCARD ITSELF and
+        answers "lacks" rather than calling through, because a panic on a security rule is a
+        500. A *:* superadmin passes by construction.
+
+    - name: RoleIsUnavailableInTenant
+      kind: manual
+      returns: bool
+      filters: [TenantID, Roles.RoleID]
+      description: >-
+        Whether this role id is absent from the roles table, points at an archived role, or
+        belongs to a tenant OTHER than the one passed. One answer for all three.
+
+    - name: RoleGrantsWildcard
+      kind: manual
+      returns: bool
+      filters: [Roles.RoleID]
+      description: >-
+        Whether the role behind this id grants any permission carrying a wildcard. Resolve it
+        through RoleRepository.Loader, whose declared read join fills every grant's resource
+        and action. Answers TRUE for an unknown id.
+
+    - name: CallerLacksAnyPermissionOfRole
+      kind: manual
+      returns: bool
+      filters: [Roles.RoleID]
+      description: >-
+        Whether the requesting caller fails to hold at least one of the permissions this role
+        grants. Shares RoleGrantsWildcard's single read, and guards the wildcard itself.
+
+read:
+  backing: relational
+  view:
+    name: users
+  managed: [CreatedAt, UpdatedAt]
+  # The rendered whole of the composite name, derived per row from the two stored halves —
+  # no column, and the method that renders it lives on the value object, so REST, GraphQL
+  # and the export all read the same definition. Named FullName rather than Name because the
+  # composite field already owns that word on this entity.
+  #
+  # ?fields=fullName fetches the two parts; ?orderBy=fullName is a typed 400, which is
+  # exactly why both halves are filterable and sortable in their own right.
+  computed:
+    - name: FullName
+      type: string
+      from: [GivenName, FamilyName]
+      labelKey: UserFullNameField
+      example: Maria Souza Lima
+      description: The person's given and family names on one line, for listings.
+  byId: true
+  byParams:
+    filters:
+      - {field: TenantID, ops: [eq, in]}
+      - {field: GivenName, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: FamilyName, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: Email, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: Status, ops: [eq, in]}
+      - {field: MustChangePassword, ops: [eq]}
+      - {field: PasswordChangedAt, ops: [gte, lte]}
+      - {field: EmailVerifiedAt, ops: [eq, gte, lte]}
+      - {field: TenantWorkspace, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: TenantStatus, ops: [eq, in]}
+      - {field: CreatedAt, ops: [gte, lte]}
+      - {field: UpdatedAt, ops: [gte, lte]}
+      - {field: ID, ops: [eq, in]}
+    # PasswordHash, FailedLoginAttempts and LockedUntil are absent from both lists, and the
+    # absence is the policy: a redacted field is still queryable by design, so nothing but
+    # this silence keeps a hash out of the query vocabulary. A filter over one is an oracle
+    # walked a rune at a time; a filter over the lockout counter publishes which accounts are
+    # under attack.
+    # Every path spec.md §9 declares sortable, and the three at the end were
+    # MISSING until the reconcile pass caught them: TenantID and TenantStatus
+    # (which Group already sorts by, and which only a *:* operator listing across
+    # tenants can use) and EmailVerifiedAt ("who verified most recently", the day
+    # a verification flow writes it).
+    #
+    # Nothing is orderable until it is named here — an undeclared path is a typed
+    # 400 — so a gap in this list is a promise the spec made and the API refuses.
+    sort: [ID, FamilyName, GivenName, Email, Status, PasswordChangedAt, EmailVerifiedAt,
+           TenantID, TenantWorkspace, TenantStatus, CreatedAt, UpdatedAt]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      includeArchived: true
+
+surfaces:
+  rest: true
+  graphql:
+    enabled: true
+    connection: true
+    mutations: [insert, update, archive]
+
+authz:
+  resource: user
+  # Every row is tenant-scoped, on READS and on WRITES both. A by-id read of another
+  # tenant's user answers 404 rather than 403. A user listing is the customer's staff
+  # directory INCLUDING e-mail addresses, so writes-only isolation would leak more here than
+  # it would have on Group.
+  dataAccess: tenant
+  tenantField: TenantID
+  bypass: "*:*"
+  noIdentity: stand-down
+  permissions:
+    insert: user:insert
+    patch: user:update
+    archive: user:archive
+    read: user:read

@@ -10,9 +10,10 @@
   sides so a future reader sees a decision rather than an oversight
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
-- **Generation:** `<pending>` — gate 1d, and **read §D first**: this is the first entity in
-  the service whose central field (the password) has **no spelling in the generator's spec
-  language** today
+- **Generation:** `omnicore-gen` **0.40.0** — chosen by the maintainer at gate 1d, 2026-08-26:
+  *"usar o omnicore-gen para tudo que for possível; o que não for possível, faz a mão."* The
+  two gaps that made this choice awkward were reported upstream and fixed before it was made
+  (§D); what remains hand-written is the boundary §D's own table names, not a workaround.
 - **Pin:** omnicore **`v0.60.0`** · `omnicore-gen` **0.40.0** · dialect postgres · Postgres
   SoR, no Mongo, no broker → relational-served views. Same posture every existing entity
   was built under

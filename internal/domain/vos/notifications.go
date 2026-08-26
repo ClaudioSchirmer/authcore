@@ -62,3 +62,23 @@ type InvalidRoleKeyNotification struct{ domain.DomainNotificationBase }
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type InvalidGroupKeyNotification struct{ domain.DomainNotificationBase }
+
+// InvalidEmailNotification reaches the caller as 422. The struct NAME is the
+// translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidEmailNotification struct{ domain.DomainNotificationBase }
+
+// InvalidPersonNameNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidPersonNameNotification struct{ domain.DomainNotificationBase }
+
+// WeakPasswordNotification reaches the caller as 422. The struct NAME is the
+// translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type WeakPasswordNotification struct{ domain.DomainNotificationBase }
+
+// UnknownUserStatusNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type UnknownUserStatusNotification struct{ domain.DomainNotificationBase }
