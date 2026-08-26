@@ -56,12 +56,12 @@ func (e *User) customRules(actionName string, service domain.Service, r *domain.
 	})
 
 	r.IfUpdate(func() {
-		// The two credential operations dispatch ModeUpdate, which is also what
-		// an ordinary PATCH dispatches — so the ACTION NAME is what tells them
-		// apart. Without this guard the password checks would fire on a rename,
-		// against a field that write never carried.
-		if IsCredentialAction(actionName) {
-			e.credentialRules(actionName, svc, r)
+		// The reset dispatches ModeUpdate, which is also what an ordinary PATCH
+		// dispatches — so the ACTION NAME is what tells them apart. Without this
+		// guard the password checks would fire on a rename, against a field that
+		// write never carried.
+		if actionName == ActionResetPassword {
+			e.credentialRules(svc, r)
 		}
 	})
 
@@ -119,16 +119,10 @@ func (e *User) deriveCredential(service UserService) {
 	// all, and it is the flag the public change-password route clears.
 	e.MustChangePassword = true
 
-	// The lockout pair starts at rest. The zero instant means "not locked" —
-	// NULL is not available on a server-assigned column, and the zero value is
-	// the honest spelling of "no lockout has ever been set".
-	e.FailedLoginAttempts = 0
-	e.LockedUntil = time.Time{}
-
-	// EmailVerifiedAt is deliberately LEFT at the zero instant. Nothing in this
-	// service verifies an address — there is no token store and no outbound
-	// mail path — so writing anything here would be a claim the service cannot
-	// support. The column exists so the flow, when it is built, is code only.
+	// EmailVerifiedAt is deliberately LEFT NIL. Nothing in this service verifies
+	// an address — there is no token store and no outbound mail path — so
+	// writing anything here would be a claim the service cannot support, and
+	// nil is how the wire says "not verified" to a caller. The column exists so the flow, when it is built, is code only.
 }
 
 // refusePasswordEchoingIdentity refuses a password built out of the user's own

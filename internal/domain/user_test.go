@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:d16607ac9bc7a99db6acd4e7a420e68214001b0b07c6d649030732390ab39506
+// checksum:   sha256:250e7e45614e2139de40949c16fcf9994f5071c6d3f3281df4b87075751be682
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -91,12 +91,10 @@ func validUser() *User {
 	return &User{
 		TenantID:             domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Email:                vos.Email("maria@acme.com"),
-		EmailVerifiedAt:      time.Date(2026, 8, 25, 14, 3, 11, 0, time.UTC),
+		EmailVerifiedAt:      func() *time.Time { v := time.Time(time.Date(2026, 8, 25, 14, 3, 11, 0, time.UTC)); return &v }(),
 		PasswordHash:         "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$aGFzaA",
 		PasswordChangedAt:    time.Date(2026, 8, 25, 14, 3, 11, 0, time.UTC),
 		MustChangePassword:   true,
-		FailedLoginAttempts:  0,
-		LockedUntil:          time.Date(2026, 8, 25, 14, 18, 0, 0, time.UTC),
 		Status:               vos.UserStatus("active"),
 		Password:             vos.Password("Str0ng!Passphrase"),
 		PasswordConfirmation: "Str0ng!Passphrase",
@@ -267,7 +265,6 @@ func TestUserNotificationSemantics(t *testing.T) {
 		{"TooManyRolesForUserNotification", TooManyRolesForUserNotification{}.Semantic(), domain.SemanticValidation},
 		{"CannotJoinGroupWithUnheldPermissionsNotification", CannotJoinGroupWithUnheldPermissionsNotification{}.Semantic(), domain.SemanticForbidden},
 		{"CannotJoinWildcardGroupNotification", CannotJoinWildcardGroupNotification{}.Semantic(), domain.SemanticForbidden},
-		{"InvalidCredentialsNotification", InvalidCredentialsNotification{}.Semantic(), domain.SemanticForbidden},
 		{"PasswordUnchangedNotification", PasswordUnchangedNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidEmailNotification", vos.InvalidEmailNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidPersonNameNotification", vos.InvalidPersonNameNotification{}.Semantic(), domain.SemanticValidation},

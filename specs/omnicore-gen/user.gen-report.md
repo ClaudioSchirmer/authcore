@@ -17,12 +17,10 @@ The backing stays a contract across every run: the mappers convert with `vos.<Na
 
 ### Fields declared DERIVED, which nothing here computes
 
-- **`EmailVerifiedAt`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
+- **`EmailVerifiedAt`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: the column starts NULL and stays null until something writes it — a `rules.manual` entry on the verb that produces the value, or hand-written code beyond this spec. Null is a state the response shows honestly (the field is simply absent), so check that the write exists rather than that the insert fills it.
 - **`PasswordHash`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
 - **`PasswordChangedAt`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
 - **`MustChangePassword`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
-- **`FailedLoginAttempts`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
-- **`LockedUntil`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
 
 ### `internal/domain/user_rules_manual.go`
 
@@ -30,7 +28,7 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 **`credential-derivation`**
 
-> Fill the server-assigned fields on creation. Hash Password with the PasswordHasher port (Argon2id, OWASP baseline, PHC-encoded) into PasswordHash; set PasswordChangedAt to now; set MustChangePassword to true, because the creator knows the password they chose; set FailedLoginAttempts to 0 and LockedUntil to the zero instant. Leave EmailVerifiedAt at the zero instant — no verification flow exists. The plaintext must never be logged, on any path.
+> Fill the server-assigned fields on creation. Hash Password with the PasswordHasher port (Argon2id, OWASP baseline, PHC-encoded) into PasswordHash; set PasswordChangedAt to now; set MustChangePassword to true, because the creator knows the password they chose. Leave EmailVerifiedAt at the zero instant — no verification flow exists. The plaintext must never be logged, on any path.
 
 - fires under `IfInsert`
 
@@ -174,12 +172,10 @@ The shape the regenerated code expects, for `users`:
 | `given_name` | string(75) | no |  |
 | `family_name` | string(75) | no |  |
 | `email` | string(254) | no |  |
-| `email_verified_at` | time | no |  |
+| `email_verified_at` | time | yes |  |
 | `password_hash` | string(255) | no |  |
 | `password_changed_at` | time | no |  |
 | `must_change_password` | bool | no |  |
-| `failed_login_attempts` | int | no |  |
-| `locked_until` | time | no |  |
 | `status` | string(16) | no |  |
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
@@ -237,7 +233,7 @@ It is forward-only, and it does not protect the database: the column holds the r
 
 ### Fields nobody receives
 
-`PasswordHash`, `FailedLoginAttempts`, `LockedUntil` — declared `hidden: true`, so stored, filterable and writable, and absent from every response: the by-id read, each row of the listing, the write responses, and the CSV/XLSX exports that render the listing. This is not `read.fieldRestrict`, which returns the field to callers holding a permission; nobody receives these. Check that a client is not expected to read back what it just wrote.
+`PasswordHash` — declared `hidden: true`, so stored, filterable and writable, and absent from every response: the by-id read, each row of the listing, the write responses, and the CSV/XLSX exports that render the listing. This is not `read.fieldRestrict`, which returns the field to callers holding a permission; nobody receives these. Check that a client is not expected to read back what it just wrote.
 
 ### Fields the caller sends and nothing stores
 
@@ -299,6 +295,17 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 ## What was generated
 
+| What | File |
+|---|---|
+| the insert command and result | `internal/application/commands/insert_user_command.go` |
+| the patch command and result | `internal/application/commands/patch_user_command.go` |
+| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
+| the User aggregate root, its modes and its rules | `internal/domain/user.go` |
+| tests for User's rules | `internal/domain/user_test.go` |
+| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
+| the insert request and response | `internal/web/requests/insert_user.go` |
+| the patch request and response | `internal/web/requests/patch_user.go` |
+
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/user_computed_manual.go` — hand-written rules live here, by design
@@ -307,13 +314,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-**Refused** — these differ from what the generator last wrote, so they were left exactly as they are:
-
-- `internal/infra/user_repository.go` — the checksum in its header no longer matches its contents — it was edited by hand
-
-To let the generator take one back, pass `--force=<path>`; to keep a fix deliberately, run `omnicore-gen adopt <path>`.
-
-42 file(s) were already up to date.
+35 file(s) were already up to date.
 
 ## What was NOT generated
 

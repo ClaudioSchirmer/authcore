@@ -7,7 +7,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:49a61126547ae00b2af2f1147034b50c6313bd98ddcedad386a7e551aaa3d5fb
+// checksum:   sha256:b735496b6aeceed50fe925a9ffd80a891b08e4056b9b94996989a44563446bf8
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -45,7 +45,6 @@ func TestUserNotificationsAreTranslated(t *testing.T) {
 		"TooManyRolesForUserNotification",
 		"CannotJoinGroupWithUnheldPermissionsNotification",
 		"CannotJoinWildcardGroupNotification",
-		"InvalidCredentialsNotification",
 		"PasswordUnchangedNotification",
 		"InvalidEmailNotification",
 		"InvalidPersonNameNotification",

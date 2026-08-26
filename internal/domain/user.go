@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:c71f9f689beed80307c2b3056dce976d0fd6ba3cc7ce29591ecd338a57e43e04
+// checksum:   sha256:5b98e02f84b0cb9be14fa7206cc4089c4a65c298a040890e3e3427931785e641
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -39,16 +39,14 @@ import (
 // snapshot the framework takes to compare old and new state.
 type User struct {
 	domain.AggregateRoot
-	TenantID            domain.ID      `labelKey:"UserTenantIDField"`            // The tenant this user belongs to. Immutable — a user never moves between tenants
-	Name                vos.PersonName `labelKey:"UserNameField"`                // The person's name, as they write it.
-	Email               vos.Email      `labelKey:"UserEmailField"`               // The address this person signs in with. Unique across the whole platform over active rows, and immutable after creation
-	EmailVerifiedAt     time.Time      `labelKey:"UserEmailVerifiedAtField"`     // When the address was proven reachable; the zero instant until a verification flow exists
-	PasswordHash        string         `labelKey:"UserPasswordField"`            // The irreversible Argon2id hash of the password, PHC-encoded so its parameters travel with it. Never sent by a caller, never returned, never copied
-	PasswordChangedAt   time.Time      `labelKey:"UserPasswordChangedAtField"`   // When the credential was last set — always, since a password is required at creation
-	MustChangePassword  bool           `labelKey:"UserMustChangePasswordField"`  // Whether the next sign-in must rotate the password
-	FailedLoginAttempts int            `labelKey:"UserFailedLoginAttemptsField"` // Consecutive credential failures on the public change-password route
-	LockedUntil         time.Time      `labelKey:"UserLockedUntilField"`         // When the lockout expires; the zero instant means the account is not locked
-	Status              vos.UserStatus `labelKey:"UserStatusField"`              // The account's state — active or suspended. Orthogonal to archiving
+	TenantID           domain.ID      `labelKey:"UserTenantIDField"`           // The tenant this user belongs to. Immutable — a user never moves between tenants
+	Name               vos.PersonName `labelKey:"UserNameField"`               // The person's name, as they write it.
+	Email              vos.Email      `labelKey:"UserEmailField"`              // The address this person signs in with. Unique across the whole platform over active rows, and immutable after creation
+	EmailVerifiedAt    *time.Time     `labelKey:"UserEmailVerifiedAtField"`    // When the address was proven reachable; NULL until a verification flow exists
+	PasswordHash       string         `labelKey:"UserPasswordField"`           // The irreversible Argon2id hash of the password, PHC-encoded so its parameters travel with it. Never sent by a caller, never returned, never copied
+	PasswordChangedAt  time.Time      `labelKey:"UserPasswordChangedAtField"`  // When the credential was last set — always, since a password is required at creation
+	MustChangePassword bool           `labelKey:"UserMustChangePasswordField"` // Whether the next sign-in must rotate the password
+	Status             vos.UserStatus `labelKey:"UserStatusField"`             // The account's state — active or suspended. Orthogonal to archiving
 
 	// No slice field for the children, deliberately: the framework keeps them
 	// in its own collection. A slice here would stay empty on every read and

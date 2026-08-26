@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:b683399abdbb41bf61cd3453cc74744c5e00f013e77a11a16f565a6c8c4d1656
+// checksum:   sha256:fe18072bf2faee664991a07474eb75fc9d20df99125f9b49a39d4917a17c4e16
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -96,22 +96,20 @@ func (q FindUserByIDQuery) ContextName() string { return "User" }
 // refused at boot. This read declares no ?fields=, so plain values are right
 // — an absent key fills as the zero value.
 type FindUserByIDResult struct {
-	ID                  string
-	TenantID            domain.ID
-	GivenName           string
-	FamilyName          string
-	Email               string
-	EmailVerifiedAt     time.Time
-	PasswordHash        string
-	PasswordChangedAt   time.Time
-	MustChangePassword  bool
-	FailedLoginAttempts int
-	LockedUntil         time.Time
-	Status              string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	TenantWorkspace     string
-	TenantStatus        string
+	ID                 string
+	TenantID           domain.ID
+	GivenName          string
+	FamilyName         string
+	Email              string
+	EmailVerifiedAt    *time.Time
+	PasswordHash       string
+	PasswordChangedAt  time.Time
+	MustChangePassword bool
+	Status             string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	TenantWorkspace    string
+	TenantStatus       string
 	// FullName is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from GivenName+FamilyName.
 	FullName string

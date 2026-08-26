@@ -27,12 +27,10 @@ CREATE TABLE "users" (
   "given_name" VARCHAR(75) NOT NULL,
   "family_name" VARCHAR(75) NOT NULL,
   "email" VARCHAR(254) NOT NULL,
-  "email_verified_at" TIMESTAMPTZ NOT NULL,
+  "email_verified_at" TIMESTAMPTZ NULL,
   "password_hash" VARCHAR(255) NOT NULL,
   "password_changed_at" TIMESTAMPTZ NOT NULL,
   "must_change_password" BOOLEAN NOT NULL,
-  "failed_login_attempts" INTEGER NOT NULL,
-  "locked_until" TIMESTAMPTZ NOT NULL,
   "status" VARCHAR(16) NOT NULL,
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -46,12 +44,10 @@ COMMENT ON COLUMN "users"."tenant_id" IS 'The tenant this user belongs to. Immut
 COMMENT ON COLUMN "users"."given_name" IS 'The person''s given name.';
 COMMENT ON COLUMN "users"."family_name" IS 'The person''s family name.';
 COMMENT ON COLUMN "users"."email" IS 'The address this person signs in with. Unique across the whole platform over active rows, and immutable after creation.';
-COMMENT ON COLUMN "users"."email_verified_at" IS 'When the address was proven reachable; the zero instant until a verification flow exists.';
+COMMENT ON COLUMN "users"."email_verified_at" IS 'When the address was proven reachable; NULL until a verification flow exists.';
 COMMENT ON COLUMN "users"."password_hash" IS 'The irreversible Argon2id hash of the password, PHC-encoded so its parameters travel with it. Never sent by a caller, never returned, never copied.';
 COMMENT ON COLUMN "users"."password_changed_at" IS 'When the credential was last set — always, since a password is required at creation.';
 COMMENT ON COLUMN "users"."must_change_password" IS 'Whether the next sign-in must rotate the password.';
-COMMENT ON COLUMN "users"."failed_login_attempts" IS 'Consecutive credential failures on the public change-password route.';
-COMMENT ON COLUMN "users"."locked_until" IS 'When the lockout expires; the zero instant means the account is not locked.';
 COMMENT ON COLUMN "users"."status" IS 'The account''s state — active or suspended. Orthogonal to archiving.';
 COMMENT ON COLUMN "users"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "users"."created_at" IS 'When the row was created; written by the database default.';

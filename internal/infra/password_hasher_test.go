@@ -6,6 +6,10 @@
 // Argon2id at the OWASP baseline costs ~100 ms per call by design, so these
 // tests are deliberately few and each one earns its place. The table cases that
 // would be free elsewhere are not free here.
+//
+// A timing case used to sit at the bottom, asserting that a miss cost the same
+// as a hit. It belonged to the public change-password endpoint, which was
+// removed on 2026-08-26 along with the dummy-verification method it guarded.
 
 package infra
 
@@ -13,7 +17,6 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
-	"time"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -149,31 +152,6 @@ func TestArgon2idMatchesRefusesMalformed(t *testing.T) {
 	}
 }
 
-// TestArgon2idDummyMatchesCostsTheSameAsAReal one is the timing guard, and it
-// is asserted as a RATIO rather than as an absolute: what matters is that a
-// miss and a hit are indistinguishable to a stopwatch, not how long either
-// takes on this machine.
-//
-// Without DummyMatches the public change-password route answers an unknown
-// e-mail in about a millisecond and a known one in about a hundred — a 100x
-// oracle that enumerates users through a response body that says nothing.
-//
-// The bound is deliberately loose (a factor of three) because a CI runner is a
-// noisy clock. It still fails hard on the bug it exists for, which is not a
-// 20% skew but two orders of magnitude.
-func TestArgon2idDummyMatchesCostsTheSameAsAReal(t *testing.T) {
-	h := NewArgon2idHasher()
-	encoded := h.Hash(testPassword)
-
-	onAHit := timeIt(func() { h.Matches("wrong-password", encoded) })
-	onAMiss := timeIt(func() { h.DummyMatches("wrong-password") })
-
-	ratio := float64(onAHit) / float64(onAMiss)
-	if ratio > 3 || ratio < 1.0/3 {
-		t.Fatalf("the dummy path costs %.2fx a real verification — the timing oracle is open", ratio)
-	}
-}
-
 // encodeCheapHash produces the hash half of the cheap-parameter fixture above,
 // using the SAME salt string the fixture declares.
 //
@@ -189,14 +167,4 @@ func encodeCheapHash(t *testing.T, password string) string {
 	}
 	key := argon2.IDKey([]byte(password), salt, 1, 8, 1, argonKeyBytes)
 	return base64.RawStdEncoding.EncodeToString(key)
-}
-
-// timeIt returns how long fn took. One sample, deliberately: the assertion it
-// feeds is a two-orders-of-magnitude question, and averaging several 100 ms
-// Argon2id calls would triple the suite's runtime to sharpen a bound that does
-// not need sharpening.
-func timeIt(fn func()) time.Duration {
-	start := time.Now()
-	fn()
-	return time.Since(start)
 }

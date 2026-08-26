@@ -37,8 +37,9 @@ Honest scope, so nobody reads intent as delivery:
 | Capability | State |
 |---|---|
 | Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — six REST endpoints and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/tenant.omnicore.yaml` against the model in `specs/scaffold-entity/tenant/spec.md`. Build, vet and the unit suite are green, and the service has been booted against Postgres with a tenant registered through the API. The contract suite (`/omnicore:qa`) is still to come |
-| `User` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing), four collection ops (join/leave a group · grant/revoke a role), **two credential operations** and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/user.omnicore.yaml` against the model in `specs/scaffold-entity/user/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
+| `User` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing), four collection ops (join/leave a group · grant/revoke a role), **one credential operation** (password reset) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/user.omnicore.yaml` against the model in `specs/scaffold-entity/user/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | User ↔ tenant association | **built** — `users.tenant_id` NOT NULL, FK to `tenants.id`, filled from the caller's `tenant_id` claim and nameable in the body only by a `*:*` operator crossing the scope |
+| Self-service password change | **not started** — and the endpoint that briefly pretended to be it was removed. It needs a forgot-password flow (e-mail, expiring link) or an authenticated change carrying the current password; neither exists |
 | User ↔ group / User → role membership | **built** — two owned collections with per-entry join/leave and grant/revoke, both gated on `user:grant` and both refusing an escalation the caller does not already hold |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
@@ -49,7 +50,7 @@ Honest scope, so nobody reads intent as delivery:
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
 | Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential path: the password hasher, the two credential operations and the rules behind them are hand-written, and `specs/omnicore-gen/user.gen-report.md` lists every piece |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**six** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant` and `user:reset-password` are the three nobody will guess from the pattern. **One route is deliberately ungated**: the public change-password endpoint carries no permission at all, and is declared in `auth.publicRoutes` in both profiles |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**six** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant` and `user:reset-password` are the three nobody will guess from the pattern. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -594,55 +595,30 @@ and stops the product. A user on leave is suspended; a user who left the company
 archived, and archiving forces the status to `suspended` so archived-and-active is
 unrepresentable rather than merely refused.
 
-#### The credential endpoints
+#### The password reset
 
-Two operations, and they are **not the same operation twice**. Neither is a shape the
-generator can express — the spec language gates operations by a closed set of verbs and
-neither of these is one — so both are hand-written, and the reasoning is in
-`specs/scaffold-entity/user/spec.md` §E.
+One operation, hand-written because the generator cannot express it — the spec language
+gates operations by a closed set of verbs and "reset a credential" is not one of them.
 
 ```
-PATCH  /users/password                  PUBLIC — no token at all
-PATCH  /users/{id}/password-reset       token: self · *:* · or user:reset-password
+PATCH  /users/{id}/password-reset       user:reset-password  (a *:* claim satisfies it)
 ```
 
-**The change is the only unauthenticated write in this service, and that is deliberate.** A
-caller who needs a new password may be exactly the caller who cannot obtain a token — a
-must-change flag, an expired credential, or a login screen that refused them — so gating the
-change on a token they cannot get is a deadlock. Possession of the **current password** is
-the authorization.
+It carries **no current password**: not knowing it is the point of a reset. That is also why
+it does not accept the user themselves — somebody who knows their password does not need
+this route, and letting a session replace a credential without proving the previous one is
+the attack a current-password check exists to stop. `user:update` deliberately does not
+reach it either: whoever can fix a typo in a name must not be able to take over an account.
 
-**It is identified by e-mail rather than by id, and that is forced rather than chosen.**
-`auth.publicRoutes` matches an exact `METHOD /path` with **no globs**, so a route carrying a
-path parameter cannot be declared public at all. What makes the by-e-mail lookup safe is the
-global unique index: one address resolves to exactly one user platform-wide, with no tenant
-claim to scope by.
+The password it leaves is somebody else's choice, so it sets `mustChangePassword`. **Nothing
+clears that flag yet** — the operation that would is the self-service change this service
+does not have.
 
-**Every credential failure answers the same thing** — *"usuário ou senha inválido"*, 401.
-An unregistered address, a wrong current password, an archived or suspended user, an
-unavailable tenant and a **locked account** are indistinguishable on purpose: distinguishing
-any of them turns the endpoint into an enumeration oracle over every tenant's staff
-directory. Two consequences worth knowing:
-
-- **A miss costs the same as a hit.** On an address nobody holds, the handler still runs a
-  full Argon2id verification against a fixed dummy hash. Without it a miss returns in about
-  a millisecond and a hit in about a hundred, and the clock enumerates users just as well as
-  a distinct message would.
-- **The NEW password's own failures are reported normally.** A caller who proved possession
-  has to be told why their new password was refused, or they can never succeed. The generic
-  answer covers the credential check and stops there.
-
-**Brute force is answered by a lockout**: five consecutive failures lock the account for
-fifteen minutes, and the counter is persisted on the request that was **rejected** — which
-is why it lives in the handler rather than in a rule, since a refused write persists
-nothing. Neither the counter nor the lock expiry is ever on the wire.
-
-**The reset takes three acceptors**: the user themselves, a `*:*` platform operator, or a
-holder of `user:reset-password`. The self acceptor must never depend on a grant — every user
-has to be able to rotate their own credential, and gating that on a permission would let an
-operator lock a whole tenant out of their own passwords by never issuing it. `user:update`
-deliberately reaches neither: whoever can fix a typo in a name must not be able to take over
-an account.
+**The permission answers WHO may attempt the verb and says nothing about WHOSE row.** The
+aggregate's own row-scope guard is what refuses a holder of `user:reset-password` in one
+tenant from resetting a password in another, and it only runs because the handler feeds it
+the caller's identity the way every generated command mapper does. A `*:*` operator crosses
+that scope, which is what lets the platform support a customer.
 
 **The password policy is 8–128 runes with all four character classes** — lowercase,
 uppercase, digit and symbol, judged by **Unicode** rather than ASCII — plus a context rule
@@ -651,6 +627,14 @@ decision made knowingly against NIST SP 800-63B-4, which states a SHALL NOT on c
 requirements and sets 15 runes as the floor for a single-factor secret. Both sides of the
 argument are in `specs/scaffold-entity/user/spec.md` §B Q3; it is one value object, and
 revisiting it changes about fifteen lines.
+
+⚠️ **One trap worth knowing before touching those rules.** The plaintext field declares
+`modes: [insert]`, so the framework excludes its value object from the automatic validation
+pass on every update — correctly, because a PATCH that renames somebody carries no password.
+This route DOES carry one, and the policy runs only because the rule calls `IsValid`
+directly. The obvious repair — `Rules.ValidateValueObject` — does not work and fails
+silently: the forced list honours the same ignore set, which is how a five-character
+password was accepted once.
 
 #### Tenant isolation
 
@@ -730,8 +714,7 @@ PATCH  /users/{id}/groups/{entryId}/archive        leave one           — user:
 POST   /users/{id}/roles                           grant a role        — user:grant
 PATCH  /users/{id}/roles/{entryId}/archive         revoke one          — user:grant
 
-PATCH  /users/password                             change your own — PUBLIC, by e-mail
-PATCH  /users/{id}/password-reset                  reset — self, *:*, or user:reset-password
+PATCH  /users/{id}/password-reset                  reset — user:reset-password (or *:*)
 ```
 
 `PATCH /users/{id}` carries **three** fields and no more: `givenName`, `familyName` and
@@ -740,10 +723,14 @@ request shape, so there is no body in which a caller can propose one. Neither is
 credential field: there is no shape reaching the ordinary update in which a password exists
 to be sent.
 
-⚠️ **`PATCH /users/password` and `PATCH /users/{id}` are the same shape to a router** —
-`password` matches `{id}` — so the public route is registered FIRST, by a feature that is
-registered before the generated one. The by-id route also parses its segment as a UUID, so
-an inverted order cannot silently swallow the change; it would answer 404 loudly instead.
+**There is no self-service password change, and that is a gap rather than a decision
+against one.** A user who wants to rotate their own credential has no endpoint today: only
+a holder of `user:reset-password` can set one. A public change-password route existed
+briefly and was removed on 2026-08-26 — it did exactly what the reset does, without a
+token, on the premise that somebody needing a new password might be unable to obtain one.
+That premise does not hold here: there is no login route, so nothing blocks authentication
+for a caller who knows their password. What it was reaching for is a FORGOT-PASSWORD flow —
+e-mail, an expiring link, a one-time token — which is real work nobody has started.
 
 ```
 GET    /groups/                              list, filter, paginate

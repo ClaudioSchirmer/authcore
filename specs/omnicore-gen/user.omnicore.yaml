@@ -122,13 +122,20 @@ fields:
   # and stays NULL until one exists. It is server-written by definition, so nothing can set
   # it by accident either. Filterable on purpose — "verified vs not" is answerable the day
   # it starts being written.
+  #
+  # nullable AND assignedFrom together, which the generator refused until 0.42.0 — the two
+  # say different things and this field needs both: "no caller may set this" (assignedFrom)
+  # and "this may have no value" (nullable). While they were mutually exclusive the field
+  # was forced non-nullable, nothing wrote it, and every response carried the zero instant
+  # rendered as `0000-12-31T18:42:28-05:17`. Reported and fixed upstream.
   - name: EmailVerifiedAt
     type: time
     column: email_verified_at
+    nullable: true
     livesOn: root
     assignedFrom: derived
     example: "2026-08-25T14:03:11Z"
-    description: When the address was proven reachable; the zero instant until a verification flow exists.
+    description: When the address was proven reachable; NULL until a verification flow exists.
     labelKey: UserEmailVerifiedAtField
     text:
       eng: E-mail verified at
@@ -222,33 +229,6 @@ fields:
       deu: Muss Passwort ändern
       ita: Deve cambiare la password
       nld: Moet wachtwoord wijzigen
-
-  # The lockout pair. The open change-password route is an unauthenticated
-  # password-guessing surface, so these two are what stop it — and both are hidden, because
-  # publishing how close an account is to locking hands an attacker the counter, and a
-  # listing that showed it would publish which accounts are under attack.
-  #
-  # They are written by the custom handler's FAILURE branch, which is why no rule here
-  # declares them: a rejected aggregate write persists nothing.
-  - name: FailedLoginAttempts
-    type: int
-    column: failed_login_attempts
-    livesOn: root
-    assignedFrom: derived
-    hidden: true
-    example: "0"
-    description: Consecutive credential failures on the public change-password route.
-    labelKey: UserFailedLoginAttemptsField
-
-  - name: LockedUntil
-    type: time
-    column: locked_until
-    livesOn: root
-    assignedFrom: derived
-    hidden: true
-    example: "2026-08-25T14:18:00Z"
-    description: When the lockout expires; the zero instant means the account is not locked.
-    labelKey: UserLockedUntilField
 
   # Suspension is NOT archiving — the distinction Tenant already draws, applied here. A
   # suspended user stays listed, keeps every membership, and stops signing in. A user on
@@ -566,27 +546,6 @@ notifications:
       ita: Un gruppo che concede permessi jolly non può essere assegnato tramite questa API.
       nld: Een groep die jokertekenrechten verleent, kan niet via deze API worden toegewezen.
 
-  # Raised by the hand-written credential operations rather than by any rule declared here —
-  # declared so the type and its seven catalogs exist. ONE answer for every credential
-  # failure: an unregistered address, a wrong current password, an archived or suspended
-  # user, an unavailable tenant, and a locked account are indistinguishable on purpose.
-  # Distinguishing any of them turns the public route into an enumeration oracle over every
-  # tenant's staff directory.
-  #
-  # semantic: forbidden is the closest this vocabulary has; the hand-written handler answers
-  # 401, because a credential failure is an authentication failure rather than an
-  # authorization one. Recorded as a deviation in scaffold-entity/user/tasks.md.
-  - name: InvalidCredentialsNotification
-    semantic: forbidden
-    text:
-      ptbr: Usuário ou senha inválido.
-      eng: Invalid username or password.
-      esp: Usuario o contraseña inválidos.
-      fra: Identifiant ou mot de passe invalide.
-      deu: Ungültiger Benutzername oder ungültiges Passwort.
-      ita: Nome utente o password non validi.
-      nld: Ongeldige gebruikersnaam of wachtwoord.
-
   - name: PasswordUnchangedNotification
     semantic: validation
     text:
@@ -785,9 +744,8 @@ rules:
         Fill the server-assigned fields on creation. Hash Password with the PasswordHasher
         port (Argon2id, OWASP baseline, PHC-encoded) into PasswordHash; set
         PasswordChangedAt to now; set MustChangePassword to true, because the creator knows
-        the password they chose; set FailedLoginAttempts to 0 and LockedUntil to the zero
-        instant. Leave EmailVerifiedAt at the zero instant — no verification flow exists.
-        The plaintext must never be logged, on any path.
+        the password they chose. Leave EmailVerifiedAt at the zero instant — no verification
+        flow exists. The plaintext must never be logged, on any path.
       scope: [insert]
 
     # NIST forbids composition requirements; it does not forbid context checks, and it
@@ -1244,11 +1202,9 @@ read:
       - {field: CreatedAt, ops: [gte, lte]}
       - {field: UpdatedAt, ops: [gte, lte]}
       - {field: ID, ops: [eq, in]}
-    # PasswordHash, FailedLoginAttempts and LockedUntil are absent from both lists, and the
-    # absence is the policy: a redacted field is still queryable by design, so nothing but
-    # this silence keeps a hash out of the query vocabulary. A filter over one is an oracle
-    # walked a rune at a time; a filter over the lockout counter publishes which accounts are
-    # under attack.
+    # PasswordHash is absent from both lists, and the absence is the policy: a redacted field
+    # is still queryable by design, so nothing but this silence keeps a hash out of the query
+    # vocabulary. A filter over one is an oracle walked a rune at a time.
     # Every path spec.md §9 declares sortable, and the three at the end were
     # MISSING until the reconcile pass caught them: TenantID and TenantStatus
     # (which Group already sorts by, and which only a *:* operator listing across

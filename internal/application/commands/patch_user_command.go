@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:eaffa74db0ac2826177ec5a2f0768908bfd5678210a8e33530ed91ba4d710715
+// checksum:   sha256:fe437d26d67cb1959029c152329206bf078feea5fa760c9e5be616b17b726e72
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -70,18 +70,16 @@ func (c *PatchUserCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *ap
 
 // PatchUserResult is the write response, projected from the entity.
 type PatchUserResult struct {
-	ID                  domain.ID
-	TenantID            domain.ID
-	GivenName           string
-	FamilyName          string
-	Email               string
-	EmailVerifiedAt     time.Time
-	PasswordHash        string
-	PasswordChangedAt   time.Time
-	MustChangePassword  bool
-	FailedLoginAttempts int
-	LockedUntil         time.Time
-	Status              string
+	ID                 domain.ID
+	TenantID           domain.ID
+	GivenName          string
+	FamilyName         string
+	Email              string
+	EmailVerifiedAt    *time.Time
+	PasswordHash       string
+	PasswordChangedAt  time.Time
+	MustChangePassword bool
+	Status             string
 	// FullName is COMPUTED: no column backs it, and FromEntity fills it
 	// from GivenName+FamilyName.
 	FullName string
@@ -100,18 +98,16 @@ type PatchUserResult struct {
 // question grows two answers.
 func (c *PatchUserCommand) FromEntity(ctx *configuration.AppContext, e *appdomain.User) (PatchUserResult, error) {
 	out := PatchUserResult{
-		ID:                  *e.GetID(),
-		TenantID:            e.TenantID,
-		Email:               e.Email.Value(),
-		EmailVerifiedAt:     e.EmailVerifiedAt,
-		PasswordHash:        e.PasswordHash,
-		PasswordChangedAt:   e.PasswordChangedAt,
-		MustChangePassword:  e.MustChangePassword,
-		FailedLoginAttempts: e.FailedLoginAttempts,
-		LockedUntil:         e.LockedUntil,
-		Status:              e.Status.Value(),
-		Groups:              projectUserGroups(e),
-		Roles:               projectUserRoles(e),
+		ID:                 *e.GetID(),
+		TenantID:           e.TenantID,
+		Email:              e.Email.Value(),
+		EmailVerifiedAt:    e.EmailVerifiedAt,
+		PasswordHash:       e.PasswordHash,
+		PasswordChangedAt:  e.PasswordChangedAt,
+		MustChangePassword: e.MustChangePassword,
+		Status:             e.Status.Value(),
+		Groups:             projectUserGroups(e),
+		Roles:              projectUserRoles(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family

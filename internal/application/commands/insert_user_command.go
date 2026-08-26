@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:b874e7dd78a8ffb6ab7868a680a8f4e7b0a731a8e43309a770328108e88312cb
+// checksum:   sha256:6c55702fa82af29b1c7888eb826733d50544ed5a6619425dd5d35a09e1e04887
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -92,18 +92,16 @@ func (c *InsertUserCommand) ToEntity(ctx *configuration.AppContext) (*appdomain.
 
 // InsertUserResult is the write response, projected from the entity.
 type InsertUserResult struct {
-	ID                  domain.ID
-	TenantID            domain.ID
-	GivenName           string
-	FamilyName          string
-	Email               string
-	EmailVerifiedAt     time.Time
-	PasswordHash        string
-	PasswordChangedAt   time.Time
-	MustChangePassword  bool
-	FailedLoginAttempts int
-	LockedUntil         time.Time
-	Status              string
+	ID                 domain.ID
+	TenantID           domain.ID
+	GivenName          string
+	FamilyName         string
+	Email              string
+	EmailVerifiedAt    *time.Time
+	PasswordHash       string
+	PasswordChangedAt  time.Time
+	MustChangePassword bool
+	Status             string
 	// FullName is COMPUTED: no column backs it, and FromEntity fills it
 	// from GivenName+FamilyName.
 	FullName string
@@ -122,18 +120,16 @@ type InsertUserResult struct {
 // question grows two answers.
 func (c *InsertUserCommand) FromEntity(ctx *configuration.AppContext, e *appdomain.User) (InsertUserResult, error) {
 	out := InsertUserResult{
-		ID:                  *e.GetID(),
-		TenantID:            e.TenantID,
-		Email:               e.Email.Value(),
-		EmailVerifiedAt:     e.EmailVerifiedAt,
-		PasswordHash:        e.PasswordHash,
-		PasswordChangedAt:   e.PasswordChangedAt,
-		MustChangePassword:  e.MustChangePassword,
-		FailedLoginAttempts: e.FailedLoginAttempts,
-		LockedUntil:         e.LockedUntil,
-		Status:              e.Status.Value(),
-		Groups:              projectUserGroups(e),
-		Roles:               projectUserRoles(e),
+		ID:                 *e.GetID(),
+		TenantID:           e.TenantID,
+		Email:              e.Email.Value(),
+		EmailVerifiedAt:    e.EmailVerifiedAt,
+		PasswordHash:       e.PasswordHash,
+		PasswordChangedAt:  e.PasswordChangedAt,
+		MustChangePassword: e.MustChangePassword,
+		Status:             e.Status.Value(),
+		Groups:             projectUserGroups(e),
+		Roles:              projectUserRoles(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family

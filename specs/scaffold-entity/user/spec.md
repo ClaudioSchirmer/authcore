@@ -60,9 +60,10 @@
 | Read joins | **all three** | root→`tenants`, child→`groups`, child→`roles` |
 | Archive | **forces `suspended`** (U15) | mirrors `Tenant` |
 
+| **The public change-password route** | ⚠️ **REMOVED 2026-08-26.** §B Q2 and §E describe it; it no longer exists. The premise it was built on — a caller who cannot obtain a token — does not hold in a service with no login route. It duplicated the reset without a token, and what it was reaching for is a forgot-password flow nobody has started. Read §E as the record of a decision that was reversed, not as a description of the code | tasks.md deviation 8 |
 | **Route naming** | **as proposed** — the OPEN one is the CHANGE (`PATCH /users/password`, verifies the current password); the JWT one is the RESET (`PATCH /users/{id}/password-reset`, does not) | §B Q2 |
 | **Public route path** | **`PATCH /users/password`**, kept inside the `/users` resource | ⚠️ it **collides** with `PATCH /users/{id}` — `password` matches `:id` — so it MUST be registered first, and that ordering is now a hard acceptance check, not a comment. §E |
-| **Reset posture** | **self (`sub` == `:id`) · `*:*` · OR `user:reset-password`** | the sixth verb is BACK. A tenant can run its own helpdesk without whoever edits a name being able to take an account. §10 |
+| **Reset posture** | ~~self · `*:*` · OR `user:reset-password`~~ → **`user:reset-password` alone** *(amended 2026-08-26)* | `*:*` satisfies it for free. The self acceptor was removed once it was PROVEN — by booting with `auth.authorization.enabled: true` — that the framework refuses a non-public route with no declared permission, and that `RequirePermission` expresses exactly one. The security reading agrees: a user who knows their password uses the CHANGE endpoint; one who does not is who needs a helpdesk, and a session replacing a credential without proving the previous one is the attack `currentPassword` exists to stop. §10 |
 | **Brute force** | **`failedLoginAttempts` + `lockedUntil` taken NOW** | §C-4 is no longer deferred — the open endpoint is the writer it was waiting for. New fields in §2, new rules U7h/U7i in §7, and lockout answers the SAME generic 401. §E |
 
 **No ⚠️ OPEN slot remains.**
@@ -499,12 +500,12 @@ INDEX  (group_id) · INDEX (role_id)                   -- the reverse walk, when
 | `TenantID` | `domain.ID` | plain (an id) | no | no | root | `0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410` | The tenant this user belongs to. **Conditional source (U1b): a `*:*` superadmin names it in the body; a tenant caller INHERITS it from their own `tenant_id` claim.** Immutable after creation — a user never moves between tenants |
 | `Name` | `vos.PersonName` | **new-COMPOSITE** `vos.PersonName` | no | no | root (**2 columns**) | — | The person's name. **ONE value across two columns** — see the parts below |
 | `Email` | `vos.Email` | **new-raw** `vos.Email` | no | **yes, GLOBALLY, active-only** | root | `maria@acme.com` | The address this person signs in with. Unique across the whole platform; **immutable after creation** (U2b); archiving the user releases it |
-| `EmailVerifiedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the address was proven reachable. ⚠️ **Nothing in this model writes it** — see the note below |
+| `EmailVerifiedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the address was proven reachable. ⚠️ **Nothing in this model writes it**, so it reads `null` — see the note below. It was briefly forced non-nullable by a generator rule, fixed upstream at 0.42.0 (`tasks.md` deviation 1) |
 | `PasswordHash` | `string` (255) | plain | no *(nullable under Q2-B)* | no | root | *(never shown — see below)* | The irreversible hash of the password, PHC-encoded so its parameters travel with it. `assignedFrom: derived` + `hidden` + **`redact` on both axes** — absent from every write request, from every response body, from the audit event and from the sync payload |
 | `PasswordChangedAt` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:03:11Z` | When the credential was last set. NULL only for a user who has never had one |
 | `MustChangePassword` | `bool` | plain | no | no | root | `true` | Whether the next sign-in must rotate the password. Set by create and by the reset, cleared by the open change |
-| `FailedLoginAttempts` | `int` | plain | no | no | root | `0` | Consecutive credential failures on the open endpoint. Incremented by U7h, zeroed on success. **Never on the wire** — `hidden` |
-| `LockedUntil` | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:18:00Z` | When the lockout expires; NULL means not locked. Set by U7h, honoured by U7i. **Never on the wire** — `hidden` |
+| ~~`FailedLoginAttempts`~~ ⚠️ *(removed with §E)* | `int` | plain | no | no | root | `0` | Consecutive credential failures on the open endpoint. Incremented by U7h, zeroed on success. **Never on the wire** — `hidden` |
+| ~~`LockedUntil`~~ ⚠️ *(removed with §E)* | `*time.Time` | plain | **yes** | no | root | `2026-08-25T14:18:00Z` | When the lockout expires; NULL means not locked. Set by U7h, honoured by U7i. **Never on the wire** — `hidden` |
 | `Status` | `vos.UserStatus` | **new-enum** `vos.UserStatus` | no | no | root | `active` | `active` \| `suspended`. Suspension blocks sign-in and keeps the row listed; it is **not** archiving |
 
 Parts of the composite `Name` — written as a nested list, never as two `§2` rows, because
@@ -956,9 +957,9 @@ irreversible purge and nothing else.
 | U5 | `Password`, `PasswordConfirmation` | **The two typings must match.** The invocation's confirmation requirement | `IfInsert` + both password operations | `PasswordConfirmationMismatchNotification` | 422 |
 | U6 | `Password` | The policy of §B Q3 — length floor/ceiling, classes if Q3-B, no leading/trailing whitespace | — | **not declared here** — `vos.Password` validates by type on every write that carries one. Declaring `required` beside it would tell the caller the same thing twice | 422 |
 | U6b | `Password`, `Email`, `Name` | **Context rule.** The password must not contain the e-mail's local part, nor any ≥4-rune word of `Name.Given` or `Name.Family`, case-insensitively | `IfInsert` + both password operations | `PasswordEchoesIdentityNotification` | 422 |
-| **U7g** | `Email`, `CurrentPassword` | **CREDENTIAL BARRIER, on the open CHANGE only.** The address must resolve to a live user **and** the current password must verify — and the two are ONE question with ONE answer: *"usuário ou senha inválido"*. `guard: true`, declared FIRST, so nothing below it runs and no second notification can leak which half failed | the open change operation | `InvalidCredentialsNotification` | **401** |
-| **U7i** | `LockedUntil` | **Runs INSIDE U7g, before the hash comparison.** A locked account is refused — and refused with the **same generic answer**, so a lockout is not a signal either | the open change operation | `InvalidCredentialsNotification` (the same one) | **401** |
-| **U7h** | `FailedLoginAttempts`, `LockedUntil` | **On every U7g failure: increment; at 5, set `LockedUntil = now + 15 min` and reset the counter. On success: zero both.** A write that happens on a request that FAILED — the one place in this entity where that is true | the open change operation | — (a mutation) | — |
+| ~~U7g~~ ⚠️ *(gone with §E)* | `Email`, `CurrentPassword` | **CREDENTIAL BARRIER, on the open CHANGE only.** The address must resolve to a live user **and** the current password must verify — and the two are ONE question with ONE answer: *"usuário ou senha inválido"*. `guard: true`, declared FIRST, so nothing below it runs and no second notification can leak which half failed | the open change operation | `InvalidCredentialsNotification` | **401** |
+| ~~U7i~~ ⚠️ *(gone with §E)* | `LockedUntil` | **Runs INSIDE U7g, before the hash comparison.** A locked account is refused — and refused with the **same generic answer**, so a lockout is not a signal either | the open change operation | `InvalidCredentialsNotification` (the same one) | **401** |
+| ~~U7h~~ ⚠️ *(gone with §E)* | `FailedLoginAttempts`, `LockedUntil` | **On every U7g failure: increment; at 5, set `LockedUntil = now + 15 min` and reset the counter. On success: zero both.** A write that happens on a request that FAILED — the one place in this entity where that is true | the open change operation | — (a mutation) | — |
 | U7b | `Password` | On both password operations: the new password must not verify against the stored hash | both password operations | `PasswordUnchangedNotification` | 422 |
 | U8 | `Groups[].GroupID` | Every joined group must exist, be **active**, and belong to **this user's tenant** — one rule, one message | `IfInsertOrUpdate`, over the entries this write ADDS | `GroupNotAvailableInTenantNotification` | 422 |
 | U9 | `Roles[].RoleID` | Every directly granted role must exist, be **active**, and belong to **this user's tenant** | `IfInsertOrUpdate`, over the entries this write ADDS | `RoleNotAvailableInTenantNotification` — **reused**, already declared and translated for `Group` | 422 |
@@ -1379,7 +1380,7 @@ user themselves and a platform operator can reset a password once `auth.authoriz
 | grant a role | `POST /users/:id/roles` | **`user:grant`** |
 | revoke a role | `PATCH /users/:id/roles/:childId/archive` | **`user:grant`** |
 | **change own password** | `PATCH /users/password` | **PUBLIC — no token, no permission.** `auth.publicRoutes`; the current password is the credential. §E |
-| **reset a password** | `PATCH /users/:id/password-reset` | **`sub` == `:id` · OR `*:*` · OR `user:reset-password`** |
+| **reset a password** | `PATCH /users/:id/password-reset` | **`user:reset-password`** (a `*:*` claim satisfies it) |
 
 **`user:grant` covers both collections, and that is a decision.** Splitting it into
 `user:grant-group` and `user:grant-role` would let a deployment delegate the two edges
@@ -1451,7 +1452,20 @@ identity in production.
 
 ---
 
-## §E — The open change-password endpoint
+## §E — ~~The open change-password endpoint~~ · ⚠️ REVERSED, THE ROUTE DOES NOT EXIST
+
+> **Read this section as a record, not as a description of the code.** The endpoint it
+> specifies was built and then REMOVED on 2026-08-26, with everything exclusive to it
+> (`tasks.md` deviation 5). Its whole premise — that somebody needing a new password might be
+> unable to obtain a token — does not hold in a service with no login route: nothing here
+> blocks authentication for a caller who knows their password, so the endpoint did what
+> `PATCH /users/{id}/password-reset` does, without a token. What it was reaching for is a
+> FORGOT-PASSWORD flow (e-mail, an expiring link), which nobody has started.
+>
+> Everything below about the generic answer, the timing guard, the lockout and the rule
+> order is therefore **the reasoning for a route that is gone**. It is kept because that
+> reasoning is what the forgot-password work will need, and because deleting the argument
+> would hide that the decision was reversed rather than never made.
 
 *(Its own section because an unauthenticated write into a credential table is a security
 surface, not a table row. Decided by the maintainer at the gate; everything below is the

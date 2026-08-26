@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:00c0edfa41d1ad734ec58a3d4668789e274de148141cb317a47f84f8161ca4b5
+// checksum:   sha256:c7ccbee2e9d023f94958df1af0eeb33176890b7718d8173e5ec7294683e38b0b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -58,19 +58,19 @@ func (r FindUserByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *appquerie
 type FindUserByIDResponse struct {
 	fwresponses.Auto
 
-	ID                 string    `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID           domain.ID `json:"tenantID" exportLabelKey:"UserTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	GivenName          string    `json:"givenName" exportLabelKey:"UserGivenNameField" example:"Maria"`
-	FamilyName         string    `json:"familyName" exportLabelKey:"UserFamilyNameField" example:"Souza Lima"`
-	Email              string    `json:"email" exportLabelKey:"UserEmailField" example:"maria@acme.com"`
-	EmailVerifiedAt    time.Time `json:"emailVerifiedAt" exportLabelKey:"UserEmailVerifiedAtField" example:"2026-08-25T14:03:11Z"`
-	PasswordChangedAt  time.Time `json:"passwordChangedAt" exportLabelKey:"UserPasswordChangedAtField" example:"2026-08-25T14:03:11Z"`
-	MustChangePassword bool      `json:"mustChangePassword" exportLabelKey:"UserMustChangePasswordField" example:"true"`
-	Status             string    `json:"status" exportLabelKey:"UserStatusField" example:"active"`
-	CreatedAt          time.Time `json:"createdAt" exportLabelKey:"UserCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt          time.Time `json:"updatedAt" exportLabelKey:"UserUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	TenantWorkspace    string    `json:"tenantWorkspace" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
-	TenantStatus       string    `json:"tenantStatus" exportLabelKey:"UserTenantStatusField" example:"active"`
+	ID                 string     `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID           domain.ID  `json:"tenantID" exportLabelKey:"UserTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	GivenName          string     `json:"givenName" exportLabelKey:"UserGivenNameField" example:"Maria"`
+	FamilyName         string     `json:"familyName" exportLabelKey:"UserFamilyNameField" example:"Souza Lima"`
+	Email              string     `json:"email" exportLabelKey:"UserEmailField" example:"maria@acme.com"`
+	EmailVerifiedAt    *time.Time `json:"emailVerifiedAt" exportLabelKey:"UserEmailVerifiedAtField" example:"2026-08-25T14:03:11Z"`
+	PasswordChangedAt  time.Time  `json:"passwordChangedAt" exportLabelKey:"UserPasswordChangedAtField" example:"2026-08-25T14:03:11Z"`
+	MustChangePassword bool       `json:"mustChangePassword" exportLabelKey:"UserMustChangePasswordField" example:"true"`
+	Status             string     `json:"status" exportLabelKey:"UserStatusField" example:"active"`
+	CreatedAt          time.Time  `json:"createdAt" exportLabelKey:"UserCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt          time.Time  `json:"updatedAt" exportLabelKey:"UserUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	TenantWorkspace    string     `json:"tenantWorkspace" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
+	TenantStatus       string     `json:"tenantStatus" exportLabelKey:"UserTenantStatusField" example:"active"`
 	// The person's given and family names on one line, for listings.
 	FullName string         `json:"fullName" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups   []UserGroupRow `json:"groups"`

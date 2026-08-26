@@ -175,8 +175,8 @@ func hasKey(keys []string, want string) bool {
 // ── credential-derivation ──────────────────────────────────────────────────
 
 // TestInsertDerivesTheWholeCredentialState is the test for the rule that fills
-// six server-assigned fields, and it asserts all six: leaving any of them out is
-// how a column silently keeps its zero value with nothing reporting it.
+// the server-assigned fields, and it asserts every one: leaving any of them out
+// is how a column silently keeps its zero value with nothing reporting it.
 func TestInsertDerivesTheWholeCredentialState(t *testing.T) {
 	e := validUser()
 	// Deliberately WRONG starting values, so the assertions below prove the rule
@@ -184,9 +184,7 @@ func TestInsertDerivesTheWholeCredentialState(t *testing.T) {
 	e.PasswordHash = ""
 	e.PasswordChangedAt = time.Time{}
 	e.MustChangePassword = false
-	e.FailedLoginAttempts = 7
-	e.LockedUntil = time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
-	e.EmailVerifiedAt = time.Time{}
+	e.EmailVerifiedAt = nil
 
 	svc := insertUser(t, e, &probingUserService{})
 
@@ -202,13 +200,11 @@ func TestInsertDerivesTheWholeCredentialState(t *testing.T) {
 	if !e.MustChangePassword {
 		t.Fatal("MustChangePassword is false — the creator knows the password and nothing forces a rotation")
 	}
-	if e.FailedLoginAttempts != 0 || !e.LockedUntil.IsZero() {
-		t.Fatalf("the lockout pair did not start at rest: attempts=%d lockedUntil=%v", e.FailedLoginAttempts, e.LockedUntil)
-	}
-	// LEFT at zero on purpose: nothing in this service verifies an address, so
-	// writing anything here would be a claim it cannot support.
-	if !e.EmailVerifiedAt.IsZero() {
-		t.Fatalf("EmailVerifiedAt was written (%v) — no verification flow exists to justify it", e.EmailVerifiedAt)
+	// LEFT NIL on purpose: nothing in this service verifies an address, so
+	// writing anything here would be a claim it cannot support — and nil is what
+	// tells a caller "not verified" instead of a year-zero date.
+	if e.EmailVerifiedAt != nil {
+		t.Fatalf("EmailVerifiedAt was written (%v) — no verification flow exists to justify it", *e.EmailVerifiedAt)
 	}
 }
 

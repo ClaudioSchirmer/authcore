@@ -23,25 +23,14 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
-const (
-	// ActionChangePassword is the PUBLIC operation: the caller proves possession
-	// of the current password instead of carrying a token.
-	ActionChangePassword = "ChangePassword"
-
-	// ActionResetPassword is the AUTHENTICATED one: the caller proves who they
-	// are instead, and does not know the current password. It is what a helpdesk
-	// and a self-service "I am logged in and want a new password" both use.
-	ActionResetPassword = "ResetPassword"
-)
-
-// IsCredentialAction reports whether an actionName is one of the two.
+// ActionResetPassword is the action name the reset dispatches under.
 //
-// Exported so the web layer can assert it rather than repeating the strings —
-// a third caller spelling "changePassword" would silently get the ordinary
-// patch rules and no password validation at all.
-func IsCredentialAction(actionName string) bool {
-	return actionName == ActionChangePassword || actionName == ActionResetPassword
-}
+// It exists as a constant because BOTH the ordinary PATCH and this operation
+// dispatch ModeUpdate, so the action name is the only thing that tells the
+// aggregate which of the two it is judging. A second constant used to sit beside
+// it for a public change-password operation; that route was removed on
+// 2026-08-26 (see the routes file for why).
+const ActionResetPassword = "ResetPassword"
 
 // StageNewPassword puts a proposed password on the entity for the rules to
 // judge. It writes NOTHING that survives a refusal.
@@ -55,48 +44,14 @@ func (e *User) StageNewPassword(plaintext, confirmation string) {
 	e.PasswordConfirmation = confirmation
 }
 
-// RegisterFailedCredentialAttempt records one failed attempt and locks the
-// account when the threshold is reached.
-//
-// IT IS NOT A RULE, and it cannot be: it must persist on a request the domain
-// REJECTED, and a rejected aggregate write persists nothing. The handler calls
-// it on its failure branch and writes the row itself.
-//
-// The counter is reset rather than left at the threshold, so a lock that expires
-// gives the account a fresh budget instead of locking again on the next mistake.
-func (e *User) RegisterFailedCredentialAttempt(now time.Time) {
-	e.FailedLoginAttempts++
-	if e.FailedLoginAttempts >= credentialFailureThreshold {
-		e.LockedUntil = now.Add(credentialLockWindow)
-		e.FailedLoginAttempts = 0
-	}
-}
-
-// IsLockedAt reports whether the account is locked at the given instant.
-//
-// The zero instant means "never locked", which is what a server-assigned column
-// can express where NULL is not available. An expired lock is not a lock: the
-// window passing is what releases it, with no sweeper and no second write.
-func (e *User) IsLockedAt(now time.Time) bool {
-	return !e.LockedUntil.IsZero() && e.LockedUntil.After(now)
-}
-
-const (
-	// Five consecutive failures buy fifteen minutes. Both are calibrations
-	// rather than invariants — one constant each, changeable without a
-	// migration, because neither reaches the schema.
-	credentialFailureThreshold = 5
-	credentialLockWindow       = 15 * time.Minute
-)
-
-// credentialRules is the update-side branch the two operations run through, and
-// nothing else does.
+// credentialRules is the update-side branch the reset runs through, and nothing
+// else does.
 //
 // It is called from customRules' IfUpdate gate, guarded by the action name, so
 // an ordinary PATCH never reaches it — which matters in both directions: the
 // password checks do not fire on a rename, and a rename's rules do not have to
 // know a credential exists.
-func (e *User) credentialRules(actionName string, service UserService, r *domain.Rules) {
+func (e *User) credentialRules(service UserService, r *domain.Rules) {
 	// THE VALUE OBJECT IS ASKED DIRECTLY, and the two lines this is NOT are the
 	// whole reason for this comment.
 	//
@@ -129,7 +84,7 @@ func (e *User) credentialRules(actionName string, service UserService, r *domain
 
 	// ── the confirmation ──
 	// The same rule the insert path gets declaratively, restated here because a
-	// declarative rule is scoped to a verb and both operations share ModeUpdate
+	// declarative rule is scoped to a verb and this operation shares ModeUpdate
 	// with the ordinary patch.
 	if e.PasswordConfirmation != e.Password.Value() {
 		r.AddNotification("PasswordConfirmation", PasswordConfirmationMismatchNotification{})
@@ -165,15 +120,9 @@ func (e *User) credentialRules(actionName string, service UserService, r *domain
 	}
 	e.PasswordChangedAt = time.Now().UTC()
 
-	// A successful credential change clears the lockout, whichever door it came
-	// through: somebody who proved possession of the current password, or an
-	// operator who reset it, has demonstrated exactly what the lock exists to
-	// wait for.
-	e.FailedLoginAttempts = 0
-	e.LockedUntil = time.Time{}
-
-	// The two operations differ on ONE field, and this is it. A caller who
-	// chose the password themselves is done; a password somebody else set is a
-	// temporary one, and the next sign-in has to replace it.
-	e.MustChangePassword = actionName == ActionResetPassword
+	// The password a reset leaves is somebody else's choice, so the next sign-in
+	// has to replace it. This flag is set here and cleared nowhere yet — the
+	// operation that would clear it is a self-service change, which this service
+	// does not have.
+	e.MustChangePassword = true
 }

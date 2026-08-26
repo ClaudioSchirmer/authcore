@@ -40,14 +40,4 @@ type PasswordHasher interface {
 	// adapter's obligation, and it is why this is one method rather than
 	// "give me the hash and I will compare it myself".
 	Matches(plaintext, encoded string) bool
-
-	// DummyMatches burns the same work Matches would, against a fixed hash, and
-	// always answers false.
-	//
-	// It exists for ONE caller: the public change-password route, on an e-mail
-	// that resolves to no user. Without it that path returns in about a
-	// millisecond while a real address takes about a hundred, and the generic
-	// "invalid username or password" leaks by timing exactly what it was
-	// written to hide. The result is thrown away; the cost IS the point.
-	DummyMatches(plaintext string)
 }

@@ -64,13 +64,6 @@ type Argon2idHasher struct{}
 // NewArgon2idHasher returns the hasher the wiring injects.
 func NewArgon2idHasher() *Argon2idHasher { return &Argon2idHasher{} }
 
-// dummyEncoded is what DummyMatches verifies against.
-//
-// It is built ONCE, at package initialisation, from a value no caller can
-// produce. Building it lazily would put the very first miss on a different
-// timing path from every later one, which is the leak this exists to close.
-var dummyEncoded = (&Argon2idHasher{}).Hash("dummy-password-for-constant-time-comparison")
-
 // Hash returns the PHC-encoded Argon2id hash of plaintext.
 //
 // It PANICS if the system random source fails. That is deliberate: a process
@@ -112,22 +105,6 @@ func (h *Argon2idHasher) Matches(plaintext, encoded string) bool {
 	// all at the same moment.
 	got := argon2.IDKey([]byte(plaintext), p.salt, p.iterations, p.memory, p.threads, uint32(len(p.hash)))
 	return subtle.ConstantTimeCompare(got, p.hash) == 1
-}
-
-// DummyMatches burns a full verification against a fixed hash and answers
-// nothing.
-//
-// The public change-password route calls it when the e-mail resolves to no
-// user. Without it that path returns in about a millisecond and a registered
-// address takes about a hundred — a 100x timing oracle that enumerates users
-// just as well as a distinct error message would, while the response body says
-// nothing.
-//
-// The result is deliberately discarded and the signature returns nothing, so
-// there is no value a caller can accidentally branch on: the only thing this
-// call produces is elapsed time.
-func (h *Argon2idHasher) DummyMatches(plaintext string) {
-	_ = h.Matches(plaintext, dummyEncoded)
 }
 
 // encode renders the hash in the PHC string format every Argon2 implementation

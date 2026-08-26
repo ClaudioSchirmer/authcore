@@ -30,9 +30,6 @@ func Wire(d bootstrap.Deps) bootstrap.Wiring {
 			NewPermissionsFeature(d),
 			NewRolesFeature(d),
 			NewGroupsFeature(d),
-			// BEFORE UsersFeature, and that order is load-bearing: the public
-			// PATCH /users/password and the generated PATCH /users/:id are the
-			// same shape to a router, so the first one registered wins.
 			NewUserCredentialsFeature(d),
 			NewUsersFeature(d),
 		},

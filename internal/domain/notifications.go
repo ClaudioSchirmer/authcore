@@ -320,17 +320,6 @@ func (CannotJoinWildcardGroupNotification) Semantic() domain.NotificationSemanti
 	return domain.SemanticForbidden
 }
 
-// InvalidCredentialsNotification reaches the caller as 403. The struct NAME is
-// the translation key, so renaming it here without renaming it in the seven
-// catalogs leaves the message untranslated.
-type InvalidCredentialsNotification struct {
-	domain.DomainNotificationBase
-}
-
-func (InvalidCredentialsNotification) Semantic() domain.NotificationSemantic {
-	return domain.SemanticForbidden
-}
-
 // PasswordUnchangedNotification reaches the caller as 422. The struct NAME is
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.

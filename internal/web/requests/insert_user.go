@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:b29966b4363b806019641a649d22d04f2da42af71de531759059d3791443f093
+// checksum:   sha256:6e8bb08c0b66b2e77f215d09d46f5ea7a353ce0e65d3af048a0ef98678dd1666
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -66,7 +66,7 @@ type InsertUserResponse struct {
 	GivenName          string              `json:"givenName" example:"Maria"`
 	FamilyName         string              `json:"familyName" example:"Souza Lima"`
 	Email              string              `json:"email" example:"maria@acme.com"`
-	EmailVerifiedAt    time.Time           `json:"emailVerifiedAt" example:"2026-08-25T14:03:11Z"`
+	EmailVerifiedAt    *time.Time          `json:"emailVerifiedAt,omitempty" example:"2026-08-25T14:03:11Z"`
 	PasswordChangedAt  time.Time           `json:"passwordChangedAt" example:"2026-08-25T14:03:11Z"`
 	MustChangePassword bool                `json:"mustChangePassword" example:"true"`
 	Status             string              `json:"status" example:"active"`
