@@ -114,6 +114,9 @@ func (fra) Translations() map[string]string {
 		"CannotJoinGroupWithUnheldPermissionsNotification": "Vous ne pouvez pas ajouter quelqu'un à un groupe qui accorde des permissions que vous n'avez pas.",
 		"CannotJoinWildcardGroupNotification":              "Un groupe accordant des permissions génériques ne peut pas être attribué via cette API.",
 		"PasswordUnchangedNotification":                    "Le nouveau mot de passe doit être différent de l'actuel.",
+		"PasswordChangeRequiresSelfNotification":           "Vous ne pouvez modifier que votre propre mot de passe.",
+		"PasswordResetRequiresAnotherUserNotification":     "Utilisez le point de terminaison de changement de mot de passe pour définir le vôtre.",
+		"InvalidCurrentPasswordNotification":               "Le mot de passe actuel est incorrect.",
 		"InvalidEmailNotification":                         "Adresse e-mail invalide. Saisissez-la en minuscules.",
 		"InvalidPersonNameNotification":                    "Nom invalide.",
 		"WeakPasswordNotification":                         "Le mot de passe doit comporter de 8 à 128 caractères et contenir une minuscule, une majuscule, un chiffre et un symbole.",
@@ -144,5 +147,7 @@ func (fra) Translations() map[string]string {
 		"UserRoleRoleNameField":                            "Nom du rôle",
 		"UserStatus.active":                                "Actif",
 		"UserStatus.suspended":                             "Suspendu",
+		"UserRequestingUserIDField":                        "Appelant",
+		"UserCurrentPasswordField":                         "Mot de passe actuel",
 	}
 }

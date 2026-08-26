@@ -60,10 +60,10 @@
 | Read joins | **all three** | root→`tenants`, child→`groups`, child→`roles` |
 | Archive | **forces `suspended`** (U15) | mirrors `Tenant` |
 
-| **The public change-password route** | ⚠️ **REMOVED 2026-08-26.** §B Q2 and §E describe it; it no longer exists. The premise it was built on — a caller who cannot obtain a token — does not hold in a service with no login route. It duplicated the reset without a token, and what it was reaching for is a forgot-password flow nobody has started. Read §E as the record of a decision that was reversed, not as a description of the code | tasks.md deviation 8 |
-| **Route naming** | **as proposed** — the OPEN one is the CHANGE (`PATCH /users/password`, verifies the current password); the JWT one is the RESET (`PATCH /users/{id}/password-reset`, does not) | §B Q2 |
+| **The public change-password route** | ⚠️ **REMOVED 2026-08-26.** §B Q2 and §E describe it; it no longer exists. The premise it was built on — a caller who cannot obtain a token — does not hold in a service with no login route. It duplicated the reset without a token. Read §E as the record of a decision that was reversed, not as a description of the code. **Later the same day an AUTHENTICATED self-service change took its place** — `PATCH /users/{id}/password`, which proves the current password and requires a token — so the gap this row recorded is closed. A FORGOT-password flow (e-mail, expiring link) is still not started and is now the only credential gap here | tasks.md deviations 8 and 9 |
+| **Route naming** | ~~the OPEN one is the CHANGE (`PATCH /users/password`); the JWT one is the RESET~~ → **both are authenticated and both live under `/users/{id}`** *(amended 2026-08-26)*: the CHANGE is `PATCH /users/{id}/password` (the caller's own row, verifies the current password, clears the must-change flag) and the RESET is `PATCH /users/{id}/password-reset` (somebody else's row, verifies nothing, sets it). The change/reset naming distinction the original answer drew is exactly the one that survived | §B Q2 |
 | **Public route path** | **`PATCH /users/password`**, kept inside the `/users` resource | ⚠️ it **collides** with `PATCH /users/{id}` — `password` matches `:id` — so it MUST be registered first, and that ordering is now a hard acceptance check, not a comment. §E |
-| **Reset posture** | ~~self · `*:*` · OR `user:reset-password`~~ → **`user:reset-password` alone** *(amended 2026-08-26)* | `*:*` satisfies it for free. The self acceptor was removed once it was PROVEN — by booting with `auth.authorization.enabled: true` — that the framework refuses a non-public route with no declared permission, and that `RequirePermission` expresses exactly one. The security reading agrees: a user who knows their password uses the CHANGE endpoint; one who does not is who needs a helpdesk, and a session replacing a credential without proving the previous one is the attack `currentPassword` exists to stop. §10 |
+| **Reset posture** | ~~self · `*:*` · OR `user:reset-password`~~ → ~~**`user:reset-password` alone**~~ → **split across two routes, one permission each** *(amended twice on 2026-08-26)*: `user:change-password` for the caller's own row, `user:reset-password` for anybody else's. The self acceptor is back; what changed is that it no longer has to share a gate. The paragraph that follows records why the middle state existed | `*:*` satisfies it for free. The self acceptor was removed once it was PROVEN — by booting with `auth.authorization.enabled: true` — that the framework refuses a non-public route with no declared permission, and that `RequirePermission` expresses exactly one. The security reading agrees: a user who knows their password uses the CHANGE endpoint; one who does not is who needs a helpdesk, and a session replacing a credential without proving the previous one is the attack `currentPassword` exists to stop. §10 |
 | **Brute force** | **`failedLoginAttempts` + `lockedUntil` taken NOW** | §C-4 is no longer deferred — the open endpoint is the writer it was waiting for. New fields in §2, new rules U7h/U7i in §7, and lockout answers the SAME generic 401. §E |
 
 **No ⚠️ OPEN slot remains.**
@@ -244,7 +244,7 @@ wrong, and the second one is wrong *mechanically*, not just by taste — see §E
 
 | | **CHANGE — open** | **RESET — authenticated** |
 |---|---|---|
-| Route | `PATCH /users/password` *(the routing collision it carries is handled in §E)* | `PATCH /users/{id}/password-reset` |
+| Route | `PATCH /users/{id}/password` *(amended 2026-08-26; it was a public `PATCH /users/password`, and the routing collision §E handled went with it)* | `PATCH /users/{id}/password-reset` |
 | Authentication | **none — `auth.publicRoutes`** | JWT required |
 | Authorization | none. Possession of the current password **is** the authorization | **self (`sub` == `:id`) or `*:*` superadmin** — no permission verb |
 | Identified by | **`email` in the body** — never a path id | the path id |
@@ -1354,19 +1354,28 @@ only reason this column exists.
 ### Layer 1 — the permission gate
 
 `user:read` · `user:insert` · `user:update` · `user:archive` · **`user:grant`** ·
-**`user:reset-password`** — the `<resource>:<verb>` taxonomy every entity here declares, plus
-the fifth verb `Group` established and a **sixth**, taken at the gate.
+**`user:reset-password`** · **`user:change-password`** — the `<resource>:<verb>` taxonomy every
+entity here declares, plus the fifth verb `Group` established, a **sixth** taken at the gate,
+and a **seventh** added on 2026-08-26 when the credential operation was split in two.
+
+> **Amended 2026-08-26.** Everything below this line was written for ONE credential route
+> with three acceptors. It ships as TWO, one acceptor each — see the amended table and the
+> note that follows it. The reasoning is unchanged and was the reason for the split; only
+> the mechanism moved, from three alternatives on one gate to one gate apiece.
 
 **`user:reset-password` is a sixth verb because a password reset is a credential-changing
 operation performed on somebody else.** Folding it into `user:update` would mean everyone
 who can fix a typo in a name can take over any account in the tenant — the escalation this
 model refuses everywhere else, arriving through the least-guarded door. Entra and Okta both
 gate a reset behind a role a plain user-administrator does not have, for exactly this reason.
-It is **an additional acceptor, not a replacement**: the reset accepts *self* **or** `*:*`
-**or** this permission, so a tenant can run its own helpdesk while the self-service path
-never depends on a grant somebody has to remember to make. **Its deployment cost, named:**
-like `group:grant`, it is a catalog row somebody has to insert, and until they do, only the
-user themselves and a platform operator can reset a password once `auth.authorization` is on.
+~~It is **an additional acceptor, not a replacement**: the reset accepts *self* **or** `*:*`
+**or** this permission~~ → **each operation has its own permission** *(amended 2026-08-26)*.
+`user:reset-password` gates the helpdesk operation and keeps precisely the meaning it already
+had; `user:change-password` gates the self-service one. **Their deployment cost, named:** both
+are catalog rows somebody has to insert. `user:change-password` is the one that must reach
+EVERY user — it belongs in whatever role a tenant grants by default, because a caller without
+it cannot set their own password at all once `auth.authorization` is on. Until
+`user:reset-password` is granted, only a platform operator can reset somebody else's.
 
 | Operation | Route | Permission |
 |---|---|---|
@@ -1379,8 +1388,8 @@ user themselves and a platform operator can reset a password once `auth.authoriz
 | leave a group | `PATCH /users/:id/groups/:childId/archive` | **`user:grant`** |
 | grant a role | `POST /users/:id/roles` | **`user:grant`** |
 | revoke a role | `PATCH /users/:id/roles/:childId/archive` | **`user:grant`** |
-| **change own password** | `PATCH /users/password` | **PUBLIC — no token, no permission.** `auth.publicRoutes`; the current password is the credential. §E |
-| **reset a password** | `PATCH /users/:id/password-reset` | **`user:reset-password`** (a `*:*` claim satisfies it) |
+| **change own password** | `PATCH /users/:id/password` | **`user:change-password`** *(amended 2026-08-26; it was a PUBLIC `PATCH /users/password`, removed the same day)*. The id must be the caller's own, and the current password is required and verified |
+| **reset another's password** | `PATCH /users/:id/password-reset` | **`user:reset-password`** (a `*:*` claim satisfies it). The id must NOT be the caller's own |
 
 **`user:grant` covers both collections, and that is a decision.** Splitting it into
 `user:grant-group` and `user:grant-role` would let a deployment delegate the two edges
@@ -1391,14 +1400,24 @@ the other in every scenario worth modelling. One verb, following `group:grant`'s
 **The two password operations are gated differently from everything else here**, and each
 gate is the decision made at the model gate:
 
-- **the CHANGE is public**, because the caller may be unable to obtain a token at all. §E is
-  the whole contract, and it is the only unauthenticated write in this service.
-- **the RESET accepts THREE acceptors: `sub` == `:id`, OR `*:*`, OR `user:reset-password`.**
-  The self half must never depend on a grant — every user has to be able to rotate their own
-  credential, and gating that on a permission lets an operator lock a whole tenant out of
-  their own passwords simply by never making it. `*:*` is what makes platform support
-  possible. And `user:reset-password` is what lets a tenant run its own helpdesk without
-  whoever edits a name being able to take an account.
+- ~~**the CHANGE is public**~~ → **the CHANGE is authenticated and gated by
+  `user:change-password`** *(amended 2026-08-26)*. The public route was removed the same day:
+  its premise — a caller unable to obtain a token — does not hold in a service where nothing
+  blocks authentication for somebody who knows their password. What ships is
+  `PATCH /users/{id}/password`, where the id must be the caller's own and the current password
+  is proved. There is no unauthenticated write in this service.
+- ~~**the RESET accepts THREE acceptors: `sub` == `:id`, OR `*:*`, OR `user:reset-password`**~~
+  → **the three acceptors survive, split across two routes** *(amended 2026-08-26)*. The
+  reasoning below stands and is what drove the split; `RequirePermission` expresses exactly one
+  permission, so three alternatives were never declarable on one gate. `sub` == `:id` is the
+  change endpoint; `*:*` and `user:reset-password` are the reset. The self path still must
+  never be hostage to a grant an operator forgets — which is why `user:change-password`
+  belongs in the default role rather than in a helpdesk one. `*:*` is what makes platform
+  support possible, and `user:reset-password` is what lets a tenant run its own helpdesk
+  without whoever edits a name being able to take an account.
+- **each route refuses the other's rows.** The change refuses any id but the caller's; the
+  reset refuses the caller's own. Without the second half, a holder of `user:reset-password`
+  resets themselves and skips the proof the change demands, by choosing the other URL.
 - **`user:update` explicitly does NOT reach either.** Whoever can fix a typo in a name must
   not be able to take over an account; that is the escalation this model refuses everywhere
   else, arriving through the least-guarded door.
@@ -1461,6 +1480,12 @@ identity in production.
 > blocks authentication for a caller who knows their password, so the endpoint did what
 > `PATCH /users/{id}/password-reset` does, without a token. What it was reaching for is a
 > FORGOT-PASSWORD flow (e-mail, an expiring link), which nobody has started.
+>
+> **What DID replace it, later the same day:** `PATCH /users/{id}/password`, gated by
+> `user:change-password`, where the id must be the caller's own and the current password is
+> required and verified. It is the self-service change this section wanted, minus the premise
+> this section got wrong — it takes a token, because in this service anyone who knows their
+> password can get one. It is the only operation that CLEARS `mustChangePassword`.
 >
 > Everything below about the generic answer, the timing guard, the lockout and the rule
 > order is therefore **the reasoning for a route that is gone**. It is kept because that

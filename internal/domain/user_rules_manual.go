@@ -56,12 +56,16 @@ func (e *User) customRules(actionName string, service domain.Service, r *domain.
 	})
 
 	r.IfUpdate(func() {
-		// The reset dispatches ModeUpdate, which is also what an ordinary PATCH
-		// dispatches — so the ACTION NAME is what tells them apart. Without this
-		// guard the password checks would fire on a rename, against a field that
-		// write never carried.
-		if actionName == ActionResetPassword {
-			e.credentialRules(svc, r)
+		// All three of these dispatch ModeUpdate — the ordinary PATCH included —
+		// so the ACTION NAME is what tells them apart. Without this switch the
+		// password checks would fire on a rename, against a field that write
+		// never carried, and the two credential operations would be
+		// indistinguishable from each other.
+		switch actionName {
+		case ActionChangePassword:
+			e.changePasswordRules(svc, r)
+		case ActionResetPassword:
+			e.resetPasswordRules(svc, r)
 		}
 	})
 

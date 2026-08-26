@@ -114,6 +114,9 @@ func (esp) Translations() map[string]string {
 		"CannotJoinGroupWithUnheldPermissionsNotification": "No puede añadir a alguien a un grupo que otorga permisos que usted no tiene.",
 		"CannotJoinWildcardGroupNotification":              "Un grupo que otorga permisos comodín no puede asignarse mediante esta API.",
 		"PasswordUnchangedNotification":                    "La nueva contraseña debe ser distinta de la actual.",
+		"PasswordChangeRequiresSelfNotification":           "Solo puede cambiar su propia contraseña.",
+		"PasswordResetRequiresAnotherUserNotification":     "Use el endpoint de cambio de contraseña para establecer la suya.",
+		"InvalidCurrentPasswordNotification":               "La contraseña actual es incorrecta.",
 		"InvalidEmailNotification":                         "Correo electrónico inválido. Indíquelo en minúsculas.",
 		"InvalidPersonNameNotification":                    "Nombre inválido.",
 		"WeakPasswordNotification":                         "La contraseña debe tener entre 8 y 128 caracteres e incluir minúscula, mayúscula, número y símbolo.",
@@ -144,5 +147,7 @@ func (esp) Translations() map[string]string {
 		"UserRoleRoleNameField":                            "Nombre del rol",
 		"UserStatus.active":                                "Activo",
 		"UserStatus.suspended":                             "Suspendido",
+		"UserRequestingUserIDField":                        "Llamante",
+		"UserCurrentPasswordField":                         "Contraseña actual",
 	}
 }

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:5b98e02f84b0cb9be14fa7206cc4089c4a65c298a040890e3e3427931785e641
+// checksum:   sha256:3f0054ab0b5b119aa2301e93f58d15faa0fc141dd197936ce330900d7939f5c3
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -61,9 +61,24 @@ type User struct {
 
 	// Fed from the caller's identity by the command mapper and read by the
 	// rules below. Never persisted, so it carries no labelKey and no column.
+	RequestingUserID          string // The caller's own id, read off their token — what the change compares against this row
 	RequestingIdentityPresent bool   // Whether the request carried an identity at all
 	RequestingTenant          string // The caller's own tenant, from the request identity
 	RequestingMayCrossScope   bool   // Whether the caller is a super-admin (*:*), which crosses the row scope
+
+	// Declared here and filled by NOTHING this generator writes. No write DTO,
+	// command, mapper or OpenAPI schema carries it, because no generated verb
+	// has anything to put here — your own operation does, and the rules below
+	// read it from the aggregate like any other field.
+	//
+	// It is for the operation this spec cannot declare: one that dispatches the
+	// same mode a generated verb does and is told apart by its action name. A
+	// value it needs must reach the aggregate WITHOUT joining the ordinary
+	// write bodies, and that is the whole of what this field is.
+	//
+	// Nothing reports it staying empty. A field your code does not fill reads
+	// as the zero value, and every rule over it judges that.
+	CurrentPassword string `labelKey:"UserCurrentPasswordField"` // The password the caller currently holds, proved by the change and never stored
 
 	// Sent by the caller and read by the rules below, and stored by nobody:
 	// there is no column, so the value reaches neither the outbox payload nor

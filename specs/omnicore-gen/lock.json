@@ -1232,8 +1232,8 @@
     },
     "User": {
       "spec": "specs/omnicore-gen/user.omnicore.yaml",
-      "specHash": "6818fa1b773e6b78a25b9752b0fcf59b8c1227f971f06f81487d09722ddca0ee",
-      "framework": "v0.60.0",
+      "specHash": "ec138419ff5abfe42cbc4a5991e73447b4c04d1cb6554f0ec1b1e02440e0fc56",
+      "framework": "v0.61.0",
       "files": {
         "bootstrap/users_feature.go": {
           "class": "owned",
@@ -1241,15 +1241,15 @@
         },
         "internal/application/commands/archive_user_command.go": {
           "class": "owned",
-          "hash": "58dcf213ce3898531311a6bf4cb3232a6b63432f8d0f59526c036973605fc6db"
+          "hash": "9f730021eabc167a3426504dcc07165f417db90d912654406ed1a3b19ddaead4"
         },
         "internal/application/commands/insert_user_command.go": {
           "class": "owned",
-          "hash": "02de147cd2fab8c688ce65c27ce0966d9df7602eb838d6136cfc135d4bf7eead"
+          "hash": "61aa284f8ef87715f0d9765abec625e0b9984d1afdfdb90b25997d1e2a8c9a32"
         },
         "internal/application/commands/patch_user_command.go": {
           "class": "owned",
-          "hash": "1c72dfd1c4e12a5ea8f8dec61aac6d22de74c6086fc86aa849ae10a2cf9c727b"
+          "hash": "191081ea2af8b3414cee2fb33593bc004c6d85b5ea0261ec0f7848af2cefc6fb"
         },
         "internal/application/commands/user_child_results.go": {
           "class": "owned",
@@ -1257,15 +1257,15 @@
         },
         "internal/application/commands/user_commands_test.go": {
           "class": "owned",
-          "hash": "01e20945c9aa57d408a9c9ee17a6f605aa8d49d615d2920c80d05b265e5cd9c8"
+          "hash": "c5eccd27ccfaed9b00fa1a7cd88c6469885daf39942c7acd2184ff7ed5749ec1"
         },
         "internal/application/commands/user_group_commands.go": {
           "class": "owned",
-          "hash": "3259a672ad8538decb5f690aaf9f09541b781a9df3f4984d58c976cc2886d795"
+          "hash": "de0dcf53642cab88e117ff31d91146ed41ce228b33b65a7acc51ca9a2a67a013"
         },
         "internal/application/commands/user_role_commands.go": {
           "class": "owned",
-          "hash": "3dd6ecfac6481df755860c3a40e225cea24bcd561ff36905749feca256619fc9"
+          "hash": "d0367fd45c6f21b1a17779b353a5643b942a92fdf92ff5617a960e8254cae176"
         },
         "internal/application/dtos/user_dtos_test.go": {
           "class": "owned",
@@ -1317,7 +1317,7 @@
         },
         "internal/domain/user.go": {
           "class": "owned",
-          "hash": "dd321c96c03657801e6d05d1addd90abaf1ccfc7b1856df5772218b1950bcf99"
+          "hash": "1154d61852c54ccb21c8b7b2f26a1bdb665b7492d303e1ad11d70c451bb2b890"
         },
         "internal/domain/user_rules_manual.go": {
           "class": "hook",
@@ -1445,6 +1445,7 @@
           "UserAlreadyGrantsRoleNotification": "0e2d6d60d4048d3971c347d7dc0f50bf9a77856f9ce919f68d1d25d596d642ed",
           "UserAlreadyInGroupNotification": "cc354803a744150beee8f02ee3ca1f109c060db6e72410da7f3b63831e572074",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "7bdf6e89701c96379abd8f7d04db640ed05aa9d0a950a7387628091cf46eca78",
           "UserEmailAlreadyExistsNotification": "a3bf3541a27ab0465e0f5d97e8290e161d8e52e3228aadc757fd8ef43c1b3650",
           "UserEmailField": "2fae6fb30b0d0077f771923d6d037d8e43c45e6078e2b3c31637a489c029cee5",
           "UserEmailIsImmutableNotification": "67805635ae3501599f9179513293d158ed480e2e53c3cae3e3a4928b071de961",
@@ -1461,6 +1462,7 @@
           "UserPasswordConfirmationField": "3a4d7b82b668c115e44b4fd4f1e41914c08245e3db364f1d0cfbdabf897be6b7",
           "UserPasswordField": "a36c101570cc4410993de5385ad7034adb2dae6a05139ac7672577803084634d",
           "UserPasswordPlainField": "a36c101570cc4410993de5385ad7034adb2dae6a05139ac7672577803084634d",
+          "UserRequestingUserIDField": "c35ad9c69ae92d3e00920fb58612ee53ada527e3ae647cbb5989d8647024674c",
           "UserRoleRoleIDField": "0038a9cf86613cec04ae936ef71b55a4dac1ab4d040925108269518736abf85c",
           "UserRoleRoleKeyField": "8fc29999905b6df190ed5ceaa37f6d1e3b9a962e3b8ff8431a841b35ded74a0e",
           "UserRoleRoleNameField": "6f348aa45edf274e38b2068dd33d1d41dfb5875185af01d3d8e8d6842764994c",
@@ -1495,6 +1497,7 @@
           "UserAlreadyGrantsRoleNotification": "38701cd9d8535bca5a2d42e367b5820690bacf726f83234616dec1080bcb5040",
           "UserAlreadyInGroupNotification": "163260aa1f237a17cf6082b624da38f2584a83857908f103eda793a871caad61",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "72ed2bd767cef62711f4293e17fef76dfe2858fe169db0a6b5c757193d45aa0c",
           "UserEmailAlreadyExistsNotification": "177c6e66be69cdca73089bddc72ad532662d1f0001280492954e7c77c4ea4c01",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "11a698b102ed082cae792fbf27dace0226c3a75031615fcde2a02a71286e2c79",
@@ -1511,6 +1514,7 @@
           "UserPasswordConfirmationField": "f26981217e04f18953ba6d993dc2647a93c94302aa938bd5d6a4733d065c0f8a",
           "UserPasswordField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
           "UserPasswordPlainField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserRequestingUserIDField": "9bc9b83c11ddcb417258094c42d71f0b548df6b26b39b91e64042143f19112e7",
           "UserRoleRoleIDField": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "UserRoleRoleKeyField": "e2db287a07351f071f36c63dcca25bcbafe3e470781f557f97a7206218867165",
           "UserRoleRoleNameField": "82c784ca1c4ccf6592d4e8daa8b4d2f004800ee04ef0670abb0808c5fe050c1d",
@@ -1545,6 +1549,7 @@
           "UserAlreadyGrantsRoleNotification": "cf417fdec1770eda0482e7d6bb79164f6d01826398787db73c964ccf4cbac55e",
           "UserAlreadyInGroupNotification": "64ed17dad09bb62600a487b35363f5aa7d2cbd396e7c24704e9452504687bc43",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "14a433147337bb11c36e113f92c9c4aea0ed4048145fe41b4da35665c8b571ed",
           "UserEmailAlreadyExistsNotification": "13c1b25a7e481a7564b298b2bb68a900ce1f6393de370cb4ba1e7148b95c5050",
           "UserEmailField": "ec64dc30a483cdcfaf24992c5aaec20a4ae391af91ada725f886fc3270b669ac",
           "UserEmailIsImmutableNotification": "c0441c657db3d121e9d0b1d352c9732927bad8b26b58faa894ca8255f03a28db",
@@ -1561,6 +1566,7 @@
           "UserPasswordConfirmationField": "fd6ef9a376f405755a152da57d660221a45e5b1d58b6c499d0ec3744c3b50977",
           "UserPasswordField": "a389a638dec32538f55b0c8dc5c84f84aad65bcd5aacd5f05d36f30b71271a6b",
           "UserPasswordPlainField": "a389a638dec32538f55b0c8dc5c84f84aad65bcd5aacd5f05d36f30b71271a6b",
+          "UserRequestingUserIDField": "91ae6ec40ea5be86db080aab9c1f9c285a5369a075187c4cb42fec26290ae6e0",
           "UserRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
           "UserRoleRoleKeyField": "e7522ee12a3c167ddaec99b2a3dce65189cab73c5d097766eeb9e7b5b144cf8b",
           "UserRoleRoleNameField": "7d5629f31ad81b0f13322a86016ac2393800a9ebc1160e6dc0a67274583f170d",
@@ -1595,6 +1601,7 @@
           "UserAlreadyGrantsRoleNotification": "6c03b6de97361ce7ac16b1671c5f4bffb28c76d8f707c3bcaabbc9635a1f0a92",
           "UserAlreadyInGroupNotification": "521b0a2034d0fe6c66c146f214a8c97c389141bf3adbca364d2fda7f00ef46c1",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "55f685a23ed5787e1435caed5eb3d4ef0942cb01cf72fa1db56a31036ced125c",
           "UserEmailAlreadyExistsNotification": "385f1af72c6feb3b541921890c7efa2e758ee8627f15c6ec2192ee7ce16b1099",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "96fcd19c5488eeb6c35baecea027cc5fab8597cc26802001566b2d07639cdc2e",
@@ -1611,6 +1618,7 @@
           "UserPasswordConfirmationField": "07992c3b56fbc87aa1ca908ecc3619ca0ba1e8121dd93544a6bfa08b0e4212cc",
           "UserPasswordField": "ff9c8b8c0677c3d05a018508b29783af6de561164b9f8ecd64a6cdbdcf3e48f5",
           "UserPasswordPlainField": "ff9c8b8c0677c3d05a018508b29783af6de561164b9f8ecd64a6cdbdcf3e48f5",
+          "UserRequestingUserIDField": "36de20c262d67238d1a1a13a4b8831675f5d8ecf479c8078a582e1e5cdd48d69",
           "UserRoleRoleIDField": "a1fc967c558796933832ebe6eb716a7eb69d4ac48349d05366c22531d0b0df66",
           "UserRoleRoleKeyField": "9ed80be4cd3c19fa8ff6bcaaa6ae1ebf4abb816fd46c32ee2ba6ce7acb50a0ba",
           "UserRoleRoleNameField": "07ddf0695e6897db9ddd08d3ac06e637541090d0d0a3ceab6f2843e31d67b6d9",
@@ -1645,6 +1653,7 @@
           "UserAlreadyGrantsRoleNotification": "f344519f77f3b6189ebfb54f36d502980a7d3a53db57691c90c29da2ec657555",
           "UserAlreadyInGroupNotification": "703734d89a16c7b7af1b5ebb3bf2e2b2b6e7a1dbc0e66644a6163fe274d496b4",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "3f72f02a13c746cf4424cab34f2970abf917ec5b53164aa3f80c8f2a6b1e9d49",
           "UserEmailAlreadyExistsNotification": "ac0068261b02fb988d3eaf3d6c5ac7e134353aff0ac5f817272cdba7a4d1280d",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "6b1278d34fccb83a33d2a35561100cbadd19d3204fd80be5611c26b380d624c8",
@@ -1661,6 +1670,7 @@
           "UserPasswordConfirmationField": "44d09ab8e50d457a911adc1977b4b1261846429d432d93b3fdefc5ce66fa2f4b",
           "UserPasswordField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
           "UserPasswordPlainField": "e7cf3ef4f17c3999a94f2c6f612e8a888e5b1026878e4e19398b23bd38ec221a",
+          "UserRequestingUserIDField": "ea0228002f1ba8ac9e082e30baf69960e7c4c3be160036c679a503abffce629d",
           "UserRoleRoleIDField": "7a972bbc14808919bbd655b3a1452084434445d65aff8ad58958f7d04a1c2762",
           "UserRoleRoleKeyField": "de7b1fa6f48d3675cc844b12775ebaee55797c49486fd170f84c83dde77f0c12",
           "UserRoleRoleNameField": "7aa73acc84b709dea6e189fc03ed97d58de2df5dec214f2619218dd336b0cd40",
@@ -1695,6 +1705,7 @@
           "UserAlreadyGrantsRoleNotification": "d7d6b48743a1888a0d97beafd47d964efd41c2556d1a118790facb93fcd36e38",
           "UserAlreadyInGroupNotification": "ef2527ad772de28bed023e6cbeede605ca8746bb81f80e6181b5494009c76505",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "46bba9f06496ea930f327e7ecd1a6fd007fa95b5727c5dc1c2b273bf0fa2afe6",
           "UserEmailAlreadyExistsNotification": "29209603faab44e8e2cd502cf2537fea6fbaf0b68ac005dd82f4eb5b2ebc1d40",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "46bea914a6ac7de9dabec495e6a8e80e1b495005caaabc8b6d044b48988822a9",
@@ -1711,6 +1722,7 @@
           "UserPasswordConfirmationField": "d6aa9d60c727c4bdb744102b09fe8aee2e78a0c25846f7cc66c7d31b870fa39f",
           "UserPasswordField": "9a2bca3b828e24f91baa5dd22a49919c14d60efa1375cbdf28ac7b6ff585c2b8",
           "UserPasswordPlainField": "9a2bca3b828e24f91baa5dd22a49919c14d60efa1375cbdf28ac7b6ff585c2b8",
+          "UserRequestingUserIDField": "2f4cf4d0c43e5af29916b3e4b9e15670236983a5969ebc33565f3141f52088a3",
           "UserRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
           "UserRoleRoleKeyField": "1b4b9d98966cfdd6161f2e6dbbbabe8adc7f1450cf97c89f2666f4b8bf958b4a",
           "UserRoleRoleNameField": "e820a6c2b82d9df7f0fd9ffd23bebfa59ac9dfa3a17d5e62319c1df03ef717c1",
@@ -1745,6 +1757,7 @@
           "UserAlreadyGrantsRoleNotification": "6ec4d47e5fdd6c7e4303d00c6c1439fcf967de8eaea90ab30571f7479bc6b87b",
           "UserAlreadyInGroupNotification": "eff8abb233bc3eb405e537e06cb6b12d56d3b56ea454169176697b22904f8727",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "UserCurrentPasswordField": "070b4b3394f4075c1602d65a79baef777b52b1f9bd1db9b8e795271535ae0010",
           "UserEmailAlreadyExistsNotification": "0acee3000c1a49d028d0ddf849ba31e472be58d44ebede913817f71a97b007a7",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "84c4366010b16b39b73cdb272baed8dbbabcaa94d9109e046c186c1d48a90072",
@@ -1761,6 +1774,7 @@
           "UserPasswordConfirmationField": "4e8532b4fd8ace99419a8ccd75a55f0a21e8865f10f264e3288bd167801ca0c8",
           "UserPasswordField": "d482c10b3d4d2a198042e6c042e7a6d292dd4d4abd4bf7820813fcc316135063",
           "UserPasswordPlainField": "d482c10b3d4d2a198042e6c042e7a6d292dd4d4abd4bf7820813fcc316135063",
+          "UserRequestingUserIDField": "2bf7e8a4a8b6d6ffa0ded199a917a8f09c89bcc23c08eb9fcdb3f92551a313c9",
           "UserRoleRoleIDField": "e0165d8a6de1b4e2ed0eff3a2c23366ddb907a5a3420d5a51e4c9af07c65b5a8",
           "UserRoleRoleKeyField": "e2c3d45a9df20c6ea3e72a95f3285c120349ed105f507c9fa6385d86d8ebf293",
           "UserRoleRoleNameField": "8ec37951ad70acfed151996741f845e33ea7a7cc444cc127884859a7ba76fed5",

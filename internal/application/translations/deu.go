@@ -114,6 +114,9 @@ func (deu) Translations() map[string]string {
 		"CannotJoinGroupWithUnheldPermissionsNotification": "Sie können niemanden zu einer Gruppe hinzufügen, die Berechtigungen gewährt, die Sie nicht besitzen.",
 		"CannotJoinWildcardGroupNotification":              "Eine Gruppe mit Platzhalter-Berechtigungen kann über diese API nicht zugewiesen werden.",
 		"PasswordUnchangedNotification":                    "Das neue Passwort muss sich vom aktuellen unterscheiden.",
+		"PasswordChangeRequiresSelfNotification":           "Sie können nur Ihr eigenes Passwort ändern.",
+		"PasswordResetRequiresAnotherUserNotification":     "Verwenden Sie den Endpunkt zur Passwortänderung, um Ihr eigenes Passwort zu setzen.",
+		"InvalidCurrentPasswordNotification":               "Das aktuelle Passwort ist falsch.",
 		"InvalidEmailNotification":                         "Ungültige E-Mail-Adresse. Bitte in Kleinbuchstaben eingeben.",
 		"InvalidPersonNameNotification":                    "Ungültiger Name.",
 		"WeakPasswordNotification":                         "Das Passwort muss 8 bis 128 Zeichen lang sein und einen Kleinbuchstaben, einen Großbuchstaben, eine Ziffer und ein Sonderzeichen enthalten.",
@@ -144,5 +147,7 @@ func (deu) Translations() map[string]string {
 		"UserRoleRoleNameField":                            "Rollenname",
 		"UserStatus.active":                                "Aktiv",
 		"UserStatus.suspended":                             "Gesperrt",
+		"UserRequestingUserIDField":                        "Aufrufer",
+		"UserCurrentPasswordField":                         "Aktuelles Passwort",
 	}
 }

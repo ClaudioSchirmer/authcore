@@ -114,6 +114,9 @@ func (nld) Translations() map[string]string {
 		"CannotJoinGroupWithUnheldPermissionsNotification": "U kunt niemand toevoegen aan een groep die rechten verleent die u zelf niet heeft.",
 		"CannotJoinWildcardGroupNotification":              "Een groep die jokertekenrechten verleent, kan niet via deze API worden toegewezen.",
 		"PasswordUnchangedNotification":                    "Het nieuwe wachtwoord moet verschillen van het huidige.",
+		"PasswordChangeRequiresSelfNotification":           "U kunt alleen uw eigen wachtwoord wijzigen.",
+		"PasswordResetRequiresAnotherUserNotification":     "Gebruik het eindpunt voor wachtwoordwijziging om uw eigen wachtwoord in te stellen.",
+		"InvalidCurrentPasswordNotification":               "Het huidige wachtwoord is onjuist.",
 		"InvalidEmailNotification":                         "Ongeldig e-mailadres. Voer het in kleine letters in.",
 		"InvalidPersonNameNotification":                    "Ongeldige naam.",
 		"WeakPasswordNotification":                         "Het wachtwoord moet 8 tot 128 tekens lang zijn en een kleine letter, een hoofdletter, een cijfer en een symbool bevatten.",
@@ -144,5 +147,7 @@ func (nld) Translations() map[string]string {
 		"UserRoleRoleNameField":                            "Rolnaam",
 		"UserStatus.active":                                "Actief",
 		"UserStatus.suspended":                             "Opgeschort",
+		"UserRequestingUserIDField":                        "Aanroeper",
+		"UserCurrentPasswordField":                         "Huidig wachtwoord",
 	}
 }

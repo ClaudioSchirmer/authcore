@@ -50,7 +50,7 @@ Honest scope, so nobody reads intent as delivery:
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Contract QA suite (`/omnicore:qa`) | not generated |
 | Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential path: the password hasher, the two credential operations and the rules behind them are hand-written, and `specs/omnicore-gen/user.gen-report.md` lists every piece |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**six** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant` and `user:reset-password` are the three nobody will guess from the pattern. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the four nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -134,7 +134,7 @@ the escape hatch, not as a plan.
 
 **The address is immutable.** A user cannot change their e-mail through this API at all —
 it is absent from the patch body, not merely refused by a rule — so the login handle, the
-global unique key and the lookup the public change-password route resolves by are all one
+global unique key is (the lookup the removed public change-password route resolved by was the same one) — all one
 value that never moves. The cost is stated where it lands: correcting a typo means
 archiving the user and creating them again, which loses every group and role they had.
 
@@ -597,22 +597,32 @@ unrepresentable rather than merely refused.
 
 #### The password reset
 
-One operation, hand-written because the generator cannot express it — the spec language
-gates operations by a closed set of verbs and "reset a credential" is not one of them.
+Two operations, hand-written because the generator cannot express them — the spec language
+gates operations by a closed set of verbs and neither "change a credential" nor "reset one"
+is among them.
 
 ```
-PATCH  /users/{id}/password-reset       user:reset-password  (a *:* claim satisfies it)
+PATCH  /users/{id}/password             user:change-password  (the id must BE the caller)
+PATCH  /users/{id}/password-reset       user:reset-password   (the id must NOT be the caller)
 ```
 
-It carries **no current password**: not knowing it is the point of a reset. That is also why
-it does not accept the user themselves — somebody who knows their password does not need
-this route, and letting a session replace a credential without proving the previous one is
-the attack a current-password check exists to stop. `user:update` deliberately does not
-reach it either: whoever can fix a typo in a name must not be able to take over an account.
+**They are one operation each, not one route with a mode.** The change is the caller
+rotating their own credential: it requires `currentPassword`, verifies it, and CLEARS
+`mustChangePassword`, because the password it leaves is the caller's own choice. The reset
+is the helpdesk setting somebody else's: it carries **no current password** — not knowing it
+is the point — and SETS the flag, so the next sign-in has to replace what a stranger chose.
 
-The password it leaves is somebody else's choice, so it sets `mustChangePassword`. **Nothing
-clears that flag yet** — the operation that would is the self-service change this service
-does not have.
+**Each refuses the other's rows, and the second half of that is what matters.** Without the
+reset refusing the caller's own id, a holder of `user:reset-password` points it at
+themselves and replaces their credential without proving the previous one — defeating the
+change endpoint's `currentPassword` by choosing the other URL. Same id is always the change;
+a different id is always the reset. `user:update` deliberately reaches **neither**:
+whoever can fix a typo in a name must not be able to take over an account.
+
+The password a RESET leaves is somebody else's choice, so it sets `mustChangePassword`; the
+CHANGE clears it, because the caller picked that password and proved the one before it. The
+insert sets it too, for the same reason the reset does — an admin chose the initial
+password.
 
 **The permission answers WHO may attempt the verb and says nothing about WHOSE row.** The
 aggregate's own row-scope guard is what refuses a holder of `user:reset-password` in one
@@ -645,11 +655,11 @@ naming here specifically: a user listing is the customer's staff directory **inc
 e-mail addresses**, so reads-open isolation would leak more here than the org chart `Group`
 already refused to leak.
 
-**The public change-password route is the one place in this service where a request legitimately carries no
-identity in production.** Every other stand-down is confined to `auth.mode: disabled`, which
-the framework permits only under `APP_PROFILE=dev`. That route is exempt by design, and the
-global e-mail index is what makes it safe — there is no tenant to scope by, and there does
-not need to be. Nobody should "fix" it by requiring a claim the caller structurally cannot
+**No request in this service legitimately carries no identity in production** *(amended
+2026-08-26)*. This paragraph described the public change-password route, which was removed
+that day; every stand-down that remains is confined to `auth.mode: disabled`, which the
+framework permits only under `APP_PROFILE=dev`. The paragraph below is kept as the record of
+why that route was exempt while it existed. Nobody should "fix" it by requiring a claim the caller structurally cannot
 have.
 
 
@@ -714,7 +724,8 @@ PATCH  /users/{id}/groups/{entryId}/archive        leave one           — user:
 POST   /users/{id}/roles                           grant a role        — user:grant
 PATCH  /users/{id}/roles/{entryId}/archive         revoke one          — user:grant
 
-PATCH  /users/{id}/password-reset                  reset — user:reset-password (or *:*)
+PATCH  /users/{id}/password                        change own — user:change-password
+PATCH  /users/{id}/password-reset                  reset another — user:reset-password (or *:*)
 ```
 
 `PATCH /users/{id}` carries **three** fields and no more: `givenName`, `familyName` and
@@ -723,14 +734,17 @@ request shape, so there is no body in which a caller can propose one. Neither is
 credential field: there is no shape reaching the ordinary update in which a password exists
 to be sent.
 
-**There is no self-service password change, and that is a gap rather than a decision
-against one.** A user who wants to rotate their own credential has no endpoint today: only
-a holder of `user:reset-password` can set one. A public change-password route existed
-briefly and was removed on 2026-08-26 — it did exactly what the reset does, without a
+**Self-service password change: `PATCH /users/{id}/password`.** A PUBLIC change-password
+route existed briefly and was removed on 2026-08-26 — it did what the reset does, without a
 token, on the premise that somebody needing a new password might be unable to obtain one.
 That premise does not hold here: there is no login route, so nothing blocks authentication
-for a caller who knows their password. What it was reaching for is a FORGOT-PASSWORD flow —
-e-mail, an expiring link, a one-time token — which is real work nobody has started.
+for a caller who knows their password. What replaced it later the same day is the
+authenticated change above: token required, id must be the caller's own, current password
+proved.
+
+**What is still missing is a FORGOT-PASSWORD flow** — e-mail, an expiring link, a one-time
+token — for the caller who has no password to prove. That is real work nobody has started,
+and it is the only credential gap this service ships with.
 
 ```
 GET    /groups/                              list, filter, paginate

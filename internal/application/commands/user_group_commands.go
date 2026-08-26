@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:f3dd625e1f19aca08f897533dea1eab9e8f6f4eaa1998b17a2d27bd8bf25d75f
+// checksum:   sha256:97d51c3a99742169e94a4faad736cc2a767609e62c60f32ecd16075408bb9c38
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -43,11 +43,13 @@ func (cmd *AddUserGroupCommand) ApplyTo(ctx *configuration.AppContext, e *appdom
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
+		e.RequestingUserID = id.Subject
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil
@@ -84,11 +86,13 @@ func (cmd *RemoveUserGroupCommand) ApplyTo(ctx *configuration.AppContext, e *app
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
+		e.RequestingUserID = id.Subject
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil

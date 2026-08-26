@@ -212,7 +212,9 @@ fields:
       nld: Wachtwoord gewijzigd op
 
   # What makes an admin-set initial password tolerable: the next sign-in has to rotate it.
-  # Set by the create and by the reset, cleared by the open change.
+  # Set by the create and by the RESET — both leave a password somebody else chose — and
+  # cleared by the CHANGE, the one operation where the caller picks their own and proves
+  # the one before it.
   - name: MustChangePassword
     type: bool
     column: must_change_password
@@ -260,7 +262,7 @@ fields:
   # not be answered with "the password is required" for a field it had no business sending,
   # and the generator excludes the value object from that verb's automatic pass by itself.
   #
-  # The two credential OPERATIONS (the public change and the reset) are hand-written custom
+  # The two credential OPERATIONS (the self-service change and the helpdesk reset) are hand-written custom
   # commands and carry their own copies of this pair; they are outside what this language
   # can declare, and scaffold-entity/user/spec.md §D says why.
   - name: Password
@@ -303,6 +305,63 @@ fields:
       deu: Passwortbestätigung
       ita: Conferma password
       nld: Wachtwoordbevestiging
+
+  # ── the two fields the hand-written credential operations read ────────────────────────
+  #
+  # Both exist for rules the SPEC LANGUAGE CANNOT DECLARE. The change and the reset are
+  # custom commands that both dispatch ModeUpdate — the same mode the ordinary PATCH
+  # dispatches — so they are told apart by the action name, and an `ownerCheck` rule here
+  # would fire on the rename too. The comparison stays hand-written; only the VALUES it
+  # reads are declared, which is what these two are.
+
+  # The caller's own id, so the change can ask "is this row yours?" without a ctx the
+  # domain does not have.
+  #
+  # source: subject reads Identity.Subject, the canonical accessor — NOT Claims["sub"].
+  # The distinction is load-bearing: BuildIdentity copies every claim, so the raw map
+  # carries `sub` for a JWT caller, but the framework builds identities with Subject set
+  # and no `sub` claim elsewhere (web/grpc/posture.go, infra/integration/registry.go). A
+  # rule reading the map would compare against "" for those callers and refuse nothing.
+  - name: RequestingUserID
+    type: string
+    runtime: true
+    source: subject
+    livesOn: root
+    description: The caller's own id, read off their token — what the change compares against this row.
+    labelKey: UserRequestingUserIDField
+    text:
+      eng: Caller
+      ptbr: Chamador
+      esp: Llamante
+      fra: Appelant
+      deu: Aufrufer
+      ita: Chiamante
+      nld: Aanroeper
+
+  # The password the caller currently holds, which the CHANGE requires and the RESET
+  # deliberately does not: not knowing it is the whole point of a reset.
+  #
+  # source: manual and not `body`, though a body is exactly where it comes from. `modes`
+  # only spans the verbs the spec declares, and this field belongs to neither of them —
+  # declaring it under `update` would put currentPassword in the body of PATCH /users/:id,
+  # a rename endpoint that has no business carrying one. manual means the generator emits
+  # the field and nothing else: no DTO, no command, no OpenAPI schema. The hand-written
+  # command stages it.
+  - name: CurrentPassword
+    type: string
+    runtime: true
+    source: manual
+    livesOn: root
+    description: The password the caller currently holds, proved by the change and never stored.
+    labelKey: UserCurrentPasswordField
+    text:
+      eng: Current password
+      ptbr: Senha atual
+      esp: Contraseña actual
+      fra: Mot de passe actuel
+      deu: Aktuelles Passwort
+      ita: Password attuale
+      nld: Huidig wachtwoord
 
 valueObjects:
   # written: manual — the SHAPE stays declared (the schema decomposes the parts, the mappers

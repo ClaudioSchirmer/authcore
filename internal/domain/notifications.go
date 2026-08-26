@@ -324,3 +324,48 @@ func (CannotJoinWildcardGroupNotification) Semantic() domain.NotificationSemanti
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type PasswordUnchangedNotification struct{ domain.DomainNotificationBase }
+
+// PasswordChangeRequiresSelfNotification reaches the caller as 403. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+//
+// It is the change endpoint's row decision: the permission on the route says
+// WHO may attempt the verb, and this says WHOSE row they reached. A caller who
+// holds user:change-password and points it at somebody else meets this — the
+// reset is the operation for that, and it asks for a different permission.
+type PasswordChangeRequiresSelfNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (PasswordChangeRequiresSelfNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}
+
+// PasswordResetRequiresAnotherUserNotification reaches the caller as 403. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+//
+// It is the OTHER half, and it is not symmetry for its own sake. Without it a
+// holder of user:reset-password could point the reset at their OWN row and
+// replace their credential without proving the previous one — which is exactly
+// what the change endpoint's currentPassword exists to stop, defeated by
+// choosing the other URL. It keeps the two operations disjoint: same id is
+// always the change, different id is always the reset.
+type PasswordResetRequiresAnotherUserNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (PasswordResetRequiresAnotherUserNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}
+
+// InvalidCurrentPasswordNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+//
+// 422 and not 403: the caller is who they say they are and may perform the
+// verb — they mistyped a field. The 403s above are about which ROW was reached,
+// which is a different refusal and deserves a different status.
+type InvalidCurrentPasswordNotification struct {
+	domain.DomainNotificationBase
+}
