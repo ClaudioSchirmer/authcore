@@ -1122,6 +1122,22 @@ service:
         The irreversible Argon2id hash of the plaintext, PHC-encoded so the parameters
         travel with the value. Pure CPU, no query. It must never log its input.
 
+    # The other half of the hasher, and the one the two credential OPERATIONS
+    # need: "is this plaintext the password already on the row". Named for the
+    # PROBLEM — a rule wants to refuse an unchanged password, and the generated
+    # stub answering false has to mean "nothing wrong".
+    #
+    # Pure CPU like HashPassword: it verifies against the hash it is handed and
+    # asks the database nothing.
+    - name: PasswordIsUnchanged
+      kind: manual
+      returns: bool
+      filters: [Password, PasswordHash]
+      description: >-
+        Whether the plaintext given verifies against the hash already stored — the
+        refusal behind "the new password must differ from the current one". Never
+        logs its input.
+
     - name: TenantIsUnavailable
       kind: manual
       returns: bool

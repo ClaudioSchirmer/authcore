@@ -250,6 +250,24 @@ func (s *UserServiceImpl) HashPassword(password string) string {
 	return userHasher.Hash(password)
 }
 
+// PasswordIsUnchanged reports whether the plaintext given is the password
+// already on the row.
+//
+// It is the refusal behind "the new password must differ from the current one",
+// and it is NOT password reuse prevention: it can only see the ONE hash the row
+// carries. Real reuse prevention needs a history table, which this model
+// deliberately does not have — saying so here keeps the rule from being sold as
+// something it is not.
+//
+// An empty stored hash answers FALSE: a row with no credential has no password
+// for a new one to be identical to.
+func (s *UserServiceImpl) PasswordIsUnchanged(password string, passwordHash string) bool {
+	if passwordHash == "" {
+		return false
+	}
+	return userHasher.Matches(password, passwordHash)
+}
+
 // TenantIsUnavailable reports whether the owning tenant is missing, archived, or
 // commercially SUSPENDED. Queries the tenants table by its primary key.
 //

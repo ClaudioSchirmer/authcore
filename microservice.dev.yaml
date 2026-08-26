@@ -36,6 +36,15 @@ graphql:
 # Accepted ONLY under APP_PROFILE=dev; any other profile aborts the boot on this value.
 auth:
   mode: disabled
+  # DECLARED EVEN THOUGH mode: disabled MAKES IT INERT, and that is the point.
+  # The dev profile authenticates nobody, so nothing here changes what this bench
+  # does today — but the entry is what a reader compares against prd, and it is
+  # what keeps the two profiles from disagreeing about which routes are public
+  # the day this one gains a mode.
+  #
+  # The prd copy carries the full reasoning.
+  publicRoutes:
+    - PATCH /users/password
 
 # No audit: block — the framework default keeps both destinations active
 # (in-transaction audit_events row + post-commit slog line).

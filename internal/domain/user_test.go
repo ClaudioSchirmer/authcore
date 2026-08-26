@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:69e186abb2eddd0d44ae548acdbe01028c3711758cb1d09fe6120acab5d36fa9
+// checksum:   sha256:d16607ac9bc7a99db6acd4e7a420e68214001b0b07c6d649030732390ab39506
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -74,6 +74,7 @@ type stubUserService struct {
 
 func (stubUserService) EmailTaken(_ string, _ domain.ID) bool                    { return false }
 func (stubUserService) HashPassword(_ string) string                             { return "" }
+func (stubUserService) PasswordIsUnchanged(_ string, _ string) bool              { return false }
 func (stubUserService) TenantIsUnavailable(_ domain.ID) bool                     { return false }
 func (stubUserService) GroupIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool { return false }
 func (stubUserService) GroupGrantsWildcard(_ domain.ID) bool                     { return false }

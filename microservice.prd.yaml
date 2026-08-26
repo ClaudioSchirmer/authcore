@@ -42,6 +42,21 @@ auth:
   publicRoutes:
     - GET /livez
     - GET /readyz
+    # The ONE unauthenticated WRITE in this service, and the only entry here that
+    # is not a probe. A caller who needs a new password may be exactly the caller
+    # who cannot obtain a token — a must-change flag, an expired credential, or
+    # simply a login screen that refused them — so gating the change on a token
+    # they cannot get is a deadlock.
+    #
+    # It is identified by e-mail rather than by id because THIS LIST cannot hold a
+    # path parameter: the match is an exact METHOD /path with no globs, so
+    # `PATCH /users/{id}/password` is not declarable as public at all.
+    #
+    # Removing this line does not merely close the route: once
+    # auth.authorization is enabled, the boot scan requires a permission on every
+    # non-public route and the service refuses to start. That is the good failure
+    # direction, and it is what makes the omission impossible to ship quietly.
+    - PATCH /users/password
 
 shutdown:
   drainTimeoutSeconds: 30

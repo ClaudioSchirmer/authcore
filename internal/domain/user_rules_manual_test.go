@@ -42,6 +42,7 @@ type probingUserService struct {
 	roleUnavailable   bool
 	roleWildcard      bool
 	lacksRolePerm     bool
+	passwordUnchanged bool
 
 	askedTenant        int
 	askedGroupAvail    []scopedQuestion
@@ -51,6 +52,7 @@ type probingUserService struct {
 	askedRoleWildcard  []domain.ID
 	askedRoleEscalate  []domain.ID
 	hashedPlaintexts   []string
+	askedUnchanged     []string
 }
 
 // scopedQuestion records BOTH arguments, because which tenant the rule passes is
@@ -65,6 +67,14 @@ func (s *probingUserService) EmailTaken(string, domain.ID) bool { return s.email
 func (s *probingUserService) HashPassword(password string) string {
 	s.hashedPlaintexts = append(s.hashedPlaintexts, password)
 	return "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$" + password
+}
+
+// passwordUnchanged is off by default: the stub's whole posture is "nothing is
+// wrong", so a valid fixture passes and each negative case fails for the rule it
+// is testing.
+func (s *probingUserService) PasswordIsUnchanged(password, hash string) bool {
+	s.askedUnchanged = append(s.askedUnchanged, password)
+	return s.passwordUnchanged
 }
 
 func (s *probingUserService) TenantIsUnavailable(domain.ID) bool {

@@ -55,3 +55,9 @@ Alternatives worth weighing against it:
 
 Depends on **token issuance**, which is still *not started* (README, roadmap table). There
 is no minting path to add a claim to yet, so this cannot be built before that exists.
+
+**Half of that dependency resolved on 2026-08-26**: `User` is built, so the SUBJECT a token
+would be minted for now exists, and both arrows into `Role` — through a group and directly —
+are stored and served. What is still missing is the walk that turns them into one set of
+effective permissions, and the `Issuer` call that carries it. Until those land, this entry
+stays where it is: a claim map has nothing to be merged into.

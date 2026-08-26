@@ -1232,7 +1232,7 @@
     },
     "User": {
       "spec": "specs/omnicore-gen/user.omnicore.yaml",
-      "specHash": "adb183dc8348801977ae4fe2d7dc0c683ab93b9b06ad5e70ba5563ee5ed51377",
+      "specHash": "0a5d4c4f975e9561bbc4a43d7791ed3d43e96a458deeb42dcd866d063f61b114",
       "framework": "v0.60.0",
       "files": {
         "bootstrap/users_feature.go": {
@@ -1325,11 +1325,11 @@
         },
         "internal/domain/user_service.go": {
           "class": "owned",
-          "hash": "92e8d7a2158d3ac90b76906f4d4333cae86858a832439c0b3e5bc81231206e1f"
+          "hash": "2c2cc570b8a733855a37e3734220d912c3c941189961def122316c7fb0a00df5"
         },
         "internal/domain/user_test.go": {
           "class": "owned",
-          "hash": "142b81990247d3614524934f55c1efddcb3d46ed4c9c59c6416afb70e0fe0169"
+          "hash": "b253ba60a10e532e092b2a2b539d2ff804da4d6d7c1369c0e15b5d5f93fc52a7"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",

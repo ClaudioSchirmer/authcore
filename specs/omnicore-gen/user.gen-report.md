@@ -98,6 +98,10 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > The irreversible Argon2id hash of the plaintext, PHC-encoded so the parameters travel with the value. Pure CPU, no query. It must never log its input.
 
+**`PasswordIsUnchanged(password string, passwordHash string) bool`**
+
+> Whether the plaintext given verifies against the hash already stored — the refusal behind "the new password must differ from the current one". Never logs its input.
+
 **`TenantIsUnavailable(tenantID domain.ID) bool`**
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
@@ -295,10 +299,6 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the listing request and response | `internal/web/requests/find_users_by_params.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/user_computed_manual.go` — hand-written rules live here, by design
@@ -306,6 +306,12 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `internal/infra/user_service_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+**Refused** — these differ from what the generator last wrote, so they were left exactly as they are:
+
+- `internal/infra/user_repository.go` — the checksum in its header no longer matches its contents — it was edited by hand
+
+To let the generator take one back, pass `--force=<path>`; to keep a fix deliberately, run `omnicore-gen adopt <path>`.
 
 42 file(s) were already up to date.
 

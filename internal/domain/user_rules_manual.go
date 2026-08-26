@@ -55,6 +55,16 @@ func (e *User) customRules(actionName string, service domain.Service, r *domain.
 		e.refuseUngrantableRoles(svc, r)
 	})
 
+	r.IfUpdate(func() {
+		// The two credential operations dispatch ModeUpdate, which is also what
+		// an ordinary PATCH dispatches — so the ACTION NAME is what tells them
+		// apart. Without this guard the password checks would fire on a rename,
+		// against a field that write never carried.
+		if IsCredentialAction(actionName) {
+			e.credentialRules(actionName, svc, r)
+		}
+	})
+
 	r.IfArchive(func() {
 		// ── archive-forces-suspended ──
 		// A MUTATION, not a validation: set the field and raise nothing. An
