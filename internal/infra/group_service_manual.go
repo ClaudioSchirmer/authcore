@@ -85,42 +85,14 @@ func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 	return c
 }
 
-// roleRow is everything the three per-entry facts need to know about one role,
-// resolved in a single read.
+// The `roleRow` type and its grantsWildcard() USED TO LIVE HERE. They moved to
+// role_probe.go on 2026-08-26, when User needed the same answer: the type is
+// about a ROLE, not about a group, and a second entity depending on a type
+// declared in this file would have made removing Group break User for a reason
+// that has nothing to do with groups.
 //
-// found is false for a role no ACTIVE row carries — which deliberately collapses
-// "no such role" and "a role this tenant retired" into one state. The two are
-// indistinguishable to every caller of this type, and they have to be: the
-// notification these facts feed answers all three of its questions with one
-// message, because a distinct reply would be an existence oracle.
-//
-// keys are the permissions the role confers, already rendered from the grants'
-// joined resource and action. ACTIVE grants only — the loader's default child
-// scope — because a revoked grant confers nothing and must not be judged.
-type roleRow struct {
-	found    bool
-	tenantID domain.ID
-	keys     []vos.PermissionKey
-}
-
-// grantsWildcard reports whether the role confers any permission with a wildcard
-// in either part.
-//
-// A role that resolves to nothing answers TRUE. That is deliberate and it is the
-// fail-closed direction: an unresolvable attachment must never reach the
-// escalation probe, which would hand its key to Identity.HasPermission — and
-// that panics on a wildcard and on an empty string alike.
-func (r roleRow) grantsWildcard() bool {
-	if !r.found {
-		return true
-	}
-	for _, key := range r.keys {
-		if key.Resource == vos.PermissionWildcard || key.Action == vos.PermissionWildcard {
-			return true
-		}
-	}
-	return false
-}
+// Nothing about the behaviour changed. The resolution below — the read, the memo
+// and the repositories — stays here, because those are this service's.
 
 // roleRow resolves one role and its conferred permission keys, memoised for the
 // request.
