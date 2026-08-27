@@ -70,7 +70,7 @@ func (w *fakeWriter) Delete(domain.Deletable) error       { return nil }
 // testing.
 type credentialService struct {
 	domain.ServiceBase
-	hasher appdomain.PasswordHasher
+	hasher *infra.Argon2idHasher
 }
 
 func (s *credentialService) EmailTaken(string, domain.ID) bool { return false }
@@ -97,7 +97,7 @@ const (
 	newPassword = "An0ther!Passphrase"
 )
 
-func resetFixture(t *testing.T) (*fakeStore, appdomain.PasswordHasher, *ResetPasswordHandler) {
+func resetFixture(t *testing.T) (*fakeStore, *infra.Argon2idHasher, *ResetPasswordHandler) {
 	t.Helper()
 
 	hasher := infra.NewArgon2idHasher()
@@ -296,7 +296,7 @@ func raised(err error, notification string) bool {
 
 const someOperatorID = "2c9e1f44-8a7b-4d61-b0c3-5f1e7a9d3b28"
 
-func changeFixture(t *testing.T) (*fakeStore, appdomain.PasswordHasher, *ChangePasswordHandler) {
+func changeFixture(t *testing.T) (*fakeStore, *infra.Argon2idHasher, *ChangePasswordHandler) {
 	t.Helper()
 
 	hasher := infra.NewArgon2idHasher()

@@ -1,0 +1,922 @@
+# Client — a machine account: an integration that authenticates as itself.
+#
+# Model authority: scaffold-entity/client/spec.md (Status: APPROVED, 2026-08-26). Nothing here
+# re-decides the model; where this file and that spec disagree, the spec wins.
+#
+# The one idea to hold while reading: THE ROW ID IS THE CLIENT ID, AND THE SECRET IS NEVER
+# STORED. There is no second identifier to keep in step, and the plaintext exists for the
+# length of one request — minted from crypto/rand by a rule, hashed with SHA-256 (NOT
+# Argon2id: spec §B-Q4), and gone. What a column holds is the hash, and four declarations
+# keep even that out of every copy the framework makes of the row.
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: Client
+plural: Clients
+language: en-US
+
+storage:
+  kind: flat
+  table: clients
+  description: >-
+    A machine account: an integration that authenticates as itself, holding a server-minted
+    credential and a set of role grants inside exactly one tenant. The row id IS the client
+    id the caller signs in with, and the label is unique per tenant over active rows.
+  managed:
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+    revision: revision
+
+fields:
+  # The owner. assignedFrom: identity-claim fills it from the caller's token, so no ordinary
+  # caller can file a client under someone else's tenant; bypassMaySet lets the ONE caller
+  # authz.bypass admits — the platform operator — state which tenant a new row belongs to.
+  # Inherited verbatim from User; not re-argued here.
+  - name: TenantID
+    type: id
+    column: tenant_id
+    livesOn: root
+    assignedFrom: identity-claim
+    claim: tenant_id
+    bypassMaySet: true
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
+    description: The tenant this client belongs to. Immutable — a client never moves between tenants.
+    labelKey: ClientTenantIDField
+    text:
+      eng: Tenant
+      ptbr: Inquilino
+      esp: Inquilino
+      fra: Locataire
+      deu: Mandant
+      ita: Tenant
+      nld: Tenant
+
+  # DisplayName is the project's value object FOR THINGS, not people — its own file header
+  # says so, and an integration is a thing. Unique PER TENANT over active rows: two clients
+  # called "Billing" in one tenant is how somebody revokes the wrong one.
+  - name: Name
+    type: string
+    column: name
+    length: 120
+    livesOn: root
+    vo: {kind: reuse, ref: DisplayName}
+    example: Billing integration
+    description: The human label this integration is found by. Unique within the tenant over active rows.
+    labelKey: ClientNameField
+    unique:
+      enforce: service-precheck+constraint
+      notification: ClientNameAlreadyExistsNotification
+      scope: active-only
+      within: [TenantID]
+    text:
+      eng: Name
+      ptbr: Nome
+      esp: Nombre
+      fra: Nom
+      deu: Name
+      ita: Nome
+      nld: Naam
+
+  - name: Description
+    type: string
+    column: description
+    length: 500
+    livesOn: root
+    vo: {kind: reuse, ref: Description}
+    example: Posts invoices from the billing system into the ledger.
+    description: What this integration is for, in the tenant's own words.
+    labelKey: ClientDescriptionField
+    text:
+      eng: Description
+      ptbr: Descrição
+      esp: Descripción
+      fra: Description
+      deu: Beschreibung
+      ita: Descrizione
+      nld: Omschrijving
+
+  # THE CREDENTIAL. Four declarations, and each closes a different copy of the row:
+  #   assignedFrom: derived  — no write request, command or OpenAPI schema carries it; a
+  #                            rules.manual entry scoped to insert is the only writer.
+  #   hidden: true           — out of the by-id read, every listing row, the write results,
+  #                            the exports and the ?fields= vocabulary.
+  #   redact.inSync          — out of the outbox payload, and with it the topic, every
+  #                            consuming service, both failure ledgers and the projection.
+  #   redact.inAudit         — out of the audit event; applied AFTER the delta, so the trail
+  #                            still records THAT it changed without recording what to.
+  # VARCHAR(64) and not 255: SHA-256 is 64 hex characters, fixed. The password column is 255
+  # because a PHC string carries its own parameters; this one carries nothing, and sizing it
+  # for a format it does not use would invite somebody to put one there.
+  - name: SecretHash
+    type: string
+    column: secret_hash
+    length: 64
+    livesOn: root
+    assignedFrom: derived
+    hidden: true
+    example: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+    description: >-
+      The SHA-256 of the current secret, lowercase hex. Never sent by a caller, never
+      returned, never copied.
+    labelKey: ClientSecretHashField
+    redact:
+      inSync: {kind: fixed, value: "***"}
+      inAudit: {kind: fixed, value: "***"}
+
+  - name: SecretChangedAt
+    type: time
+    column: secret_changed_at
+    livesOn: root
+    assignedFrom: derived
+    example: "2026-08-26T14:03:11Z"
+    description: When the credential was last minted.
+    labelKey: ClientSecretChangedAtField
+    text:
+      eng: Secret changed at
+      ptbr: Segredo alterado em
+      esp: Secreto cambiado en
+      fra: Secret modifié le
+      deu: Geheimnis geändert am
+      ita: Segreto modificato il
+      nld: Geheim gewijzigd op
+
+  # The retiring half of the overlap. NULL when no rotation is in flight — which is the
+  # normal state, and why `derived` is the one assignedFrom that takes nullable.
+  - name: PreviousSecretHash
+    type: string
+    column: previous_secret_hash
+    length: 64
+    livesOn: root
+    nullable: true
+    assignedFrom: derived
+    hidden: true
+    example: 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+    description: >-
+      The SHA-256 of the secret being retired, accepted until the grace window closes.
+      Absent when no rotation is in flight.
+    labelKey: ClientPreviousSecretHashField
+    redact:
+      inSync: {kind: fixed, value: "***"}
+      inAudit: {kind: fixed, value: "***"}
+
+  # Served in the response and in no filter or sort: a timestamp leaks nothing, and an
+  # operator asking "is a rotation still open, and until when" should not have to derive it.
+  - name: PreviousSecretExpiresAt
+    type: time
+    column: previous_secret_expires_at
+    livesOn: root
+    nullable: true
+    assignedFrom: derived
+    example: "2026-08-27T14:03:11Z"
+    description: >-
+      When the retiring secret stops being accepted. Absent when no rotation is in flight.
+    labelKey: ClientPreviousSecretExpiresAtField
+    text:
+      eng: Previous secret expires at
+      ptbr: Segredo anterior expira em
+      esp: Secreto anterior expira en
+      fra: Le secret précédent expire le
+      deu: Vorheriges Geheimnis läuft ab am
+      ita: Il segreto precedente scade il
+      nld: Vorig geheim verloopt op
+
+  - name: Status
+    type: string
+    column: status
+    length: 16
+    livesOn: root
+    vo: {kind: enum, ref: ClientStatus}
+    example: active
+    description: The account's state — active or suspended. Orthogonal to archiving.
+    labelKey: ClientStatusField
+    text:
+      eng: Status
+      ptbr: Situação
+      esp: Situación
+      fra: Statut
+      deu: Status
+      ita: Stato
+      nld: Status
+
+  # THE PLAINTEXT, and it is source: manual rather than body — nobody SENDS it. The
+  # generator declares the field and fills it from nowhere; the rules mint it. There is no
+  # column, so there is no payload, no audit event and nothing to redact.
+  #
+  # It carries no value object on purpose: a VO's IsValid is a rule about caller input, and
+  # this value is never caller input. A rule over a value the server chose can never fire.
+  - name: Secret
+    type: string
+    runtime: true
+    source: manual
+    livesOn: root
+    example: acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM
+    description: >-
+      The plaintext secret, minted by the rules and rendered by the operation that minted
+      it — and nowhere else, ever. No column, no payload, no audit event, no listing.
+    labelKey: ClientSecretField
+
+  # How long the retiring secret stays valid, in seconds. The hand-written rotate command
+  # resolves the caller's optional value (24 h when omitted, 0…604800) and puts it here; no
+  # generated verb carries it, which is what source: manual says.
+  - name: GracePeriodSeconds
+    type: int
+    runtime: true
+    source: manual
+    livesOn: root
+    example: "86400"
+    description: >-
+      How long the retiring secret stays valid, in seconds. Zero is an immediate kill and is
+      a legitimate answer, not an omission.
+    labelKey: ClientGracePeriodSecondsField
+
+  # WHO IS ASKING. The row scope synthesises RequestingTenant, RequestingMayCrossScope and
+  # RequestingIdentityPresent by itself; these two are the entity's own.
+  #
+  # RequestingClientID reads Identity.Subject, never Claims["sub"] — the framework builds
+  # identities that set Subject and carry no sub claim at all, so a comparison against the
+  # raw map answers "not the owner" to everyone.
+  - name: RequestingClientID
+    type: string
+    runtime: true
+    source: subject
+    livesOn: root
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
+    description: The caller's own subject, read off their token — what the row rule compares against this row.
+
+  # 'user' or 'client'. The same vocabulary authentication_attempts.identity_kind already
+  # holds. NOTHING MINTS IT YET: POST /auth/client/token does, and it does not exist — so
+  # this reads "" today and the rule below stands down, which is deliberate (spec §B-Q8e).
+  - name: RequestingIdentityKind
+    type: string
+    runtime: true
+    source: claim
+    claim: identity_kind
+    livesOn: root
+    example: client
+    description: >-
+      Which kind of subject the caller is — user or client. Absent means user, which is what
+      keeps the row rule inert until the client token endpoint mints the claim.
+
+valueObjects:
+  - name: ClientStatus
+    kind: enum
+    backing: string
+    description: The state of a client's account, orthogonal to whether the row is archived.
+    unknownNotification: UnknownClientStatusNotification
+    members:
+      - name: Active
+        value: active
+        text: {ptbr: Ativo, eng: Active, esp: Activo, fra: Actif, deu: Aktiv, ita: Attivo, nld: Actief}
+      - name: Suspended
+        value: suspended
+        text: {ptbr: Suspenso, eng: Suspended, esp: Suspendido, fra: Suspendu, deu: Ausgesetzt, ita: Sospeso, nld: Opgeschort}
+
+  # manual: the rule is a COMPOSITION — parse, mask the host bits away, and refuse the two
+  # universal prefixes — and none of that is a shape a regex states or a set a member list
+  # closes. Backing is a CONTRACT: the mappers write vos.CIDRBlock(x) and read .Value().
+  - name: CIDRBlock
+    kind: manual
+    backing: string
+    description: >-
+      An IPv4 or IPv6 network range in CIDR notation, accepted only in its CANONICAL form —
+      host bits masked away. 203.0.113.5/24 is refused and the answer names 203.0.113.0/24,
+      because the two are one range written two ways and a collection that stores both has
+      a unique index that cannot see the duplicate. Refusing beats normalising silently:
+      the mappers convert straight to this type, so there is no seat to rewrite the value
+      in, and a caller told the canonical spelling learns something a silent rewrite hides.
+      It also refuses 0.0.0.0/0 and ::/0 outright — an empty collection is how "no
+      restriction" is spelled, and two spellings for it is how a reviewer comes to believe
+      a client is restricted when it is not. Raises InvalidCIDRBlockNotification for a
+      value netip.ParsePrefix rejects, CIDRHasHostBitsSetNotification for a well-formed
+      range that is not masked, and UniversalCIDRNotAllowedNotification for a universal
+      prefix.
+
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+  # The credential columns have no request shape reaching them at all (assignedFrom:
+  # derived), so they need no exclusion here.
+
+delete:
+  # Soft only. An archived client's row is the evidence of what a credential was allowed
+  # to do while it lived; purging it deletes the answer to the question an incident asks
+  # first. Each collection declares its own removal with softRemove, above.
+  root: soft
+
+rules:
+  list:
+    # The tenant is the premise of everything below it — the availability probe, the row
+    # scope, the role checks. Pulled forward so an unparseable owner is reported in the
+    # FIRST 422 rather than after the barrier has already stopped the automatic pass.
+    - id: tenant-valid
+      kind: valueObject
+      scope: [insertOrUpdate, archive]
+      fields: [TenantID]
+      guard: true
+      description: the tenant probe, the row scope and the role rules below all read this owner.
+
+    - id: tenant-immutable
+      kind: immutable
+      scope: [update]
+      fields: [TenantID]
+      notification: ClientTenantIsImmutableNotification
+
+    - id: status-transition
+      kind: transition
+      scope: [update]
+      fields: [Status]
+      transitions:
+        active: [suspended]
+        suspended: [active]
+      notification: InvalidClientStatusTransitionNotification
+      description: The two states move into each other and nowhere else; staying put is always allowed.
+
+    - id: roles-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [Roles]
+      cap: 50
+      notification: TooManyRolesForClientNotification
+      description: at most 50 role grants on one client, counted over the whole collection.
+
+    - id: allowed-cidrs-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [AllowedCIDRs]
+      cap: 20
+      notification: TooManyAllowedCIDRsForClientNotification
+      description: at most 20 allowed ranges on one client, counted over the whole collection.
+
+  manual:
+    - id: credential-minting
+      description: >-
+        Mint the credential on creation. Draw 32 bytes from crypto/rand, render them
+        base64url WITHOUT padding, prefix them with "acs_", and put the result in Secret;
+        put HashSecret(Secret) in SecretHash; set SecretChangedAt to now. Leave
+        PreviousSecretHash and PreviousSecretExpiresAt absent — there is nothing retiring on
+        a first issue. Derive ONLY after every other check has passed: writing a hash for a
+        secret the rules refused is one refactor away otherwise. The plaintext must never be
+        logged, on any path.
+      scope: [insert]
+
+    - id: tenant-available
+      description: >-
+        Refuse a client whose owning tenant is missing, archived or commercially SUSPENDED.
+        A trial tenant is a live customer and passes — "unavailable" is not "not active".
+        Asks TenantIsUnavailable.
+      scope: [insert]
+      notification: ClientTenantDoesNotExistNotification
+      attachTo: TenantID
+
+    - id: role-available-in-tenant
+      description: >-
+        For every role this write ADDS: refuse when the id is absent from the roles table,
+        points at an archived role, or belongs to a tenant other than this client's. ONE
+        answer for all three — a distinct "belongs to another tenant" reply is an existence
+        oracle over a competitor's catalogue. Asks RoleIsUnavailableInTenant, and judges the
+        ADDED entries only, never the ones already stored.
+      scope: [insertOrUpdate]
+      notification: RoleNotAvailableInTenantNotification
+      attachTo: Roles
+
+    - id: no-wildcard-role
+      description: >-
+        For every role this write ADDS: refuse a role granting a permission that carries a
+        wildcard in either part. Asks RoleGrantsWildcard. It runs BEFORE the escalation
+        probe below and that order is load-bearing — the framework's HasPermission PANICS on
+        a wildcard argument, and a panic on a security rule is a 500. A machine credential
+        carrying *:* is the single worst thing this entity could mint.
+      scope: [insertOrUpdate]
+      notification: CannotGrantWildcardRoleNotification
+      attachTo: Roles
+
+    - id: no-escalation
+      description: >-
+        For every role this write ADDS: refuse when the requesting caller does not hold every
+        permission that role confers. Asks CallerLacksAnyPermissionOfRole. Without it,
+        anyone holding client:grant mints a non-expiring, non-interactive credential carrying
+        privileges they do not have themselves. A *:* caller passes by construction.
+      scope: [insertOrUpdate]
+      notification: CannotGrantRoleWithUnheldPermissionsNotification
+      attachTo: Roles
+
+    - id: archive-forces-suspended
+      description: >-
+        Archiving a client sets Status to suspended. Mirrors Tenant rule 13 and User's U15:
+        a row that is gone must not read as active anywhere it is still listed. There is no
+        Unarchive on this entity, so this is a one-way door by construction.
+      scope: [archive]
+
+    - id: client-may-not-create-clients
+      description: >-
+        When RequestingIdentityKind is exactly "client", refuse the creation outright. A
+        machine credential that mints machine credentials is a persistence mechanism:
+        revoking the original leaves the ones it created working. It is DECLARED here rather
+        than left to fall out of the own-row rule below — that rule would refuse the insert
+        too, because a row being created has no id to match, but a refusal by side effect
+        reads as an accident and answers with the wrong message. Stands down when the claim
+        is absent (it reads as a user) and when no identity is present at all.
+      scope: [insert]
+      notification: ClientsMayNotCreateClientsNotification
+      attachTo: ID
+
+    - id: client-modifies-only-itself
+      description: >-
+        When RequestingIdentityKind is exactly "client", refuse any write whose row id is not
+        RequestingClientID. Stands down when the claim is absent (it reads as a user), and
+        when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token
+        MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the
+        subject kind from another claim's absence.
+      scope: [update, archive]
+      notification: ClientMayOnlyModifyItselfNotification
+      attachTo: ID
+
+notifications:
+  - name: ClientNameAlreadyExistsNotification
+    semantic: conflict
+    text:
+      ptbr: Já existe um client com este nome neste inquilino.
+      eng: A client with this name already exists in this tenant.
+      esp: Ya existe un client con este nombre en este inquilino.
+      fra: Un client portant ce nom existe déjà dans ce locataire.
+      deu: Ein Client mit diesem Namen existiert in diesem Mandanten bereits.
+      ita: Esiste già un client con questo nome in questo tenant.
+      nld: Er bestaat al een client met deze naam in deze tenant.
+
+  - name: ClientTenantIsImmutableNotification
+    semantic: validation
+    text:
+      ptbr: O inquilino de um client não pode ser alterado.
+      eng: A client's tenant cannot be changed.
+      esp: El inquilino de un client no se puede modificar.
+      fra: Le locataire d'un client ne peut pas être modifié.
+      deu: Der Mandant eines Clients kann nicht geändert werden.
+      ita: Il tenant di un client non può essere modificato.
+      nld: De tenant van een client kan niet worden gewijzigd.
+
+  - name: ClientTenantDoesNotExistNotification
+    semantic: validation
+    text:
+      ptbr: O inquilino informado não existe, está arquivado ou está suspenso.
+      eng: The tenant given does not exist, is archived, or is suspended.
+      esp: El inquilino indicado no existe, está archivado o está suspendido.
+      fra: Le locataire indiqué n'existe pas, est archivé ou est suspendu.
+      deu: Der angegebene Mandant existiert nicht, ist archiviert oder ist gesperrt.
+      ita: Il tenant indicato non esiste, è archiviato o è sospeso.
+      nld: De opgegeven tenant bestaat niet, is gearchiveerd of is opgeschort.
+
+  - name: InvalidClientStatusTransitionNotification
+    semantic: validation
+    text:
+      ptbr: Esta mudança de situação do client não é permitida.
+      eng: This client status change is not allowed.
+      esp: Este cambio de situación del client no está permitido.
+      fra: Ce changement de statut du client n'est pas autorisé.
+      deu: Diese Statusänderung des Clients ist nicht zulässig.
+      ita: Questo cambio di stato del client non è consentito.
+      nld: Deze statuswijziging van de client is niet toegestaan.
+
+  - name: TooManyRolesForClientNotification
+    semantic: validation
+    tvars: [max]
+    text:
+      ptbr: Um client pode receber no máximo {max} papéis.
+      eng: A client may hold at most {max} roles.
+      esp: Un client puede recibir como máximo {max} roles.
+      fra: Un client peut détenir au maximum {max} rôles.
+      deu: Ein Client darf höchstens {max} Rollen halten.
+      ita: Un client può avere al massimo {max} ruoli.
+      nld: Een client mag maximaal {max} rollen hebben.
+
+  - name: ClientAlreadyGrantsRoleNotification
+    semantic: conflict
+    text:
+      ptbr: Este client já possui este papel.
+      eng: This client already holds this role.
+      esp: Este client ya posee este rol.
+      fra: Ce client détient déjà ce rôle.
+      deu: Dieser Client besitzt diese Rolle bereits.
+      ita: Questo client possiede già questo ruolo.
+      nld: Deze client heeft deze rol al.
+
+  - name: TooManyAllowedCIDRsForClientNotification
+    semantic: validation
+    tvars: [max]
+    text:
+      ptbr: Um client pode ter no máximo {max} faixas de rede liberadas.
+      eng: A client may have at most {max} allowed network ranges.
+      esp: Un client puede tener como máximo {max} rangos de red permitidos.
+      fra: Un client peut avoir au maximum {max} plages réseau autorisées.
+      deu: Ein Client darf höchstens {max} freigegebene Netzbereiche haben.
+      ita: Un client può avere al massimo {max} intervalli di rete consentiti.
+      nld: Een client mag maximaal {max} toegestane netwerkbereiken hebben.
+
+  - name: ClientAlreadyAllowsCIDRNotification
+    semantic: conflict
+    text:
+      ptbr: Esta faixa de rede já está liberada para este client.
+      eng: This network range is already allowed for this client.
+      esp: Este rango de red ya está permitido para este client.
+      fra: Cette plage réseau est déjà autorisée pour ce client.
+      deu: Dieser Netzbereich ist für diesen Client bereits freigegeben.
+      ita: Questo intervallo di rete è già consentito per questo client.
+      nld: Dit netwerkbereik is al toegestaan voor deze client.
+
+  - name: InvalidCIDRBlockNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: Faixa de rede inválida. Use notação CIDR, como 203.0.113.0/24 ou 2001:db8::/32.
+      eng: Invalid network range. Use CIDR notation, such as 203.0.113.0/24 or 2001:db8::/32.
+      esp: Rango de red inválido. Use notación CIDR, como 203.0.113.0/24 o 2001:db8::/32.
+      fra: Plage réseau invalide. Utilisez la notation CIDR, comme 203.0.113.0/24 ou 2001:db8::/32.
+      deu: Ungültiger Netzbereich. Verwenden Sie die CIDR-Notation, etwa 203.0.113.0/24 oder 2001:db8::/32.
+      ita: Intervallo di rete non valido. Usare la notazione CIDR, come 203.0.113.0/24 o 2001:db8::/32.
+      nld: Ongeldig netwerkbereik. Gebruik CIDR-notatie, zoals 203.0.113.0/24 of 2001:db8::/32.
+
+  - name: CIDRHasHostBitsSetNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: A faixa de rede precisa vir na forma canônica, com os bits de host zerados.
+      eng: The network range must be given in its canonical form, with the host bits cleared.
+      esp: El rango de red debe indicarse en su forma canónica, con los bits de host en cero.
+      fra: La plage réseau doit être fournie sous sa forme canonique, bits d'hôte à zéro.
+      deu: Der Netzbereich muss in kanonischer Form angegeben werden, mit genullten Host-Bits.
+      ita: L'intervallo di rete deve essere indicato nella forma canonica, con i bit host azzerati.
+      nld: Het netwerkbereik moet in canonieke vorm worden opgegeven, met de hostbits op nul.
+
+  - name: UniversalCIDRNotAllowedNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: Uma faixa que cobre toda a internet não é aceita. Deixe a lista vazia para não restringir.
+      eng: A range covering the whole internet is not accepted. Leave the list empty to place no restriction.
+      esp: No se acepta un rango que cubra toda la internet. Deje la lista vacía para no restringir.
+      fra: Une plage couvrant tout l'internet n'est pas acceptée. Laissez la liste vide pour ne rien restreindre.
+      deu: Ein Bereich, der das gesamte Internet umfasst, wird nicht akzeptiert. Lassen Sie die Liste leer, um nichts einzuschränken.
+      ita: Non è accettato un intervallo che copre l'intera internet. Lasciare la lista vuota per non porre restrizioni.
+      nld: Een bereik dat het hele internet omvat, wordt niet geaccepteerd. Laat de lijst leeg om niets te beperken.
+
+  - name: UnknownClientStatusNotification
+    package: vos
+    semantic: validation
+    text:
+      ptbr: Situação de client desconhecida.
+      eng: Unknown client status.
+      esp: Situación de client desconocida.
+      fra: Statut de client inconnu.
+      deu: Unbekannter Client-Status.
+      ita: Stato del client sconosciuto.
+      nld: Onbekende clientstatus.
+
+  # Raised by the hand-written rotate operation, which the spec language cannot declare
+  # (authz.permissions takes a closed verb set and rotate-secret is not one of them).
+  - name: InvalidGracePeriodNotification
+    semantic: validation
+    tvars: [max]
+    text:
+      ptbr: A janela de carência deve ficar entre 0 e {max} segundos.
+      eng: The grace window must be between 0 and {max} seconds.
+      esp: La ventana de gracia debe estar entre 0 y {max} segundos.
+      fra: La fenêtre de grâce doit être comprise entre 0 et {max} secondes.
+      deu: Das Übergangsfenster muss zwischen 0 und {max} Sekunden liegen.
+      ita: La finestra di tolleranza deve essere compresa tra 0 e {max} secondi.
+      nld: Het overgangsvenster moet tussen 0 en {max} seconden liggen.
+
+  - name: ClientMustBeActiveToRotateNotification
+    semantic: state-conflict
+    text:
+      ptbr: Só um client ativo pode ter o segredo rotacionado. Reative-o antes.
+      eng: Only an active client can have its secret rotated. Reactivate it first.
+      esp: Sólo un client activo puede rotar su secreto. Reactívelo primero.
+      fra: Seul un client actif peut voir son secret pivoté. Réactivez-le d'abord.
+      deu: Nur bei einem aktiven Client kann das Geheimnis rotiert werden. Aktivieren Sie ihn zuerst.
+      ita: Solo un client attivo può ruotare il proprio segreto. Riattivarlo prima.
+      nld: Alleen bij een actieve client kan het geheim worden geroteerd. Activeer hem eerst.
+
+  - name: ClientsMayNotCreateClientsNotification
+    semantic: forbidden
+    text:
+      ptbr: Um token de client não pode criar clients.
+      eng: A client token cannot create clients.
+      esp: Un token de client no puede crear clients.
+      fra: Un jeton de client ne peut pas créer de clients.
+      deu: Ein Client-Token kann keine Clients anlegen.
+      ita: Un token di client non può creare client.
+      nld: Een clienttoken kan geen clients aanmaken.
+
+  - name: ClientMayOnlyModifyItselfNotification
+    semantic: forbidden
+    text:
+      ptbr: Um token de client só pode alterar o próprio registro.
+      eng: A client token may only modify its own record.
+      esp: Un token de client sólo puede modificar su propio registro.
+      fra: Un jeton de client ne peut modifier que son propre enregistrement.
+      deu: Ein Client-Token darf nur den eigenen Datensatz ändern.
+      ita: Un token di client può modificare solo il proprio record.
+      nld: Een clienttoken mag alleen het eigen record wijzigen.
+
+  # Reused verbatim from ../omnicore-gen/user.omnicore.yaml and group.omnicore.yaml so the
+  # three entities cannot drift apart about what these mean.
+  - name: RoleNotAvailableInTenantNotification
+    semantic: validation
+    text:
+      ptbr: Este papel não está disponível no seu inquilino, ou não está mais ativo.
+      eng: This role is not available in your tenant, or is no longer active.
+      esp: Este rol no está disponible en su inquilino, o ya no está activo.
+      fra: Ce rôle n'est pas disponible dans votre locataire, ou n'est plus actif.
+      deu: Diese Rolle ist in Ihrem Mandanten nicht verfügbar oder nicht mehr aktiv.
+      ita: Questo ruolo non è disponibile nel tuo tenant, o non è più attivo.
+      nld: Deze rol is niet beschikbaar in uw tenant, of is niet meer actief.
+
+  - name: CannotGrantRoleWithUnheldPermissionsNotification
+    semantic: forbidden
+    text:
+      ptbr: Você não pode conferir um papel que concede permissões que você não possui.
+      eng: You cannot confer a role that grants permissions you do not hold.
+      esp: No puede conferir un rol que concede permisos que usted no posee.
+      fra: Vous ne pouvez pas conférer un rôle qui accorde des permissions que vous ne détenez pas.
+      deu: Sie können keine Rolle gewähren, die Berechtigungen erteilt, die Sie nicht besitzen.
+      ita: Non è possibile conferire un ruolo che concede permessi che non si possiedono.
+      nld: U kunt geen rol verlenen die rechten geeft die u zelf niet heeft.
+
+  - name: CannotGrantWildcardRoleNotification
+    semantic: forbidden
+    text:
+      ptbr: Um papel que concede uma permissão curinga não pode ser conferido por um grupo.
+      eng: A role that grants a wildcard permission cannot be conferred by a group.
+      esp: Un rol que concede un permiso comodín no puede ser conferido por un grupo.
+      fra: Un rôle accordant une permission joker ne peut pas être conféré par un groupe.
+      deu: Eine Rolle mit einer Platzhalter-Berechtigung kann von keiner Gruppe gewährt werden.
+      ita: Un ruolo che concede un permesso jolly non può essere conferito da un gruppo.
+      nld: Een rol die een jokerrecht verleent, kan niet door een groep worden verleend.
+
+children:
+  - name: ClientRole
+    plural: Roles
+    table: client_roles
+    parentColumn: client_id
+    ownedBy: root
+    editStrategy: per-child
+    # No change verb: the entry holds one catalog id and nothing else, so there is nothing
+    # it can change and still be the same entry — a change would turn grant A into grant B
+    # while keeping A's row id, which an audit trail reads as one grant BECOMING another.
+    operations: [add, remove]
+    softRemove: true
+    archivedAt: deleted_at
+    businessIdentity: [RoleID]
+    duplicateNotification: ClientAlreadyGrantsRoleNotification
+    # Granting a role is a different job from renaming an integration: this is the edge that
+    # hands out privilege, and it gets its own permission.
+    permissions:
+      add: client:grant
+      remove: client:grant
+    description: >-
+      The roles granted to this client. One row per grant, holding nothing but the role's id
+      — so a retired-and-recreated role is never silently re-granted.
+    fields:
+      - name: RoleID
+        type: id
+        column: role_id
+        unique:
+          enforce: constraint-only
+          notification: ClientAlreadyGrantsRoleNotification
+          scope: active-only
+        example: 0198f3e0-1a44-7bb2-9c31-77c0d5e1b904
+        description: >-
+          The role granted to this client — the id and not the key, so a
+          retired-and-recreated role needs an explicit re-grant.
+        labelKey: ClientRoleRoleIDField
+        text:
+          eng: Role
+          ptbr: Papel
+          esp: Rol
+          fra: Rôle
+          deu: Rolle
+          ita: Ruolo
+          nld: Rol
+
+  - name: ClientAllowedCIDR
+    plural: AllowedCIDRs
+    table: client_allowed_cidrs
+    parentColumn: client_id
+    ownedBy: root
+    editStrategy: per-child
+    operations: [add, remove]
+    softRemove: true
+    archivedAt: deleted_at
+    businessIdentity: [CIDR]
+    duplicateNotification: ClientAlreadyAllowsCIDRNotification
+    # Editing the allow-list is configuration rather than privilege: it grants the client
+    # nothing it does not already hold, it only narrows or widens WHERE FROM.
+    permissions:
+      add: client:update
+      remove: client:update
+    description: >-
+      The network ranges this client may authenticate from. An EMPTY collection means any
+      address: the restriction is opt-in, so a newly created client is not born unable to
+      sign in.
+    fields:
+      - name: CIDR
+        type: string
+        column: cidr
+        length: 43
+        vo: {kind: manual, ref: CIDRBlock}
+        unique:
+          enforce: constraint-only
+          notification: ClientAlreadyAllowsCIDRNotification
+          scope: active-only
+        example: 203.0.113.0/24
+        description: A network range this client may authenticate from, stored normalised.
+        labelKey: ClientAllowedCIDRCIDRField
+        text:
+          eng: Network range
+          ptbr: Faixa de rede
+          esp: Rango de red
+          fra: Plage réseau
+          deu: Netzbereich
+          ita: Intervallo di rete
+          nld: Netwerkbereik
+      - name: Label
+        type: string
+        column: label
+        length: 120
+        vo: {kind: reuse, ref: DisplayName}
+        example: NAT gateway, sa-east-1
+        description: What this range is, in the tenant's words — an unlabelled range is one nobody dares remove.
+        labelKey: ClientAllowedCIDRLabelField
+        text:
+          eng: Label
+          ptbr: Rótulo
+          esp: Etiqueta
+          fra: Libellé
+          deu: Bezeichnung
+          ita: Etichetta
+          nld: Label
+
+joins:
+  - kind: inner
+    to: Tenant
+    on: tenant_id
+    fields:
+      - name: TenantWorkspace
+        column: workspace
+        example: acme-comercio
+        description: The owning tenant's immutable handle. Read-only, filled on every load.
+        labelKey: ClientTenantWorkspaceField
+        text:
+          eng: Workspace
+          ptbr: Workspace
+          esp: Workspace
+          fra: Espace de travail
+          deu: Workspace
+          ita: Workspace
+          nld: Workspace
+      # Declared FOR THE RULES and kept off the wire: needing a value and publishing it are
+      # different questions.
+      - name: TenantStatus
+        column: status
+        hidden: true
+        example: active
+        description: The owning tenant's commercial lifecycle. Read by the rules, never served.
+        labelKey: ClientTenantStatusField
+
+  - kind: inner
+    to: Role
+    inChild: ClientRole
+    on: role_id
+    fields:
+      - name: RoleKey
+        column: role_key
+        example: billing-manager
+        description: The granted role's stable machine handle. Read-only, filled on load.
+        labelKey: ClientRoleRoleKeyField
+        text:
+          eng: Role key
+          ptbr: Chave do papel
+          esp: Clave del rol
+          fra: Clé du rôle
+          deu: Rollenschlüssel
+          ita: Chiave del ruolo
+          nld: Rolsleutel
+      - name: RoleName
+        column: name
+        example: Billing Manager
+        description: The granted role's display name. Read-only, filled on load.
+        labelKey: ClientRoleRoleNameField
+        text:
+          eng: Role name
+          ptbr: Nome do papel
+          esp: Nombre del rol
+          fra: Nom du rôle
+          deu: Rollenname
+          ita: Nome del ruolo
+          nld: Rolnaam
+
+service:
+  required: true
+  facts:
+    - name: NameTaken
+      kind: exists
+      filters: [TenantID, Name]
+      excludeSelf: true
+      activeOnly: true
+      description: >-
+        Reports whether another ACTIVE client in the SAME tenant already holds this label.
+        Excludes the row being updated, so an update never collides with itself.
+
+    - name: HashSecret
+      kind: manual
+      returns: string
+      filters: [Secret]
+      description: >-
+        The SHA-256 of the secret, lowercase hex. NOT Argon2id, and the reason is in
+        spec §B-Q4: memory-hardness buys nothing against 256 random bits and costs 19 MiB
+        per verify on an unauthenticated endpoint. No salt — a rainbow table over 2^256
+        random values cannot exist. Pure CPU, no query. It must never log its input, and
+        whatever verifies against it must compare with crypto/subtle.
+
+    - name: TenantIsUnavailable
+      kind: manual
+      returns: bool
+      filters: [TenantID]
+      description: >-
+        Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
+        the tenants table by its primary key. A trial tenant is a live customer and is
+        available.
+
+    - name: RoleIsUnavailableInTenant
+      kind: manual
+      returns: bool
+      filters: [TenantID, Roles.RoleID]
+      description: >-
+        Whether this role id is absent from the roles table, points at an archived role, or
+        belongs to a tenant OTHER than the one passed. One answer for all three — the
+        caller-facing message must not distinguish them.
+
+    - name: RoleGrantsWildcard
+      kind: manual
+      returns: bool
+      filters: [Roles.RoleID]
+      description: >-
+        Whether this role grants a permission carrying a wildcard in either part. Answers
+        TRUE when the id is unknown, so an unresolvable grant never reaches the escalation
+        probe — the framework's HasPermission panics on a wildcard argument.
+
+    - name: CallerLacksAnyPermissionOfRole
+      kind: manual
+      returns: bool
+      filters: [Roles.RoleID]
+      description: >-
+        Whether the requesting caller fails to hold at least one permission this role
+        confers — the escalation half. GUARDS THE WILDCARD ITSELF and answers "lacks" rather
+        than calling through, because a panic on a security rule is a 500. A *:* superadmin
+        passes by construction.
+
+read:
+  backing: relational
+  view:
+    name: clients
+  managed: [CreatedAt, UpdatedAt]
+  byId: true
+  byParams:
+    filters:
+      - {field: TenantID, ops: [eq, in]}
+      - {field: Name, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: Description, ops: [contains, icontains]}
+      - {field: Status, ops: [eq, in]}
+      - {field: SecretChangedAt, ops: [gte, lte]}
+      - {field: TenantWorkspace, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: CreatedAt, ops: [gte, lte]}
+      - {field: UpdatedAt, ops: [gte, lte]}
+      - {field: ID, ops: [eq, in]}
+    sort: [ID, Name, Status, SecretChangedAt, TenantID, TenantWorkspace, CreatedAt, UpdatedAt]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      includeArchived: true
+
+surfaces:
+  rest: true
+  graphql:
+    enabled: true
+    connection: true
+    mutations: [insert, update, archive]
+
+authz:
+  resource: client
+  dataAccess: tenant
+  tenantField: TenantID
+  bypass: "*:*"
+  noIdentity: stand-down
+  permissions:
+    insert: client:insert
+    patch: client:update
+    archive: client:archive
+    read: client:read

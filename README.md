@@ -667,6 +667,93 @@ why that route was exempt while it existed. Nobody should "fix" it by requiring 
 have.
 
 
+### Client
+
+A **machine account**: an integration that authenticates as itself rather than as a person.
+Same shape as `User` one level simpler — a tenant-owned flat root holding a credential and a
+set of role grants — and it is the second and last place in this service that holds one. Flat
+aggregate, table `clients`, with two owned collections: `client_roles` and
+`client_allowed_cidrs`. Its approved model, with the alternatives that were rejected and why,
+is in `specs/scaffold-entity/client/spec.md`.
+
+**The row id IS the client id.** There is no second identifier. A UUID v7 carries 74 random
+bits, so it is not guessable — which matters more than it looks, because the lockout keys on
+the *attempted* identity and a guessable client id would let anyone hold an integration shut
+for fifteen minutes on a loop. What it costs is that the id cannot be rotated without a new
+row, which is the same work as provisioning a new client anyway.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id, **and the client id the integration signs in with** |
+| `tenantID` | UUID | the owning tenant. Immutable, filled from the caller's `tenant_id` claim, nameable in the create body only by a `*:*` operator |
+| `name` | string(120) | the human label. Unique **per tenant** over active rows — two integrations called "Billing" in one tenant is how somebody revokes the wrong one |
+| `description` | string(500) | what the integration is for. Required, like `Role`'s and `Group`'s: a client nobody can explain is a client nobody dares revoke |
+| `status` | `active` / `suspended` | reversible deactivation, orthogonal to archiving. Archiving forces `suspended` |
+| `secretChangedAt` | timestamp | when the credential was last minted — the field an audit asks for |
+| `previousSecretExpiresAt` | timestamp? | when the retiring secret stops working. Absent when no rotation is in flight |
+| `roles[]` | collection | direct role grants, id-only, with the key and name read across the foreign key |
+| `allowedCIDRs[]` | collection | the network ranges this client may authenticate from |
+
+The hash columns are in **no response, no filter, no sort and no `?fields=` vocabulary**, and
+they are redacted on both axes — the outbox payload and the audit event — the same four
+mechanisms `users.password_hash` carries.
+
+**The secret is SHA-256, not Argon2id, and that is deliberate.** Memory-hardness makes
+*offline* guessing expensive, which is worth 19 MiB and ~100 ms against a human password of
+perhaps 30 bits. This secret is 32 bytes from the operating system's random source: not
+guessable at any cost per guess, so a work factor buys nothing — while it would be paid on
+every request to an endpoint that is unauthenticated by construction. The whole argument is
+in the spec's §B-Q4. The comparison is `crypto/subtle`, which is what a fast digest makes
+non-negotiable.
+
+Three behaviours are deliberate and worth knowing before you debug them:
+
+- **The secret is shown once.** It is in the response of the operation that minted it and
+  nowhere else, ever — nothing stores the plaintext, so no endpoint could show it again. A
+  caller who loses it rotates. It carries an `acs_` prefix so a leaked value is *detectable*
+  by GitHub secret scanning, gitleaks and every in-house scanner; a UUID in a config file
+  would be invisible to all of them.
+- **Rotation OVERLAPS, it does not swap.** `POST /clients/{id}/secret` mints a new secret and
+  gives the old one a deadline, so consumers can be redeployed without an outage —
+  `gracePeriodSeconds`, 0 to 604800, a day when omitted. **Send 0 when the secret leaked**:
+  that clears the retiring slot instead of stamping a past deadline. Hard cutover was
+  rejected for the reason nobody rotates credentials — a rotation that breaks every consumer
+  is a scheduled outage, so it gets deferred, so secrets live for years.
+- **An empty `allowedCIDRs` means any address.** Fail-open, on purpose: fail-closed would
+  make every newly created client unable to sign in until a second call, which is a step
+  every script forgets and whose symptom is a generic 401. The restriction is opt-in, and the
+  empty array in the response is what says which state a client is in.
+
+**Two things this entity does not do yet**, both recorded rather than hidden:
+`POST /auth/client/token` is not built — the entity is the thing it will authenticate, and
+its contract is written down in the spec's §F. And `POST /clients` does not hand back a
+secret today: it mints one and stores the hash, so a new client is usable only after a
+rotation call. That gap and its three ways out are in
+`specs/scaffold-entity/client/tasks.md`.
+
+Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
+`client:grant` (the two role verbs) · **`client:rotate-secret`**, which is its own verb for
+the reason `user:reset-password` is — whoever may fix a typo in a description is not
+automatically whoever may hand out a production credential. Editing the allow-list is
+`client:update`: it grants the client nothing it does not already hold, it only narrows or
+widens where from.
+
+Row scope is `User`'s, plus two: a **client token may not create a client**, and it **writes
+only its own row** (`sub == id`). Both are written and **inert** — they read an
+`identity_kind` claim nothing mints until the token route exists, and an absent claim reads as
+a user.
+
+**The first one is asymmetric with `User` on purpose**, and the asymmetry is worth stating
+because it is not a security principle applied evenly: a user holding `user:insert` creates an
+account whose password they chose, which is the same persistence mechanism, and that stays
+open. What separates them is attendance — a compromised machine credential mints replacements
+in a loop unattended, while a person can be refused and asked what they were doing. Closing
+the `User` side needs an invite flow, not a rule, and has not been started. Meanwhile a client
+can never be granted more than whoever granted it (the escalation and wildcard rules), and
+"who created this row" is answered from `audit_events`, which records the actor of every
+write.
+
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -729,7 +816,13 @@ GET    /.well-known/jwks.json     the public key, framework-mounted
 **The `user` segment is not decoration.** A client-credentials token — machine-to-machine —
 is planned as `POST /auth/client/token`, and it is a different operation: a client id and a
 secret rather than an e-mail and a password, claims carrying no e-mail and no groups, and no
-refresh token at all, because the client's secret already is its long-lived credential. Each
+refresh token at all, because the client's secret already is its long-lived credential.
+**The subject it will authenticate now exists** — see `Client` above — and the contract that
+run has to honour is written down in `specs/scaffold-entity/client/spec.md` §F, including two
+hard prerequisites: the source IP must be resolved correctly behind the proxy or the
+allow-list is theatre, and the `identity_kind` claim has to be minted on BOTH token routes,
+because a claim carried by one side only is an inference on the other. **The route itself does
+not exist yet.** Each
 subject type keeps its own route, its own request shape and its own OpenAPI page, rather than
 sharing one endpoint behind a `grantType` field whose required fields change with the value.
 That is the same call this service made when it split the two credential routes.

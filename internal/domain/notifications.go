@@ -369,3 +369,111 @@ func (PasswordResetRequiresAnotherUserNotification) Semantic() domain.Notificati
 type InvalidCurrentPasswordNotification struct {
 	domain.DomainNotificationBase
 }
+
+// ClientNameAlreadyExistsNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClientNameAlreadyExistsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientNameAlreadyExistsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// ClientTenantIsImmutableNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClientTenantIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// ClientTenantDoesNotExistNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClientTenantDoesNotExistNotification struct{ domain.DomainNotificationBase }
+
+// InvalidClientStatusTransitionNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+type InvalidClientStatusTransitionNotification struct{ domain.DomainNotificationBase }
+
+// TooManyRolesForClientNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type TooManyRolesForClientNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// ClientAlreadyGrantsRoleNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClientAlreadyGrantsRoleNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientAlreadyGrantsRoleNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// TooManyAllowedCIDRsForClientNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated. It interpolates max
+// into the message.
+type TooManyAllowedCIDRsForClientNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// ClientAlreadyAllowsCIDRNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClientAlreadyAllowsCIDRNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientAlreadyAllowsCIDRNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// ClientMayOnlyModifyItselfNotification reaches the caller as 403. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClientMayOnlyModifyItselfNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientMayOnlyModifyItselfNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}
+
+// InvalidGracePeriodNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type InvalidGracePeriodNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// ClientMustBeActiveToRotateNotification reaches the caller as 409 (wrong
+// state). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClientMustBeActiveToRotateNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientMustBeActiveToRotateNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticStateConflict
+}
+
+// ClientsMayNotCreateClientsNotification reaches the caller as 403. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClientsMayNotCreateClientsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientsMayNotCreateClientsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}

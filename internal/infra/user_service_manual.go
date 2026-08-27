@@ -97,7 +97,7 @@ var (
 // It is a package-level value rather than a field because Argon2idHasher is
 // stateless and carries no engine: there is nothing per-repository about it,
 // and nothing to key it by.
-var userHasher appdomain.PasswordHasher = NewArgon2idHasher()
+var userHasher = NewArgon2idHasher()
 
 // companions returns the three repositories this service reads across, building
 // them once per owning UserRepository.
