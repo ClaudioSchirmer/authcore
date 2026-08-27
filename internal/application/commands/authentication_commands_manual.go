@@ -23,6 +23,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/exception"
+	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/web/authcore"
@@ -123,12 +125,18 @@ type RefreshTokenLookup interface {
 // would have cost the canonical envelope and the seven catalogs for one string.
 const ContextKeyClientIP = "authcore.request.ip"
 
-// AttemptRecorder is the lockout, and the forensic log behind it.
+// AttemptRecorder is the lockout: the counters that decide whether an identity is
+// refused outright, and the lifetime totals beside them.
 //
 // It is a SEPARATE port from AuthenticationStore for the same reason
 // RefreshTokenLookup is: a different adapter implements it, over a different
 // table, and folding them together would give whichever grew first methods it has
 // no business owning.
+//
+// IT IS NOT THE FORENSIC LOG. The per-attempt narrative — every attempt, its
+// origin, its order — is published to the service's log stream through
+// AuthenticationEventPublisher below; what this port owns is the state that has
+// to be transactional, and nothing else.
 //
 // THREE RECORDING METHODS RATHER THAN ONE WITH AN OUTCOME PARAMETER. An earlier
 // draft passed an outcome value and a struct describing the attempt, which forced
@@ -143,36 +151,59 @@ const ContextKeyClientIP = "authcore.request.ip"
 // rather than an oversight.
 type AttemptRecorder interface {
 	// LockedUntil reports whether an identity is currently refused outright,
-	// until when, and what its counted failures already established about
-	// whether it names a real account.
+	// until when, and what its failures already established about whether it
+	// names a real account.
 	//
 	// It answers identically for an identity that names an account and one that
 	// does not — that uniformity IS the feature. The existence flag it returns
-	// never reaches the caller of the endpoint; it exists so the `locked` row
-	// this handler writes can carry it, which is the whole reason that column is
-	// on the table.
-	LockedUntil(ctx context.Context, identity string) (until time.Time, locked bool, identityExisted *bool, err error)
+	// never reaches the caller of the endpoint; it exists so the log record this
+	// handler publishes about a blocked attempt can say whether a real account is
+	// the one under attack.
+	LockedUntil(ctx context.Context, identity, kind string) (until time.Time, locked bool, identityExisted *bool, err error)
 
-	// RecordFailure logs a credential presented and rejected. The only outcome
-	// that counts toward a lockout. identityExisted is nil when the lookup itself
-	// failed and the answer is genuinely unknown.
+	// RecordFailure counts a credential presented and rejected. The only outcome
+	// that moves the lockout. identityExisted is nil when the lookup itself
+	// failed and the answer is genuinely unknown — the store then leaves the
+	// stored verdict alone rather than overwriting it with a guess.
 	RecordFailure(ctx context.Context, identity, kind, ip string, identityExisted *bool) error
 
-	// RecordSuccess logs a credential that verified. It also ANCHORS the window:
-	// failures before it stop counting, which is how "a successful sign-in clears
-	// the counter" works with no counter to clear.
+	// RecordSuccess counts a credential that verified and CLEARS the lockout:
+	// the live counter goes to zero while the lifetime total is untouched, which
+	// is how "a successful sign-in resets the counter" works without erasing
+	// history.
 	RecordSuccess(ctx context.Context, identity, kind, ip string) error
 
-	// RecordLocked logs an attempt refused because the identity was already
-	// locked — recorded so a reviewer sees the persistence, never counted so the
-	// persistence cannot extend the lock.
+	// RecordLocked counts an attempt refused because the identity was already
+	// locked. It bumps one lifetime counter and moves neither the live count nor
+	// the window anchor, so the persistence is visible to a reviewer and yet
+	// cannot extend the lock.
 	//
-	// identityExisted is CARRIED IN from LockedUntil rather than looked up: this
-	// path deliberately never asks. Stamping it here is what lets somebody filter
-	// `WHERE outcome = 'locked'` on its own and still see which locks are real
-	// accounts under attack and which are noise — the question that column was
-	// added to answer.
-	RecordLocked(ctx context.Context, identity, kind, ip string, identityExisted *bool) error
+	// It takes no existence flag: this path deliberately never performs a lookup,
+	// and the flag already sits on the row that the failures causing this lock
+	// wrote.
+	RecordLocked(ctx context.Context, identity, kind, ip string) error
+}
+
+// AuthenticationEventPublisher is where the per-attempt record goes now that the
+// attempt table is a rollup: one structured record on the service's always-on log
+// stream for every sign-in outcome, success or failure.
+//
+// IT IS THE FRAMEWORK'S OWN PORT, NARROWED — deliberately spelled with the same
+// signature as omnicore's events.Publisher so *events.SlogPublisher satisfies it
+// structurally and the composition root hands one straight in. No adapter is
+// written, and no type is invented to carry an event across a layer: both
+// persistence.RequestContext and domain.Event are already legal imports above
+// infra, and *configuration.AppContext already satisfies the first.
+//
+// PublishAll is deliberately absent. The framework's write path publishes an
+// entity's accumulated events in a batch; a sign-in has exactly one fact to
+// announce per outcome, and a port that only offers what the caller needs cannot
+// be misused into batching them.
+//
+// WHAT CROSSES IT IS NEVER A CREDENTIAL. The same rule as the table, for the
+// stronger reason: this stream leaves the box.
+type AuthenticationEventPublisher interface {
+	Publish(ctx persistence.RequestContext, event domain.Event) error
 }
 
 // identityKindUser is what this route's attempts are logged as. The client
@@ -244,6 +275,76 @@ type IssueTokenHandler struct {
 	Store    AuthenticationStore
 	Attempts AttemptRecorder
 	Issuer   TokenIssuer
+
+	// Events carries the per-attempt record that the rollup table stopped
+	// keeping. A nil publisher disables the announcements and changes nothing
+	// else — the same semantic the framework gives its own event port, and what
+	// lets a test drive the refusal branches without one.
+	Events AuthenticationEventPublisher
+}
+
+// authenticationEventClass is what every announcement from this file is filed
+// under. It surfaces as `entityType` on the log record, so one filter reaches
+// every sign-in outcome and nothing else.
+//
+// It is not an entity name and does not pretend to be: the framework's publisher
+// documents this field as optional precisely because system-level facts — a
+// sign-in among them — are not about one entity class. Naming it anyway is what
+// makes the stream queryable.
+const authenticationEventClass = "Authentication"
+
+// announce publishes one record about a sign-in outcome to the service's log
+// stream — the per-attempt narrative the attempt table no longer holds.
+//
+// ITS FAILURE IS SWALLOWED, and the asymmetry with the counter write is the whole
+// design rather than an oversight. A counter that fails to record costs the
+// lockout its evidence and must refuse the request; an announcement that fails
+// costs a log line, and turning that into a 500 would let a full log buffer
+// refuse valid sign-ins. This is the framework's own posture for the same port,
+// down to the message the warning carries.
+//
+// THE MESSAGE HERE IS NOT THE MESSAGE THE CALLER GETS. Every refusal answers the
+// caller with one indistinguishable notification; these strings separate the
+// branches for whoever reads the stream later. Holding those two apart is what
+// lets the log be useful without the response becoming an oracle.
+//
+// NOTHING A CREDENTIAL COULD RIDE IN. vals is assembled by the caller from the
+// identity, its kind, the origin and the counters — there is no parameter for a
+// password and no branch below passes one.
+func (h *IssueTokenHandler) announce(
+	ctx *configuration.AppContext, severity domain.EventType, message string, vals map[string]any,
+) {
+	if h.Events == nil {
+		return
+	}
+	if err := h.Events.Publish(ctx, domain.DomainEvent{
+		Type:  severity,
+		Class: authenticationEventClass,
+		Msg:   message,
+		Vals:  vals,
+	}); err != nil {
+		// slog.Default() is the service's configured logger: bootstrap installs
+		// it as the default before anything here can run.
+		slog.Default().Warn("event.publish.error", "error", err, "message", message)
+	}
+}
+
+// attemptValues is the payload every announcement below shares.
+//
+// identityExisted is OMITTED when nothing established it, rather than emitted as
+// null: the column behaves the same way for the same reason, and a reader should
+// be able to tell "we know this address has no account" from "nobody ever found
+// out".
+func attemptValues(identity, kind, ip string, identityExisted *bool) map[string]any {
+	vals := map[string]any{
+		"identity":     identity,
+		"identityKind": kind,
+		"ip":           ip,
+	}
+	if identityExisted != nil {
+		vals["identityExisted"] = *identityExisted
+	}
+	return vals
 }
 
 // Handle authenticates and mints.
@@ -272,7 +373,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	// past the threshold this costs one indexed read instead of a lookup plus a
 	// ~100 ms verification. It answers identically whether or not the identity
 	// names an account, which is what keeps the 429 from being an oracle.
-	until, locked, knownToExist, err := h.Attempts.LockedUntil(ctx, email)
+	until, locked, knownToExist, err := h.Attempts.LockedUntil(ctx, email, identityKindUser)
 	if err != nil {
 		// NOT a refusal. A lockout probe that cannot run has not established
 		// anything, and answering 401 would tell a caller with a correct password
@@ -280,14 +381,21 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		return TokenResult{}, err
 	}
 	if locked {
-		// Recorded, so a reviewer sees somebody kept trying through the lock —
-		// and NOT counted, so the trying does not extend it.
-		// knownToExist comes from the failures that caused this lock — the probe
-		// read them anyway. Nothing here looked the account up, and nothing should:
-		// past the threshold the point is to stop paying for guesses.
-		if rerr := h.Attempts.RecordLocked(ctx, email, identityKindUser, ip, knownToExist); rerr != nil {
+		// Counted, so a reviewer sees somebody kept trying through the lock — and
+		// counted on a lifetime column that moves neither the live count nor the
+		// window anchor, so the trying cannot extend the lock.
+		if rerr := h.Attempts.RecordLocked(ctx, email, identityKindUser, ip); rerr != nil {
 			return TokenResult{}, rerr
 		}
+		// knownToExist comes from the failures that CAUSED this lock — the probe
+		// read that row anyway. Nothing here looked the account up, and nothing
+		// should: past the threshold the point is to stop paying for guesses. It
+		// rides the announcement because "which locked identities are real
+		// accounts under attack" is the question that separates a targeted attack
+		// from credential-stuffing noise.
+		vals := attemptValues(email, identityKindUser, ip, knownToExist)
+		vals["lockedUntil"] = until.UTC()
+		h.announce(ctx, domain.EventWarning, "sign-in refused: identity is locked", vals)
 		return TokenResult{}, refuseLocked(until)
 	}
 
@@ -315,6 +423,17 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, existed); rerr != nil {
 			return TokenResult{}, rerr
 		}
+		// The same split the counter makes, made once more on the stream: an
+		// address that is provably absent and a lookup that never answered are one
+		// refusal to the caller and two different lines to whoever reads this
+		// later.
+		if err == nil {
+			h.announce(ctx, domain.EventWarning, "sign-in failed: no account for this identity",
+				attemptValues(email, identityKindUser, ip, existed))
+		} else {
+			h.announce(ctx, domain.EventWarning, "sign-in failed: identity lookup could not be performed",
+				attemptValues(email, identityKindUser, ip, existed))
+		}
 		return TokenResult{}, refuseCredentials()
 	}
 
@@ -325,6 +444,8 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, &existed); rerr != nil {
 			return TokenResult{}, rerr
 		}
+		h.announce(ctx, domain.EventWarning, "sign-in failed: credential rejected",
+			attemptValues(email, identityKindUser, ip, &existed))
 		return TokenResult{}, refuseCredentials()
 	}
 
@@ -336,6 +457,11 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, &existed); rerr != nil {
 			return TokenResult{}, rerr
 		}
+		// The one branch where the credential was RIGHT and the answer is still a
+		// refusal. Indistinguishable to the caller by design; on the stream it is
+		// the line that explains a support ticket in one read.
+		h.announce(ctx, domain.EventWarning, "sign-in failed: credential valid but account or tenant not usable",
+			attemptValues(email, identityKindUser, ip, &existed))
 		return TokenResult{}, refuseCredentials()
 	}
 
@@ -362,6 +488,8 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	if rerr := h.Attempts.RecordSuccess(ctx, email, identityKindUser, ip); rerr != nil {
 		return TokenResult{}, rerr
 	}
+	h.announce(ctx, domain.EventLog, "sign-in succeeded",
+		attemptValues(email, identityKindUser, ip, &existed))
 
 	return TokenResult{
 		AccessToken:      access.Token,

@@ -20,6 +20,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
+	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/web/authcore"
 )
@@ -80,7 +82,7 @@ type fakeAttempts struct {
 	recordErr    error
 }
 
-func (a *fakeAttempts) LockedUntil(context.Context, string) (time.Time, bool, *bool, error) {
+func (a *fakeAttempts) LockedUntil(context.Context, string, string) (time.Time, bool, *bool, error) {
 	if a.lockErr != nil {
 		return time.Time{}, false, nil, a.lockErr
 	}
@@ -103,9 +105,59 @@ func (a *fakeAttempts) RecordSuccess(_ context.Context, identity, kind, ip strin
 	return a.recordErr
 }
 
-func (a *fakeAttempts) RecordLocked(_ context.Context, identity, kind, ip string, existed *bool) error {
-	a.recorded = append(a.recorded, recordedAttempt{"locked", identity, kind, ip, existed})
+// RecordLocked takes NO existence flag: it bumps a lifetime counter on the
+// failure row and this path never performs a lookup. What the failures
+// established travels with the ANNOUNCEMENT instead — see fakePublisher.
+func (a *fakeAttempts) RecordLocked(_ context.Context, identity, kind, ip string) error {
+	a.recorded = append(a.recorded, recordedAttempt{"locked", identity, kind, ip, nil})
 	return a.recordErr
+}
+
+// fakePublisher stands in for the service's log stream: it keeps every
+// announcement so a test can assert what a reviewer would read later.
+//
+// It records through the framework's own port signature, which is what the
+// application declares — so this double proves the handler talks to something
+// *events.SlogPublisher can be.
+type fakePublisher struct {
+	published []domain.DomainEvent
+	err       error
+}
+
+func (p *fakePublisher) Publish(_ persistence.RequestContext, event domain.Event) error {
+	if de, ok := event.(domain.DomainEvent); ok {
+		p.published = append(p.published, de)
+	}
+	return p.err
+}
+
+// messages renders what was announced, so a test can assert the SEQUENCE.
+func (p *fakePublisher) messages() []string {
+	out := make([]string, 0, len(p.published))
+	for _, e := range p.published {
+		out = append(out, e.Msg)
+	}
+	return out
+}
+
+// only returns the single announcement a branch is expected to have made.
+func (p *fakePublisher) only(t *testing.T) domain.DomainEvent {
+	t.Helper()
+	if len(p.published) != 1 {
+		t.Fatalf("announced %v, want exactly one record", p.messages())
+	}
+	return p.published[0]
+}
+
+// vals reads one key out of an announcement's payload.
+func vals(t *testing.T, e domain.DomainEvent, key string) (any, bool) {
+	t.Helper()
+	m, ok := e.Vals.(map[string]any)
+	if !ok {
+		t.Fatalf("payload is %T, want map[string]any", e.Vals)
+	}
+	v, present := m[key]
+	return v, present
 }
 
 // outcomes renders what was logged, so a test can assert the SEQUENCE rather than
@@ -730,9 +782,10 @@ func TestIssueToken_LockedRefusesBeforeTouchingTheCredential(t *testing.T) {
 	if store.burned != 0 {
 		t.Error("a verification was spent on a locked identity")
 	}
-	// Recorded, and as `locked` rather than `failure`: a failure would count, and
-	// counting attempts made during a lock would let anyone hold an account shut
-	// indefinitely just by continuing to try.
+	// Counted through RecordLocked rather than RecordFailure: a failure would move
+	// the live counter and the window anchor, and letting attempts made DURING a
+	// lock do that would let anyone hold an account shut indefinitely just by
+	// continuing to try.
 	if got := attempts.outcomes(); len(got) != 1 || got[0] != "locked" {
 		t.Errorf("logged %v, want exactly one locked attempt", got)
 	}
@@ -870,9 +923,9 @@ func TestIssueToken_LogsTheExistenceFlagPerBranch(t *testing.T) {
 	}
 }
 
-// The success is logged LAST, after the token is minted. It anchors the window —
-// every failure before it stops counting — so writing it any earlier would clear
-// the counter for a sign-in that had not happened yet.
+// The success is recorded LAST, after the token is minted. It CLEARS the failure
+// counter, so recording it any earlier would release a lock for a sign-in that
+// had not happened yet.
 func TestIssueToken_SuccessIsLoggedOnlyAfterTheTokenExists(t *testing.T) {
 	attempts := &fakeAttempts{}
 	h := &IssueTokenHandler{
@@ -884,7 +937,7 @@ func TestIssueToken_SuccessIsLoggedOnlyAfterTheTokenExists(t *testing.T) {
 		t.Fatal("expected the issuer failure to surface")
 	}
 	if len(attempts.recorded) != 0 {
-		t.Errorf("logged %v — a sign-in that produced no token must not anchor the window", attempts.outcomes())
+		t.Errorf("counted %v — a sign-in that produced no token must not clear the counter", attempts.outcomes())
 	}
 }
 
@@ -973,40 +1026,231 @@ func TestIssueToken_AbsenceAndOutageRefuseAlikeButLogDifferently(t *testing.T) {
 	}
 }
 
-// THE REASON THE EXISTENCE COLUMN EXISTS, asserted at the handler: a locked
-// attempt is stamped with what the failures that caused the lock established.
+// THE REASON THE EXISTENCE VERDICT IS CARRIED BACK AT ALL, asserted at the
+// handler. The lockout probe reads the failure row anyway, so the verdict those
+// failures established comes back for free — and it rides the ANNOUNCEMENT about
+// the blocked attempt.
 //
-// Without this, somebody filtering `WHERE outcome = 'locked'` — which is exactly
-// how a manager looks for accounts under attack — sees a column of blanks and
-// cannot tell a real account being hammered from noise against an address that
-// does not exist. The verdict costs nothing: the lockout probe read those rows
-// anyway.
-func TestIssueToken_LockedAttemptCarriesTheExistenceVerdict(t *testing.T) {
+// Without it, somebody scanning the stream for locked identities — which is
+// exactly how you look for accounts under attack — cannot tell a real account
+// being hammered from noise against an address that does not exist here. That is
+// the difference that decides how urgently anyone reacts.
+//
+// It does NOT go back to the table: this path performs no lookup, and the flag
+// already sits on the row the causing failures wrote.
+func TestIssueToken_LockedAnnouncementCarriesTheExistenceVerdict(t *testing.T) {
 	real := true
 	attempts := &fakeAttempts{lockedFor: 5 * time.Minute, knownToExist: &real}
-	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Issuer: &fakeIssuer{}}
+	events := &fakePublisher{}
+	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Events: events, Issuer: &fakeIssuer{}}
 
 	_, _ = h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
 
-	got := attempts.recorded[0]
-	if got.outcome != "locked" {
-		t.Fatalf("outcome = %q, want locked", got.outcome)
+	if got := attempts.outcomes(); len(got) != 1 || got[0] != "locked" {
+		t.Fatalf("counted %v, want exactly one blocked attempt", got)
 	}
-	if got.existed == nil || !*got.existed {
-		t.Errorf("identity_existed = %v on a locked row, want true — a manager filtering locked attempts must see which are real accounts", got.existed)
+	got, present := vals(t, events.only(t), "identityExisted")
+	if !present || got != true {
+		t.Errorf("identityExisted = %v (present %v), want true — a reviewer must see which locks are real accounts",
+			got, present)
 	}
 }
 
-// And it still claims nothing when nothing was established. The column never
-// guesses: an identity whose failures all landed during an outage carries no
-// verdict, and a locked row for it stays blank rather than inventing one.
-func TestIssueToken_LockedAttemptClaimsNothingWhenNothingIsKnown(t *testing.T) {
+// And it still claims nothing when nothing was established. An identity whose
+// failures all landed during an outage carries no verdict, and the announcement
+// OMITS the key rather than emitting null — so a reader can tell "we know there
+// is no account" from "nobody ever found out".
+func TestIssueToken_LockedAnnouncementClaimsNothingWhenNothingIsKnown(t *testing.T) {
 	attempts := &fakeAttempts{lockedFor: 5 * time.Minute} // knownToExist nil
-	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Issuer: &fakeIssuer{}}
+	events := &fakePublisher{}
+	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Events: events, Issuer: &fakeIssuer{}}
 
 	_, _ = h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
 
-	if got := attempts.recorded[0].existed; got != nil {
-		t.Errorf("identity_existed = %v, want NULL", *got)
+	if _, present := vals(t, events.only(t), "identityExisted"); present {
+		t.Error("identityExisted was announced when nothing established it")
+	}
+}
+
+// The 429 tells the caller how long to wait; the announcement tells the operator
+// exactly when the lock lifts, which is what makes a support ticket answerable
+// without a database session.
+func TestIssueToken_LockedAnnouncementCarriesTheExpiry(t *testing.T) {
+	attempts := &fakeAttempts{lockedFor: 5 * time.Minute}
+	events := &fakePublisher{}
+	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Events: events, Issuer: &fakeIssuer{}}
+
+	_, _ = h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
+
+	e := events.only(t)
+	if e.Type != domain.EventWarning {
+		t.Errorf("severity = %v, want EventWarning — a refusal is what an operator alerts on", e.Type)
+	}
+	raw, present := vals(t, e, "lockedUntil")
+	if !present {
+		t.Fatal("the announcement does not say when the lock lifts")
+	}
+	until, ok := raw.(time.Time)
+	if !ok {
+		t.Fatalf("lockedUntil = %#v, want a time", raw)
+	}
+	if remaining := time.Until(until); remaining < 4*time.Minute || remaining > 6*time.Minute {
+		t.Errorf("lockedUntil is %v away, want about 5 minutes", remaining)
+	}
+}
+
+// ── the announcements ───────────────────────────────────────────────────────
+
+// EVERY OUTCOME REACHES THE STREAM, and the severities are not uniform: a
+// refusal is what an operator alerts on, a success is a routine record. This is
+// the test that fails if a future branch forgets to announce itself — which
+// would be invisible otherwise, since the caller's answer would not change.
+func TestIssueToken_EveryOutcomeIsAnnouncedAtItsOwnSeverity(t *testing.T) {
+	cases := []struct {
+		name         string
+		store        *fakeAuthStore
+		attempts     *fakeAttempts
+		wantSeverity domain.EventType
+		wantMessage  string
+	}{
+		{"locked", &fakeAuthStore{}, &fakeAttempts{lockedFor: time.Minute},
+			domain.EventWarning, "sign-in refused: identity is locked"},
+		{"no such identity", &fakeAuthStore{}, &fakeAttempts{},
+			domain.EventWarning, "sign-in failed: no account for this identity"},
+		{"lookup failed", &fakeAuthStore{findErr: errors.New("connection reset")}, &fakeAttempts{},
+			domain.EventWarning, "sign-in failed: identity lookup could not be performed"},
+		{"wrong password", &fakeAuthStore{user: usableUser()}, &fakeAttempts{},
+			domain.EventWarning, "sign-in failed: credential rejected"},
+		{"suspended account", &fakeAuthStore{user: suspendedUser(), matches: true}, &fakeAttempts{},
+			domain.EventWarning, "sign-in failed: credential valid but account or tenant not usable"},
+		{"success", &fakeAuthStore{user: usableUser(), matches: true}, &fakeAttempts{},
+			domain.EventLog, "sign-in succeeded"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			events := &fakePublisher{}
+			h := &IssueTokenHandler{Store: tc.store, Attempts: tc.attempts, Events: events, Issuer: &fakeIssuer{}}
+			_, _ = h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
+
+			e := events.only(t)
+			if e.Msg != tc.wantMessage {
+				t.Errorf("message = %q, want %q", e.Msg, tc.wantMessage)
+			}
+			if e.Type != tc.wantSeverity {
+				t.Errorf("severity = %v, want %v", e.Type, tc.wantSeverity)
+			}
+			if e.Class != authenticationEventClass {
+				t.Errorf("class = %q, want %q — one filter must reach every sign-in outcome",
+					e.Class, authenticationEventClass)
+			}
+			if v, _ := vals(t, e, "identity"); v != "ada@acme.test" {
+				t.Errorf("identity = %v, want the address that was tried", v)
+			}
+			if v, _ := vals(t, e, "identityKind"); v != identityKindUser {
+				t.Errorf("identityKind = %v, want %q", v, identityKindUser)
+			}
+		})
+	}
+}
+
+// THE ANSWER IS THE SAME, THE RECORD IS NOT — now asserted across the stream
+// too. An unknown address and a lookup that never ran are one refusal to the
+// caller and two different lines to whoever reads this later. Collapsing them
+// would cost the very distinction the branch exists to preserve.
+func TestIssueToken_AbsenceAndOutageAnnounceDifferently(t *testing.T) {
+	absent := &fakePublisher{}
+	absentH := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: &fakeAttempts{}, Events: absent, Issuer: &fakeIssuer{}}
+	_, absentErr := absentH.Handle(authCtx(), &IssueTokenCommand{Email: "ghost@acme.test", Password: "x"})
+
+	outage := &fakePublisher{}
+	outageH := &IssueTokenHandler{
+		Store:    &fakeAuthStore{findErr: errors.New("connection reset")},
+		Attempts: &fakeAttempts{},
+		Events:   outage,
+		Issuer:   &fakeIssuer{},
+	}
+	_, outageErr := outageH.Handle(authCtx(), &IssueTokenCommand{Email: "ghost@acme.test", Password: "x"})
+
+	assertCredentialRefusal(t, absentErr)
+	assertCredentialRefusal(t, outageErr)
+
+	if absentMsg, outageMsg := absent.only(t).Msg, outage.only(t).Msg; absentMsg == outageMsg {
+		t.Fatalf("both announced %q; a reviewer cannot tell stuffing from an outage", absentMsg)
+	}
+	// The unknown address KNOWS it is absent and says so; the outage established
+	// nothing and omits the key rather than guessing.
+	if v, present := vals(t, absent.only(t), "identityExisted"); !present || v != false {
+		t.Errorf("an unknown address announced identityExisted = %v (present %v), want false", v, present)
+	}
+	if _, present := vals(t, outage.only(t), "identityExisted"); present {
+		t.Error("an outage announced an existence verdict nobody established")
+	}
+}
+
+// AN ANNOUNCEMENT THAT FAILS MUST NOT REFUSE THE SIGN-IN. The counters are the
+// load-bearing half and they propagate; the record is best-effort. Turning a log
+// problem into a 500 would let a full buffer refuse valid credentials.
+func TestIssueToken_AFailedAnnouncementDoesNotRefuseTheSignIn(t *testing.T) {
+	events := &fakePublisher{err: errors.New("stdout is gone")}
+	h := &IssueTokenHandler{
+		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Attempts: &fakeAttempts{},
+		Events:   events,
+		Issuer:   &fakeIssuer{},
+	}
+	if _, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"}); err != nil {
+		t.Fatalf("a publisher failure refused a valid sign-in: %v", err)
+	}
+}
+
+// A nil publisher disables the announcements and changes nothing else — the same
+// semantic the framework gives its own event port, and what lets every other test
+// in this file drive the branches without one.
+func TestIssueToken_NoPublisherIsNotAFailure(t *testing.T) {
+	h := &IssueTokenHandler{
+		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Attempts: &fakeAttempts{},
+		Issuer:   &fakeIssuer{},
+	}
+	if _, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"}); err != nil {
+		t.Fatalf("a nil publisher broke the sign-in: %v", err)
+	}
+}
+
+// THE RULE THAT MATTERS MOST NOW THAT THIS STREAM LEAVES THE BOX: no
+// announcement, on any branch, may carry the presented credential. The table was
+// always protected by having no column for it; the stream has no such structural
+// guard, so it gets a test instead.
+func TestIssueToken_NoAnnouncementCarriesTheCredential(t *testing.T) {
+	const secret = "Sup3rSecret!Passphrase"
+	stores := []*fakeAuthStore{
+		{},
+		{findErr: errors.New("connection reset")},
+		{user: usableUser()},
+		{user: suspendedUser(), matches: true},
+		{user: usableUser(), matches: true},
+	}
+	events := &fakePublisher{}
+	for _, store := range stores {
+		h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Events: events, Issuer: &fakeIssuer{}}
+		_, _ = h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: secret})
+	}
+	if len(events.published) != len(stores) {
+		t.Fatalf("announced %v, want one record per branch", events.messages())
+	}
+	for _, e := range events.published {
+		m, ok := e.Vals.(map[string]any)
+		if !ok {
+			t.Fatalf("payload is %T, want map[string]any", e.Vals)
+		}
+		for k, v := range m {
+			if str, isStr := v.(string); isStr && strings.Contains(str, secret) {
+				t.Errorf("announcement %q leaked the credential under key %q", e.Msg, k)
+			}
+		}
+		if strings.Contains(e.Msg, secret) {
+			t.Errorf("the message itself leaked the credential: %q", e.Msg)
+		}
 	}
 }
