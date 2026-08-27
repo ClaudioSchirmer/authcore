@@ -15,9 +15,19 @@ import (
 // feature to Features and its seven catalogs to Translations. Translations become
 // mandatory as soon as the first feature exists.
 func Wire(d bootstrap.Deps) bootstrap.Wiring {
-	_ = d
+	// Built here only because Wiring is what the framework reads it through; the
+	// feature OWNS it, exposes it, and is where anyone looking for it should end
+	// up. See AuthenticationFeature.RefreshTokenStore.
+	authentication := NewAuthenticationFeature(d)
 
 	return bootstrap.Wiring{
+		// The storage half of the framework's refresh-token algorithm. The Issuer
+		// owns rotation and reuse detection and never sees a raw secret — only a
+		// SHA-256 hash crosses this seam. Left nil with
+		// auth.issuer.refreshTokenTtlSeconds > 0, the boot aborts rather than
+		// starting an issuer that would fail at the first sign-in.
+		RefreshTokenStore: authentication.RefreshTokenStore(),
+
 		// The seven catalogs. The framework requires them as soon as a
 		// feature exists, so they arrive with the first entity.
 		Translations: []translation.Module{
@@ -32,6 +42,7 @@ func Wire(d bootstrap.Deps) bootstrap.Wiring {
 			NewGroupsFeature(d),
 			NewUserCredentialsFeature(d),
 			NewUsersFeature(d),
+			authentication,
 		},
 
 		OpenAPI: &openapi.Config{

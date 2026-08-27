@@ -26,7 +26,7 @@ and a standing "which of these two UUIDs is this?" question, in exchange for hid
 creation timestamp. One key is the better trade.
 
 Go module: `github.com/ClaudioSchirmer/authcore` · Go 1.26.5 · built on
-[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.60.0** (DDD + CQRS framework).
+[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.61.0** (DDD + CQRS framework).
 
 ---
 
@@ -39,18 +39,21 @@ Honest scope, so nobody reads intent as delivery:
 | Tenant registry (create, read, patch, archive/unarchive, REST + GraphQL) | **built** — six REST endpoints and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/tenant.omnicore.yaml` against the model in `specs/scaffold-entity/tenant/spec.md`. Build, vet and the unit suite are green, and the service has been booted against Postgres with a tenant registered through the API. The contract suite (`/omnicore:qa`) is still to come |
 | `User` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing), four collection ops (join/leave a group · grant/revoke a role), **one credential operation** (password reset) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/user.omnicore.yaml` against the model in `specs/scaffold-entity/user/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | User ↔ tenant association | **built** — `users.tenant_id` NOT NULL, FK to `tenants.id`, filled from the caller's `tenant_id` claim and nameable in the body only by a `*:*` operator crossing the scope |
-| Self-service password change | **not started** — and the endpoint that briefly pretended to be it was removed. It needs a forgot-password flow (e-mail, expiring link) or an authenticated change carrying the current password; neither exists |
+| Self-service password change | **built** — `PATCH /users/{id}/password`, gated on `user:change-password`: token required, the id on the path must be the caller's own, and the current password is proved before the new one is accepted. *(This row read "not started" until 2026-08-26; it was stale the same day the route landed.)* What is still missing is a FORGOT-password flow for the caller who has no password to prove — e-mail, an expiring link — and that has not been started |
 | User ↔ group / User → role membership | **built** — two owned collections with per-entry join/leave and grant/revoke, both gated on `user:grant` and both refusing an escalation the caller does not already hold |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
-| Effective-permission resolution (group path ∪ direct path) | not started — **and it is now the next thing worth building.** Both arrows exist in the data; nothing yet walks them into one set. It is what turns this model into a token |
+| Effective-permission resolution (group path ∪ direct path) | **built** — `internal/infra/authentication_reader_manual.go` resolves both arrows in ONE statement, composed at construction from the `TableSchema` declarations so a renamed column aborts the boot instead of returning nothing. Archive-gated at every hop: a revoked grant, a retired role, a left group and an archived membership each confer nothing. Proven against the bench with a user holding one permission directly and another only through a group |
 | Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
-| Token issuance with the `tenant_id` claim | not started — the value it must carry is `tenants.id`. Nothing in the code enforces that yet. **The subject it would mint for now exists**; the minting path does not |
+| Token issuance with the `tenant_id` claim | **built** — `POST /auth/user/token` and `POST /auth/user/token/refresh`, on the framework's `authcore.Issuer` (RS256, opaque single-use refresh tokens, family revocation on reuse). The `tenant_id` claim carries `tenants.id`, the same value the isolation filter compares, with no translation step. This service is now its own IdP: it publishes `GET /.well-known/jwks.json` and any other service accepts its tokens by pointing `auth.jwt.jwksUrl` at it — configuration only, no code |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
+| Brute-force lockout | **built** — 5 failed attempts for one identity inside 15 minutes answer **429** with the remaining window, auto-releasing as the window slides. The counter is a query over an append-only log (`authentication_attempts`, migration `0007`), NOT a column on `users`: keyed by the ATTEMPTED identity, so an address that names no account locks exactly as a real one does. That uniformity is the point — a counter on the user row could only exist for real users, which would have made both the message and the response time an existence oracle. Because the state is in the table, a restart does not release anybody |
+| Authentication forensics | **built** — the same log is the record of who has been trying to get in: identity, outcome, origin IP, and whether the identity named a real account at that moment. It is deliberately NEVER swept — retention is the maintainer's call — and the attempted password never enters it in any form. `WHERE outcome = 'locked'` answers "which locked identities are real accounts under attack" on its own |
+| Refresh-token storage | **built** — `authentication_refresh_tokens` (migration `0006`), hash-only: the raw value never reaches the table. Single-use with rotation on every redemption; replaying a redeemed value revokes the entire session family. The table sweeps its own expired rows on every write, so there is no scheduled job to forget to deploy |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential path: the password hasher, the two credential operations and the rules behind them are hand-written, and `specs/omnicore-gen/user.gen-report.md` lists every piece |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. `auth.mode` is `disabled` in dev and `jwt` in prd. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the four nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
+| Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential and token path: the password hasher, the two credential operations, the two token routes, the permission resolver, the refresh store and migration `0006` are hand-written. `specs/omnicore-gen/user.gen-report.md` lists the credential pieces; `specs/implement/authentication-token/plan.md` lists the token ones |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the four nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -80,9 +83,9 @@ the posture in one pass.
 
 ### The shape we are building towards
 
-**Every node and every arrow below now exists in code.** What does not exist yet is the
-walk itself — nothing resolves a user into one set of effective permissions, and nothing
-mints a token from it. The picture is the destination, and it is now also the schema:
+**Every node, every arrow and the walk across them now exists in code.** The picture stopped
+being a destination on 2026-08-26: it is the schema, and it is also the query `POST
+/auth/user/token` runs to build a token's `permissions` claim.
 
 ```
                         ┌──> Group ──> Role ──> Permission     (inherited, via group)
@@ -93,10 +96,10 @@ User ───────────────────┤
 ```
 
 A user's **effective permissions** are the union of both paths — the roles reached through
-their groups, plus the roles granted to them directly. **Both paths are stored and served;
-neither is resolved.** `GET /users/{id}` answers with the groups and the direct roles, each
-carrying its key and label, and walking those into a permission set is the piece that comes
-next. There is no precedence and no deny
+their groups, plus the roles granted to them directly. **Both paths are stored, served AND
+resolved.** `GET /users/{id}` answers with the groups and the direct roles, each carrying its
+key and label; `POST /auth/user/token` walks them into one de-duplicated set in a single statement,
+archive-gated at every hop, and signs it into the token. There is no precedence and no deny
 rule: a permission is held or it is not.
 
 Every arrow between `User`, `Group`, `Role` and `Permission` is many-to-many. The one
@@ -490,8 +493,9 @@ granted to users, and those memberships point at the group's id — so a single
 no re-approval and an audit line reading "restored". A retired group comes back as a new row
 whose members must be re-added. Entra soft-deletes a group with a 30-day restore window
 precisely because losing a 50-member group to a fat-finger is brutal; this model's answer is
-"create it again", and since `User ↔ Group` membership does not exist yet, nobody has been
-hurt by it yet either. Same rule one level down: detaching is
+"create it again". `User ↔ Group` membership DOES exist now — and so does the token path that
+reads it — so the 50-member fat-finger is a live hazard rather than a theoretical one: every
+member loses the group's roles from their next token. Same rule one level down: detaching is
 `PATCH /groups/{id}/roles/{entryId}/archive`, never `DELETE`.
 
 **8. You cannot filter or sort by an attached role.**
@@ -672,19 +676,90 @@ Requires Docker and a Go toolchain.
 start.cmd           # Windows
 ```
 
-It starts the Postgres bench (`devops/docker-compose.yml`), applies pending migrations and
+It starts the Postgres bench (`devops/docker-compose.yml`), generates a dev signing key on
+first run (`devops/dev-signing-key.pem`, never committed), applies pending migrations and
 serves on `:8080` under `APP_PROFILE=dev`.
 
 | Surface | URL |
 |---|---|
 | OpenAPI UI | http://localhost:8080/docs (`GET /` redirects here) |
 | GraphQL | http://localhost:8080/graphql · playground at `/graphql/ui` |
+| JWKS | http://localhost:8080/.well-known/jwks.json — public, framework-mounted |
 | Probes | `/livez` · `/readyz` |
 
-Authentication is `disabled` in the dev profile — accepted **only** there; any other
-profile aborts the boot without an `auth` block.
+**THE DEV BENCH IS CLOSED.** `auth.mode: disabled` was removed on 2026-08-26; dev validates
+tokens exactly as production does, with the permission gate on. Everything but the two token
+routes, the probes, the JWKS document and the documentation surface answers **401** without a
+bearer.
+
+So the first call is always a sign-in:
+
+```bash
+curl -s -X POST http://localhost:8080/auth/user/token \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.test","password":"…"}'
+```
+
+**There is no seed.** A brand-new database has no tenant, no user and no permission catalog,
+and every route that could create one needs a token that only a user could obtain — so the
+first account is inserted by hand in SQL. Making that a supported operation (a bootstrap
+command, or a seeded platform tenant) is [its own piece of work](#current-state) and has not
+been started.
+
+One boot line is expected and not a fault: the JWKS fetch fails at startup, because this
+service validates through the document it has not begun serving yet. The client is built to
+tolerate a failed first fetch, and the first request carrying a token triggers a refresh that
+succeeds — by then the listener is up.
+
+```
+ERROR  Failed to refresh HTTP JWK Set … connect: connection refused
+WARN   authcore: JWKS endpoint returned no keys on first fetch …
+```
 
 ### API shape
+
+**Everything below needs a token except the two routes that hand one out.**
+
+```
+POST   /auth/user/token           sign in — e-mail + password → access + refresh token
+POST   /auth/user/token/refresh   rotate — an unused refresh token → a fresh pair
+GET    /.well-known/jwks.json     the public key, framework-mounted
+```
+
+**The `user` segment is not decoration.** A client-credentials token — machine-to-machine —
+is planned as `POST /auth/client/token`, and it is a different operation: a client id and a
+secret rather than an e-mail and a password, claims carrying no e-mail and no groups, and no
+refresh token at all, because the client's secret already is its long-lived credential. Each
+subject type keeps its own route, its own request shape and its own OpenAPI page, rather than
+sharing one endpoint behind a `grantType` field whose required fields change with the value.
+That is the same call this service made when it split the two credential routes.
+
+The access token carries `sub`, `tenant_id`, `tenant_workspace`, `email`, `name`,
+`permissions`, `groups`, `roles` and `must_change_password`. `permissions` is the union of
+both grant paths — roles granted directly and roles inherited through a group — as
+`resource:action` strings; `groups` and `roles` are stable **keys**, never display names.
+Display names travel in the response BODY instead, which a client reads once and never
+re-sends: a token rides in a header on every request to every service, and a group
+description is exactly the field that grows unnoticed until a proxy truncates the header.
+
+Three behaviours are deliberate and worth knowing before you debug them:
+
+- **Every failed sign-in answers the same 401.** Unknown address, wrong password, suspended
+  account, suspended tenant, unknown refresh value, replayed refresh value — one message,
+  one neutral field name, and the same response time in every case. Telling them apart would
+  let anyone discover which addresses have accounts here.
+- **Five failures lock an identity for fifteen minutes**, answered as 429 with the remaining
+  window — the one refusal that is not the generic 401, because a user told nothing has no way
+  to learn that waiting is the fix. It discloses nothing: an address with no account locks the
+  same way and gets the same message. A successful sign-in anchors the window, so failures
+  before it stop counting.
+- **A replayed refresh token revokes the whole session family.** Not just the value replayed:
+  every token descended from that sign-in. A value being presented twice means somebody holds
+  a copy, and there is no way to tell which holder is the legitimate one.
+- **`must_change_password` restricts the token to `user:change-password` and nothing else** —
+  `*:*` included. A session that exists to rotate an expired credential can do that and
+  nothing more. If the account's own bundle does not contain that permission, the claim is an
+  empty list and only a helpdesk reset unblocks it.
 
 ```
 GET    /tenants/                 list, filter, paginate
@@ -737,8 +812,8 @@ to be sent.
 **Self-service password change: `PATCH /users/{id}/password`.** A PUBLIC change-password
 route existed briefly and was removed on 2026-08-26 — it did what the reset does, without a
 token, on the premise that somebody needing a new password might be unable to obtain one.
-That premise does not hold here: there is no login route, so nothing blocks authentication
-for a caller who knows their password. What replaced it later the same day is the
+That premise never held, and it holds even less now: `POST /auth/user/token` is exactly how a
+caller who knows their password obtains a token. What replaced it later the same day is the
 authenticated change above: token required, id must be the caller's own, current password
 proved.
 
@@ -873,15 +948,32 @@ devops/             the local bench (Postgres)
 
 Everything in `internal/` is generated from `specs/omnicore-gen/<entity>.omnicore.yaml`
 EXCEPT the files named `*_manual.go`, which the generator writes once and never touches
-again, and the credential path, which it cannot express at all:
+again, and two paths it cannot express at all.
+
+The **credential** path — the spec language gates operations by a closed set of lifecycle
+verbs, and "change a credential" is not one of them:
 
 ```
-internal/domain/password_hasher.go          the port — Hash · Matches · DummyMatches
+internal/domain/password_hasher.go          the port — Hash · Matches
 internal/infra/password_hasher.go           Argon2id, OWASP baseline, PHC-encoded
 internal/domain/user_credential_manual.go   the rules, entered by actionName
 internal/application/commands/…_manual.go   the two commands and their handlers
 internal/web/…_credential_routes_manual.go  the two routes
 internal/infra/role_probe.go                what "one role, resolved" means — shared by Group and User
+```
+
+The **token** path — same reason, plus the framework ships the Issuer as METHODS and never as
+HTTP endpoints, so every route on top of it is this service's own:
+
+```
+internal/domain/effective_grants_manual.go        the resolved answer's shape, shared by infra and application
+internal/domain/notifications.go                  InvalidCredentialsNotification — one 401 for five questions
+internal/infra/authentication_reader_manual.go    both grant paths in ONE schema-composed statement
+internal/infra/refresh_token_store_manual.go      authcore.RefreshTokenStore — hash-only, self-sweeping
+internal/application/commands/authentication_…    the two handlers and their application-owned ports
+internal/web/authentication_routes_manual.go      POST /auth/user/token · POST /auth/user/token/refresh
+bootstrap/authentication_feature_manual.go        owns both adapters; Wire only forwards the store
+migrations/postgres/0006_refresh_tokens_manual.*  the table, hand-written: it is not an entity
 ```
 
 ## Where the decisions are written down
@@ -899,6 +991,10 @@ kept in the repository rather than in chat history:
   entity is generated; the code regenerates from it, the database never does.
 - `specs/omnicore-gen/<entity>.gen-report.md` — what was generated, what was refused, and what
   had to be written by hand.
+- `specs/implement/<slug>/plan.md` — for a CAPABILITY rather than an entity: which framework
+  section it was routed to, the integration semantics that were confirmed before any code, the
+  full impact map, and — at the bottom — what was actually proven once it shipped, so the
+  claim and its evidence sit in one file. `authentication-token` is the token path.
 - anything the spec language cannot express is named in each entity's `spec.md` **before**
   generation, under *What generation will have to write by hand, and why* — next to the model
   decision it affects rather than in a file that outlives it. A gap in the tooling itself goes
@@ -914,6 +1010,7 @@ without reverse-engineering it from the code.
 | add an entity | `/omnicore:scaffold-entity` |
 | change an existing one | `/omnicore:evolve-entity` — it edits the spec and regenerates |
 | add a cross-entity read model | `/omnicore:scaffold-view` |
+| wire a framework capability (auth, gRPC, cache, events) | `/omnicore:implement` — it routes the request against the pinned docs first |
 | change the infrastructure posture | `/omnicore:configure` |
 | generate an end-to-end contract suite | `/omnicore:qa` |
 

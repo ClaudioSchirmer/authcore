@@ -29,19 +29,92 @@ graphql:
   playground: false
   introspection: false
 
+# THIS SERVICE IS ITS OWN IdP. It signs with auth.issuer and validates with
+# auth.jwt, and the two are wired to each other. JWT_ISSUER feeds BOTH jwt.issuer
+# and issuer.selfUrl from one variable on purpose: the framework refuses the boot
+# when they disagree, and a service that issues and validates cannot hold two
+# opinions about who it is. Splitting them into two vars would let a deploy set
+# one and forget the other.
 auth:
   mode: jwt
   jwt:
+    algorithms: [RS256]
     issuer: "${JWT_ISSUER}"
     audience: "${JWT_AUDIENCE}"
     jwksUrl: "${JWKS_URL}"
+
+  # The permission gate. A route that forgets RequirePermission aborts the boot
+  # rather than shipping open — the scan runs over every registered route.
+  authorization:
+    enabled: true
+    # users.tenant_id is NOT NULL, so a token with no tenant claim is malformed
+    # rather than merely unscoped: required rejects it at the middleware with 403,
+    # before any handler can read a row with an empty scope.
+    tenant:
+      enabled: true
+      required: true
+
+  # The claims that reach audit_events.actorClaims — deliberately SHORT. Actor
+  # (the subject) and TenantID are already top-level fields on every audit event;
+  # listing them here would only duplicate them into the JSON blob, where they are
+  # worse to query than the indexed column.
+  #
+  # These two have no other vehicle: tenant_workspace because no other service in
+  # the mesh has this service's tenants table, so without it every audit line out
+  # there identifies its tenant by a UUID it cannot resolve at any price; email
+  # because Actor on its own is a UUID too.
+  #
+  # EVERY CONSUMER SERVICE NEEDS THIS SAME LINE in its own yaml — the claims ride
+  # in the token either way, but filterClaims drops whatever is not named here.
+  auditClaims:
+    - tenant_workspace
+    - email
+
+  issuer:
+    enabled: true
+    # Never inherited from jwt.issuer, always explicit — same variable, so the
+    # boot-time equality check can never fail on a typo.
+    selfUrl: "${JWT_ISSUER}"
+    audience:
+      - "${JWT_AUDIENCE}"
+    tokenTtlSeconds: 900
+    maxTokenTtlSeconds: 3600
+    refreshTokenTtlSeconds: 2592000
+    # A LIST from day one, even holding a single key: rotation is then an edit
+    # (add `next`, wait a propagation window, promote) rather than a restructure
+    # under time pressure. Bare ${VARS}, no defaults — a signing key has no
+    # sensible fallback.
+    keys:
+      - kid: "${JWT_SIGNING_KID}"
+        algorithm: RS256
+        state: current
+        privateKeyPem: "${JWT_SIGNING_KEY}"
+      # The retiring key during a rotation. Left commented rather than absent so
+      # the shape is in front of whoever performs one: promote next -> current,
+      # old current -> previous, and drop this entry only after the longest access
+      # token TTL has elapsed.
+      # - kid: "${JWT_SIGNING_KID_PREVIOUS}"
+      #   algorithm: RS256
+      #   state: previous
+      #   privateKeyPem: "${JWT_SIGNING_KEY_PREVIOUS}"
+    # The block's PRESENCE mounts GET <path> as a public route — a JWKS document
+    # that needed a bearer to fetch could never bootstrap trust in itself. This is
+    # what every consumer service's auth.jwt.jwksUrl points at.
+    jwks:
+      path: /.well-known/jwks.json
+
   # The probes are framework-owned but NOT auto-public: without these entries a
   # tokenless kubelet gets 401 and the orchestrator kills a healthy pod. The
   # "METHOD /path" form is mandatory and validated at boot against the registered
   # routes — a typo aborts the boot.
+  #
+  # The two token routes are public for the obvious reason: a login cannot require
+  # the credential it is about to grant.
   publicRoutes:
     - GET /livez
     - GET /readyz
+    - POST /auth/user/token
+    - POST /auth/user/token/refresh
 
 shutdown:
   drainTimeoutSeconds: 30

@@ -1,0 +1,13 @@
+-- The reverse of 0007_authentication_attempts_manual.up.sql.
+--
+-- THIS DROP DESTROYS EVIDENCE. Every other down-migration in this folder gives
+-- back structure that can be rebuilt from a spec; this one deletes the record of
+-- who has been trying to get in, and nothing anywhere else holds a copy — no
+-- rollup shadows it, on purpose. Rolling 0007 back on an environment that has
+-- served traffic is a security decision, not a schema one.
+--
+-- It also silently disables the lockout: with the table gone the sign-in has
+-- nothing to count, and password guessing becomes unlimited again.
+--
+-- The two indexes go with the table; naming them would be noise.
+DROP TABLE IF EXISTS "authentication_attempts";

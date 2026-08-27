@@ -33,9 +33,108 @@ graphql:
   playground: true
   introspection: true
 
-# Accepted ONLY under APP_PROFILE=dev; any other profile aborts the boot on this value.
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTH — THE DEV BENCH IS CLOSED, ON PURPOSE.
+#
+# `auth.mode: disabled` was removed on 2026-08-26. A bench that answers without a
+# token proves nothing about a service whose entire job is deciding who may do
+# what: every row-scope guard stands down with no identity (each one asks whether
+# an identity was PRESENT before comparing anything), so the tests that matter
+# most were the tests not running. Dev now validates like production does.
+#
+# THIS SERVICE IS ITS OWN IdP. It signs with auth.issuer below and validates with
+# auth.jwt here, and the two are wired to each other: jwksUrl points back at the
+# route auth.issuer.jwks mounts. selfUrl must EQUAL jwt.issuer — the framework
+# refuses the boot otherwise, because a service that issues and validates cannot
+# disagree with itself about who it is.
+#
+# The self-reference resolves itself, and the boot log says so out loud. At boot
+# the JWKS fetch hits a port nothing is listening on yet; the client is built with
+# NoErrorReturnFirstHTTPReq, so that is a WARN and not a boot failure ("JWKS
+# endpoint returned no keys on first fetch"). The first request carrying a token
+# presents an unknown `kid`, which triggers a refresh — and by then the listener
+# is up. Nothing to configure, nothing to order.
+# ─────────────────────────────────────────────────────────────────────────────
 auth:
-  mode: disabled
+  mode: jwt
+
+  jwt:
+    algorithms: [RS256]
+    issuer: "${AUTH_SELF_URL:http://localhost:8080}"
+    audience: "${AUTH_AUDIENCE:authcore}"
+    jwksUrl: "${AUTH_SELF_URL:http://localhost:8080}/.well-known/jwks.json"
+
+  # The permission gate. Enabled here so a route that forgets RequirePermission
+  # aborts the boot instead of shipping open — the scan runs over every
+  # registered route at startup.
+  authorization:
+    enabled: true
+    # Every user in this service belongs to exactly one tenant (users.tenant_id is
+    # NOT NULL), so a token without the claim is malformed rather than merely
+    # unscoped: required rejects it at the middleware with 403, before any handler
+    # can read a row with an empty scope.
+    tenant:
+      enabled: true
+      required: true
+
+  # The claims that reach audit_events.actorClaims. Deliberately SHORT: Actor
+  # (the subject) and TenantID are already top-level fields on every audit event,
+  # so listing them here would only duplicate them into the JSON blob, where they
+  # are worse to query than the indexed column.
+  #
+  # These two are the ones with no other vehicle. tenant_workspace because no
+  # other service in the mesh has this service's tenants table — without it every
+  # audit line out there identifies its tenant by a bare UUID it cannot resolve at
+  # any price. email because Actor on its own is a UUID too.
+  #
+  # Authorization state (groups, roles, permissions) is deliberately ABSENT: an
+  # audit trail records who acted, not what they were entitled to, and those are
+  # variable-length arrays that would be copied into every row, one per write.
+  auditClaims:
+    - tenant_workspace
+    - email
+
+  # THIS SERVICE MINTS ITS OWN TOKENS. The framework ships the Issuer and the JWKS
+  # route; every HTTP endpoint on top of it is ours (internal/web/authentication_routes_manual.go).
+  issuer:
+    enabled: true
+    # Never inherited from jwt.issuer, always explicit — a service may issue
+    # without validating locally. When both blocks exist they must agree.
+    selfUrl: "${AUTH_SELF_URL:http://localhost:8080}"
+    audience:
+      - "${AUTH_AUDIENCE:authcore}"
+    tokenTtlSeconds: 900
+    maxTokenTtlSeconds: 3600
+    refreshTokenTtlSeconds: 2592000
+    keys:
+      # No default, deliberately: a signing key has no sensible fallback, and an
+      # empty PEM fails the boot with a diagnostic instead of signing with
+      # something predictable. start.sh generates one on first run and exports it.
+      - kid: "${JWT_SIGNING_KID:dev}"
+        algorithm: RS256
+        state: current
+        privateKeyPem: "${JWT_SIGNING_KEY}"
+    # The block's PRESENCE is the switch. It mounts GET <path> as a public route
+    # automatically — a JWKS document that needed a bearer to fetch could never
+    # bootstrap trust in itself.
+    jwks:
+      path: /.well-known/jwks.json
+
+  # Exact "METHOD /path", validated at boot against the registered routes: a typo,
+  # a wrong method or a trailing slash aborts the boot naming the offender.
+  #
+  # The probes are framework-owned but NOT auto-public: without these a tokenless
+  # kubelet gets 401. The two token routes are here for the obvious reason — a
+  # login cannot require the credential it is about to grant.
+  #
+  # /openapi.json, the /docs UI and (because rootRedirect is on) GET / are
+  # extended onto this list by the framework itself; they are not repeated here.
+  # The JWKS route is added by the issuer block above, likewise.
+  publicRoutes:
+    - GET /livez
+    - GET /readyz
+    - POST /auth/user/token
+    - POST /auth/user/token/refresh
 
 # No audit: block — the framework default keeps both destinations active
 # (in-transaction audit_events row + post-commit slog line).
