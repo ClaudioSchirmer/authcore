@@ -23,7 +23,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +32,6 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/exception"
-	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/web/authcore"
@@ -72,6 +70,26 @@ const (
 	claimGroups             = "groups"
 	claimRoles              = "roles"
 	claimMustChangePassword = "must_change_password"
+
+	// WHICH KIND OF SUBJECT THE TOKEN SPEAKS FOR — `user` here, `client` when
+	// POST /auth/client/token mints one. The spelling is not ours to choose
+	// freely: specs/omnicore-gen/client.omnicore.yaml declares it, and Client's
+	// row rules already read it back under exactly this name.
+	//
+	// MINTED EVEN THOUGH NOTHING REQUIRES IT YET, and that is the point. Client's
+	// rules stand down on anything that is not `client`, so emitting `user`
+	// changes no decision today — what it removes is the inference. Until now a
+	// user token was recognised by the ABSENCE of this claim, which cannot
+	// distinguish a user from an issuer that forgot, or from a token minted
+	// before the claim existed.
+	//
+	// It also has to be minted BEFORE the client route arrives rather than with
+	// it: tokens outlive a deploy by their TTL, so a rule written positively
+	// (`== "user"`) on the day the client route lands would misjudge every token
+	// still in flight. Minting it now means that by then every live token carries
+	// it. Until a full TTL has passed, rules stay written NEGATIVELY — the two
+	// that exist compare against `client`, and they should not be "improved".
+	claimIdentityKind = "identity_kind"
 )
 
 // AuthenticationStore is what the sign-in needs from infra, and no more.
@@ -124,92 +142,6 @@ type RefreshTokenLookup interface {
 // than the Fiber one. The alternative — MountRaw, to reach c.IP() directly —
 // would have cost the canonical envelope and the seven catalogs for one string.
 const ContextKeyClientIP = "authcore.request.ip"
-
-// AttemptRecorder is the lockout: the counters that decide whether an identity is
-// refused outright, and the lifetime totals beside them.
-//
-// It is a SEPARATE port from AuthenticationStore for the same reason
-// RefreshTokenLookup is: a different adapter implements it, over a different
-// table, and folding them together would give whichever grew first methods it has
-// no business owning.
-//
-// IT IS NOT THE FORENSIC LOG. The per-attempt narrative — every attempt, its
-// origin, its order — is published to the service's log stream through
-// AuthenticationEventPublisher below; what this port owns is the state that has
-// to be transactional, and nothing else.
-//
-// THREE RECORDING METHODS RATHER THAN ONE WITH AN OUTCOME PARAMETER. An earlier
-// draft passed an outcome value and a struct describing the attempt, which forced
-// both a shared enum and a shared type — and neither had a home, since a type both
-// layers name can live only in the domain, where a row shape with an IP in it does
-// not belong. Naming the outcome in the METHOD dissolves the problem: the storage
-// vocabulary stays with the table that owns it, and nothing crosses this seam but
-// strings the caller already had.
-//
-// NOTHING ABOUT THE CREDENTIAL CROSSES IT EITHER. There is no parameter a password
-// could arrive in — see the store and the 0007 migration for why that is a rule
-// rather than an oversight.
-type AttemptRecorder interface {
-	// LockedUntil reports whether an identity is currently refused outright,
-	// until when, and what its failures already established about whether it
-	// names a real account.
-	//
-	// It answers identically for an identity that names an account and one that
-	// does not — that uniformity IS the feature. The existence flag it returns
-	// never reaches the caller of the endpoint; it exists so the log record this
-	// handler publishes about a blocked attempt can say whether a real account is
-	// the one under attack.
-	LockedUntil(ctx context.Context, identity, kind string) (until time.Time, locked bool, identityExisted *bool, err error)
-
-	// RecordFailure counts a credential presented and rejected. The only outcome
-	// that moves the lockout. identityExisted is nil when the lookup itself
-	// failed and the answer is genuinely unknown — the store then leaves the
-	// stored verdict alone rather than overwriting it with a guess.
-	RecordFailure(ctx context.Context, identity, kind, ip string, identityExisted *bool) error
-
-	// RecordSuccess counts a credential that verified and CLEARS the lockout:
-	// the live counter goes to zero while the lifetime total is untouched, which
-	// is how "a successful sign-in resets the counter" works without erasing
-	// history.
-	RecordSuccess(ctx context.Context, identity, kind, ip string) error
-
-	// RecordLocked counts an attempt refused because the identity was already
-	// locked. It bumps one lifetime counter and moves neither the live count nor
-	// the window anchor, so the persistence is visible to a reviewer and yet
-	// cannot extend the lock.
-	//
-	// It takes no existence flag: this path deliberately never performs a lookup,
-	// and the flag already sits on the row that the failures causing this lock
-	// wrote.
-	RecordLocked(ctx context.Context, identity, kind, ip string) error
-}
-
-// AuthenticationEventPublisher is where the per-attempt record goes now that the
-// attempt table is a rollup: one structured record on the service's always-on log
-// stream for every sign-in outcome, success or failure.
-//
-// IT IS THE FRAMEWORK'S OWN PORT, NARROWED — deliberately spelled with the same
-// signature as omnicore's events.Publisher so *events.SlogPublisher satisfies it
-// structurally and the composition root hands one straight in. No adapter is
-// written, and no type is invented to carry an event across a layer: both
-// persistence.RequestContext and domain.Event are already legal imports above
-// infra, and *configuration.AppContext already satisfies the first.
-//
-// PublishAll is deliberately absent. The framework's write path publishes an
-// entity's accumulated events in a batch; a sign-in has exactly one fact to
-// announce per outcome, and a port that only offers what the caller needs cannot
-// be misused into batching them.
-//
-// WHAT CROSSES IT IS NEVER A CREDENTIAL. The same rule as the table, for the
-// stronger reason: this stream leaves the box.
-type AuthenticationEventPublisher interface {
-	Publish(ctx persistence.RequestContext, event domain.Event) error
-}
-
-// identityKindUser is what this route's attempts are logged as. The client
-// credentials route will pass its own; the store takes it as a string precisely
-// so neither side has to import the other's vocabulary.
-const identityKindUser = "user"
 
 // TokenIssuer is the slice of the framework's Issuer these handlers use.
 //
@@ -283,68 +215,14 @@ type IssueTokenHandler struct {
 	Events AuthenticationEventPublisher
 }
 
-// authenticationEventClass is what every announcement from this file is filed
-// under. It surfaces as `entityType` on the log record, so one filter reaches
-// every sign-in outcome and nothing else.
+// journal is this route's view of the shared path to the auxiliary tables and
+// the log stream, bound to the subject kind it authenticates.
 //
-// It is not an entity name and does not pretend to be: the framework's publisher
-// documents this field as optional precisely because system-level facts — a
-// sign-in among them — are not about one entity class. Naming it anyway is what
-// makes the stream queryable.
-const authenticationEventClass = "Authentication"
-
-// announce publishes one record about a sign-in outcome to the service's log
-// stream — the per-attempt narrative the attempt table no longer holds.
-//
-// ITS FAILURE IS SWALLOWED, and the asymmetry with the counter write is the whole
-// design rather than an oversight. A counter that fails to record costs the
-// lockout its evidence and must refuse the request; an announcement that fails
-// costs a log line, and turning that into a 500 would let a full log buffer
-// refuse valid sign-ins. This is the framework's own posture for the same port,
-// down to the message the warning carries.
-//
-// THE MESSAGE HERE IS NOT THE MESSAGE THE CALLER GETS. Every refusal answers the
-// caller with one indistinguishable notification; these strings separate the
-// branches for whoever reads the stream later. Holding those two apart is what
-// lets the log be useful without the response becoming an oracle.
-//
-// NOTHING A CREDENTIAL COULD RIDE IN. vals is assembled by the caller from the
-// identity, its kind, the origin and the counters — there is no parameter for a
-// password and no branch below passes one.
-func (h *IssueTokenHandler) announce(
-	ctx *configuration.AppContext, severity domain.EventType, message string, vals map[string]any,
-) {
-	if h.Events == nil {
-		return
-	}
-	if err := h.Events.Publish(ctx, domain.DomainEvent{
-		Type:  severity,
-		Class: authenticationEventClass,
-		Msg:   message,
-		Vals:  vals,
-	}); err != nil {
-		// slog.Default() is the service's configured logger: bootstrap installs
-		// it as the default before anything here can run.
-		slog.Default().Warn("event.publish.error", "error", err, "message", message)
-	}
-}
-
-// attemptValues is the payload every announcement below shares.
-//
-// identityExisted is OMITTED when nothing established it, rather than emitted as
-// null: the column behaves the same way for the same reason, and a reader should
-// be able to tell "we know this address has no account" from "nobody ever found
-// out".
-func attemptValues(identity, kind, ip string, identityExisted *bool) map[string]any {
-	vals := map[string]any{
-		"identity":     identity,
-		"identityKind": kind,
-		"ip":           ip,
-	}
-	if identityExisted != nil {
-		vals["identityExisted"] = *identityExisted
-	}
-	return vals
+// Built per call rather than held as a field: it is two interface copies and a
+// string, and building it here keeps the handler's wiring exactly what the web
+// layer already passes — the composition root never learns a new name.
+func (h *IssueTokenHandler) journal() authenticationJournal {
+	return newAuthenticationJournal(h.Attempts, h.Events, identityKindUser)
 }
 
 // Handle authenticates and mints.
@@ -373,7 +251,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	// past the threshold this costs one indexed read instead of a lookup plus a
 	// ~100 ms verification. It answers identically whether or not the identity
 	// names an account, which is what keeps the 429 from being an oracle.
-	until, locked, knownToExist, err := h.Attempts.LockedUntil(ctx, email, identityKindUser)
+	journal := h.journal()
+
+	until, locked, knownToExist, err := journal.lockedUntil(ctx, email)
 	if err != nil {
 		// NOT a refusal. A lockout probe that cannot run has not established
 		// anything, and answering 401 would tell a caller with a correct password
@@ -384,18 +264,16 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		// Counted, so a reviewer sees somebody kept trying through the lock — and
 		// counted on a lifetime column that moves neither the live count nor the
 		// window anchor, so the trying cannot extend the lock.
-		if rerr := h.Attempts.RecordLocked(ctx, email, identityKindUser, ip); rerr != nil {
-			return TokenResult{}, rerr
-		}
+		//
 		// knownToExist comes from the failures that CAUSED this lock — the probe
 		// read that row anyway. Nothing here looked the account up, and nothing
 		// should: past the threshold the point is to stop paying for guesses. It
 		// rides the announcement because "which locked identities are real
 		// accounts under attack" is the question that separates a targeted attack
 		// from credential-stuffing noise.
-		vals := attemptValues(email, identityKindUser, ip, knownToExist)
-		vals["lockedUntil"] = until.UTC()
-		h.announce(ctx, domain.EventWarning, "sign-in refused: identity is locked", vals)
+		if rerr := journal.refusedWhileLocked(ctx, email, ip, until, knownToExist); rerr != nil {
+			return TokenResult{}, rerr
+		}
 		return TokenResult{}, refuseLocked(until)
 	}
 
@@ -420,19 +298,16 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 			existed = &absent
 		}
 		h.Store.BurnPasswordVerification()
-		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, existed); rerr != nil {
-			return TokenResult{}, rerr
-		}
 		// The same split the counter makes, made once more on the stream: an
 		// address that is provably absent and a lookup that never answered are one
 		// refusal to the caller and two different lines to whoever reads this
 		// later.
-		if err == nil {
-			h.announce(ctx, domain.EventWarning, "sign-in failed: no account for this identity",
-				attemptValues(email, identityKindUser, ip, existed))
-		} else {
-			h.announce(ctx, domain.EventWarning, "sign-in failed: identity lookup could not be performed",
-				attemptValues(email, identityKindUser, ip, existed))
+		reason := "sign-in failed: no account for this identity"
+		if err != nil {
+			reason = "sign-in failed: identity lookup could not be performed"
+		}
+		if rerr := journal.failed(ctx, email, ip, reason, existed); rerr != nil {
+			return TokenResult{}, rerr
 		}
 		return TokenResult{}, refuseCredentials()
 	}
@@ -441,11 +316,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	existed := true
 
 	if !h.Store.PasswordMatches(cmd.Password, user.PasswordHash) {
-		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, &existed); rerr != nil {
+		if rerr := journal.failed(ctx, email, ip, "sign-in failed: credential rejected", &existed); rerr != nil {
 			return TokenResult{}, rerr
 		}
-		h.announce(ctx, domain.EventWarning, "sign-in failed: credential rejected",
-			attemptValues(email, identityKindUser, ip, &existed))
 		return TokenResult{}, refuseCredentials()
 	}
 
@@ -454,14 +327,13 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		// success: nobody got in. It counts toward the lockout like any other,
 		// which is correct — repeatedly presenting a valid credential for a
 		// disabled account is exactly the pattern worth rate-limiting.
-		if rerr := h.Attempts.RecordFailure(ctx, email, identityKindUser, ip, &existed); rerr != nil {
-			return TokenResult{}, rerr
-		}
 		// The one branch where the credential was RIGHT and the answer is still a
 		// refusal. Indistinguishable to the caller by design; on the stream it is
 		// the line that explains a support ticket in one read.
-		h.announce(ctx, domain.EventWarning, "sign-in failed: credential valid but account or tenant not usable",
-			attemptValues(email, identityKindUser, ip, &existed))
+		if rerr := journal.failed(ctx, email, ip,
+			"sign-in failed: credential valid but account or tenant not usable", &existed); rerr != nil {
+			return TokenResult{}, rerr
+		}
 		return TokenResult{}, refuseCredentials()
 	}
 
@@ -485,11 +357,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	// Recorded LAST, once the sign-in has actually succeeded. It is what anchors
 	// the window — every failure before this moment stops counting — so writing it
 	// any earlier would clear a counter for a sign-in that had not happened yet.
-	if rerr := h.Attempts.RecordSuccess(ctx, email, identityKindUser, ip); rerr != nil {
+	if rerr := journal.succeeded(ctx, email, ip); rerr != nil {
 		return TokenResult{}, rerr
 	}
-	h.announce(ctx, domain.EventLog, "sign-in succeeded",
-		attemptValues(email, identityKindUser, ip, &existed))
 
 	return TokenResult{
 		AccessToken:      access.Token,
@@ -701,6 +571,7 @@ func accountIsUsable(user *appdomain.User) bool {
 // hand out a grant nobody issued.
 func buildClaims(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey) map[string]any {
 	return map[string]any{
+		claimIdentityKind:       identityKindUser,
 		claimTenantID:           user.TenantID.Value(),
 		claimTenantWorkspace:    user.TenantWorkspace,
 		claimEmail:              user.Email.Value(),
