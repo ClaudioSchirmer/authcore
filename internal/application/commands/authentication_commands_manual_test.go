@@ -1254,3 +1254,77 @@ func TestIssueToken_NoAnnouncementCarriesTheCredential(t *testing.T) {
 		}
 	}
 }
+
+// ── the identity_kind claim ─────────────────────────────────────────────────
+
+// THE USER TOKEN SAYS WHAT KIND OF SUBJECT IT SPEAKS FOR, on both paths.
+//
+// It changes no decision today — Client's row rules stand down on anything that
+// is not "client" — and that is exactly why it can be minted now. What it removes
+// is the inference: until this claim existed, a user token was recognised by the
+// ABSENCE of it, which cannot tell a user from an issuer that forgot or from a
+// token minted before the claim was introduced.
+//
+// The refresh is asserted too because it rebuilds claims from the database rather
+// than replaying the old token's — so a claim added to the sign-in and not to
+// buildClaims would silently vanish at the first rotation.
+func TestBuildClaims_TokenDeclaresTheSubjectKindOnBothPaths(t *testing.T) {
+	t.Run("sign-in", func(t *testing.T) {
+		issuer := &fakeIssuer{}
+		h := &IssueTokenHandler{
+			Store:    &fakeAuthStore{user: usableUser(), matches: true},
+			Attempts: &fakeAttempts{},
+			Issuer:   issuer,
+		}
+		if _, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := issuer.claims[claimIdentityKind]; got != identityKindUser {
+			t.Errorf("%s = %v, want %q", claimIdentityKind, got, identityKindUser)
+		}
+	})
+
+	t.Run("refresh", func(t *testing.T) {
+		issuer := &fakeIssuer{}
+		h := &RefreshTokenHandler{
+			Store:  &fakeAuthStore{byID: usableUser()},
+			Lookup: &fakeLookup{subject: usableUser().GetID().Value()},
+			Issuer: issuer,
+		}
+		if _, err := h.Handle(authCtx(), &RefreshTokenCommand{RefreshToken: "v"}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := issuer.claims[claimIdentityKind]; got != identityKindUser {
+			t.Errorf("%s = %v, want %q — a rotation must not drop the subject kind", claimIdentityKind, got, identityKindUser)
+		}
+	})
+}
+
+// THE PRODUCER AND THE CONSUMER MUST SPELL IT THE SAME, and nothing else checks.
+//
+// buildClaims is the only thing that MINTS this claim; Client's runtime feeders
+// READ it, by a name the omnicore-gen spec declares. Rename either side alone and
+// Client's row rules go quietly inert — a client token would stop being
+// recognised as one, and the rule that keeps a client inside its own row would
+// stand down without a single test failing anywhere else.
+func TestIdentityKindClaim_ProducerAndConsumerAgree(t *testing.T) {
+	if claimIdentityKind != clientIdentityKindClaim {
+		t.Errorf("the token mints %q and Client reads %q — Client's row rules would go inert",
+			claimIdentityKind, clientIdentityKindClaim)
+	}
+	// Pinned against the literal the generated feeders carry inline and the
+	// omnicore-gen spec declares, which no compiler checks for us.
+	if claimIdentityKind != "identity_kind" {
+		t.Errorf("claim = %q, want %q — specs/omnicore-gen/client.omnicore.yaml is the source of truth",
+			claimIdentityKind, "identity_kind")
+	}
+}
+
+// The vocabulary is closed and matches what the attempt table stores, so one
+// value never means two things across the token, the rules and the log.
+func TestIdentityKinds_AreTheTwoTheRestOfTheServiceUses(t *testing.T) {
+	if identityKindUser != "user" || identityKindClient != "client" {
+		t.Errorf("kinds = %q/%q, want user/client — authentication_attempts.identity_kind stores these",
+			identityKindUser, identityKindClient)
+	}
+}
