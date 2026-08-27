@@ -19,6 +19,7 @@ import (
 	appinfra "github.com/ClaudioSchirmer/authcore/internal/infra"
 	appweb "github.com/ClaudioSchirmer/authcore/internal/web"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
+	"github.com/ClaudioSchirmer/omnicore/infra/events"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -71,5 +72,14 @@ func (f *AuthenticationFeature) RefreshTokenStore() *appinfra.RefreshTokenStore 
 func (f *AuthenticationFeature) Mount(app *fiber.App, d bootstrap.Deps) {
 	// See the file header: this is the value that is nil at construction time and
 	// filled by the time Mount runs.
-	appweb.MountAuthentication(app, f.reader, f.store, f.attempts, d.Issuer, d)
+	// The publisher is the framework's own, built here rather than held as a
+	// field: it is stateless, it is the composition root's to choose, and passing
+	// d.Logger is what puts the sign-in's records on the SAME stdout channel and
+	// in the same vocabulary as every audit echo — so one log query reaches both.
+	//
+	// No adapter and no wrapper type: *events.SlogPublisher satisfies the
+	// application's narrow port structurally, which is exactly why that port was
+	// spelled with the framework's own signature.
+	appweb.MountAuthentication(app, f.reader, f.store, f.attempts,
+		events.NewSlogPublisher(d.Logger), d.Issuer, d)
 }

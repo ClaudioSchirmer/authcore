@@ -41,6 +41,7 @@ func MountAuthentication(
 	store commands.AuthenticationStore,
 	lookup commands.RefreshTokenLookup,
 	attempts commands.AttemptRecorder,
+	events commands.AuthenticationEventPublisher,
 	issuer commands.TokenIssuer,
 	d bootstrap.Deps,
 ) {
@@ -97,7 +98,7 @@ func MountAuthentication(
 	issueH, issueSpec := fwweb.CommandWithBodySpec(d.Pipeline,
 		requests.IssueTokenRequest{},
 		requests.TokenResponse{}.FromResult,
-		&commands.IssueTokenHandler{Store: store, Attempts: attempts, Issuer: issuer},
+		&commands.IssueTokenHandler{Store: store, Attempts: attempts, Events: events, Issuer: issuer},
 		fiber.StatusOK)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/user/token",
 		issueH, issueSpec,

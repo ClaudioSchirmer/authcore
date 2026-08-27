@@ -43,7 +43,7 @@ func (testDialect) ApplyLimit(sql string, n int) string {
 func (testDialect) DecodeID(string) (string, error)   { panic("unexpected DecodeID") }
 func (testDialect) ILikeClause(string, string) string { panic("unexpected ILikeClause") }
 func (testDialect) LikeClause(string, string) string  { panic("unexpected LikeClause") }
-func (testDialect) NowExpr() string                   { panic("unexpected NowExpr") }
+func (testDialect) NowExpr() string                   { return "NOW()" }
 func (testDialect) ApplyLimitOffset(string, int, int) string {
 	panic("unexpected ApplyLimitOffset")
 }

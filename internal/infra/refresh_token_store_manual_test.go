@@ -43,6 +43,16 @@ type recordingQuerier struct {
 	execs    []string
 	execArgs [][]any
 	execErr  error
+	// execErrAfter lets N statements through before execErr starts applying, so a
+	// test can fail the SECOND statement of a two-statement write. Zero — the
+	// default — fails from the first, which is what every earlier test expects.
+	execErrAfter int
+
+	// rowsScanErr and rowsIterErr make the replayed result set fail mid-scan and
+	// after iteration — the two branches a fixed set of rows cannot otherwise
+	// reach.
+	rowsScanErr error
+	rowsIterErr error
 
 	queried  []string
 	scanErr  error
@@ -62,14 +72,16 @@ func (q *recordingQuerier) Query(_ context.Context, sql string, args ...any) (co
 	if q.queryErr != nil {
 		return nil, q.queryErr
 	}
-	return &recordingRows{rows: q.rows}, nil
+	return &recordingRows{rows: q.rows, scanErr: q.rowsScanErr, iterErr: q.rowsIterErr}, nil
 }
 
 // recordingRows replays a fixed result set. Deliberately minimal: the tests that
 // use it assert the DECISION taken over the rows, not the driver's behaviour.
 type recordingRows struct {
-	rows [][]any
-	at   int
+	rows    [][]any
+	at      int
+	scanErr error
+	iterErr error
 }
 
 func (r *recordingRows) Next() bool {
@@ -81,14 +93,25 @@ func (r *recordingRows) Next() bool {
 }
 
 func (r *recordingRows) Scan(dest ...any) error {
+	if r.scanErr != nil {
+		return r.scanErr
+	}
 	row := r.rows[r.at-1]
 	for i := range dest {
 		if i >= len(row) {
 			break
 		}
 		switch target := dest[i].(type) {
+		case *int:
+			if v, ok := row[i].(int); ok {
+				*target = v
+			}
 		case *time.Time:
 			if v, ok := row[i].(time.Time); ok {
+				*target = v
+			}
+		case **time.Time:
+			if v, ok := row[i].(*time.Time); ok {
 				*target = v
 			}
 		case **bool:
@@ -100,7 +123,7 @@ func (r *recordingRows) Scan(dest ...any) error {
 	return nil
 }
 
-func (r *recordingRows) Err() error   { return nil }
+func (r *recordingRows) Err() error   { return r.iterErr }
 func (r *recordingRows) Close() error { return nil }
 
 func (q *recordingQuerier) QueryRow(_ context.Context, sql string, _ ...any) core.Row {
@@ -117,6 +140,9 @@ func (q *recordingQuerier) QueryMaps(context.Context, string, ...any) ([]map[str
 func (q *recordingQuerier) Exec(_ context.Context, sql string, args ...any) error {
 	q.execs = append(q.execs, sql)
 	q.execArgs = append(q.execArgs, args)
+	if len(q.execs) <= q.execErrAfter {
+		return nil
+	}
 	return q.execErr
 }
 
