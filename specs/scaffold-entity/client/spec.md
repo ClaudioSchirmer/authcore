@@ -252,9 +252,31 @@ altera qualquer um, e se por um acaso for um token de client, só altera ele mes
 The first two clauses are C1, already inherited from `User`. The third is new, and it
 **subsumes** the question this slot originally asked (*"may a client mint more clients?"*):
 
-- **Insert is refused for free.** On an insert there is no row yet — the id is not minted
-  until after the rules run — so `sub == id` is false and a client-subject caller never
-  creates a client. The self-replication concern dies here without a special-case rule.
+- **Insert is refused, and it has its OWN rule** *(amended 2026-08-26, after the build)*.
+  It first shipped as a consequence: a row being created has no id, so `sub == id` is false
+  and the write was refused with no rule naming it. The maintainer then asked the question
+  this slot had never asked out loud — *"um client pode criar outro client do mesmo tenant,
+  tipo um user que pode criar outro user?"* — and the answer, **no**, is now C14a rather
+  than arithmetic. Two things were wrong with the consequence: a refusal that falls out of
+  another rule reads as an accident to whoever maintains it, and the caller was answered
+  *"you may only modify your own record"* about a CREATION.
+
+  **The asymmetry with `User` is deliberate, and the honest version of it is on the record.**
+  A user holding `user:insert` creates an account whose password they chose, so the human
+  path carries the SAME persistence mechanism and is knowingly left open — "machines must not
+  breed" is therefore not a principle this service applies uniformly, it is a rule applied to
+  one subject kind. What distinguishes them is attendance: a compromised machine credential
+  mints replacements in a loop at three in the morning, while a person can be refused,
+  suspended and asked what they were doing. Closing the `User` side too was offered at the
+  gate and declined as its own piece of work — it needs an invite flow or a
+  creator-does-not-see-the-password path, not a rule.
+
+  **What already bounds the damage, so this is not the only lock:** C9 and C10 mean a client
+  can never be granted more than whoever granted it, and `client:insert` is held by nobody.
+  **Provenance was offered and declined**: a `createdBy` column would turn "show me
+  everything this compromised credential created" into a filter, and `audit_events.Actor`
+  already answers it by walking the trail — accepted, with the note that an aggressive
+  retention policy is exactly what erases that trail first.
 - **What remains is a client editing itself**, which is exactly what it should be able to
   do: rotate its own secret is a legitimate self-service operation for an integration.
 - **Granting itself a role is bounded by C9**, which already refuses any role carrying a
@@ -581,7 +603,8 @@ Numbered `C…`. Rules marked *(inherited)* are `User`'s, verbatim, and are not 
 | **C11** | `RoleID` | At most **50** role grants on one client *(inherited cap)* | InsertOrUpdate | `TooManyRolesForClientNotification` | 422 |
 | **C12** | `RoleID` | A duplicate grant is refused by business identity | (child add) | `ClientAlreadyGrantsRoleNotification` | 409 |
 | **C13** | `Secret`, `GracePeriodSeconds` | **Rotate:** the row must not be archived and `status` must be `active`; the window must be 0…604800 (24 h when omitted); the current hash moves to `PreviousSecretHash` with `PreviousSecretExpiresAt = now + window`, and a new secret is minted. A window of **0** clears both `previous_*` columns instead of stamping them — an immediate kill, not a zero-length overlap | Update (`ActionRotateSecret`) | `InvalidGracePeriodNotification` | 422 |
-| **C14** | — | **A client-subject caller writes only its own row** — `RequestingIdentityKind == "client"` ⇒ `RequestingSubject` must equal this row's id. Refuses the insert for free (no id yet). Stands down when the claim is absent (⇒ `user`) or no identity is present at all | InsertOrUpdate, Archive | `ClientMayOnlyModifyItselfNotification` | 403 |
+| **C14a** | — | **A client-subject caller may not CREATE a client** — declared, not derived (§B-Q8). Stands down when the claim is absent (⇒ `user`) or no identity is present at all | Insert | `ClientsMayNotCreateClientsNotification` | 403 |
+| **C14b** | — | **A client-subject caller writes only its own row** — `RequestingIdentityKind == "client"` ⇒ `RequestingClientID` must equal this row's id. Same stand-downs | Update, Archive | `ClientMayOnlyModifyItselfNotification` | 403 |
 | **C15** | `CIDR` | The value must parse as an IPv4 or IPv6 prefix, and is stored masked *(the VO answers this)* | InsertOrUpdate | `vos` — `InvalidCIDRBlockNotification` | 422 |
 | **C16** | `CIDR` | The universal prefixes `0.0.0.0/0` and `::/0` are refused — an empty collection is how "no restriction" is spelled, and there must be only one spelling | InsertOrUpdate | `UniversalCIDRNotAllowedNotification` | 422 |
 | **C17** | `CIDR` | At most **20** entries on one client | InsertOrUpdate | `TooManyAllowedCIDRsForClientNotification` | 422 |
@@ -593,7 +616,7 @@ not hold themselves — a non-expiring, non-interactive privilege escalation. Th
 exist and are already translated for `User` and `Group`; this entity reuses them rather than
 restating them.
 
-**C14 is inert until the token run mints `identity_kind`**, and that is by design (§B-Q8e):
+**C14a and C14b are inert until the token run mints `identity_kind`**, and that is by design (§B-Q8e):
 an absent claim reads as `user`, so the rule evaluates to "no restriction" and changes
 nothing until the claim exists. It is written now so it is already in place the day the
 claim arrives. The maintainer's own reading applies — *"provavelmente será só por

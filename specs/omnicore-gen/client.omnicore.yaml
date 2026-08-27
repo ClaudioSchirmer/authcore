@@ -410,16 +410,27 @@ rules:
         Unarchive on this entity, so this is a one-way door by construction.
       scope: [archive]
 
+    - id: client-may-not-create-clients
+      description: >-
+        When RequestingIdentityKind is exactly "client", refuse the creation outright. A
+        machine credential that mints machine credentials is a persistence mechanism:
+        revoking the original leaves the ones it created working. It is DECLARED here rather
+        than left to fall out of the own-row rule below — that rule would refuse the insert
+        too, because a row being created has no id to match, but a refusal by side effect
+        reads as an accident and answers with the wrong message. Stands down when the claim
+        is absent (it reads as a user) and when no identity is present at all.
+      scope: [insert]
+      notification: ClientsMayNotCreateClientsNotification
+      attachTo: ID
+
     - id: client-modifies-only-itself
       description: >-
         When RequestingIdentityKind is exactly "client", refuse any write whose row id is not
-        RequestingClientID. On an insert there is no id yet, so the comparison is false and
-        the insert is refused for free — which is the whole self-replication answer. Stands
-        down when the claim is absent (it reads as a user), and when no identity is present
-        at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is
-        deliberate — do not add a fallback that infers the subject kind from another claim's
-        absence.
-      scope: [insertOrUpdate, archive]
+        RequestingClientID. Stands down when the claim is absent (it reads as a user), and
+        when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token
+        MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the
+        subject kind from another claim's absence.
+      scope: [update, archive]
       notification: ClientMayOnlyModifyItselfNotification
       attachTo: ID
 
@@ -586,6 +597,17 @@ notifications:
       deu: Nur bei einem aktiven Client kann das Geheimnis rotiert werden. Aktivieren Sie ihn zuerst.
       ita: Solo un client attivo può ruotare il proprio segreto. Riattivarlo prima.
       nld: Alleen bij een actieve client kan het geheim worden geroteerd. Activeer hem eerst.
+
+  - name: ClientsMayNotCreateClientsNotification
+    semantic: forbidden
+    text:
+      ptbr: Um token de client não pode criar clients.
+      eng: A client token cannot create clients.
+      esp: Un token de client no puede crear clients.
+      fra: Un jeton de client ne peut pas créer de clients.
+      deu: Ein Client-Token kann keine Clients anlegen.
+      ita: Un token di client non può creare client.
+      nld: Een clienttoken kan geen clients aanmaken.
 
   - name: ClientMayOnlyModifyItselfNotification
     semantic: forbidden

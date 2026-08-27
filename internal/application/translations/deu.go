@@ -191,5 +191,6 @@ func (deu) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "Der Netzbereich muss in kanonischer Form angegeben werden, mit genullten Host-Bits.",
 		"InvalidGracePeriodNotification":                   "Das Übergangsfenster muss zwischen 0 und {max} Sekunden liegen.",
 		"ClientMustBeActiveToRotateNotification":           "Nur bei einem aktiven Client kann das Geheimnis rotiert werden. Aktivieren Sie ihn zuerst.",
+		"ClientsMayNotCreateClientsNotification":           "Ein Client-Token kann keine Clients anlegen.",
 	}
 }

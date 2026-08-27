@@ -466,3 +466,14 @@ type ClientMustBeActiveToRotateNotification struct {
 func (ClientMustBeActiveToRotateNotification) Semantic() domain.NotificationSemantic {
 	return domain.SemanticStateConflict
 }
+
+// ClientsMayNotCreateClientsNotification reaches the caller as 403. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClientsMayNotCreateClientsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientsMayNotCreateClientsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticForbidden
+}

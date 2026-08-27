@@ -191,5 +191,6 @@ func (eng) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "The network range must be given in its canonical form, with the host bits cleared.",
 		"InvalidGracePeriodNotification":                   "The grace window must be between 0 and {max} seconds.",
 		"ClientMustBeActiveToRotateNotification":           "Only an active client can have its secret rotated. Reactivate it first.",
+		"ClientsMayNotCreateClientsNotification":           "A client token cannot create clients.",
 	}
 }

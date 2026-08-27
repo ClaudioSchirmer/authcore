@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-26
-// checksum:   sha256:089a42499b7b8c1b4f4c909a63308c7d326cc5dfa182548bfec0fcc20d2993a0
+// checksum:   sha256:35ab92fbbdd09f325dc9cb0f609132694de070083e204c1eb56b495d666d69b6
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -262,6 +262,7 @@ func TestClientNotificationSemantics(t *testing.T) {
 		{"UnknownClientStatusNotification", vos.UnknownClientStatusNotification{}.Semantic(), domain.SemanticValidation},
 		{"InvalidGracePeriodNotification", InvalidGracePeriodNotification{}.Semantic(), domain.SemanticValidation},
 		{"ClientMustBeActiveToRotateNotification", ClientMustBeActiveToRotateNotification{}.Semantic(), domain.SemanticStateConflict},
+		{"ClientsMayNotCreateClientsNotification", ClientsMayNotCreateClientsNotification{}.Semantic(), domain.SemanticForbidden},
 		{"ClientMayOnlyModifyItselfNotification", ClientMayOnlyModifyItselfNotification{}.Semantic(), domain.SemanticForbidden},
 		{"RoleNotAvailableInTenantNotification", RoleNotAvailableInTenantNotification{}.Semantic(), domain.SemanticValidation},
 		{"CannotGrantRoleWithUnheldPermissionsNotification", CannotGrantRoleWithUnheldPermissionsNotification{}.Semantic(), domain.SemanticForbidden},

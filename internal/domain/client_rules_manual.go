@@ -90,6 +90,7 @@ func (e *Client) customRules(actionName string, service domain.Service, r *domai
 	svc, _ := service.(ClientService)
 
 	r.IfInsert(func() {
+		e.refuseClientCallerCreating(r)
 		e.refuseUnavailableTenant(svc, r)
 		// LAST in the gate, deliberately. Minting derives a hash, and deriving
 		// one for a secret the rules above refused is a write nobody asked for
@@ -99,11 +100,12 @@ func (e *Client) customRules(actionName string, service domain.Service, r *domai
 	})
 
 	r.IfInsertOrUpdate(func() {
-		e.refuseForeignClientCaller(r)
 		e.refuseUngrantableRoles(svc, r)
 	})
 
 	r.IfUpdate(func() {
+		e.refuseForeignClientCaller(r)
+
 		// The ordinary PATCH and the rotation both dispatch ModeUpdate, so the
 		// ACTION NAME is what tells them apart. Without this switch the rotation
 		// would fire on a rename, replacing a live credential because somebody
@@ -254,19 +256,49 @@ func (e *Client) refuseUnavailableTenant(service ClientService, r *domain.Rules)
 	}
 }
 
+// refuseClientCallerCreating refuses a CLIENT-subject caller the creation of a
+// client, and it is a DECLARED rule rather than a consequence.
+//
+// The own-row rule below would refuse the insert too — a row being created has
+// no id for `sub == id` to match — and shipping it that way was the first
+// version. It is wrong twice: a refusal that falls out of another rule's
+// arithmetic reads as an accident to whoever maintains it, and the message the
+// caller receives talks about MODIFYING a record they were trying to create.
+//
+// WHY IT IS REFUSED, decided by the maintainer on 2026-08-26 when he asked the
+// question this rule now answers out loud — "um client pode criar outro client
+// do mesmo tenant, tipo um user que pode criar outro user?". The answer is no,
+// and the asymmetry with User is deliberate rather than an oversight: a machine
+// credential is unattended, so a compromised one can mint replacements in a loop
+// at three in the morning, and revoking the original leaves every one of them
+// working. The human path is not safer in kind — a user holding user:insert
+// creates an account whose password they chose, which is the same persistence
+// mechanism — but there is a person in it who can be refused, suspended and
+// asked what they were doing.
+//
+// WHAT ALREADY BOUNDS THE DAMAGE, so this rule is not the only lock: C9 and C10
+// mean a client can never be granted more than whoever granted it, and
+// client:insert is held by nobody today.
+//
+// Stands down with an absent claim and with no identity at all, for the reasons
+// the own-row rule gives below.
+func (e *Client) refuseClientCallerCreating(r *domain.Rules) {
+	if e.RequestingIdentityPresent && e.RequestingIdentityKind == identityKindClient {
+		r.AddNotification("ID", ClientsMayNotCreateClientsNotification{})
+	}
+}
+
 // refuseForeignClientCaller keeps a CLIENT-subject caller inside its own row.
 //
 // The three row rules of this service, stated once: a tenant token writes
 // inside its own tenant (the generated refuseForeignTenant), a `*:*` token
 // crosses that scope, and a CLIENT token writes only the row it IS. This is the
-// third.
+// third, and it covers UPDATE and ARCHIVE — creation has its own rule above,
+// because "no" deserves to be said rather than computed.
 //
-// IT ANSWERS THE SELF-REPLICATION QUESTION FOR FREE. On an insert the id is not
-// minted until after the rules run, so GetID is nil, the comparison is false,
-// and a client-subject caller cannot create another client however many
-// permissions it holds. What remains is a client editing itself — which is what
-// it should be able to do — and granting itself a role, which C9 already bounds
-// to roles whose permissions it already has.
+// What it leaves a client able to do is edit itself, which is what it should be
+// able to do, and grant itself a role — bounded by C9 to roles whose permissions
+// it already holds, so the grant can add nothing.
 //
 // IT IS INERT TODAY, AND THAT IS DELIBERATE. RequestingIdentityKind is fed from
 // the `identity_kind` claim, which only POST /auth/client/token mints and which

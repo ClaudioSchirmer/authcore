@@ -191,5 +191,6 @@ func (nld) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "Het netwerkbereik moet in canonieke vorm worden opgegeven, met de hostbits op nul.",
 		"InvalidGracePeriodNotification":                   "Het overgangsvenster moet tussen 0 en {max} seconden liggen.",
 		"ClientMustBeActiveToRotateNotification":           "Alleen bij een actieve client kan het geheim worden geroteerd. Activeer hem eerst.",
+		"ClientsMayNotCreateClientsNotification":           "Een clienttoken kan geen clients aanmaken.",
 	}
 }

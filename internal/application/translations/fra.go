@@ -191,5 +191,6 @@ func (fra) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "La plage réseau doit être fournie sous sa forme canonique, bits d'hôte à zéro.",
 		"InvalidGracePeriodNotification":                   "La fenêtre de grâce doit être comprise entre 0 et {max} secondes.",
 		"ClientMustBeActiveToRotateNotification":           "Seul un client actif peut voir son secret pivoté. Réactivez-le d'abord.",
+		"ClientsMayNotCreateClientsNotification":           "Un jeton de client ne peut pas créer de clients.",
 	}
 }

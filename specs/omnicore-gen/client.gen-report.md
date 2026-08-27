@@ -61,11 +61,17 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfArchive`
 
+**`client-may-not-create-clients`**
+
+> When RequestingIdentityKind is exactly "client", refuse the creation outright. A machine credential that mints machine credentials is a persistence mechanism: revoking the original leaves the ones it created working. It is DECLARED here rather than left to fall out of the own-row rule below — that rule would refuse the insert too, because a row being created has no id to match, but a refusal by side effect reads as an accident and answers with the wrong message. Stands down when the claim is absent (it reads as a user) and when no identity is present at all.
+
+- fires under `IfInsert` · raise `ClientsMayNotCreateClientsNotification{}` · attach it to `ID`
+
 **`client-modifies-only-itself`**
 
-> When RequestingIdentityKind is exactly "client", refuse any write whose row id is not RequestingClientID. On an insert there is no id yet, so the comparison is false and the insert is refused for free — which is the whole self-replication answer. Stands down when the claim is absent (it reads as a user), and when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the subject kind from another claim's absence.
+> When RequestingIdentityKind is exactly "client", refuse any write whose row id is not RequestingClientID. Stands down when the claim is absent (it reads as a user), and when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the subject kind from another claim's absence.
 
-- fires under `IfInsertOrUpdate`, `IfArchive` · raise `ClientMayOnlyModifyItselfNotification{}` · attach it to `ID`
+- fires under `IfUpdate`, `IfArchive` · raise `ClientMayOnlyModifyItselfNotification{}` · attach it to `ID`
 
 The tests for them are yours too, and the same check applies.
 
@@ -255,15 +261,15 @@ These are the decisions the spec made that are expensive to change later. Read t
 | What | File |
 |---|---|
 | the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
-| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | tests for Client's rules | `internal/domain/client_test.go` |
-| 14 notification declaration(s) | `internal/domain/notifications.go` |
+| 15 notification declaration(s) | `internal/domain/notifications.go` |
 
 **Left untouched** (yours, by design):
 

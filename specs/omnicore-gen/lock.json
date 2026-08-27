@@ -3,7 +3,7 @@
   "entities": {
     "Client": {
       "spec": "specs/omnicore-gen/client.omnicore.yaml",
-      "specHash": "195679eb535679588173da4ac14644ffd6351af1ced2aa8619abcd57ab3d2c94",
+      "specHash": "bb92f1280e98e51d81c8e84ea8609f38b5dc96a57df6236842e23678adc887ca",
       "framework": "v0.61.0",
       "files": {
         "bootstrap/clients_feature.go": {
@@ -68,7 +68,7 @@
         },
         "internal/application/translations/client_translations_test.go": {
           "class": "owned",
-          "hash": "ee346605473f1a06519db61f7f81a802b43338e160f6d999b3f54f68a6d04b6f"
+          "hash": "b9a948bce8ea6bc91064aa1be12a4da36c164a63b12b97d99da54218074ee505"
         },
         "internal/domain/aggregatevos/client_allowed_cidr.go": {
           "class": "owned",
@@ -96,7 +96,7 @@
         },
         "internal/domain/client_test.go": {
           "class": "owned",
-          "hash": "bc77eb90ec81d1b999a6f3a2f06251443829c22e8b3dc5b7060907160b8b0897"
+          "hash": "bb552b2230f7f639b3e8eee117fdf8b3e78830bf0e6a307d16a9746c7f9e8f0b"
         },
         "internal/domain/vos/client_status.go": {
           "class": "owned",
@@ -223,6 +223,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "3b1e00efce454479e6f7e029453ed93d713bb1e069d2153176cddda750f6b339",
           "InvalidCIDRBlockNotification": "a92e68a24eb9352038ff356d2ed1ce587e8cfbb6d145362ff605399758a49c52",
           "InvalidClientStatusTransitionNotification": "29f3e52e598818127b5d41c2e9486ea70dbcd3d7d6cdafc4e97fff973dc2ab58",
           "InvalidGracePeriodNotification": "e9882bf07d65d7fe9f481584a803339c157157c98ac76515ad925a7d6e787ee7",
@@ -267,6 +268,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "be3ab0eec768ed9bca5930d7587269cd85a4a3f6844f747637589121823fa136",
           "InvalidCIDRBlockNotification": "5c8c727f2d997c5484dfab1825010a7fc60f3716857a621b7edb6d6acd6da201",
           "InvalidClientStatusTransitionNotification": "0c588750fb9232cdd9e8918b1c3b1b4748598487670379b0279ca17c63ad861e",
           "InvalidGracePeriodNotification": "be6941d8c224978ee256e5678559b25731a724cdbd1b53fec621e21b2b98c745",
@@ -311,6 +313,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "7539fe0dfebe701eee961e8906d45faf78ebeee31a916eba0f15a26c3ca82764",
           "InvalidCIDRBlockNotification": "6e0e6f92438500361578643a5f4f9f256e2c0557370be132febcb3ff946194ac",
           "InvalidClientStatusTransitionNotification": "7a70bd792f15d963d1d3226ec57239aff33bcb14783deea53a0a49a7abbe6505",
           "InvalidGracePeriodNotification": "55c85a0d94ee9231c1ea29d5d57cd37adf2c8f8daa9a23d53039bc3598c0975f",
@@ -355,6 +358,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "3f680c5fc8ca2079f7cee2ad9df2a6dd5923fa8d17607fb9c84f43859efdee93",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "0a070f5418635298817fde5683fa2c0d56b6a9443507e6e040147e196ba3c796",
           "InvalidCIDRBlockNotification": "ced5af20fd0bd64636b457b243c94d95820e4e2c9a72e61fbbcb7eee11f0098c",
           "InvalidClientStatusTransitionNotification": "080d6b1e2728df39aa1259078d98326e189d63ae9d7e93b37eebc18a6430b8a3",
           "InvalidGracePeriodNotification": "601abdacc16a128520977bba15c2a4dd00dc50df0d0c50905a7ce11ca20a251a",
@@ -399,6 +403,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "60f8195edcb29c9a65a472678a60e1c6a390d1011434e32d94a9ccc0b3993fb3",
           "InvalidCIDRBlockNotification": "6a75508ac98e52aa30908e9a3e86bfe195ea134f69e7b260d6606f8ed6df44a8",
           "InvalidClientStatusTransitionNotification": "809f1aa577339516b9acfc63b0a1f2c1ad73f9360584a69fc6df023ae87c7eca",
           "InvalidGracePeriodNotification": "994f599876d7341549924b2d1ad71c6b75076d06d0e297d843e6187fa8947d03",
@@ -443,6 +448,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "56d03d89a801caf6c24d1a49968a38cd4c79d128e708754eb17841d02b2163a4",
           "InvalidCIDRBlockNotification": "33feaa25eecfb589d6a0712e4e1e082d971e6b540c6e6108aef090d03de92c80",
           "InvalidClientStatusTransitionNotification": "a3a7cb1dab65a36b351191779fb5584c37440784b4963a13cc505baa7df2fb78",
           "InvalidGracePeriodNotification": "9273c91f164a66235c7600a622e33894160216352b4bdafbe2a5a71e0744fa7c",
@@ -487,6 +493,7 @@
           "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "ClientsMayNotCreateClientsNotification": "b967945c0ad5c0fc711bc00db8a019becf51c0d6f88910d3aef68831a7b8fd78",
           "InvalidCIDRBlockNotification": "697b5804db377fae604c56ded6cb94f99857ea6f33faf0ee5784ba3490868d6e",
           "InvalidClientStatusTransitionNotification": "89b78eaa0b4a30bcdeb81ecb56d77ff4a258742994a07dfd2ac9a27ae44e217e",
           "InvalidGracePeriodNotification": "f27049493ed06e0382c9080cea2e03974089029a1f9e60ba989b12010e5e1c70",
@@ -506,6 +513,7 @@
           "ClientNameAlreadyExistsNotification": "d26e70d41044b4d9bc54b6ef80bc4968c7b82c5f51aba40df099a9e2d321974e",
           "ClientTenantDoesNotExistNotification": "ddcc2c7e15d318219a27b55dbe2c6204baf79728fcd64f28d98355ff371f8aad",
           "ClientTenantIsImmutableNotification": "16cde4c5fe63a0cb0a2e8dcde15de885db95be3e2d5d6a271414995551e7636e",
+          "ClientsMayNotCreateClientsNotification": "883d390024317a3845e0915df9ac98336b3ba708cb5cfb65de3428076cc14e3a",
           "InvalidClientStatusTransitionNotification": "097082c9196b9c4f430e8fa15b2fd53eb3b517d00aae9dfb0b21a82d16247cdf",
           "InvalidGracePeriodNotification": "f8c219d30079d24e48a104cca1d1e79e25b628bc2b512218002e277b732eee47",
           "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",

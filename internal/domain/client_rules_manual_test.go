@@ -362,8 +362,10 @@ func TestAClientSubjectCallerMayNotEditAnotherRow(t *testing.T) {
 }
 
 // TestAClientSubjectCallerCannotCreateAClient is the self-replication answer,
-// and it costs no rule of its own: on an insert there is no id yet, so the
-// comparison is false and the write is refused.
+// and it has a rule of its own on purpose. The own-row rule would refuse the
+// insert too — a row being created has no id to match — but the MESSAGE is what
+// makes this a separate rule: a caller told "you may only modify your own
+// record" while trying to CREATE one has been answered about the wrong verb.
 func TestAClientSubjectCallerCannotCreateAClient(t *testing.T) {
 	e := validClient()
 	e.RequestingIdentityKind = "client"
@@ -371,8 +373,42 @@ func TestAClientSubjectCallerCannotCreateAClient(t *testing.T) {
 
 	insertClient(t, e, &probingClientService{})
 
-	if !clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
-		t.Fatalf("a machine credential minted another machine credential; got %v", clientNotificationKeys(e))
+	keys := clientNotificationKeys(e)
+	if !clientHasKey(keys, "ClientsMayNotCreateClientsNotification") {
+		t.Fatalf("a machine credential minted another machine credential; got %v", keys)
+	}
+	if clientHasKey(keys, "ClientMayOnlyModifyItselfNotification") {
+		t.Fatalf("a refused CREATION was answered as a refused modification; got %v", keys)
+	}
+}
+
+// TestAClientSubjectCallerCannotCreateEvenItsOwnID closes the reading that would
+// make the rule above vacuous: it is the SUBJECT KIND that refuses, not a
+// mismatched id, so a caller cannot get through by naming itself.
+func TestAClientSubjectCallerCannotCreateEvenItsOwnID(t *testing.T) {
+	e := validClient()
+	e.RequestingIdentityKind = "client"
+	e.RequestingClientID = clientRowID
+
+	insertClient(t, e, &probingClientService{})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClientsMayNotCreateClientsNotification") {
+		t.Fatalf("a client created a client by naming itself; got %v", clientNotificationKeys(e))
+	}
+}
+
+// TestAUserSubjectCallerMayStillCreateAClient is the other half, and it is the
+// asymmetry stated as a test: the restriction is on the SUBJECT KIND, and a
+// person holding client:insert creates clients in their tenant like they always
+// did.
+func TestAUserSubjectCallerMayStillCreateAClient(t *testing.T) {
+	e := validClient()
+	e.RequestingIdentityKind = "user"
+
+	insertClient(t, e, &probingClientService{})
+
+	if clientHasKey(clientNotificationKeys(e), "ClientsMayNotCreateClientsNotification") {
+		t.Fatalf("a person was refused the creation of a client; got %v", clientNotificationKeys(e))
 	}
 }
 

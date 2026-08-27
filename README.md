@@ -738,10 +738,20 @@ automatically whoever may hand out a production credential. Editing the allow-li
 `client:update`: it grants the client nothing it does not already hold, it only narrows or
 widens where from.
 
-Row scope is `User`'s, plus one: a **client token writes only its own row** (`sub == id`).
-That rule is written and **inert** — it reads an `identity_kind` claim nothing mints until the
-token route exists, and an absent claim reads as a user. It costs the self-replication answer
-nothing: on an insert there is no id yet, so a machine cannot mint another machine.
+Row scope is `User`'s, plus two: a **client token may not create a client**, and it **writes
+only its own row** (`sub == id`). Both are written and **inert** — they read an
+`identity_kind` claim nothing mints until the token route exists, and an absent claim reads as
+a user.
+
+**The first one is asymmetric with `User` on purpose**, and the asymmetry is worth stating
+because it is not a security principle applied evenly: a user holding `user:insert` creates an
+account whose password they chose, which is the same persistence mechanism, and that stays
+open. What separates them is attendance — a compromised machine credential mints replacements
+in a loop unattended, while a person can be refused and asked what they were doing. Closing
+the `User` side needs an invite flow, not a rule, and has not been started. Meanwhile a client
+can never be granted more than whoever granted it (the escalation and wildcard rules), and
+"who created this row" is answered from `audit_events`, which records the actor of every
+write.
 
 
 ## Running it locally

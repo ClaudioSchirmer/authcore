@@ -191,5 +191,6 @@ func (ptbr) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "A faixa de rede precisa vir na forma canônica, com os bits de host zerados.",
 		"InvalidGracePeriodNotification":                   "A janela de carência deve ficar entre 0 e {max} segundos.",
 		"ClientMustBeActiveToRotateNotification":           "Só um client ativo pode ter o segredo rotacionado. Reative-o antes.",
+		"ClientsMayNotCreateClientsNotification":           "Um token de client não pode criar clients.",
 	}
 }

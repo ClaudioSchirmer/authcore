@@ -191,5 +191,6 @@ func (esp) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "El rango de red debe indicarse en su forma canónica, con los bits de host en cero.",
 		"InvalidGracePeriodNotification":                   "La ventana de gracia debe estar entre 0 y {max} segundos.",
 		"ClientMustBeActiveToRotateNotification":           "Sólo un client activo puede rotar su secreto. Reactívelo primero.",
+		"ClientsMayNotCreateClientsNotification":           "Un token de client no puede crear clients.",
 	}
 }
