@@ -7,12 +7,29 @@
   §B-Q8, which is better than what it replaced.
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md`
   rule 3 and the maintainer's invocation
-- **Generation:** `<pending>` — gate 1d, asked after this spec is approved
+- **Generation:** `omnicore-gen` — chosen by the maintainer at gate 1d, 2026-08-26. §D
+  records what stays hand-written on this path: the reveal-once secret (no spec key puts a
+  runtime value into a response — established by running `explain keys`), the SHA-256 port
+  and its adapter, the CIDR value object, the rotate route and its action name, the
+  cross-aggregate foreign keys in the migration, and the seven catalogs for each new
+  notification
 - **Pin:** omnicore **`v0.61.0`** (already the latest published — the 0v check found no
   update) · `omnicore-gen` from plugin 0.44.0 · dialect **postgres** · Postgres SoR, no
   Mongo, no broker → **relational-served views**. The same posture every existing entity
   was built under
 - **Branch:** `feature/client-credentials`
+
+- **AMENDED 2026-08-26, AFTER the build** — eight things came out different from what this
+  spec promised, and every one is in `tasks.md`'s deviation table with its reason. Three of
+  them change what is written below, so they are marked inline: the CIDR value object
+  **refuses** a non-canonical range instead of normalising it (§2 — the generated mapper
+  converts straight to the type, so there is no seat to rewrite in); **neither computed read
+  field exists** (§9 — one is refused by the generator, one became redundant); and there is
+  **no `SecretHasher` port** (§D — nothing in the domain calls it, so it would have been a
+  name placed by import convenience). The maintainer then had `PasswordHasher` removed from
+  the domain for the same reason, which is a change to `User`'s tree authorised in chat.
+  **One promise is not met and is OPEN**: `POST /clients` does not hand back a secret — see
+  `tasks.md`'s open item and its three ways out.
 
 ## ✅ Decisions taken at the model gate (2026-08-26)
 
@@ -472,8 +489,14 @@ Six properties, and each names the mechanism that delivers it:
 - **`vos.ClientStatus`** (enum): `active` · `suspended`, with `ClientStatusUnknown` as the
   zero sentinel. A verbatim structural copy of `vos.UserStatus`.
 - **`vos.CIDRBlock`** (raw): parses with `netip.ParsePrefix`, refuses what does not parse,
-  and **normalises host bits away** with `.Masked()` so `203.0.113.5/24` stores as
-  `203.0.113.0/24` and two callers cannot write the same range two ways. It refuses the
+  and ~~normalises host bits away~~ → **REFUSES a range whose host bits are set, naming the
+  canonical spelling in the notification payload** *(amended after the build)*. The reason is
+  mechanical: the generated mapper converts the caller's string straight to this type, so
+  there is no seat between the wire and the value in which a rewrite could happen. The
+  property the normalisation was for is preserved — the stored form is canonical, so the
+  unique index tells the truth about duplicates — and a caller told "write 203.0.113.0/24"
+  learns something a silent rewrite would have hidden. It raises
+  `CIDRHasHostBitsSetNotification`, a third answer this section did not originally list. It refuses the
   universal prefixes `0.0.0.0/0` and `::/0` outright — they are exactly equivalent to an
   empty collection, and having two spellings for "no restriction" is how a reviewer comes to
   believe a client is restricted when it is not.
@@ -615,7 +638,14 @@ reaches them — the rotate operation is the only writer), `id`.
   `?search=` **no** (no text index will serve it; `name` filtering covers the need) ·
   `?onlyTotal` **yes** · `?includeArchived` **yes**, gated on `client:read` like every other
   entity.
-- **Computed read fields** (two, both proposed):
+- **Computed read fields** — ⚠️ **NEITHER WAS BUILT** *(amended after the build; `tasks.md`
+  deviation 4)*. `ipRestricted` is REFUSED by the generator, and the refusal is right:
+  `read.computed.from` may not name a collection's field, because the derivation runs once
+  per document and what the root holds for a collection is a slice. The state stays visible
+  — an empty `allowedCIDRs: []` is served on the by-id read and on every listing row.
+  `secretRotationPending` was DROPPED as redundant once `previousSecretExpiresAt` is served
+  directly, which is strictly more informative than a boolean derived from it. The original
+  proposals are kept below for the reasoning:
   - **`ipRestricted`** (bool) — true when the allow-list is non-empty. This is what pays for
     the fail-open decision: "unrestricted" and "not configured yet" are the same state, so
     the listing has to name it rather than render a silent empty array.
@@ -707,7 +737,11 @@ Also hand-written, by the same boundary the `User` credential operations sit on:
 - the `POST /clients/{id}/secret` route, its command, its handler and its
   `ActionRotateSecret` discriminator (`authz.permissions` takes a closed verb set and
   `rotate-secret` is not one);
-- `domain.SecretHasher` + its SHA-256 adapter and its tests (Q4), including the
+- ~~`domain.SecretHasher` +~~ **the SHA-256 adapter alone**, with no port *(amended after
+  the build)*: nothing in the domain calls it — the aggregate asks `ClientService.HashSecret`,
+  which IS the port — so an interface would have existed only to give the adapter a name
+  reachable from another layer. `internal/domain` is the one package every layer may import
+  without a cycle, and that is never a reason to put a name there. It includes the
   `crypto/subtle` comparison and the `acs_` minting;
 - `vos.CIDRBlock` — a `netip`-backed VO with normalisation, which is a composition of parse,
   mask and two refusals rather than a pattern;

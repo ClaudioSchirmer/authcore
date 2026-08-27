@@ -81,3 +81,46 @@ The precedence question is still the one that has to be answered first, and it i
 one that breaks an existing property: effective permissions today have **no precedence and no
 deny rule**, and a claim map with last-writer-wins would be the first place that stops being
 true.
+
+---
+
+## Declined at the `Client` model gate (2026-08-26)
+
+Two additions were weighed and turned down. They are here with the reason rather than as bare
+ideas, so a future reader sees a decision instead of an omission.
+
+**A hard expiry on a client secret** (`secretExpiresAt`). Real hygiene — it is what forces
+rotation instead of letting a credential live for years — and also a scheduled production
+outage the first time it fires. To be worth taking it needs a warning path: something has to
+tell somebody thirty days out. This service has no outbound channel at all — no CDC relay, no
+mail — so the feature would ship as a timer that silently breaks an integration at 03:00.
+**Revisit when an outbound channel exists**, not before.
+
+**Scope-down claims on a grant** — letting a role grant say "this client may act only on
+tenant X's billing resources". It is the custom-claims question from the entry above wearing a
+different hat, and it inherits the same unanswered problem: effective permissions today have
+**no precedence and no deny rule**, and a scoped grant is a deny rule by another name. The
+precedence question has to be answered first, and answering it for clients alone would mean
+two authorization models in one service.
+
+## Not started: `POST /auth/client/token`
+
+The `Client` entity exists; the route that authenticates it does not. It is a capability
+rather than an entity, so it belongs to `/omnicore:implement`, and the contract it has to
+honour is already written: `specs/scaffold-entity/client/spec.md` §F lists the row shape it
+reads, the eligibility checks, `identity_kind = 'client'` on every attempt row (which makes
+the existing lockout apply unchanged), no refresh token per RFC 6749 §4.4.3, and the claim
+set — `sub`, `tenant_id`, `tenant_workspace`, `name`, `identity_kind`, `permissions`, `roles`,
+and no `email`, no `groups`, no `must_change_password`.
+
+**Two prerequisites block it, and neither is this route's own work.** The source IP has to be
+resolved correctly behind the proxy — `X-Forwarded-For` unguarded is spoofable, so an attacker
+sets the header to an allowed range and walks through, while the socket IP alone is the load
+balancer and blocks everybody. That is a trusted-proxy configuration and it is
+`/omnicore:configure`'s territory. And `auth.auditClaims` has to gain `name` and
+`identity_kind`, so an audit row says whether the actor was a person or a machine without
+anybody cross-referencing the `clients` table.
+
+**One thing to say out loud in whatever documents that route:** an allowed CIDR constrains
+where a token is *obtained*, never where it is *used*. authcore does not see the requests a
+client later makes to other services.

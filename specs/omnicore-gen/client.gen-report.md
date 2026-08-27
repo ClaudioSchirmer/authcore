@@ -1,0 +1,304 @@
+# Client — generation report
+
+Generated from `specs/omnicore-gen/client.omnicore.yaml`.
+
+The descriptions, examples and labels quoted here are in **en-US**, as the spec declares.
+
+## What still needs implementing
+
+### Value objects you already wrote
+
+Written by hand — `kind: manual`, or a composite with `written: manual` — and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
+
+- **`CIDRBlock`** — `internal/domain/vos/cidr_block.go`. An IPv4 or IPv6 network range in CIDR notation, accepted only in its CANONICAL form — host bits masked away. 203.0.113.5/24 is refused and the answer names 203.0.113.0/24, because the two are one range written two ways and a collection that stores both has a unique index that cannot see the duplicate. Refusing beats normalising silently: the mappers convert straight to this type, so there is no seat to rewrite the value in, and a caller told the canonical spelling learns something a silent rewrite hides. It also refuses 0.0.0.0/0 and ::/0 outright — an empty collection is how "no restriction" is spelled, and two spellings for it is how a reviewer comes to believe a client is restricted when it is not. Raises InvalidCIDRBlockNotification for a value netip.ParsePrefix rejects, CIDRHasHostBitsSetNotification for a well-formed range that is not masked, and UniversalCIDRNotAllowedNotification for a universal prefix.
+
+The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec.
+
+### Fields declared DERIVED, which nothing here computes
+
+- **`SecretHash`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
+- **`SecretChangedAt`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: a `rules.manual` entry scoped to insert, assigning it from the fields it derives from. Idempotent by construction when it is a pure function of an immutable field, which is the case this exists for.
+- **`PreviousSecretHash`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: the column starts NULL and stays null until something writes it — a `rules.manual` entry on the verb that produces the value, or hand-written code beyond this spec. Null is a state the response shows honestly (the field is simply absent), so check that the write exists rather than that the insert fills it.
+- **`PreviousSecretExpiresAt`** — `assignedFrom: derived` took it out of every write request, command and OpenAPI request schema, so a client cannot set it. WRITING it is yours: the column starts NULL and stays null until something writes it — a `rules.manual` entry on the verb that produces the value, or hand-written code beyond this spec. Null is a state the response shows honestly (the field is simply absent), so check that the write exists rather than that the insert fills it.
+
+### `internal/domain/client_rules_manual.go`
+
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are implemented. It lists them so you can check the file still covers what the spec declares, which is where a rule added to the spec later goes unnoticed.
+
+**`credential-minting`**
+
+> Mint the credential on creation. Draw 32 bytes from crypto/rand, render them base64url WITHOUT padding, prefix them with "acs_", and put the result in Secret; put HashSecret(Secret) in SecretHash; set SecretChangedAt to now. Leave PreviousSecretHash and PreviousSecretExpiresAt absent — there is nothing retiring on a first issue. Derive ONLY after every other check has passed: writing a hash for a secret the rules refused is one refactor away otherwise. The plaintext must never be logged, on any path.
+
+- fires under `IfInsert`
+
+**`tenant-available`**
+
+> Refuse a client whose owning tenant is missing, archived or commercially SUSPENDED. A trial tenant is a live customer and passes — "unavailable" is not "not active". Asks TenantIsUnavailable.
+
+- fires under `IfInsert` · raise `ClientTenantDoesNotExistNotification{}` · attach it to `TenantID`
+
+**`role-available-in-tenant`**
+
+> For every role this write ADDS: refuse when the id is absent from the roles table, points at an archived role, or belongs to a tenant other than this client's. ONE answer for all three — a distinct "belongs to another tenant" reply is an existence oracle over a competitor's catalogue. Asks RoleIsUnavailableInTenant, and judges the ADDED entries only, never the ones already stored.
+
+- fires under `IfInsertOrUpdate` · raise `RoleNotAvailableInTenantNotification{}` · attach it to `Roles`
+
+**`no-wildcard-role`**
+
+> For every role this write ADDS: refuse a role granting a permission that carries a wildcard in either part. Asks RoleGrantsWildcard. It runs BEFORE the escalation probe below and that order is load-bearing — the framework's HasPermission PANICS on a wildcard argument, and a panic on a security rule is a 500. A machine credential carrying *:* is the single worst thing this entity could mint.
+
+- fires under `IfInsertOrUpdate` · raise `CannotGrantWildcardRoleNotification{}` · attach it to `Roles`
+
+**`no-escalation`**
+
+> For every role this write ADDS: refuse when the requesting caller does not hold every permission that role confers. Asks CallerLacksAnyPermissionOfRole. Without it, anyone holding client:grant mints a non-expiring, non-interactive credential carrying privileges they do not have themselves. A *:* caller passes by construction.
+
+- fires under `IfInsertOrUpdate` · raise `CannotGrantRoleWithUnheldPermissionsNotification{}` · attach it to `Roles`
+
+**`archive-forces-suspended`**
+
+> Archiving a client sets Status to suspended. Mirrors Tenant rule 13 and User's U15: a row that is gone must not read as active anywhere it is still listed. There is no Unarchive on this entity, so this is a one-way door by construction.
+
+- fires under `IfArchive`
+
+**`client-modifies-only-itself`**
+
+> When RequestingIdentityKind is exactly "client", refuse any write whose row id is not RequestingClientID. On an insert there is no id yet, so the comparison is false and the insert is refused for free — which is the whole self-replication answer. Stands down when the claim is absent (it reads as a user), and when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the subject kind from another claim's absence.
+
+- fires under `IfInsertOrUpdate`, `IfArchive` · raise `ClientMayOnlyModifyItselfNotification{}` · attach it to `ID`
+
+The tests for them are yours too, and the same check applies.
+
+### `internal/infra/client_service_manual.go`
+
+The spec marked these questions as ones the generator cannot answer, so it declared them on the port and left the bodies to you. **They panic until you write them** — the project still builds and boots, and the failure arrives the moment the rule asks, as a 500 with the write rolled back. The outcome being avoided is the other one: a query against the wrong source would compile, return, and mean nothing.
+
+**`HashSecret(secret string) string`**
+
+> The SHA-256 of the secret, lowercase hex. NOT Argon2id, and the reason is in spec §B-Q4: memory-hardness buys nothing against 256 random bits and costs 19 MiB per verify on an unauthenticated endpoint. No salt — a rainbow table over 2^256 random values cannot exist. Pure CPU, no query. It must never log its input, and whatever verifies against it must compare with crypto/subtle.
+
+**`TenantIsUnavailable(tenantID domain.ID) bool`**
+
+> Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
+
+**`RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool`**
+
+> Whether this role id is absent from the roles table, points at an archived role, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
+
+**`RoleGrantsWildcard(roleID domain.ID) bool`**
+
+> Whether this role grants a permission carrying a wildcard in either part. Answers TRUE when the id is unknown, so an unresolvable grant never reaches the escalation probe — the framework's HasPermission panics on a wildcard argument.
+
+**`CallerLacksAnyPermissionOfRole(roleID domain.ID) bool`**
+
+> Whether the requesting caller fails to hold at least one permission this role confers — the escalation half. GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through, because a panic on a security rule is a 500. A *:* superadmin passes by construction.
+
+The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+### Fields nothing generated fills
+
+Declared `runtime: true` with `source: manual`. Each one is on the aggregate so your rules can read it, and on nothing else: no write request DTO, no command, no mapper, no OpenAPI schema — and no column, so no migration, `TableSchema`, outbox payload, audit event or response either. **No generated code puts a value there.** That is the declaration, not an omission.
+
+| field | type | what it is for |
+|---|---|---|
+| `Secret` | `string` | The plaintext secret, minted by the rules and rendered by the operation that minted it — and nowhere else, ever. No column, no payload, no audit event, no listing. |
+| `GracePeriodSeconds` | `int` | How long the retiring secret stays valid, in seconds. Zero is an immediate kill and is a legitimate answer, not an omission. |
+
+Write the assignment in the operation that owns it — the hand-written command whose mapper has both the request and the entity. The shape this exists for is an operation that dispatches the same mode a generated verb does and is told apart by its action name: it needs the value on the aggregate, and the ordinary write bodies must not grow a field for it.
+
+**Until something assigns it, the field is the zero value on every write, and nothing says so.** A rule reading it does not fail — it judges `""` (or `false`, or `0`) and answers accordingly, which for a possession check is the answer that looks like a pass. Value objects are the one part already handled: the automatic pass would judge this field on every generated write, so its validation is excluded under every gate, and what checks the value is the rule you write.
+
+### The migration — already yours
+
+The SQL for this entity was written on an earlier run and **was not touched**:
+
+- `migrations/postgres/0008_client_manual.down.sql`
+- `migrations/postgres/0008_client_manual.up.sql`
+
+That is permanent, and it is the same posture as the `_manual` rule files: created once, never regenerated. A migration is the only thing here whose effect outlives the file — once it has run anywhere, the framework's tracking table records it as applied, so rewriting the file would change what the file CLAIMS without changing a single table. A service that boots green and fails on the first query touching the change is the outcome being avoided.
+
+**If the shape below no longer matches what that migration created, the fix is a NEW numbered pair in the same folder** — never an edit to one that may have run. Two things are worth being deliberate about, because they are where data is lost: adding a NOT NULL column to a table that already has rows fails unless it carries a default, and a rename done as drop-then-add takes the data with it.
+
+If nothing about the storage changed this run, there is nothing to do here — read the shape as confirmation, not as a task.
+
+**A changed `description:` is a storage change too, on postgres.** The description is stored IN the database — a COMMENT on postgres, mysql and oracle, an `MS_Description` extended property on sqlserver — so that someone holding a connection and not this repository can read it. The code regenerates from the spec; that catalogue entry does not. Rewording a description therefore needs a new pair carrying just the `COMMENT ON` / `sp_addextendedproperty` statements, or the database keeps answering with the old wording.
+
+The shape the regenerated code expects, for `clients`:
+
+**`clients`** — the aggregate root
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `tenant_id` | id | no |  |
+| `name` | string(120) | no |  |
+| `description` | string(500) | no |  |
+| `secret_hash` | string(64) | no |  |
+| `secret_changed_at` | time | no |  |
+| `previous_secret_hash` | string(64) | yes |  |
+| `previous_secret_expires_at` | time | yes |  |
+| `status` | string(16) | no |  |
+| `revision` | int64 | no | optimistic concurrency, maintained by the framework |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+| `deleted_at` | time | yes | archive stamp |
+
+Indexes it expects:
+
+- `clients_tenant_id_name_key` — UNIQUE on (tenant_id, name), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientNameAlreadyExistsNotification
+- `client_roles_client_id_role_id_key` — UNIQUE on (client_id, role_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientAlreadyGrantsRoleNotification
+- `client_allowed_cidrs_client_id_cidr_key` — UNIQUE on (client_id, cidr), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientAlreadyAllowsCIDRNotification
+
+
+**`client_roles`** — the roles collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `client_id` | id | no | foreign key to clients |
+| `role_id` | id | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+**`client_allowed_cidrs`** — the allowedCIDRs collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `client_id` | id | no | foreign key to clients |
+| `cidr` | string(43) | no |  |
+| `label` | string(120) | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+A new pair goes in every dialect this service targets (postgres), numbered after the highest existing one. Every `.up.sql` needs its `.down.sql` or the service refuses to boot.
+
+If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
+
+### Fields whose copies carry a mask
+
+The real value stays in the COLUMN and in the hydrated entity — the rules read it, the writes store it. What is masked is every copy the framework makes of the row:
+
+| field | in the sync (payload → topic → consumers → document) | in the audit event |
+|---|---|---|
+| `Client.SecretHash` | replaced by `***` | replaced by `***` |
+| `Client.PreviousSecretHash` | replaced by `***` | replaced by `***` |
+
+Three things to check, in the order they bite.
+
+1. **The read side is NOT covered by this.** Redaction governs what the framework copies; what this service's own API returns is yours. This read model is RELATIONAL — it selects the columns, which hold the real value — so every redacted field it projects is served in the clear unless it is `hidden: true` or behind `read.fieldRestrict`. Check each row of the table above against that.
+2. **A rebuild is what fixes documents already written.** Declaring a redaction, or changing a redactor or its parameter, changes the projected shape: the framework's own drift check fires, `read.view.version` must be bumped, and the resulting rebuild is what replaces the values an earlier policy already projected. Without it, turning a field redacted protects future writes while every document already in the read model keeps its plaintext.
+3. **A `hook` is invisible to that check.** A closure has no portable identity, so the hash mixes in only the KIND — changing what the function RETURNS is a shape change nobody detects for you. Bump the version yourself when you change one.
+
+It is forward-only, and it does not protect the database: the column holds the real value, and anyone with SQL access reads it.
+
+### Fields nobody receives
+
+`SecretHash`, `PreviousSecretHash` — declared `hidden: true`, so stored, filterable and writable, and absent from every response: the by-id read, each row of the listing, the write responses, and the CSV/XLSX exports that render the listing. This is not `read.fieldRestrict`, which returns the field to callers holding a permission; nobody receives these. Check that a client is not expected to read back what it just wrote.
+
+### What this entity asks about the caller
+
+Declared `runtime: true` with an identity `source`. The domain is handed no request and no `ctx`, so each of these rides onto the aggregate in the command mapper — `if id := ctx.Identity(); id != nil { … }` — and the rules read it from there. None of them is stored: no column, no migration, no `TableSchema`, no outbox payload, no audit event, no response.
+
+| field | asks | answered by |
+|---|---|---|
+| `RequestingClientID` | who the caller is | `Identity().Subject` |
+
+The claim NAMES behind these are the framework's to resolve, not this code's: the tenant claim is `authorization.tenant.claim` and the permissions claim is `authorization.permissionsClaim`. The generated feed calls the accessor and never spells either name — the generated unit tests build their fixture Identity under the framework's DEFAULTS, which is the only name a test with no yaml can honestly use.
+
+### The tenant is server-assigned, and the insert accepts one anyway
+
+`TenantID` is declared `assignedFrom: identity-claim` with `bypassMaySet: true`, so it is filled from the caller's identity on every insert and is in no update or patch body. The INSERT body carries it as an OPTIONAL value, for one reason: a super-admin (`*:*`) crosses the row scope, and without a field to name the tenant in they could repair a customer's records and never create one.
+
+**Check the guard, not the mapper.** The mapper applies whatever was sent, deliberately: what refuses a caller who may not state a tenant is `refuseForeignTenant` in `internal/domain/client.go`, which compares `TenantID` against the caller's own and stands down only for the bypass. Two things follow. A caller who names someone else's tenant gets the same refusal a write into that tenant gets — not a silent 201 filed under their own. And if that guard is ever removed or narrowed, this field becomes a tenant anyone can choose.
+
+### Rules that END the validation pass
+
+`tenant-valid` (in `IfInsertOrUpdate`), `tenant-valid` (in `IfArchive`) — declared `guard: true`. After each of them the pass stops if anything has already been rejected: the rules below it, this entity's automatic value-object validation, and the `BuildRules` and value objects of every collection. A clean write is unaffected — the barrier fires only where something was ALREADY refused — so what changes is the SHAPE of a 422: it carries what was found up to the barrier, not that plus every other field the write would have failed on. Check that against what the API consumers expect to receive in one response.
+
+### Value objects validated with the rules, not after them
+
+`TenantID` (in `IfInsertOrUpdate`), `TenantID` (in `IfArchive`) — declared `kind: valueObject`. The framework validates every value-object field on every write, but that pass runs AFTER `BuildRules`, so a value object cannot be the premise of the rules below it. Each field above is checked where it is declared instead — by the value object's own answer, never a second one — and excluded from the automatic pass in those verbs, so nothing is reported twice. Two consequences worth checking: the value is now validated BEFORE any barrier that follows, so a 422 that used to hide it behind another failure now carries both; and in the verbs this rule does not cover, the field is still validated at the end, exactly as before.
+
+### Fields the server fills
+
+- **`TenantID`** — written on insert from the `tenant_id` claim of the caller's token. It is **absent from every write request and command**: a client cannot set it, and an update does not touch it. Confirm the callers are authenticated on the insert route — with no identity the field stays empty, and nothing else will say so.
+
+### Per-entry command tests are generated now
+
+The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/client_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+
+**If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
+
+## What to check
+
+These are the decisions the spec made that are expensive to change later. Read them against what you actually meant.
+
+| Decision | Value | Why it matters |
+|---|---|---|
+| Storage | flat table `clients` | A field group that should be shared with another role later would need a real migration to extract. |
+| Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
+| Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
+| Collection `AllowedCIDRs` | `add` → `client:update` (declared); `remove` → `client:update` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
+| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
+| Data access | tenant | Callers are restricted to their tenant's rows. |
+| Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
+| Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
+| Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. On the entity and OFF the wire: TenantStatus — read by the rules, in no response body and in no export. |
+| Read join → Role | `InnerJoin` on `role_id`, from ClientRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
+
+## What was generated
+
+| What | File |
+|---|---|
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
+| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| tests for Client's rules | `internal/domain/client_test.go` |
+| 14 notification declaration(s) | `internal/domain/notifications.go` |
+
+**Left untouched** (yours, by design):
+
+- `internal/domain/client_rules_manual.go` — hand-written rules live here, by design
+- `internal/infra/client_service_manual.go` — hand-written rules live here, by design
+- `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+- `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+40 file(s) were already up to date.
+
+## What was NOT generated
+
+Owned by other tools:
+
+- the gRPC surface and its proto contract — `/omnicore:implement`
+- integration events (publish/subscribe) — `/omnicore:implement`
+- read models spanning more than this entity — `/omnicore:scaffold-view`
+- changing this entity once it exists — `/omnicore:evolve-entity`, which edits this spec and regenerates. The CODE comes back from the spec; the DATABASE never does — the migration a change needs is written by hand, and that skill's impact map is what carries it, along with the orphans a shrinking spec leaves and everything outside this generator's ownership
+
+Read controls this listing does NOT serve: `?search=`. That is a contract, not an omission — sending one is answered with a typed 400 rather than being ignored.
+
+## Framework compatibility and next steps
+
+Verdict: **ahead** (project pins v0.61.0)
+
+the project pins framework v0.61.0, ahead of the v0.60.0 this generator targets. Generating anyway. Read the changelog of the pinned version and ask two questions: was there a breaking change, and does it touch what the generator emits? Then build — go vet and go build settle it faster than reading can. A small fix is fine (adopt it with `omnicore-gen adopt <path>` so the next run keeps it); a capability that changed shape entirely is a generator bump, not a patch
+
+Verify what was generated:
+
+```
+go build -tags 'postgres' ./...
+go vet -tags 'postgres' ./...
+go test -tags 'postgres' ./... -count=1
+```
+
+A service that builds with a transport tag (kafka, nats) needs it IN ADDITION to the engine tag on every command above — an engine tag alone may not select a buildable configuration there.
+
+Then exercise the endpoints end to end — a green build proves the code compiles, not that the entity works.

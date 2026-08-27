@@ -1,6 +1,21 @@
-// Hand-written, and not a hook: no generator declares this file. It is the one
-// implementation of domain.PasswordHasher, and the only place in this service
-// that knows what Argon2id is.
+// Hand-written, and not a hook: no generator declares this file. It is the only
+// place in this service that knows what Argon2id is.
+//
+// IT DECLARES NO PORT, and that absence is deliberate. There used to be a
+// domain.PasswordHasher interface for this one type to satisfy; nothing in the
+// domain ever called it — the aggregate asks UserService.HashPassword, which IS
+// the port — so the interface existed only to give this file a name reachable
+// from another layer. `internal/domain` is the one package every layer may
+// import without a cycle, which makes it the path of least resistance for any
+// shared name and is never a reason to put one there. Removed 2026-08-26, by the
+// maintainer's instruction, together with the same mistake made fresh on the
+// client secret.
+//
+// What the port did carry is worth keeping, so it is here: the reason this is
+// two methods and no third. Everything a caller could want from a credential is
+// either "store this" or "is this the one", and any surface beyond those two — an
+// "unhash", a "give me the parameters", a "compare two hashes" — is a way to get
+// it wrong.
 //
 // PARAMETERS ARE THE OWASP BASELINE — 19 MiB of memory, 2 iterations, 1 degree
 // of parallelism — which lands around 100 ms on a modern server core. That
@@ -30,7 +45,6 @@ import (
 	"fmt"
 	"strings"
 
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -55,7 +69,8 @@ const (
 	argonVersion = argon2.Version
 )
 
-// Argon2idHasher is the only implementation of domain.PasswordHasher.
+// Argon2idHasher turns a plaintext password into an irreversible hash and
+// verifies one against it.
 //
 // It is stateless and safe for concurrent use: every call draws its own salt,
 // and nothing is shared but the constants above.
@@ -176,5 +191,3 @@ func decode(encoded string) (argonParams, error) {
 	}
 	return p, nil
 }
-
-var _ appdomain.PasswordHasher = (*Argon2idHasher)(nil)

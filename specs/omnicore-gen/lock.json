@@ -1,6 +1,525 @@
 {
   "version": 1,
   "entities": {
+    "Client": {
+      "spec": "specs/omnicore-gen/client.omnicore.yaml",
+      "specHash": "195679eb535679588173da4ac14644ffd6351af1ced2aa8619abcd57ab3d2c94",
+      "framework": "v0.61.0",
+      "files": {
+        "bootstrap/clients_feature.go": {
+          "class": "owned",
+          "hash": "34f2b102f0b41ad743ae43edd4ab0ee8a609bb91dc74d97dd2f4f58024b16571"
+        },
+        "internal/application/commands/archive_client_command.go": {
+          "class": "owned",
+          "hash": "f92c5a44cc938797f285e4d3e2d4291e7313a250d6ea7d8f7f52d19ed0c50e13"
+        },
+        "internal/application/commands/client_allowed_cidr_commands.go": {
+          "class": "owned",
+          "hash": "ba14e8f9e1e57c65af097e6e3c9f2b88973e5a305b9509324d731dfa2c6f639e"
+        },
+        "internal/application/commands/client_child_results.go": {
+          "class": "owned",
+          "hash": "eb9c3a6ff99f5f33bacc2963a171af1030b04dd3aaa95181d7168d0e808255e3"
+        },
+        "internal/application/commands/client_commands_test.go": {
+          "class": "owned",
+          "hash": "aa7c809705145ffa05d27bbf3533173d696df6d71aa0d8c40e022b3661293ee7"
+        },
+        "internal/application/commands/client_role_commands.go": {
+          "class": "owned",
+          "hash": "62370d685e609c2b73e19921ab54762cebd2bcd625ca40b6b05d50053a6e746d"
+        },
+        "internal/application/commands/insert_client_command.go": {
+          "class": "owned",
+          "hash": "7c6ffa1a2969e8df9d95e247769e760e197a8376f6173975c4648613d782a91d"
+        },
+        "internal/application/commands/patch_client_command.go": {
+          "class": "owned",
+          "hash": "4672f33de4d7c4f10e0af9f25a46795aab78ec73cbca3cda69972ee1c4997016"
+        },
+        "internal/application/dtos/client_allowed_cidr_input.go": {
+          "class": "owned",
+          "hash": "90765b57da7d2b5baeefcd82d59da5d953ecb5463a3f87384be8925cf2e6d9e5"
+        },
+        "internal/application/dtos/client_dtos_test.go": {
+          "class": "owned",
+          "hash": "b13eddd1636982090663d7fde6731dd767164c27053e095b6b3696447f686fa0"
+        },
+        "internal/application/dtos/client_role_input.go": {
+          "class": "owned",
+          "hash": "5f3896cafe3da18ae3c9fe7cefd09416223599771884073fc6f49e67eb7533f1"
+        },
+        "internal/application/queries/client_queries_test.go": {
+          "class": "owned",
+          "hash": "f31dfda8c9676ab8809ea3d8202acc6ce959c5e5f8db0fd100fc9d2e466366d5"
+        },
+        "internal/application/queries/client_row_results.go": {
+          "class": "owned",
+          "hash": "fbccf90d4fd8202560186e13d431b6a124975e57edd5c23fd64fb9ea05ff354c"
+        },
+        "internal/application/queries/find_client_by_id_query.go": {
+          "class": "owned",
+          "hash": "ead630459f8d41490736f442226b4a0ac9f5e4014c15024c6ff51c26a186bffb"
+        },
+        "internal/application/queries/find_clients_by_params_query.go": {
+          "class": "owned",
+          "hash": "0d2519680954a24b5a65335863791029d0ede813e01ae68adcaf076c6397c159"
+        },
+        "internal/application/translations/client_translations_test.go": {
+          "class": "owned",
+          "hash": "ee346605473f1a06519db61f7f81a802b43338e160f6d999b3f54f68a6d04b6f"
+        },
+        "internal/domain/aggregatevos/client_allowed_cidr.go": {
+          "class": "owned",
+          "hash": "7851eefef89f98184e46502838898abfbdf80b720bb9fdd713c7118999eb0bfd"
+        },
+        "internal/domain/aggregatevos/client_children_test.go": {
+          "class": "owned",
+          "hash": "ea84630d0562a717e4152394892221dbfac22753f63c85d6470e769d1c7d28da"
+        },
+        "internal/domain/aggregatevos/client_role.go": {
+          "class": "owned",
+          "hash": "0ef5c474997a7777aa641dc78cead0b0f8ba983a9f313765a8445b96846ef46c"
+        },
+        "internal/domain/client.go": {
+          "class": "owned",
+          "hash": "cc6ccca5a088e1de28dafce6dc0b01e0b657477c8fa756b2f2b90d9d5e510ca0"
+        },
+        "internal/domain/client_rules_manual.go": {
+          "class": "hook",
+          "hash": "ee72c786c31b2fe9720a7b9ab782d9347f39e799c5392dcc917f4838e371a983"
+        },
+        "internal/domain/client_service.go": {
+          "class": "owned",
+          "hash": "093598024e23f763aa399b545fe9fed6ffeb3dac734afc7510654c617986b0a7"
+        },
+        "internal/domain/client_test.go": {
+          "class": "owned",
+          "hash": "bc77eb90ec81d1b999a6f3a2f06251443829c22e8b3dc5b7060907160b8b0897"
+        },
+        "internal/domain/vos/client_status.go": {
+          "class": "owned",
+          "hash": "e3c4f8bba11bf54e3fc368461bbcb5c7b6ee1e52113734bd068157d2e7d18a1a"
+        },
+        "internal/domain/vos/client_vos_test.go": {
+          "class": "owned",
+          "hash": "0537d5217506f2dd7d9f31ec9d5e11bcbad057de93e171819027dc2d005657a1"
+        },
+        "internal/domain/vos/doc.go": {
+          "class": "owned",
+          "hash": "94f9639f86d244b66927c8fd2c28fe7efd030abfeb073c99d5d0c4cb0fac2f5f"
+        },
+        "internal/infra/client_repository.go": {
+          "class": "owned",
+          "hash": "4c8ed44c3980290b91fa327591184a25ecb57a87f7b7fd45d62ac40a631f25a8"
+        },
+        "internal/infra/client_service.go": {
+          "class": "owned",
+          "hash": "a55ff4efdb320ba370aa8348274dc5be52c460ae425eabff34e4c642879cc7f8"
+        },
+        "internal/infra/client_service_manual.go": {
+          "class": "hook",
+          "hash": "3a46f9a7b9d04734a8f35ce94da54769b4e84c22a97d7cb36fd49ad8f810fdeb"
+        },
+        "internal/infra/schemas/client_allowed_cidr_schema.go": {
+          "class": "owned",
+          "hash": "993ac38c775d247a9fe69165223d864c6309536744ab48ad1dbdf91ac72c4f8d"
+        },
+        "internal/infra/schemas/client_role_schema.go": {
+          "class": "owned",
+          "hash": "97be8c5eff481b2eaa169dac04faebaec1a12ccdcbc03a2d6d156a72ac6976d0"
+        },
+        "internal/infra/schemas/client_schema.go": {
+          "class": "owned",
+          "hash": "94817aa567015dabe7eb188b8a64edb933ee2e43030353e2b349c6383fe2d1c0"
+        },
+        "internal/infra/schemas/client_schemas_test.go": {
+          "class": "owned",
+          "hash": "324babdcd276f5a8de5edc5fc9887109e1c45c65a5592f58f6b8ef812f4135e1"
+        },
+        "internal/infra/views/client_view.go": {
+          "class": "owned",
+          "hash": "026e6f01251f364f816b9e396d150b0086ecbd075c5bbd5540d043ca8e169b6a"
+        },
+        "internal/infra/views/client_view_test.go": {
+          "class": "owned",
+          "hash": "65d5bc3bb455705cf41df895bea5078e9b5389ba2b36202d9982c0ba739c40f0"
+        },
+        "internal/web/client_routes.go": {
+          "class": "owned",
+          "hash": "0ac4a20cf206ad5d886b3da0dd133267d4d4caa28e56a4905e45878fcdded516"
+        },
+        "internal/web/requests/client_allowed_cidr_requests.go": {
+          "class": "owned",
+          "hash": "cfb12b06ae40986bb68e2f5c548fd24fb6c71f06e04df93de1516e7c2da46630"
+        },
+        "internal/web/requests/client_children.go": {
+          "class": "owned",
+          "hash": "ad83f8e669214199adfb23f0542d5b8e675417da31a63ff10b7c0250e2d3b6b7"
+        },
+        "internal/web/requests/client_requests_test.go": {
+          "class": "owned",
+          "hash": "57cb196b4c6bf91fc1de8cfba34cedf255acbf317b21bd66159af65a31c3ea9e"
+        },
+        "internal/web/requests/client_role_requests.go": {
+          "class": "owned",
+          "hash": "a409c3126959182358d46b6c52cc2875a1fc4ebc0fbee863dc6f0d79815c6cee"
+        },
+        "internal/web/requests/find_client_by_id.go": {
+          "class": "owned",
+          "hash": "a7b3d90b5d7c0ce2d7546ea2daea66f6f6940647e0b1f2ef3a3f3fd480924b4b"
+        },
+        "internal/web/requests/find_clients_by_params.go": {
+          "class": "owned",
+          "hash": "3ea4748ae5e532f7c1aa2618aacc270060f4ae385408a420c8b69c94e123e808"
+        },
+        "internal/web/requests/insert_client.go": {
+          "class": "owned",
+          "hash": "5254aa74a4911a04fcb41ca307a799eebe5665e8b5bd94a6feb59fda84e9b51b"
+        },
+        "internal/web/requests/patch_client.go": {
+          "class": "owned",
+          "hash": "7230a06e98b71b3ba36f270b1553b1c5689f0ec3d1214a93525d23b8dd5bf8e3"
+        }
+      },
+      "ordinals": {
+        "postgres": 8
+      },
+      "viewShape": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "registrations": {
+        "internal/application/translations/deu.go": {
+          "CIDRHasHostBitsSetNotification": "deb88bf959a2a7484cac2aee1a8ee5ba4fdd8cb72f45f4d7a817d1d36010fbbd",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5c84f3b256c48d2a94bf26a80528c484f20cf49bed310488813ddbe8436f7cb6",
+          "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "38f6d7096ca53fb1b8bc67f8d05670e64ecdd242e7bf6ae77649f32cee036fb0",
+          "ClientAllowedCIDRLabelField": "97d1e68526b847e94892758b4e8aa84aa130a7f2672e64a30cd12ebe8f9bf2e8",
+          "ClientAlreadyAllowsCIDRNotification": "ef08772b45b367e80142b2e4cc4848ef961f3442526559505c3474b359fde2f0",
+          "ClientAlreadyGrantsRoleNotification": "740fc9e795b03bdce05299bdd634cc9d1bd635ef771a390ed9654ac48a49ee9e",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "c8f00dd5ba26e9046210b0e2bf525224439add399a7f2f9a3899c6e6ede02507",
+          "ClientMustBeActiveToRotateNotification": "45d71c0398486284c741cf4113f6e04b42d1e74682b68dd3b9fbc19876f833b0",
+          "ClientNameAlreadyExistsNotification": "04424d960c5109a2ae142d9eea3021d65805f2f6316157f0e5b3a641a9134cba",
+          "ClientNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "ClientPreviousSecretExpiresAtField": "213079c9dedc6120784400774bce0a3c19d724b3998848f4b9a6ae1809b343be",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "0038a9cf86613cec04ae936ef71b55a4dac1ab4d040925108269518736abf85c",
+          "ClientRoleRoleKeyField": "8fc29999905b6df190ed5ceaa37f6d1e3b9a962e3b8ff8431a841b35ded74a0e",
+          "ClientRoleRoleNameField": "6f348aa45edf274e38b2068dd33d1d41dfb5875185af01d3d8e8d6842764994c",
+          "ClientSecretChangedAtField": "42d1158285efc9bb79bee6fdf85e0bb239ae5f15c61d96a80a97cfa7e4d88f8b",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "8163454f378f0814a0911afc75bb63814643a45803a0460003800e1c6b9be636",
+          "ClientStatus.suspended": "c7f222b3146a0beabe60ffeb7ef0e7e77df89e0130ccb78f62dac987eb8ba39d",
+          "ClientStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "ClientTenantDoesNotExistNotification": "4bf983f1fe1bebf94d3ec277ad5eef309dcea461005a77d4a7cffc8d1bd84b65",
+          "ClientTenantIDField": "9837fb6af947b2f590f0d9301a00c28b7f65a934a4e3cde4bbad8294e3d94020",
+          "ClientTenantIsImmutableNotification": "8dd03ecd31bbdac8b8c445823219272f751082d665b6d8f606921b384273a154",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "a92e68a24eb9352038ff356d2ed1ce587e8cfbb6d145362ff605399758a49c52",
+          "InvalidClientStatusTransitionNotification": "29f3e52e598818127b5d41c2e9486ea70dbcd3d7d6cdafc4e97fff973dc2ab58",
+          "InvalidGracePeriodNotification": "e9882bf07d65d7fe9f481584a803339c157157c98ac76515ad925a7d6e787ee7",
+          "RoleNotAvailableInTenantNotification": "e3ed12bfd66e664d09bede99885e1667699739451e85b683f740c7fd26bfdece",
+          "TooManyAllowedCIDRsForClientNotification": "5d53587783017f5eff85ff09a24bb084291f3902cb88a35507f6e7e6d3333e51",
+          "TooManyRolesForClientNotification": "14d0470f6d2a10f75fd3d917b83275849ed6ac124a6f807f9efd8d201f508692",
+          "UniversalCIDRNotAllowedNotification": "af00bbfdfe636f8a2ada7a11c6cdcb0d2da9be5c147c840793bc50011e6f2a96",
+          "UnknownClientStatusNotification": "c07858d611b4832e9810e09a7b5229ec0fd38acf2af5e4ad7604ed154b4d3be0"
+        },
+        "internal/application/translations/eng.go": {
+          "CIDRHasHostBitsSetNotification": "87e09da88a6c3cbc729418e0604858dae5d014d078d7289db0ffc435aaf31c55",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "d59dceb6caf9b684c2720e17a2f66f5ff81425ff7178436ba962b50969219725",
+          "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "a7c2af24d90977832fbe774f678988df55f2158c47bae7730db05e6d00882ac7",
+          "ClientAllowedCIDRLabelField": "0e66373f45dcf3dd656151e519f7ee5e3d558d9c22cb87df339bbdd2b6c6a3c1",
+          "ClientAlreadyAllowsCIDRNotification": "61da14f10ce523dd86e75389cefd75cd75447ecfe0e297f2215949a6470c9461",
+          "ClientAlreadyGrantsRoleNotification": "7473c139a7c8ad8431a865f20fc3ce56858e429a8ac4554f115f71c7a467a88f",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "2b8199a46e802bc5269902226d6570c0f54029579f2a1732e3afc320624252ec",
+          "ClientMustBeActiveToRotateNotification": "5a9e653ca6f5b553f4f938b630d67ce544613542a91b1978ce577761e75108c4",
+          "ClientNameAlreadyExistsNotification": "e3c1d360e86fe76e9ea8bbf9d370ec747b35489bbc5a342f3e363e5ddb9edc71",
+          "ClientNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
+          "ClientPreviousSecretExpiresAtField": "dafce9dd3f1abdf4157ded2abbcda5a83f8734bdf4b34c6dcb3be0bfcac2eb5b",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
+          "ClientRoleRoleKeyField": "e2db287a07351f071f36c63dcca25bcbafe3e470781f557f97a7206218867165",
+          "ClientRoleRoleNameField": "82c784ca1c4ccf6592d4e8daa8b4d2f004800ee04ef0670abb0808c5fe050c1d",
+          "ClientSecretChangedAtField": "a9d1a62e840e6a8c79ac519875868686ac7e02926881b08f4a1c825af7d6ba85",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "92340695899bd2d86223e4a007620e0d6502fc0e08809773634c7e0743764a9c",
+          "ClientStatus.suspended": "e392a3891c070abe312d9c08bb6a4a9f5342424dd15c80f1d5cf67d14b79650a",
+          "ClientStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "ClientTenantDoesNotExistNotification": "fd0ab9611a5cde1567d448cdb08081b7770d43ac0c12a11e1eea9d31b042217e",
+          "ClientTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "ClientTenantIsImmutableNotification": "62ea828983e2a60aca5ca288f73baa290fcb7733af44913f470c8173269fa975",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "5c8c727f2d997c5484dfab1825010a7fc60f3716857a621b7edb6d6acd6da201",
+          "InvalidClientStatusTransitionNotification": "0c588750fb9232cdd9e8918b1c3b1b4748598487670379b0279ca17c63ad861e",
+          "InvalidGracePeriodNotification": "be6941d8c224978ee256e5678559b25731a724cdbd1b53fec621e21b2b98c745",
+          "RoleNotAvailableInTenantNotification": "8222431633cde7211925e8a8640822521f9232ae7f6c444489681eddd5a1530c",
+          "TooManyAllowedCIDRsForClientNotification": "0a6cc81e8c2d9336e70989283446e3a2c7fb16d8f59dac9411f2b24e1b616178",
+          "TooManyRolesForClientNotification": "734efc9075834149119ae848a3eb7d481c47355d75e3d3abea019242aedeb3a0",
+          "UniversalCIDRNotAllowedNotification": "2bcec3668fd1743592f5ea82e35c2dbea3f5c6f35b0cf7ec527b5cd9638e6aab",
+          "UnknownClientStatusNotification": "b85b8a1eaed98ec462237ee100a7f1cb3dd848ad4664cb5737d7abf50cc48a90"
+        },
+        "internal/application/translations/esp.go": {
+          "CIDRHasHostBitsSetNotification": "a699b5306cda73fe3ddf2bde00c8a4abd0827fb931bed2677665cd704bdd99b6",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "e3f6cad92d4a19a1533fb9e39d23679832b026064ac123a8a2b0b00c56d17e9f",
+          "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "4de13025c2ae1774423f0206e529ea5efb7f224b0440977d83e847d74ba51a09",
+          "ClientAllowedCIDRLabelField": "14fa6745ea2b4ea2a8e11045b556321812fe3543fd51a17438580fadfd433eda",
+          "ClientAlreadyAllowsCIDRNotification": "f5154527ca997f428804f8c03936edcc145b5d2885e28569eee56d6428bf0365",
+          "ClientAlreadyGrantsRoleNotification": "f9250d5ff4edaf447bc5e980d126e2613637d5f875d52d543ddcada0daae57bc",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "9186f07fbc4eacb67e24ef7cbe76b6e9f9be673bc4ddf96fa570f7aa8c27163f",
+          "ClientMustBeActiveToRotateNotification": "44b7c86afc5231acf31bdca6b5ca98ff41ac3d30dcc6d5a0eeb620b4fe5662a0",
+          "ClientNameAlreadyExistsNotification": "2c977c2c9e40bd1141e84fcf2bae9617fbf40aab877f48aef2dc450e51297eaa",
+          "ClientNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
+          "ClientPreviousSecretExpiresAtField": "7290f5ee591b922548328a5c663dc7a5c13e2cc97c1210d1df60a30378a4e5e8",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "ClientRoleRoleKeyField": "e7522ee12a3c167ddaec99b2a3dce65189cab73c5d097766eeb9e7b5b144cf8b",
+          "ClientRoleRoleNameField": "7d5629f31ad81b0f13322a86016ac2393800a9ebc1160e6dc0a67274583f170d",
+          "ClientSecretChangedAtField": "cd78255833995b8daeab69b8064e73eac5064d1e4515125aa1cc4c3d09633c44",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "723858144bd5482d4ad8ae46e5fbbcca18061cf39e453730e025a286f1c0ea7f",
+          "ClientStatus.suspended": "6d0de22751da62efda46926fd1c772886e300a2a045f342d62d88b78f2b76b8b",
+          "ClientStatusField": "1ceab505f656f53495e2ef33fac2293649724207cff9530ea5c2fd0ba4f0fe4e",
+          "ClientTenantDoesNotExistNotification": "641f39cb3285c9857674ef994cc10be422622a14877d03c0eb4014429d692d9c",
+          "ClientTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "ClientTenantIsImmutableNotification": "cf7db42250759f01e0d6c6a01c3982040f1b9c6459457a2b1052b7e1b6482406",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "6e0e6f92438500361578643a5f4f9f256e2c0557370be132febcb3ff946194ac",
+          "InvalidClientStatusTransitionNotification": "7a70bd792f15d963d1d3226ec57239aff33bcb14783deea53a0a49a7abbe6505",
+          "InvalidGracePeriodNotification": "55c85a0d94ee9231c1ea29d5d57cd37adf2c8f8daa9a23d53039bc3598c0975f",
+          "RoleNotAvailableInTenantNotification": "09ada259b3fd2edf555da524d6a8c528ccdd2ceb5652d3d29d8ceef75692dd5a",
+          "TooManyAllowedCIDRsForClientNotification": "88373b04891c39a8ce16284c2c44bc9d2196d4af4229ad5d0ccdf6f822d563b1",
+          "TooManyRolesForClientNotification": "77021e23b29a63fd436cc28e60847e359e88067210292cd1e2adadeffb45405d",
+          "UniversalCIDRNotAllowedNotification": "22534d984832a9fd4555beb06a548bba326d48b6fb64f269f625c90dd44ed2b7",
+          "UnknownClientStatusNotification": "57350140d4acd1dc9f78d8013272512003c5668c22de646b79d165a5bbc325c4"
+        },
+        "internal/application/translations/fra.go": {
+          "CIDRHasHostBitsSetNotification": "9fe7c2d11a54f38ec5b87024c76f6a3890a7b1fb02a3d446b90adee949f4e54d",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "df5184c5ac362065f4997f1864ae9e0052f1a9c1230593ecb7fc358f47c716eb",
+          "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "14ac9b74c982dcb394eab241f710d2b38b5fb00b040805f565538757a728443d",
+          "ClientAllowedCIDRLabelField": "cd5b832ac5cba84828abf4ad04f4c72e0442eff1ba42b8d7d931be79fe39f99b",
+          "ClientAlreadyAllowsCIDRNotification": "8e789e155d88350085aeccff95b4c4bc5f22b146207a080130825b73f73c81dc",
+          "ClientAlreadyGrantsRoleNotification": "2850e5bf38fc101c1add7b9f85e978c4b8a44985c86be4b2894079fc826a681e",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "845471a6f474320361a77035babdf193f7b377ac31849b3e5046e24e27c4522f",
+          "ClientMustBeActiveToRotateNotification": "f43f49d023c087d68a6d7272cb73873f41ccd3d9550b19d049bc6c4f0ebe7962",
+          "ClientNameAlreadyExistsNotification": "6eb491a4e3ba08cf497f7748b0ef21e4d5f1a33d6cb642acfc8e28d589252fef",
+          "ClientNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
+          "ClientPreviousSecretExpiresAtField": "b5bd004d22b4cf8f5994de3abdae6905a51b0fb2411bbb968e5787140b303319",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "a1fc967c558796933832ebe6eb716a7eb69d4ac48349d05366c22531d0b0df66",
+          "ClientRoleRoleKeyField": "9ed80be4cd3c19fa8ff6bcaaa6ae1ebf4abb816fd46c32ee2ba6ce7acb50a0ba",
+          "ClientRoleRoleNameField": "07ddf0695e6897db9ddd08d3ac06e637541090d0d0a3ceab6f2843e31d67b6d9",
+          "ClientSecretChangedAtField": "ba281b8d5097eba500a895cc9e3902f20e7599d93f973a000b5fd8cb4a3db870",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "ad26287ab66ba05cce95d869b68d61cc706c2dc4804ee819c9600a805fce59cd",
+          "ClientStatus.suspended": "ff129984f4a1c75543abb0b74a03fb0e608124346ce4eaf10738eabad3b2b94f",
+          "ClientStatusField": "dee377cfd8cddfb8db49d63a6f80174955c594a7cb995d4a70c2f6f305286786",
+          "ClientTenantDoesNotExistNotification": "01be5f72832341ad2b613ba65ebcc456532682a3cb43e08a19fc15189aa946b0",
+          "ClientTenantIDField": "36d6aac11c524ff1bb47724bec546e0bbcb3896c39b5003af5f72792209bc915",
+          "ClientTenantIsImmutableNotification": "e174ab62cc4e29794710ebe57ea6dbd4181e61b31679f375dd92c8e217753e5a",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "3f680c5fc8ca2079f7cee2ad9df2a6dd5923fa8d17607fb9c84f43859efdee93",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "ced5af20fd0bd64636b457b243c94d95820e4e2c9a72e61fbbcb7eee11f0098c",
+          "InvalidClientStatusTransitionNotification": "080d6b1e2728df39aa1259078d98326e189d63ae9d7e93b37eebc18a6430b8a3",
+          "InvalidGracePeriodNotification": "601abdacc16a128520977bba15c2a4dd00dc50df0d0c50905a7ce11ca20a251a",
+          "RoleNotAvailableInTenantNotification": "54535d4f1ca973aa1d764e060bef390085d52057945f785867293e1dc39d941a",
+          "TooManyAllowedCIDRsForClientNotification": "20915f6dda0c246f52f0b135e5e4392c86e53668d5386a18c58e8bcaebe74b4e",
+          "TooManyRolesForClientNotification": "d2a63e3e11c88971cf79fcf0049cca660aa1149cf6fcc03ac73a1736cce1ac7b",
+          "UniversalCIDRNotAllowedNotification": "e154bd87999fa552d7e1100ea113338882ab8ae8965e53fd39139580fff5eab0",
+          "UnknownClientStatusNotification": "fe56f0e646fee182e2228d176c1347969d3706d0c9208ff8d80622e6a0bcec6e"
+        },
+        "internal/application/translations/ita.go": {
+          "CIDRHasHostBitsSetNotification": "0d27252f6b8bb2e2d23318b46d7431eb9c71bffe40b758029d74a8467f91b11d",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "8917e6fb47bcb8ab27cee787d5695f7fe11bfa21725c72cf62c0bffb5a9a6d45",
+          "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "2cee0b8a4ac6125b3c1fe88d07219285a4309fa1475baa5b0abeac2ae858a4eb",
+          "ClientAllowedCIDRLabelField": "9fe5b72aa9003436213f15e41eb27fae74ff48cf9940ee9ad92d1a907466366c",
+          "ClientAlreadyAllowsCIDRNotification": "328363cdb0fb94c21ac3f5ab7190ea9daf54343a964376932251d1f112661f47",
+          "ClientAlreadyGrantsRoleNotification": "57b25aa2d46c6fb41c4edd998233a0f670dafa4d13b2d1851298d6a7bb48d59e",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "f8e06b394d91c34dcb6de4144a4717d9297a6a15b360caec15805047a2605b13",
+          "ClientMustBeActiveToRotateNotification": "4d3fd2da344a5f392b50f8e17e407b95884f8cd746cc3984130fae1fbcb073df",
+          "ClientNameAlreadyExistsNotification": "acd3b86c8e8fc663e144ce988c0bbf26b38f3325786e0fa2cf516f0ad8ca1110",
+          "ClientNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "ClientPreviousSecretExpiresAtField": "78249001840b727cebd77b6330e76c817325335a3ef21b16945768af09d638c9",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "7a972bbc14808919bbd655b3a1452084434445d65aff8ad58958f7d04a1c2762",
+          "ClientRoleRoleKeyField": "de7b1fa6f48d3675cc844b12775ebaee55797c49486fd170f84c83dde77f0c12",
+          "ClientRoleRoleNameField": "7aa73acc84b709dea6e189fc03ed97d58de2df5dec214f2619218dd336b0cd40",
+          "ClientSecretChangedAtField": "907a35ef078720c3e17ab245c880e8f2fe2b9e0fb8b4110f7c4a6a91f39d26ee",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "39df52d249a64fe99319f2051da0de0ad9e7a4c5abad198d50dbb84589868973",
+          "ClientStatus.suspended": "743f8e855e9f490781ca32b1c1c08ed5ca47c2ac77c7857e8ebcdf1eeac393ae",
+          "ClientStatusField": "5d788017bfe473fd869501b6fab47c5f70558acd54e8edb5fb4be9ef7d2459c7",
+          "ClientTenantDoesNotExistNotification": "e8b6695005eb66c2b204f9eef8df223416abae4f90235fa585e3f5e3d36513d7",
+          "ClientTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "ClientTenantIsImmutableNotification": "97b77d7b950f192c5be1cf52f03095c227dadb08e82957f43007c02ef2c67276",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "6a75508ac98e52aa30908e9a3e86bfe195ea134f69e7b260d6606f8ed6df44a8",
+          "InvalidClientStatusTransitionNotification": "809f1aa577339516b9acfc63b0a1f2c1ad73f9360584a69fc6df023ae87c7eca",
+          "InvalidGracePeriodNotification": "994f599876d7341549924b2d1ad71c6b75076d06d0e297d843e6187fa8947d03",
+          "RoleNotAvailableInTenantNotification": "a504ebcf11acf1320e96ad96cae899c8d3cd3cc346960ca21a61ae31a2118741",
+          "TooManyAllowedCIDRsForClientNotification": "98e986bd889c2d88bcbd8a835bbf01def8f704fcbf10d72924632cd2b3d1e5d1",
+          "TooManyRolesForClientNotification": "ce6de13123fd308023fb1f76ac20b0c2b491a875b2a603f9ff5640c6c57c274c",
+          "UniversalCIDRNotAllowedNotification": "b8025f4a009e14c219fe0c40fa2a849886ac3e5e7757219ea559e0a1591e9d55",
+          "UnknownClientStatusNotification": "38e0fe3b7d5bc08ce60fb0bfd0ff64e898a564b631ebfa21f33ea20b6c5af196"
+        },
+        "internal/application/translations/nld.go": {
+          "CIDRHasHostBitsSetNotification": "5f4e997d97e664eec863f9795f530e92260cab24339d286e22e9a253b5b635c7",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "5aaa53203d630b13a253d7809e228f0ccfda3fc90dc2d33ab2c498f4f9c99fe4",
+          "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "ab6fcc3512c281f23aae59d818e2675a7f93471b996ec73d82852a3e082df865",
+          "ClientAllowedCIDRLabelField": "0e66373f45dcf3dd656151e519f7ee5e3d558d9c22cb87df339bbdd2b6c6a3c1",
+          "ClientAlreadyAllowsCIDRNotification": "b28ca48b7182fbf9e8018af623977fcd4f083c9b48f5dd427b1704fe197b7184",
+          "ClientAlreadyGrantsRoleNotification": "d865f1ed4b67b5eeaa1e2118c88ace0c3f7ada5456f7b68d9b5563bcb466600e",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "9b2cfb9ec6124c06b7796e378d61f78b8e1c34efd72ea87093cdb70ae099342f",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "fa4528abcd86fc48e4e4f6d58223daa7d419ef962fe83979e45fab64779a5a37",
+          "ClientMustBeActiveToRotateNotification": "da0675193d0b990c448eaceb6217060fd3fb029a785e1a473fe192b4e4d67709",
+          "ClientNameAlreadyExistsNotification": "e2dfa8f1137098ca14fe63f3b3e2d84cf82c9621506b90669fdda24ffd2bd4a4",
+          "ClientNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
+          "ClientPreviousSecretExpiresAtField": "90e5c6d0b56a7d8b6fb5d72de39bd4128463ce15d59ed1cd5405c85485f4a78b",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "fb9f51fe92502d1a085a15872bc75d6e1f217445918d5f0ef705ded0f5f10607",
+          "ClientRoleRoleKeyField": "1b4b9d98966cfdd6161f2e6dbbbabe8adc7f1450cf97c89f2666f4b8bf958b4a",
+          "ClientRoleRoleNameField": "e820a6c2b82d9df7f0fd9ffd23bebfa59ac9dfa3a17d5e62319c1df03ef717c1",
+          "ClientSecretChangedAtField": "4993586f290abfce0fdb8a6b4e7e7ab8ce37c6428f7973dcedb62defc0baf32b",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "de9f5d2dd16fa56bc228c7c994b1f3fec75c74d49f83e7927f72ca99866a8ced",
+          "ClientStatus.suspended": "88fcf0f2a26bf868f18bbacefccd997b4eb1b7d57f79bf521a52cd57a3a9519e",
+          "ClientStatusField": "920e413c7d411b61ef3e8c63b1cb6ad058d5f95f8b481dbafe60248387d8c355",
+          "ClientTenantDoesNotExistNotification": "f07ff2bb42675c402f108988afdb0c7fd7a2a16a992e2fef21026be695ebf291",
+          "ClientTenantIDField": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "ClientTenantIsImmutableNotification": "9912e287869ac86395c12aa5092b2a863babd75efc57b8a13fd145dbca8b9a8e",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "33feaa25eecfb589d6a0712e4e1e082d971e6b540c6e6108aef090d03de92c80",
+          "InvalidClientStatusTransitionNotification": "a3a7cb1dab65a36b351191779fb5584c37440784b4963a13cc505baa7df2fb78",
+          "InvalidGracePeriodNotification": "9273c91f164a66235c7600a622e33894160216352b4bdafbe2a5a71e0744fa7c",
+          "RoleNotAvailableInTenantNotification": "d1ff23480947e06746a163dad3464ec8183e73b91529c58b3746111463e69dab",
+          "TooManyAllowedCIDRsForClientNotification": "e53fbe8ddf281640579ff9b5a99352de4c5b80ef3ca664564ddd28708cfb2bf0",
+          "TooManyRolesForClientNotification": "19894ff804546bafb514f1520feb2723bead5703e483678d621588dae5c8dcfa",
+          "UniversalCIDRNotAllowedNotification": "3d47f4f6016b4242c676642a56a557ea2a879058271e79fa0c6f6f7ded6b0883",
+          "UnknownClientStatusNotification": "54dd4c8d541d3965ed6bc53373747bfd4a2f92767e599994591da2c05bb729a8"
+        },
+        "internal/application/translations/ptbr.go": {
+          "CIDRHasHostBitsSetNotification": "1721ecd7d10cc860036dc0ca05d24ff21eb52c2a2c8520a67c7888859d85eb73",
+          "CannotGrantRoleWithUnheldPermissionsNotification": "ede20bef362340500e4bef973568e6b11c381f5648933e6f7b03c680a6899ece",
+          "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
+          "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
+          "ClientAllowedCIDRCIDRField": "588f593dfd3484650326fc13a4956cad1763ecbbb60207b30b95c5b0f145a031",
+          "ClientAllowedCIDRLabelField": "0e4e4e5d1e1a7700c2e03e66a46debe2992e5a2a51e3bf52c31bfa790eda634e",
+          "ClientAlreadyAllowsCIDRNotification": "fe820c19b847b8e227230bb6b6d674ad1603e076b64280463cf905a97d8f9a44",
+          "ClientAlreadyGrantsRoleNotification": "24afcffd826cf419bff15d24acaf5d8b247b8c3dee0d1cf49cbd00d0736d5b1e",
+          "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
+          "ClientDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
+          "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
+          "ClientMayOnlyModifyItselfNotification": "5eb744289fcf92ab5339eee2806ec7ce37fde1e330d1aef5b86b6df582f5ca83",
+          "ClientMustBeActiveToRotateNotification": "c742eddecfc819617001a6c86f9fd3b710d6c85306352f7e2e46511c4d1b05b1",
+          "ClientNameAlreadyExistsNotification": "c3a7fcef145bde89f1fc4ec65217f4824f6d43d6fbe3a04e3639f098ae3b6a87",
+          "ClientNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
+          "ClientPreviousSecretExpiresAtField": "69003af277a864b2dec0d801fedbe1c51111876f0e5209f9b0e4c2299447b34e",
+          "ClientPreviousSecretHashField": "0340013e0c67a6100871da48c80ce9bd6b3f1744a26ed36e3fd196a54757b21f",
+          "ClientRequestingClientIDField": "e949dfe448c9e164e2754c18a9df638405a6380e9c67145b01b5b83fef248936",
+          "ClientRequestingIdentityKindField": "6fa1f2f1beda5455ece3a232bdbfb06592a00452c1662fdc31093c2f7f6fa32d",
+          "ClientRoleRoleIDField": "e0165d8a6de1b4e2ed0eff3a2c23366ddb907a5a3420d5a51e4c9af07c65b5a8",
+          "ClientRoleRoleKeyField": "e2c3d45a9df20c6ea3e72a95f3285c120349ed105f507c9fa6385d86d8ebf293",
+          "ClientRoleRoleNameField": "8ec37951ad70acfed151996741f845e33ea7a7cc444cc127884859a7ba76fed5",
+          "ClientSecretChangedAtField": "541ae8c1d281c31dfafe17fca3e2cc9bd464f943bb75e29927483f62dd6be91a",
+          "ClientSecretField": "7e32a729b1226ed1270f282a8c63054d09b26bc9ec53ea69771ce38158dfade8",
+          "ClientSecretHashField": "aa6fa1d7a07aad16869d10ff099047de59b1ad42ebe5cea2163d88fcb0c7ceb1",
+          "ClientStatus.active": "499ee302f6884f271c02454123715953dc245991fead15d51ee12c5e4f405bc6",
+          "ClientStatus.suspended": "2d605a7bf3e4a32cc87091f76ece58ba653df84dc410be4286ca7e97e0f73b80",
+          "ClientStatusField": "cf7d46ded085ce31f8c37c963b3504f6f56d9ef089b926c25f5bf12b5aa313ee",
+          "ClientTenantDoesNotExistNotification": "4b63e5b8e13300f4293e77b722911626654aff4f22aefb8014e9b598e13dd496",
+          "ClientTenantIDField": "aad72d23b2c6e2219c1569f93a3195bee3904d705cac8a1d4850632da75766a2",
+          "ClientTenantIsImmutableNotification": "63d9dce09b6e42c38c1b6023d09aa3486fb263b979f057634955c623104fadb8",
+          "ClientTenantStatusField": "70f89e43d841ec5f7f3adf5547d7ba2c6d4b3441cef2449e70e5bcd57962fede",
+          "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
+          "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
+          "InvalidCIDRBlockNotification": "697b5804db377fae604c56ded6cb94f99857ea6f33faf0ee5784ba3490868d6e",
+          "InvalidClientStatusTransitionNotification": "89b78eaa0b4a30bcdeb81ecb56d77ff4a258742994a07dfd2ac9a27ae44e217e",
+          "InvalidGracePeriodNotification": "f27049493ed06e0382c9080cea2e03974089029a1f9e60ba989b12010e5e1c70",
+          "RoleNotAvailableInTenantNotification": "8310c646c18bd3744fa415b87ced63c54870656b6636e2c923a447dba50af665",
+          "TooManyAllowedCIDRsForClientNotification": "cb63189a9dec039913119b8c64e8e88fa917c42ae99ba16feb2a7b7a3236a9c2",
+          "TooManyRolesForClientNotification": "487ea740c605f76f1f058ec01ba7e9e9eddada7015868a3c2dcef8ea34d54529",
+          "UniversalCIDRNotAllowedNotification": "66fb879b0aca025dcb97c3365a4ade49824062c2e2335932030262b3ea6bae9d",
+          "UnknownClientStatusNotification": "78a5551a29ede37579b7d3ebdd5b7f19124ba344525f30933ddfad40c3b3990c"
+        },
+        "internal/domain/notifications.go": {
+          "CannotGrantRoleWithUnheldPermissionsNotification": "cc8cd97e7eb17840a5c05d9b2a0cf9d829cd6432d7315bd57ead872f43399b2c",
+          "CannotGrantWildcardRoleNotification": "d355145da4cea2a0f64df3aa1134355d5e61b1015aefa678f3cd08564643a09d",
+          "ClientAlreadyAllowsCIDRNotification": "10ce492961fe63838daa0cbc8ba7c201370d2babfaac6c44a8aa1f63cca0a6a9",
+          "ClientAlreadyGrantsRoleNotification": "601bb2178b7fdf2b9fbb522945befbadb98bf2358018eee17ec6a0185903c998",
+          "ClientMayOnlyModifyItselfNotification": "0069f728f815cc304e8b5ac51ad26047e96f2db37c2d244c520017ed8e99ca67",
+          "ClientMustBeActiveToRotateNotification": "71abf2673448b7a15d9c2b051c0bc971c4d78cea0a2ec72094e184da563f1e2d",
+          "ClientNameAlreadyExistsNotification": "d26e70d41044b4d9bc54b6ef80bc4968c7b82c5f51aba40df099a9e2d321974e",
+          "ClientTenantDoesNotExistNotification": "ddcc2c7e15d318219a27b55dbe2c6204baf79728fcd64f28d98355ff371f8aad",
+          "ClientTenantIsImmutableNotification": "16cde4c5fe63a0cb0a2e8dcde15de885db95be3e2d5d6a271414995551e7636e",
+          "InvalidClientStatusTransitionNotification": "097082c9196b9c4f430e8fa15b2fd53eb3b517d00aae9dfb0b21a82d16247cdf",
+          "InvalidGracePeriodNotification": "f8c219d30079d24e48a104cca1d1e79e25b628bc2b512218002e277b732eee47",
+          "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",
+          "TooManyAllowedCIDRsForClientNotification": "aa8c4a530cf7a9a905d0287d723e0badb284d3a8c47f96013c6461e1cd1e21d1",
+          "TooManyRolesForClientNotification": "2b82eca2a692cf89eb2eac4cdb8c4ae12a72be4f8bdc5a6c60e68bef065e62c0"
+        },
+        "internal/domain/vos/notifications.go": {
+          "CIDRHasHostBitsSetNotification": "aef16ada880271da38b6f9423dcb8bc16efc51fcc74aabe0de0251e3af565504",
+          "InvalidCIDRBlockNotification": "b74b95525b515d44a9687a6d85d521e86ef130fa9f83c83cff29c9a45cd4c6eb",
+          "UniversalCIDRNotAllowedNotification": "ae3d5991b66ee336f039c6100907d52a0f501c91920d37bc4e8ad65173a63982",
+          "UnknownClientStatusNotification": "61b3080ec23458f2795f7ac009ace79b2c4b5691a9016337e15b27e532861b38"
+        }
+      }
+    },
     "Group": {
       "spec": "specs/omnicore-gen/group.omnicore.yaml",
       "specHash": "b1e2c9762260552b8c49dcd28988bceb388a27a86b8d26713dcf6a23cc07dd60",

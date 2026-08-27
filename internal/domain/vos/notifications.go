@@ -82,3 +82,23 @@ type WeakPasswordNotification struct{ domain.DomainNotificationBase }
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type UnknownUserStatusNotification struct{ domain.DomainNotificationBase }
+
+// InvalidCIDRBlockNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidCIDRBlockNotification struct{ domain.DomainNotificationBase }
+
+// UniversalCIDRNotAllowedNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type UniversalCIDRNotAllowedNotification struct{ domain.DomainNotificationBase }
+
+// UnknownClientStatusNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type UnknownClientStatusNotification struct{ domain.DomainNotificationBase }
+
+// CIDRHasHostBitsSetNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type CIDRHasHostBitsSetNotification struct{ domain.DomainNotificationBase }
