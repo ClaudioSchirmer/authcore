@@ -53,11 +53,31 @@ Alternatives worth weighing against it:
 - Put the claims on `Tenant` instead of `Group` — one map per tenant, no merge problem —
   if the real need is tenant-wide facts rather than per-cohort ones.
 
-Depends on **token issuance**, which is still *not started* (README, roadmap table). There
-is no minting path to add a claim to yet, so this cannot be built before that exists.
+**The dependency is resolved as of 2026-08-26.** Token issuance is built: `POST /auth/user/token`
+walks both arrows into one effective-permission set and signs it, so there IS now a minting
+path and a claim map to merge into. This entry stops being blocked and starts being a
+decision nobody has taken.
 
-**Half of that dependency resolved on 2026-08-26**: `User` is built, so the SUBJECT a token
-would be minted for now exists, and both arrows into `Role` — through a group and directly —
-are stored and served. What is still missing is the walk that turns them into one set of
-effective permissions, and the `Issuer` call that carries it. Until those land, this entry
-stays where it is: a claim map has nothing to be merged into.
+Three things the implementation settled, which sharpen the open questions rather than answer
+them:
+
+- **The claim-size budget is no longer hypothetical.** The shipped token deliberately carries
+  group and role **keys** and not their display names, precisely because a token rides in a
+  header on every request to every service and `description` is a `VARCHAR(500)` per group.
+  Free-form tenant key/values would land on top of a budget that was already argued down to
+  the minimum. Whatever merge rule wins, the size rule has to come with it.
+- **The reserved-key problem now has a concrete list.** The platform mints `sub`, `tenant_id`,
+  `tenant_workspace`, `email`, `name`, `permissions`, `groups`, `roles` and
+  `must_change_password`. A tenant must be unable to set any of them from a group — and two of
+  those (`permissions`, `tenant_id`) are read by the framework itself across the whole mesh,
+  so overwriting one does not merely confuse a consumer, it changes what every service
+  authorizes.
+- **The audit allowlist is a second, separate decision.** `auth.auditClaims` controls which
+  claims reach `audit_events.actorClaims`, and it was deliberately kept to two entries.
+  Tenant-defined claims would need their own answer there: forwarding an arbitrary map into
+  every audit row, one per write, forever, is not the same question as putting it in a token.
+
+The precedence question is still the one that has to be answered first, and it is still the
+one that breaks an existing property: effective permissions today have **no precedence and no
+deny rule**, and a claim map with last-writer-wins would be the first place that stops being
+true.
