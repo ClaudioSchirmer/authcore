@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|mcp__(goland|idea)__(apply_patch|create_new_file|create_notebook|edit_notebook|notebookEdit|reformat_file|rename_refactoring)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-/Volumes/Lynx/Development/GO/authcore}/.claude/hooks/guard-branch.sh\"",
+            "statusMessage": "Checking branch before edit..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__(goland|idea)__execute_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-/Volumes/Lynx/Development/GO/authcore}/.claude/hooks/guard-branch-shell.sh\"",
+            "statusMessage": "Checking branch before shell write..."
+          }
+        ]
+      }
+    ]
+  }
+}
