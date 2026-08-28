@@ -138,20 +138,21 @@ Membership is not here: `user_groups` is a collection of **User**, gated on `use
 
 Tenant-scoped: `users.tenant_id`. Two collections (`groups`, `roles`) and the two hand-written credential routes — the only endpoints in the service where the caller's own identity decides the row.
 
-| Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached |
-|---|---|---|---|---|---|---|---|
-| `POST /users` | `createUser` | `user:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /users/:id` | `patchUser` | `user:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /users/:id/archive` | `archiveUser` | `user:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `POST /users/:id/groups` | `addUserGroup` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /users/:id/groups/:userGroupId/archive` | `removeUserGroup` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `POST /users/:id/roles` | `addUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `GET /users` | `users` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant |
-| `GET /users/:id` | `user` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant |
-| `PATCH /users/:id/password` | `changeUserPassword` | `user:change-password` | JWT + claim | guard foreign-tenant | `sub → self` | yes | **own row** |
-| `PATCH /users/:id/password-reset` | `resetUserPassword` | `user:reset-password` | JWT + claim | guard foreign-tenant | `sub → not self` | yes | any OTHER user, own tenant |
+| Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached | Must change password |
+|---|---|---|---|---|---|---|---|---|
+| `POST /users` | `createUser` | `user:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant | **next sign-in** |
+| `PATCH /users/:id` | `patchUser` | `user:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /users/:id/archive` | `archiveUser` | `user:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /users/:id/groups` | `addUserGroup` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /users/:id/groups/:userGroupId/archive` | `removeUserGroup` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /users/:id/roles` | `addUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `GET /users` | `users` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
+| `GET /users/:id` | `user` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
+| `PATCH /users/:id/password` | `changeUserPassword` | `user:change-password` | JWT + claim | guard foreign-tenant | `sub → self` | yes | **own row** | — |
+| `PATCH /users/:id/password-reset` | `resetUserPassword` | `user:reset-password` | JWT + claim | guard foreign-tenant | `sub → not self` | yes | any OTHER user, own tenant | **next sign-in** |
 
+- **Must change password**: the endpoint leaves a password the user did not choose, so the next sign-in has to rotate it. The token that sign-in issues carries `user:change-password` and nothing else, whatever the account holds — see *By the TOKEN itself*.
 - **Insert**: `tenantID` is optional in the body. Absent means the claim's tenant; present and foreign meets the same 403 a foreign write meets — never a silent overwrite.
 - **Patch** carries `givenName`, `familyName`, `status` (`active` ⇄ `suspended`, nothing else). `email` is immutable; no password field reaches this verb.
 - **Archive** forces `status = suspended`. No unarchive, on the root or per entry.
