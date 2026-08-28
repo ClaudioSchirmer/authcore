@@ -124,3 +124,188 @@ anybody cross-referencing the `clients` table.
 **One thing to say out loud in whatever documents that route:** an allowed CIDR constrains
 where a token is *obtained*, never where it is *used*. authcore does not see the requests a
 client later makes to other services.
+
+---
+
+## Custom claims via a `Claim` catalog (tenant-owned, two levels)
+
+**Status:** open question — raised 2026-08-28, not approved, not specified. The shape below
+was drafted from a survey of how other identity systems solve it; nothing here is decided.
+
+Consumers need extra facts on a token that are neither permissions nor platform identity:
+`cost_center`, `region`, `plan_tier`, `erp_id`. Two cases have to hold **at the same time**: a
+**default** value shared by many accounts, and a **specialised** value that differs per
+account. `Client` cannot borrow `Group` for this — it has no groups — and a single map on
+`Tenant` mints the same claim into every token of both identity kinds, which is the case that
+started the survey.
+
+### What other systems do
+
+- **Okta** — two named sources and an explicit fallback operator: `user.<x>` per account,
+  `app.profile.<x>` per application, combined per claim with the Elvis operator
+  (`user.costCenter ?: app.profile.costCenter`).
+- **Auth0** — the same split under different names: `app_metadata` (per user) and
+  `client_metadata` (per application); an Action merges them with `??`, checking the client id
+  on the M2M path.
+- **Cognito / Ory** — no declaration at all: a pre-token Lambda, or a Jsonnet mapper, does the
+  whole merge in code.
+- **AD FS** — the naming precedent: its registry is called `Claim Description` (claim type,
+  name, description, publishing state). A catalog of CLAIMS, not of attributes.
+- **Keycloak** — the cautionary one, and the closest to a "grant N bundles" design. It has a
+  hardcoded-claim mapper (the default) and a user-attribute mapper (the specialised value) in
+  the same pipeline; when two mappers target the SAME claim name only one value survives, and
+  the priority order is neither documented nor stable (keycloak#25774, keycloak#16347). The
+  practical advice that remains is "use different names".
+
+The transversal lesson: **every system that sustains default + specialised has ONE ordered
+place where precedence is written.** None lets precedence emerge from the binding — and the
+one that came closest is the one with undefined behaviour.
+
+### Why the registry is called `Claim` and not `Attribute`
+
+The industry distinction is real but does not apply here. AD FS keeps the data in an
+*attribute store* and a *Claim Description* names what leaves in the token; Keycloak keeps a
+user *attribute* and a protocol mapper turns it into a *claim*. Both need two words because
+the data exists independently of the token.
+
+In this service it does not: the row exists to be minted. A registry entry would carry a `Key`
+and a `ClaimName` that are always 1:1, with no transformation and no N:1 — two fields for one
+value, which is what a postiche internal name looks like. Called `Claim`, they collapse into
+one. The indirection only earns its keep alongside an `emitAsClaim` flag and an emission
+policy, and neither is proposed here.
+
+If a need ever appears for principal data that must NOT reach the token, it deserves its own
+model rather than a boolean on this one.
+
+### The chain — two levels
+
+The claim name lives in the DEFINITION, never in the binding. One name is one definition, and
+a principal holds at most one value per definition (a unique constraint on the edge).
+Collision is therefore impossible by construction, and precedence is not a merge rule between
+peers but an ordered chain for the same name — first non-null wins:
+
+```
+  user_claims.value  /  client_claims.value        level 1 — the specialised value
+            ↓ if null
+  claims.default_value                             level 2 — the default, of the
+     (of the tenant that owns the definition)                tenant that owns it
+            ↓ if null
+  the claim does not enter the token at all
+```
+
+**Two levels rather than three, and `tenant_id` is why.** An earlier draft had a third level —
+a `tenant_claims` collection holding a per-tenant default for a globally defined claim. Once
+the definition itself belongs to a tenant, its `default_value` IS that tenant's default, and
+the middle collection has no work left to do: one whole aggregate, with its verbs, its
+permission and its seven translation catalogs, disappears.
+
+What that trades away is recorded under the open questions: two tenants needing `region` write
+two definitions, so the vocabulary can diverge between them.
+
+### The registry — basic fields
+
+Table `claims`. Tenant-owned, following the decision already taken for `Role`: *the platform's
+own rows live in the reserved platform tenant rather than in a null scope*. **This entry
+therefore inherits `Role`'s and `Group`'s dependency on that reserved tenant**, which the
+README still lists as not started.
+
+| Field | Type | Notes |
+|---|---|---|
+| `TenantID` | id | the owner, NOT NULL. The reserved platform tenant is what marks a row as the platform's — no `isPlatform` boolean is needed |
+| `Name` | string | the exact name minted into the token. Unique PER TENANT over active rows |
+| `ValueType` | enum | `string` · `number` · `bool` — what the edges are validated against |
+| `AppliesTo` | enum | `user` · `client` · `both` — which identity kinds may hold a value |
+| `DefaultValue` | string, nullable | level 2 of the chain; null means "no default" |
+| `Description` | string | what the value means, for the operator filling it in |
+
+Managed columns as everywhere else (`revision`, `created_at`, `updated_at`, `deleted_at`).
+
+**Uniqueness is per tenant, and the reserved prefix is what keeps that safe.** Global
+uniqueness would forbid two tenants from both naming a claim `region`, which is harmless — a
+token carries exactly one tenant. But per-tenant uniqueness alone would let a tenant define
+`permissions` or `tenant_id`. The prefix closes it by construction: a definition owned by any
+tenant OTHER than the reserved one must carry it, and no platform claim does. The runtime
+check is then a seatbelt rather than the mechanism.
+
+### The two owned collections — basic fields
+
+The SAME two fields on each parent, so the edge is one shape learned once:
+
+| Field | Type | Notes |
+|---|---|---|
+| `ClaimID` | id | FK to `claims.id`; the entry's business identity |
+| `Value` | string | validated against the definition's `ValueType`; never null on the edge |
+
+| Parent | Child | Table | Parent column |
+|---|---|---|---|
+| `User` | `UserClaim` | `user_claims` | `user_id` |
+| `Client` | `ClientClaim` | `client_claims` | `client_id` |
+
+`businessIdentity: [ClaimID]`, unique per parent — that constraint IS the anti-collision
+argument above, not a hygiene detail.
+
+`editStrategy: per-child` with `operations: [add, remove, change]`. Note the difference from
+`role_permissions`, which deliberately refuses `change`: there the single stored column IS the
+business identity, so a change turns grant A into grant B while keeping A's row id. Here the
+identity is the `ClaimID` and `Value` is a separate mutable column, so "correct this cost
+center" is genuinely one entry changing rather than two events.
+
+### Seeding the platform's own nine
+
+Because the catalog is of CLAIMS, it can hold **all** of them — including the nine this
+service already mints (`identity_kind`, `tenant_id`, `tenant_workspace`, `email`, `name`,
+`permissions`, `groups`, `roles`, `must_change_password`), seeded by migration into the
+reserved platform tenant. Worth doing for three reasons beyond tidiness:
+
+- the catalog becomes the living documentation of the token's vocabulary, instead of a prose
+  list that ages;
+- `AppliesTo` then states as DATA what the `POST /auth/client/token` entry above states as
+  text — that a client token carries no `email`, no `groups` and no `must_change_password`;
+- two of those names (`permissions`, `tenant_id`) are read by the framework across the whole
+  mesh, so having them present and platform-owned makes their reservation visible to anyone
+  reading the table.
+
+### Emission
+
+`buildClaims` (`internal/application/commands/authentication_commands_manual.go:572`) keeps
+its fixed set and merges the resolved map on top. A null at both levels means the claim is
+simply absent — an absent claim and an empty one are not the same thing to a consumer. The
+refresh path already rebuilds claims from the database on every redemption, so a corrected
+value propagates on the next refresh with no special invalidation.
+
+### What has to be answered before this becomes a spec
+
+- **Does a tenant need to override the default of a PLATFORM-defined claim?** This is the one
+  question that reopens the third level. If yes, `tenant_claims` comes back and the chain is
+  three deep again. If no, the two levels above stand and the vocabulary simply lives per
+  tenant.
+- **The reserved prefix, literally.** `x_`? `ext_`? A URI, as Auth0 requires for
+  collision-resistance? Whatever it is, it is the mechanism, so it has to be decided before
+  the uniqueness rule can be written.
+- **Who writes, and under which verb.** The catalog is tenant-owned, so a tenant admin creates
+  definitions — but is setting a VALUE on a user the same job? A new `*:set-claim`, or the
+  existing `*:grant`? The criterion is exact: riding `user:grant` means whoever may hand out
+  roles may also set claims, and those are not obviously the same job.
+- **Removal semantics on the edge.** `role_permissions` soft-removes because an access review
+  has to read what a past grant meant. A claim value is not a privilege — is a hard delete
+  right, or does the audit story want the same stamp?
+- **`auth.auditClaims`.** Forwarding an arbitrary map into every audit row, one per write,
+  forever, is a separate decision from putting it in a token. The allowlist is deliberately
+  two entries today.
+- **Claim-size budget.** The shipped token carries group and role KEYS rather than display
+  names precisely because it rides in a header on every request. Whatever this adds lands on
+  top of a budget already argued down to the minimum.
+
+### Deliberately left out of this shape: the bundle
+
+Granting claims in a PACKAGE — a `claim_sets` aggregate in `Role`'s shape — is the one
+addition that brings a genuinely new problem. Two packages granted to the same principal can
+carry the same definition with different values, and that is exactly the Keycloak case:
+undefined precedence reaching the token. Resolving it needs a rule (grant order, a priority on
+the set, or refusing the conflicting grant at bind time — only the last keeps the
+indeterminacy away from the token). The two levels above already deliver "default plus
+specialised" without it.
+
+The earlier `Custom claims on Group` entry asks a related question through a different
+carrier; this shape does not answer it, since a user reaches several groups and the collision
+returns there.
