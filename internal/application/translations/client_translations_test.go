@@ -6,8 +6,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:d8ee0a47978a2c5bfc553a73fa4d63c14a49731b1e0a5e818c8562c750e9233d
+// generated:  2026-08-28
+// checksum:   sha256:8883a21e972691160489ba4f3cecba203f90bac2ce8e93f3fc41c985fb78b706
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -45,8 +45,7 @@ func TestClientNotificationsAreTranslated(t *testing.T) {
 		"UnknownClientStatusNotification",
 		"InvalidGracePeriodNotification",
 		"ClientMustBeActiveToRotateNotification",
-		"ClientsMayNotCreateClientsNotification",
-		"ClientMayOnlyModifyItselfNotification",
+		"ClientMayOnlyRotateItsOwnSecretNotification",
 		"RoleNotAvailableInTenantNotification",
 		"CannotGrantRoleWithUnheldPermissionsNotification",
 		"CannotGrantWildcardRoleNotification",

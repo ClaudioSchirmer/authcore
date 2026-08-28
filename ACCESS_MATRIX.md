@@ -12,7 +12,7 @@ Pending: Authentication.
 | **Permission** | What `RequirePermission` demands at the mount. Satisfied exactly, by resource wildcard (`x:*`), or by `*:*` |
 | **Admission** | `JWT + claim` = bearer token AND a `tenant_id` claim, both required to reach the handler. Service-wide gate: 403 without it, no permission bypasses it |
 | **Tenant scope** | What ties the row to the caller's tenant. `filter TenantID` = the read query forces `Filter["TenantID"] = id.TenantID()`. `guard foreign-tenant` = the domain refuses a write whose row is not the caller's (`TenantMismatchNotification`). `none` = nothing does |
-| **Self** | What the caller's `sub` says about the target ROW. `must be self` / `must not be self` = the domain compares the path id against the caller and answers 403. `—` = nothing compares them |
+| **Self** | What the caller's IDENTITY says about the target ROW, and for WHICH kind of caller. `sub → self` / `sub → not self` = the domain compares the path id against the caller's subject, whoever they are. `kind:client → …` applies **only to a client-subject token**: a user token of the same tenant never meets it and passes on the tenant scope alone. `—` = nothing compares them |
 | **`*:*` crosses** | Whether `IsSuperAdmin()` lifts the tenant scope. It never lifts a **Self** rule — that comparison does not ask |
 | **Rows reached** | What the caller ends up touching |
 
@@ -149,8 +149,8 @@ Tenant-scoped: `users.tenant_id`. Two collections (`groups`, `roles`) and the tw
 | `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
 | `GET /users` | `users` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 | `GET /users/:id` | `user` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant |
-| `PATCH /users/:id/password` | `changeUserPassword` | `user:change-password` | JWT + claim | guard foreign-tenant | **must be self** | yes | **own row** |
-| `PATCH /users/:id/password-reset` | `resetUserPassword` | `user:reset-password` | JWT + claim | guard foreign-tenant | **must not be self** | yes | any OTHER user, own tenant |
+| `PATCH /users/:id/password` | `changeUserPassword` | `user:change-password` | JWT + claim | guard foreign-tenant | `sub → self` | yes | **own row** |
+| `PATCH /users/:id/password-reset` | `resetUserPassword` | `user:reset-password` | JWT + claim | guard foreign-tenant | `sub → not self` | yes | any OTHER user, own tenant |
 
 - **Insert**: `tenantID` is optional in the body. Absent means the claim's tenant; present and foreign meets the same 403 a foreign write meets — never a silent overwrite.
 - **Patch** carries `givenName`, `familyName`, `status` (`active` ⇄ `suspended`, nothing else). `email` is immutable; no password field reaches this verb.
@@ -193,18 +193,22 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 
 | Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached |
 |---|---|---|---|---|---|---|---|
-| `POST /clients` | `createClient` | `client:insert` | JWT + claim | guard foreign-tenant | client: **refused** (dormant) | yes | own tenant |
-| `PATCH /clients/:id` | `patchClient` | `client:update` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `PATCH /clients/:id/archive` | `archiveClient` | `client:archive` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `POST /clients/:id/roles` | `addClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
+| `POST /clients` | `createClient` | `client:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /clients/:id` | `patchClient` | `client:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /clients/:id/archive` | `archiveClient` | `client:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `POST /clients/:id/roles` | `addClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` (dormant) | yes | own tenant |
 | `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 | `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 
-**What `dormant` means here**: the two rules exist and are tested, but nothing reaches them yet. Both read `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Under a user token the field reads `""`, both stand down, and every cell above behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
+**One row rule, and it is about MACHINES rather than ownership.** A user token of the tenant meets it on no route at all: it holds the permission, the row is in its tenant, and it writes — so an operator with `client:rotate-secret` rotates the secret of any client in their tenant, the mirror of User's reset. What it bounds is a CLIENT-subject caller, and only on the rotation.
+
+**Everything else a client-subject caller may do, it may do to a sibling**: create, edit, archive, grant a role, edit the allow-list — ordinary tenant-scoped writes, gated by the permission the caller carries and nothing more. Until 2026-08-28 the rule covered every update and the archive, and a companion rule refused a client-subject insert outright; both were narrowed away as closed past the point of usefulness. Rotation is the exception because it is not editing a row: it mints a credential AND starts retiring the one in use, so a machine able to rotate another machine's secret could lock it out and take its place in one call.
+
+**`dormant` means nothing reaches it yet**: it reads `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Until it does the field reads `""`, the rule stands down, and that cell behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
 
 - `client:rotate-secret` is a **sixth verb**, for the reason `user:reset-password` is its own: handing out a production credential is not editing a label.
 - **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.

@@ -163,7 +163,6 @@ func (fra) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Plage réseau invalide. Utilisez la notation CIDR, comme 203.0.113.0/24 ou 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "Une plage couvrant tout l'internet n'est pas acceptée. Laissez la liste vide pour ne rien restreindre.",
 		"UnknownClientStatusNotification":                  "Statut de client inconnu.",
-		"ClientMayOnlyModifyItselfNotification":            "Un jeton de client ne peut modifier que son propre enregistrement.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Locataire",
 		"ClientNameField":                                  "Nom",
@@ -191,6 +190,6 @@ func (fra) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "La plage réseau doit être fournie sous sa forme canonique, bits d'hôte à zéro.",
 		"InvalidGracePeriodNotification":                   "La fenêtre de grâce doit être comprise entre 0 et {max} secondes.",
 		"ClientMustBeActiveToRotateNotification":           "Seul un client actif peut voir son secret pivoté. Réactivez-le d'abord.",
-		"ClientsMayNotCreateClientsNotification":           "Un jeton de client ne peut pas créer de clients.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "Un jeton de client ne peut faire pivoter que son propre secret.",
 	}
 }

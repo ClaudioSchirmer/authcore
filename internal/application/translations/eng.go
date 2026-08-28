@@ -163,7 +163,6 @@ func (eng) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Invalid network range. Use CIDR notation, such as 203.0.113.0/24 or 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "A range covering the whole internet is not accepted. Leave the list empty to place no restriction.",
 		"UnknownClientStatusNotification":                  "Unknown client status.",
-		"ClientMayOnlyModifyItselfNotification":            "A client token may only modify its own record.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Tenant",
 		"ClientNameField":                                  "Name",
@@ -191,6 +190,6 @@ func (eng) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "The network range must be given in its canonical form, with the host bits cleared.",
 		"InvalidGracePeriodNotification":                   "The grace window must be between 0 and {max} seconds.",
 		"ClientMustBeActiveToRotateNotification":           "Only an active client can have its secret rotated. Reactivate it first.",
-		"ClientsMayNotCreateClientsNotification":           "A client token cannot create clients.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "A client token may only rotate its own secret.",
 	}
 }

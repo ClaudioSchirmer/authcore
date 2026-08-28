@@ -436,17 +436,6 @@ func (ClientAlreadyAllowsCIDRNotification) Semantic() domain.NotificationSemanti
 	return domain.SemanticConflict
 }
 
-// ClientMayOnlyModifyItselfNotification reaches the caller as 403. The struct
-// NAME is the translation key, so renaming it here without renaming it in the
-// seven catalogs leaves the message untranslated.
-type ClientMayOnlyModifyItselfNotification struct {
-	domain.DomainNotificationBase
-}
-
-func (ClientMayOnlyModifyItselfNotification) Semantic() domain.NotificationSemantic {
-	return domain.SemanticForbidden
-}
-
 // InvalidGracePeriodNotification reaches the caller as 422. The struct NAME is
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated. It interpolates max into the
@@ -467,13 +456,13 @@ func (ClientMustBeActiveToRotateNotification) Semantic() domain.NotificationSema
 	return domain.SemanticStateConflict
 }
 
-// ClientsMayNotCreateClientsNotification reaches the caller as 403. The struct
-// NAME is the translation key, so renaming it here without renaming it in the
-// seven catalogs leaves the message untranslated.
-type ClientsMayNotCreateClientsNotification struct {
+// ClientMayOnlyRotateItsOwnSecretNotification reaches the caller as 403. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+type ClientMayOnlyRotateItsOwnSecretNotification struct {
 	domain.DomainNotificationBase
 }
 
-func (ClientsMayNotCreateClientsNotification) Semantic() domain.NotificationSemantic {
+func (ClientMayOnlyRotateItsOwnSecretNotification) Semantic() domain.NotificationSemantic {
 	return domain.SemanticForbidden
 }

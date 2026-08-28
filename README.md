@@ -746,20 +746,28 @@ spelled, so archiving the last entry opens the credential to every address on th
 One verb covers both directions, as everywhere else in this service: the add only tightens, and
 splitting the pair would leave an operator unable to undo their own change.
 
-Row scope is `User`'s, plus two: a **client token may not create a client**, and it **writes
-only its own row** (`sub == id`). Both are written and **inert** — they read an
-`identity_kind` claim nothing mints until the token route exists, and an absent claim reads as
-a user.
+Row scope is `User`'s, plus one: a **client token rotates only its own secret** (`sub == id`).
+It is written and **inert** — it reads an `identity_kind` claim nothing mints until the token
+route exists, and an absent claim reads as a user. A USER token never meets it: an operator
+holding `client:rotate-secret` rotates any client in their tenant, which is the mirror of
+`User`'s reset.
 
-**The first one is asymmetric with `User` on purpose**, and the asymmetry is worth stating
-because it is not a security principle applied evenly: a user holding `user:insert` creates an
-account whose password they chose, which is the same persistence mechanism, and that stays
-open. What separates them is attendance — a compromised machine credential mints replacements
-in a loop unattended, while a person can be refused and asked what they were doing. Closing
-the `User` side needs an invite flow, not a rule, and has not been started. Meanwhile a client
-can never be granted more than whoever granted it (the escalation and wildcard rules), and
-"who created this row" is answered from `audit_events`, which records the actor of every
-write.
+**It used to be two rules covering far more**, and they were narrowed on 2026-08-28: a
+client-subject caller was refused the creation of any client, and refused every update and
+archive of a row that was not its own. That left a machine unable to administer its tenant's
+other clients at all — closed past the point of usefulness, and not where the boundary
+belongs. Creating, editing, archiving, granting a role and editing the allow-list are ordinary
+tenant-scoped writes now, gated by the permission the caller carries, exactly as they are for a
+user token.
+
+**Rotation is the exception because it is not editing a row.** The call mints a credential AND
+starts retiring the one in use, so a machine able to rotate another machine's secret could lock
+it out and take its place — one call that is both a denial of service and an impersonation,
+made by something unattended. What was given up with the create rule is stated plainly: a
+compromised client holding `client:insert` can mint sibling clients, and revoking the original
+leaves them working. What still bounds it is that a client can never be granted more than
+whoever granted it (the escalation and wildcard rules), the tenant scope, and `audit_events`,
+which records the actor of every write.
 
 
 ## Running it locally

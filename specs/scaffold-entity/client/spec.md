@@ -46,7 +46,7 @@
 | **Q7b** `secretExpiresAt` | **not now** | §C-2 keeps the offer and the reason |
 | **Q7c** `description` | **required**, `vos.Description` as-is | symmetry with `Role` and `Group` |
 | **Q8** May a client manage clients? | ~~deferred to the token run~~ → **replaced by the row rule below**, at the maintainer's instruction | C14 is back in §7, and it says more than the rule it replaced. §B-Q8 |
-| **Q8b** Row scope, all three cases | **tenant token → its own tenant · `*:*` → any row · client token → only its own row (`sub == id`)** | §10, Layer 2/3. A row decision, so it lives in `BuildRules` and not in a new route |
+| **Q8b** Row scope, all three cases | **tenant token → its own tenant · `*:*` → any row · client token → only its own row (`sub == id`)** *(the third was narrowed to the SECRET ROTATION on 2026-08-28 — see C14b)* | §10, Layer 2/3. A row decision, so it lives in `BuildRules` and not in a new route |
 | **Q8c** Scope of the client rule | **only on the `Client` entity**, not service-wide | *"provavelmente será só por segurança, dificilmente um client terá permission client:update"* — defense in depth, expected never to fire. §B-Q8 |
 | **Q8d** Telling the two token kinds apart | **an `identity_kind` claim** (`user` \| `client`) | reuses the vocabulary `authentication_attempts.identity_kind` already holds. No new word |
 | **Q8e** Claim absent | **assume `user`** | the restriction narrows only when the token positively says `client`; the framework's own internal identities carry no claims |
@@ -603,8 +603,8 @@ Numbered `C…`. Rules marked *(inherited)* are `User`'s, verbatim, and are not 
 | **C11** | `RoleID` | At most **50** role grants on one client *(inherited cap)* | InsertOrUpdate | `TooManyRolesForClientNotification` | 422 |
 | **C12** | `RoleID` | A duplicate grant is refused by business identity | (child add) | `ClientAlreadyGrantsRoleNotification` | 409 |
 | **C13** | `Secret`, `GracePeriodSeconds` | **Rotate:** the row must not be archived and `status` must be `active`; the window must be 0…604800 (24 h when omitted); the current hash moves to `PreviousSecretHash` with `PreviousSecretExpiresAt = now + window`, and a new secret is minted. A window of **0** clears both `previous_*` columns instead of stamping them — an immediate kill, not a zero-length overlap | Update (`ActionRotateSecret`) | `InvalidGracePeriodNotification` | 422 |
-| **C14a** | — | **A client-subject caller may not CREATE a client** — declared, not derived (§B-Q8). Stands down when the claim is absent (⇒ `user`) or no identity is present at all | Insert | `ClientsMayNotCreateClientsNotification` | 403 |
-| **C14b** | — | **A client-subject caller writes only its own row** — `RequestingIdentityKind == "client"` ⇒ `RequestingClientID` must equal this row's id. Same stand-downs | Update, Archive | `ClientMayOnlyModifyItselfNotification` | 403 |
+| ~~**C14a**~~ | — | ~~A client-subject caller may not CREATE a client~~ — **DROPPED 2026-08-28.** A client-subject caller holding `client:insert` creates clients in its tenant like any other caller | — | — | — |
+| **C14b** | — | **A client-subject caller rotates only its own secret** — `RequestingIdentityKind == "client"` ⇒ `RequestingClientID` must equal this row's id. **Narrowed 2026-08-28** from every Update and Archive to the rotation alone. Stands down when the claim is absent (⇒ `user`) or no identity is present at all | Update (`ActionRotateSecret`) | `ClientMayOnlyRotateItsOwnSecretNotification` | 403 |
 | **C15** | `CIDR` | The value must parse as an IPv4 or IPv6 prefix, and is stored masked *(the VO answers this)* | InsertOrUpdate | `vos` — `InvalidCIDRBlockNotification` | 422 |
 | **C16** | `CIDR` | The universal prefixes `0.0.0.0/0` and `::/0` are refused — an empty collection is how "no restriction" is spelled, and there must be only one spelling | InsertOrUpdate | `UniversalCIDRNotAllowedNotification` | 422 |
 | **C17** | `CIDR` | At most **20** entries on one client | InsertOrUpdate | `TooManyAllowedCIDRsForClientNotification` | 422 |
@@ -726,8 +726,15 @@ out here because they are easy to leave in prose:
    id exists).
 2. **A `*:*` token crosses the row scope** — the platform operator repairing a customer's
    row.
-3. **A client token writes only its own row** — C14, `sub == id`, on this entity only.
-   Defense in depth: nothing grants `client:update` to a client today.
+3. **A client token rotates only its own secret** — C14b, `sub == id`, on this entity only.
+   **Narrowed on 2026-08-28**: it used to cover every update and archive, and a companion
+   rule (C14a) refused a client-subject insert outright. Both left a machine unable to
+   administer its tenant's other clients at all, which is closed past the point of
+   usefulness. Creating, editing, archiving and granting are ordinary tenant-scoped writes
+   now. Rotation stays because it is not editing a row: it mints a credential AND retires the
+   one in use, so a machine able to do it to another machine could lock it out and take its
+   place. What that costs is stated rather than hidden — a compromised client holding
+   `client:insert` mints siblings that outlive the revocation of the original.
 
 All three are **row decisions**, so all three live in `BuildRules` and none of them is a
 route. The permission gate above decides admission; this decides which row.
