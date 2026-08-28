@@ -35,8 +35,9 @@ if printf '%s' "$cmd" | grep -qE '(/private)?/tmp/|/scratchpad/|/dev/null'; then
   printf '%s' "$cmd" | grep -qE '\.(go|md|html|json|ya?ml|sql|sh|ts|js|tsx|jsx)([^a-zA-Z0-9]|$)' || exit 0
 fi
 
-# 4. Which repository would this touch? authcore is a single-repo project, so
-#    the target is either the repo the shell is standing in or the project's own.
+# 4. Which repository would this touch? Whoever takes the write is who judges
+#    it, so the working directory's repository decides — never this project's
+#    branch standing in for someone else's.
 blocked=""
 
 check_repo() {
@@ -48,17 +49,15 @@ check_repo() {
   esac
 }
 
-# The working directory's repository, when there is one — it may be the project
-# itself, a worktree of it, or an unrelated repo the shell was moved into.
-repo=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null) && check_repo "$repo"
-
-# Otherwise (or when the command names the project explicitly) fall back to the
-# project repository, which is what an ambiguous command almost always targets.
-if [ -z "$blocked" ]; then
-  project_repo=$(git -C "$project" rev-parse --show-toplevel 2>/dev/null) || project_repo=""
-  if [ -n "$project_repo" ] && [ "$project_repo" != "${repo:-}" ]; then
-    check_repo "$project_repo"
-  fi
+if repo=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null); then
+  # Inside a repository — that one answers for the write, even when it is not
+  # this project. Consulting the project's branch here would block edits the
+  # other repository has every right to accept.
+  check_repo "$repo"
+else
+  # Outside every repository. An ambiguous write ("git commit -m x") lands
+  # wherever the shell wanders, so judge it by the project's own branch.
+  project_repo=$(git -C "$project" rev-parse --show-toplevel 2>/dev/null) && check_repo "$project_repo"
 fi
 
 [ -z "$blocked" ] && exit 0
