@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:d2b6fad0b2cd60cc4d89313448d80b9cfc9591cced107b65b096da44d8b36a9d
+// generated:  2026-08-28
+// checksum:   sha256:f65ede3db740b1ad5bc4271619e9f69d33e8cf6781c87adbbc3893c9b0a1635a
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -140,15 +140,15 @@ func MountClients(
 
 	hRemoveClientRole, sRemoveClientRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveClientRoleRequest{},
-		requests.RemoveClientRoleResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientRoleCommand, commands.RemoveClientRoleResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/roles/:clientRoleId/archive",
 		hRemoveClientRole, sRemoveClientRole,
 		fwopenapi.Doc{
 			Summary:     "Archive one ClientRole of a Client",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Clients"},
 		},
 		fwopenapi.RequirePermission("client:grant"))
@@ -170,15 +170,15 @@ func MountClients(
 
 	hRemoveClientAllowedCIDR, sRemoveClientAllowedCIDR := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveClientAllowedCIDRRequest{},
-		requests.RemoveClientAllowedCIDRResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, commands.RemoveClientAllowedCIDRResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/allowedCIDRs/:clientAllowedCIDRId/archive",
 		hRemoveClientAllowedCIDR, sRemoveClientAllowedCIDR,
 		fwopenapi.Doc{
 			Summary:     "Archive one ClientAllowedCIDR of a Client",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Clients"},
 		},
 		fwopenapi.RequirePermission("client:update"))

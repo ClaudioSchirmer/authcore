@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:b7fe97c84a62c53e33063c264ebb990921dd42c0ec9dc27c8fce53ec1645dd25
+// generated:  2026-08-28
+// checksum:   sha256:6b1dca7c615d43f2ce639b0b06fb81992d5800a109d9701cb9b1cace9af6a240
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -204,15 +204,11 @@ func TestAddUserGroupResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveUserGroup answers with the owner, which is all it has to carry.
-func TestRemoveUserGroupRequestAndResponse(t *testing.T) {
+// RemoveUserGroupRequest carries the addressed entry into its command.
+func TestRemoveUserGroupRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveUserGroupRequest{UserGroupID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().UserGroupID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveUserGroupResponse{}).FromResult(commands.RemoveUserGroupResult{UserID: ownerID}).UserID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }
 
@@ -255,14 +251,10 @@ func TestAddUserRoleResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveUserRole answers with the owner, which is all it has to carry.
-func TestRemoveUserRoleRequestAndResponse(t *testing.T) {
+// RemoveUserRoleRequest carries the addressed entry into its command.
+func TestRemoveUserRoleRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveUserRoleRequest{UserRoleID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().UserRoleID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveUserRoleResponse{}).FromResult(commands.RemoveUserRoleResult{UserID: ownerID}).UserID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }

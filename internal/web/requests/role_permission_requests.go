@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:03031b3bcaca9693e5082ba559e621e3e0bbd315c80affebe845bb0618a16763
+// generated:  2026-08-28
+// checksum:   sha256:3c74f7aae1fb461cedd1190b6678b0edb8fa9a607a26fd45c90bc44bfe75f5de
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -63,7 +63,8 @@ func (AddRolePermissionResponse) FromResult(r commands.AddRolePermissionResult) 
 
 // RemoveRolePermissionRequest names the entry to take out.
 //
-// There is no body: everything the verb needs is in the path.
+// There is no body: everything the verb needs is in the path. Nothing comes
+// back either — the endpoint answers 204.
 type RemoveRolePermissionRequest struct {
 	fwrequests.Auto
 
@@ -79,22 +80,4 @@ type RemoveRolePermissionRequest struct {
 // reshaping would drop the marker and write ToCommand by hand instead.
 func (r RemoveRolePermissionRequest) ToCommand() *commands.RemoveRolePermissionCommand {
 	return fwrequests.AutoFromRequest[*commands.RemoveRolePermissionCommand](r)
-}
-
-// RemoveRolePermissionResponse answers with the owner alone.
-type RemoveRolePermissionResponse struct {
-	fwresponses.Auto
-
-	RoleID domain.ID `json:"roleId"`
-}
-
-// FromResult projects the application Result onto
-// RemoveRolePermissionResponse.
-//
-// The embedded marker opts this Response into the framework's generic
-// Result→Response mapping: every field is read from the same-named Result
-// field, and the pair is checked at boot. A shape that needed renaming or
-// reshaping would drop the marker and write FromResult by hand instead.
-func (RemoveRolePermissionResponse) FromResult(r commands.RemoveRolePermissionResult) RemoveRolePermissionResponse {
-	return fwresponses.AutoFromResult[RemoveRolePermissionResponse](r)
 }

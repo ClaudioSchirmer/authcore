@@ -6,21 +6,17 @@ The descriptions, examples and labels quoted here are in **en-US**, as the spec 
 
 ## What still needs implementing
 
-### Value objects you write
+### Value objects you already wrote
 
-Declared as `kind: manual` (a scalar whose rule is beyond this language) or as a composite with `written: manual` (its shape is declared, its file is yours), so the generator wrote NO file for them — the emitted code already declares fields of these types and converts to and from them, so the package does not compile until each one exists:
+Written by hand — `kind: manual`, or a composite with `written: manual` — and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
 
 - **`GroupKey`** — `internal/domain/vos/group_key.go`. A group's stable machine handle: a lowercase slug of 2-64 runes, groups separated by single hyphens so a hyphen can never lead, trail or double. Reuses this project's shared anti-junk predicates. No reserved list and no derivation — those two rules belong to the tenant handle. No normalization: a value that does not already comply is refused, never repaired.
-  ```go
-  type GroupKey string
-  func (v GroupKey) Value() string { return string(v) }
-  func (v GroupKey) IsValid(fieldName string, ctx *domain.NotificationContext) bool
-  ```
-  The underlying type is `string` and is not negotiable: the mappers convert with `vos.GroupKey(x)` and read back with `.Value()`. `IsValid` is the framework's entry point — it is found by TYPE, with no registration, and reports every problem it finds through the context rather than returning one, so a caller sees all of them at once.
+
+The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec.
 
 ### `internal/domain/group_rules_manual.go`
 
-The spec declared these invariants as ones it could not express. The file was just created, with a stub for each; the code is yours to write, and regeneration will never touch it.
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are implemented. It lists them so you can check the file still covers what the spec declares, which is where a rule added to the spec later goes unnoticed.
 
 **`tenant-must-be-available`**
 
@@ -46,7 +42,7 @@ The spec declared these invariants as ones it could not express. The file was ju
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantRoleWithUnheldPermissionsNotification{}` · attach it to `Roles`
 
-Its tests are yours too — the generator does not know what these rules mean.
+The tests for them are yours too, and the same check applies.
 
 ### `internal/infra/group_service_manual.go`
 
@@ -70,6 +66,58 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
 
+### The migration — already yours
+
+The SQL for this entity was written on an earlier run and **was not touched**:
+
+- `migrations/postgres/0004_group_manual.down.sql`
+- `migrations/postgres/0004_group_manual.up.sql`
+
+That is permanent, and it is the same posture as the `_manual` rule files: created once, never regenerated. A migration is the only thing here whose effect outlives the file — once it has run anywhere, the framework's tracking table records it as applied, so rewriting the file would change what the file CLAIMS without changing a single table. A service that boots green and fails on the first query touching the change is the outcome being avoided.
+
+**If the shape below no longer matches what that migration created, the fix is a NEW numbered pair in the same folder** — never an edit to one that may have run. Two things are worth being deliberate about, because they are where data is lost: adding a NOT NULL column to a table that already has rows fails unless it carries a default, and a rename done as drop-then-add takes the data with it.
+
+If nothing about the storage changed this run, there is nothing to do here — read the shape as confirmation, not as a task.
+
+**A changed `description:` is a storage change too, on postgres.** The description is stored IN the database — a COMMENT on postgres, mysql and oracle, an `MS_Description` extended property on sqlserver — so that someone holding a connection and not this repository can read it. The code regenerates from the spec; that catalogue entry does not. Rewording a description therefore needs a new pair carrying just the `COMMENT ON` / `sp_addextendedproperty` statements, or the database keeps answering with the old wording.
+
+The shape the regenerated code expects, for `groups`:
+
+**`groups`** — the aggregate root
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `tenant_id` | id | no |  |
+| `group_key` | string(64) | no |  |
+| `name` | string(120) | no |  |
+| `description` | string(500) | no |  |
+| `revision` | int64 | no | optimistic concurrency, maintained by the framework |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+| `deleted_at` | time | yes | archive stamp |
+
+Indexes it expects:
+
+- `groups_tenant_id_group_key_key` — UNIQUE on (tenant_id, group_key), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as GroupKeyAlreadyExistsNotification
+- `group_roles_group_id_role_id_key` — UNIQUE on (group_id, role_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as GroupAlreadyGrantsRoleNotification
+
+
+**`group_roles`** — the roles collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `group_id` | id | no | foreign key to groups |
+| `role_id` | id | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+A new pair goes in every dialect this service targets (postgres), numbered after the highest existing one. Every `.up.sql` needs its `.down.sql` or the service refuses to boot.
+
+If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
+
 ### Rules that END the validation pass
 
 `tenant-is-a-usable-id` (in `IfInsertOrUpdate`) — declared `guard: true`. After each of them the pass stops if anything has already been rejected: the rules below it, this entity's automatic value-object validation, and the `BuildRules` and value objects of every collection. A clean write is unaffected — the barrier fires only where something was ALREADY refused — so what changes is the SHAPE of a 422: it carries what was found up to the barrier, not that plus every other field the write would have failed on. Check that against what the API consumers expect to receive in one response.
@@ -92,8 +140,8 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `groups` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Collection `Roles` | `add` → `group:grant` (declared); `remove` → `group:grant` (declared) | These routes hang off `/groups/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
-| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Collection `Roles` | `add` → `group:grant` (declared); `remove` → `group:grant` (declared) | These routes hang off `/groups/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Key` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `GroupKeyAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
 | Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
@@ -105,56 +153,24 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the groups feature (repository + view + mount) | `bootstrap/groups_feature.go` |
-| the GroupsFeature registration in the composition root | `bootstrap/wire.go` |
 | the archive command and result | `internal/application/commands/archive_group_command.go` |
 | the shapes for 1 child collection(s) | `internal/application/commands/group_child_results.go` |
 | tests for the command mappers | `internal/application/commands/group_commands_test.go` |
 | the per-entry commands for group_roles | `internal/application/commands/group_role_commands.go` |
 | the insert command and result | `internal/application/commands/insert_group_command.go` |
 | the patch command and result | `internal/application/commands/patch_group_command.go` |
-| tests for the 1 collection input mapper(s) | `internal/application/dtos/group_dtos_test.go` |
-| the GroupRole input DTO | `internal/application/dtos/group_role_input.go` |
-| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/group_queries_test.go` |
-| the read shapes for 1 child collection(s) | `internal/application/queries/group_row_results.go` |
-| 22 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 22 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 22 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 22 FRA translation key(s) | `internal/application/translations/fra.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/group_translations_test.go` |
-| 22 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 22 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 22 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| tests for the collection types | `internal/domain/aggregatevos/group_children_test.go` |
-| the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
-| the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
-| the hand-written rules for Group (4 to implement) | `internal/domain/group_rules_manual.go` |
-| the Group service port (5 fact(s)) | `internal/domain/group_service.go` |
-| tests for Group's rules | `internal/domain/group_test.go` |
-| 9 notification declaration(s) | `internal/domain/notifications.go` |
-| 1 notification declaration(s) | `internal/domain/vos/notifications.go` |
-| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
-| the Group service implementation | `internal/infra/group_service.go` |
-| the hand-written facts for Group (4 to implement) | `internal/infra/group_service_manual.go` |
-| the group_roles child schema | `internal/infra/schemas/group_role_schema.go` |
-| the groups schema (4 columns) | `internal/infra/schemas/group_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/group_schemas_test.go` |
-| the groups view (relational-backed) | `internal/infra/views/group_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/group_view_test.go` |
 | the 5 group endpoints | `internal/web/group_routes.go` |
-| the by-id request and response | `internal/web/requests/find_group_by_id.go` |
-| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
-| the wire types for 1 child collection(s) | `internal/web/requests/group_children.go` |
 | the request mapper tests | `internal/web/requests/group_requests_test.go` |
 | the per-entry wire types for group_roles | `internal/web/requests/group_role_requests.go` |
-| the insert request and response | `internal/web/requests/insert_group.go` |
-| the patch request and response | `internal/web/requests/patch_group.go` |
-| the rollback of groups on postgres | `migrations/postgres/0004_group_manual.down.sql` |
-| the groups table on postgres | `migrations/postgres/0004_group_manual.up.sql` |
 
-1 file(s) were already up to date.
+**Left untouched** (yours, by design):
+
+- `internal/domain/group_rules_manual.go` — hand-written rules live here, by design
+- `internal/infra/group_service_manual.go` — hand-written rules live here, by design
+- `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+- `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+26 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -169,9 +185,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.59.0)
+Verdict: **exact** (project pins v0.62.0)
 
-framework v0.59.0 meets the required v0.59.0
+framework v0.62.0 meets the required v0.62.0
 
 Verify what was generated:
 

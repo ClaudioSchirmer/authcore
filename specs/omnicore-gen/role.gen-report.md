@@ -160,8 +160,8 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `roles` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Collection `Permissions` | `add` → `role:update` (inherited); `remove` → `role:update` (inherited) | These routes hang off `/roles/:id/permissions`. They inherit the root's update permission, which is the default. If changing what this collection holds is a different job from editing the record — a role assignment, a grant — declare `children[].permissions` so one does not carry the other. |
-| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Collection `Permissions` | `add` → `role:update` (inherited); `remove` → `role:update` (inherited) | These routes hang off `/roles/:id/permissions`. They inherit the root's update permission, which is the default. If changing what this collection holds is a different job from editing the record — a role assignment, a grant — declare `children[].permissions` so one does not carry the other. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Key` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `RoleKeyAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
 | Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
@@ -171,6 +171,18 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 ## What was generated
 
+| What | File |
+|---|---|
+| the archive command and result | `internal/application/commands/archive_role_command.go` |
+| the insert command and result | `internal/application/commands/insert_role_command.go` |
+| the patch command and result | `internal/application/commands/patch_role_command.go` |
+| the shapes for 1 child collection(s) | `internal/application/commands/role_child_results.go` |
+| tests for the command mappers | `internal/application/commands/role_commands_test.go` |
+| the per-entry commands for role_permissions | `internal/application/commands/role_permission_commands.go` |
+| the per-entry wire types for role_permissions | `internal/web/requests/role_permission_requests.go` |
+| the request mapper tests | `internal/web/requests/role_requests_test.go` |
+| the 5 role endpoints | `internal/web/role_routes.go` |
+
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/role_computed_manual.go` — hand-written rules live here, by design
@@ -179,7 +191,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-35 file(s) were already up to date.
+26 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -194,9 +206,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.59.0)
+Verdict: **exact** (project pins v0.62.0)
 
-framework v0.59.0 meets the required v0.59.0
+framework v0.62.0 meets the required v0.62.0
 
 Verify what was generated:
 

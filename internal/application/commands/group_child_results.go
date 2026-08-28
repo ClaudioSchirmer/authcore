@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:6c9ef85fb31aed8fe20ed4737075f3f476bae9f3a9e1f3caa311f104103f6c97
+// generated:  2026-08-28
+// checksum:   sha256:674af0b699dcac9897a32d21bf2c337ac9f6f1ed9b3033e999b70b3117486d3c
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -31,7 +31,7 @@ type GroupRoleResult struct {
 	RoleID domain.ID
 }
 
-func projectRoles(e *appdomain.Group) []GroupRoleResult {
+func projectGroupRoles(e *appdomain.Group) []GroupRoleResult {
 	items := domain.GetCurrentItemsOf[aggregatevos.GroupRole](&e.AggregateRoot)
 	out := make([]GroupRoleResult, 0, len(items))
 	for _, item := range items {

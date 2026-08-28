@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:f55164d8ccae4187eca545bdf1ef148714fb06dccb85842960628a29e13e93c2
+// generated:  2026-08-28
+// checksum:   sha256:6ca8bc6602b5326da0e09d6c0be5aa2be9f67f2b9b4d66c2fa630d25d8c1c119
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -112,13 +113,12 @@ func (cmd *RemoveClientAllowedCIDRCommand) ApplyTo(ctx *configuration.AppContext
 	return nil
 }
 
-// RemoveClientAllowedCIDRResult carries only the owner: the entry it names is gone.
-type RemoveClientAllowedCIDRResult struct {
-	ClientID domain.ID
-}
-
-func (cmd *RemoveClientAllowedCIDRCommand) FromEntity(_ *configuration.AppContext, e *appdomain.Client) (RemoveClientAllowedCIDRResult, error) {
-	return RemoveClientAllowedCIDRResult{ClientID: *e.GetID()}, nil
+// FromEntity projects nothing: the entry RemoveClientAllowedCIDRCommand named
+// is
+// gone, so the endpoint answers 204 — and the framework's NoBody projection
+// is paired with a None on this side.
+func (cmd *RemoveClientAllowedCIDRCommand) FromEntity(_ *configuration.AppContext, _ *appdomain.Client) (fwresults.None, error) {
+	return fwresults.None{}, nil
 }
 
 // projectOneClientAllowedCIDR renders one stored entry.

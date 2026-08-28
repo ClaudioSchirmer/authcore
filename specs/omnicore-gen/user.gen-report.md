@@ -304,9 +304,9 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `users` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Collection `Groups` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/groups`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
-| Collection `Roles` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
-| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Collection `Groups` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/groups`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `Roles` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Email` — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `UserEmailAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
 | Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
@@ -317,6 +317,16 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 ## What was generated
 
+| What | File |
+|---|---|
+| tests for the command mappers | `internal/application/commands/user_commands_test.go` |
+| the per-entry commands for user_groups | `internal/application/commands/user_group_commands.go` |
+| the per-entry commands for user_roles | `internal/application/commands/user_role_commands.go` |
+| the per-entry wire types for user_groups | `internal/web/requests/user_group_requests.go` |
+| the request mapper tests | `internal/web/requests/user_requests_test.go` |
+| the per-entry wire types for user_roles | `internal/web/requests/user_role_requests.go` |
+| the 5 user endpoints | `internal/web/user_routes.go` |
+
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/user_computed_manual.go` — hand-written rules live here, by design
@@ -325,7 +335,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-43 file(s) were already up to date.
+36 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -340,9 +350,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **ahead** (project pins v0.61.0)
+Verdict: **exact** (project pins v0.62.0)
 
-the project pins framework v0.61.0, ahead of the v0.60.0 this generator targets. Generating anyway. Read the changelog of the pinned version and ask two questions: was there a breaking change, and does it touch what the generator emits? Then build — go vet and go build settle it faster than reading can. A small fix is fine (adopt it with `omnicore-gen adopt <path>` so the next run keeps it); a capability that changed shape entirely is a generator bump, not a patch
+framework v0.62.0 meets the required v0.62.0
 
 Verify what was generated:
 

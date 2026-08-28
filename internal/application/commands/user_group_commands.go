@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:97d51c3a99742169e94a4faad736cc2a767609e62c60f32ecd16075408bb9c38
+// generated:  2026-08-28
+// checksum:   sha256:e6d3208ef34380a9439a957f5fb85477e73c217438b6831e42db4666918e8149
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -98,13 +99,11 @@ func (cmd *RemoveUserGroupCommand) ApplyTo(ctx *configuration.AppContext, e *app
 	return nil
 }
 
-// RemoveUserGroupResult carries only the owner: the entry it names is gone.
-type RemoveUserGroupResult struct {
-	UserID domain.ID
-}
-
-func (cmd *RemoveUserGroupCommand) FromEntity(_ *configuration.AppContext, e *appdomain.User) (RemoveUserGroupResult, error) {
-	return RemoveUserGroupResult{UserID: *e.GetID()}, nil
+// FromEntity projects nothing: the entry RemoveUserGroupCommand named is
+// gone, so the endpoint answers 204 — and the framework's NoBody projection
+// is paired with a None on this side.
+func (cmd *RemoveUserGroupCommand) FromEntity(_ *configuration.AppContext, _ *appdomain.User) (fwresults.None, error) {
+	return fwresults.None{}, nil
 }
 
 // projectOneUserGroup renders one stored entry.

@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:c6739e0ae3700497d604e601cbb97e082bba588e9380d96eb86046909b7b9021
+// generated:  2026-08-28
+// checksum:   sha256:66042dac90faf407479013b0059cebeb62f80884ea2d2d4570b00349a26782d2
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -140,15 +140,15 @@ func MountRoles(
 
 	hRemoveRolePermission, sRemoveRolePermission := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveRolePermissionRequest{},
-		requests.RemoveRolePermissionResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.RemoveRolePermissionCommand, commands.RemoveRolePermissionResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.RemoveRolePermissionCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/permissions/:rolePermissionId/archive",
 		hRemoveRolePermission, sRemoveRolePermission,
 		fwopenapi.Doc{
 			Summary:     "Archive one RolePermission of a Role",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Roles"},
 		},
 		fwopenapi.RequirePermission("role:update"))

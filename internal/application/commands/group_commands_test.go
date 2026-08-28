@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:ac56853ec2ef79334464875df0c6c0ec062ffe9043368146a4be49da001b7bdb
+// generated:  2026-08-28
+// checksum:   sha256:84f23347a3fc85e5875b470ff414cc30e7af46bb9e034084eacf3b5c12acc646
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,6 +21,7 @@ import (
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
@@ -288,9 +289,13 @@ func TestAddGroupRoleCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveGroupRoleCommand takes the entry out and answers with the owner alone
-// — the entry it names is gone, so there is nothing to project.
-func TestRemoveGroupRoleCommand_AppliesAndProjects(t *testing.T) {
+// RemoveGroupRoleCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveGroupRoleCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -315,11 +320,12 @@ func TestRemoveGroupRoleCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.GroupID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }

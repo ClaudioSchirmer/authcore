@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:c184ea79ad21cbc2a12e2201d2927c890c274d7a0ededcca7cd457fe348d1920
+// generated:  2026-08-28
+// checksum:   sha256:3beababb76bdbe9c08ae5dbaa28487baa2e58fd98c1af4ff0e70741f237de8cc
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,6 +21,7 @@ import (
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
@@ -288,9 +289,13 @@ func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveRolePermissionCommand takes the entry out and answers with the owner
-// alone — the entry it names is gone, so there is nothing to project.
-func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
+// RemoveRolePermissionCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveRolePermissionCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -315,11 +320,12 @@ func TestRemoveRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.RoleID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }

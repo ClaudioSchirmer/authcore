@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:fc82f5cba66c66769f48df2b981b63fc20464efccf0f56f24dafd2218bac3f0c
+// generated:  2026-08-28
+// checksum:   sha256:1508e0102088edc860be519795af19d3a22a7d94170eee694dd16ebf9725b44c
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -64,7 +64,8 @@ func (AddClientAllowedCIDRResponse) FromResult(r commands.AddClientAllowedCIDRRe
 
 // RemoveClientAllowedCIDRRequest names the entry to take out.
 //
-// There is no body: everything the verb needs is in the path.
+// There is no body: everything the verb needs is in the path. Nothing comes
+// back either — the endpoint answers 204.
 type RemoveClientAllowedCIDRRequest struct {
 	fwrequests.Auto
 
@@ -80,22 +81,4 @@ type RemoveClientAllowedCIDRRequest struct {
 // reshaping would drop the marker and write ToCommand by hand instead.
 func (r RemoveClientAllowedCIDRRequest) ToCommand() *commands.RemoveClientAllowedCIDRCommand {
 	return fwrequests.AutoFromRequest[*commands.RemoveClientAllowedCIDRCommand](r)
-}
-
-// RemoveClientAllowedCIDRResponse answers with the owner alone.
-type RemoveClientAllowedCIDRResponse struct {
-	fwresponses.Auto
-
-	ClientID domain.ID `json:"clientId"`
-}
-
-// FromResult projects the application Result onto
-// RemoveClientAllowedCIDRResponse.
-//
-// The embedded marker opts this Response into the framework's generic
-// Result→Response mapping: every field is read from the same-named Result
-// field, and the pair is checked at boot. A shape that needed renaming or
-// reshaping would drop the marker and write FromResult by hand instead.
-func (RemoveClientAllowedCIDRResponse) FromResult(r commands.RemoveClientAllowedCIDRResult) RemoveClientAllowedCIDRResponse {
-	return fwresponses.AutoFromResult[RemoveClientAllowedCIDRResponse](r)
 }

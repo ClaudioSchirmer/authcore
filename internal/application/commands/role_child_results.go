@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:d54fda80be2766cb8139681789e5416415a5c6f68db5280c8473d5daf806e0fe
+// generated:  2026-08-28
+// checksum:   sha256:e838dd99e055e1a1fbe39b98fb452c8998689aa52a69129915100013ea3be276
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -31,7 +31,7 @@ type RolePermissionResult struct {
 	PermissionID domain.ID
 }
 
-func projectPermissions(e *appdomain.Role) []RolePermissionResult {
+func projectRolePermissions(e *appdomain.Role) []RolePermissionResult {
 	items := domain.GetCurrentItemsOf[aggregatevos.RolePermission](&e.AggregateRoot)
 	out := make([]RolePermissionResult, 0, len(items))
 	for _, item := range items {

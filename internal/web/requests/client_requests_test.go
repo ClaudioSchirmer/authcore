@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:a124ef2051084d83b0c08d4a722b418b87d392dec27318add60cc95ea4eeab30
+// generated:  2026-08-28
+// checksum:   sha256:f3e94ec88b667a8c16773460fdba36f0577efeb813fb03de0a804db1755f1f3d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -193,15 +193,11 @@ func TestAddClientRoleResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveClientRole answers with the owner, which is all it has to carry.
-func TestRemoveClientRoleRequestAndResponse(t *testing.T) {
+// RemoveClientRoleRequest carries the addressed entry into its command.
+func TestRemoveClientRoleRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveClientRoleRequest{ClientRoleID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().ClientRoleID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveClientRoleResponse{}).FromResult(commands.RemoveClientRoleResult{ClientID: ownerID}).ClientID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }
 
@@ -252,15 +248,10 @@ func TestAddClientAllowedCIDRResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveClientAllowedCIDR answers with the owner, which is all it has to
-// carry.
-func TestRemoveClientAllowedCIDRRequestAndResponse(t *testing.T) {
+// RemoveClientAllowedCIDRRequest carries the addressed entry into its command.
+func TestRemoveClientAllowedCIDRRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveClientAllowedCIDRRequest{ClientAllowedCIDRID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().ClientAllowedCIDRID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveClientAllowedCIDRResponse{}).FromResult(commands.RemoveClientAllowedCIDRResult{ClientID: ownerID}).ClientID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }

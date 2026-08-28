@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:2cca7dae030aa5b9c095072fb035c46a7001736cfa1d58ea8d1a5ea9cda0de84
+// generated:  2026-08-28
+// checksum:   sha256:09d27ae5eaf7f73de99196f37558e75ab5c821ded1e4fe843073403d50194005
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -193,14 +193,10 @@ func TestAddGroupRoleResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveGroupRole answers with the owner, which is all it has to carry.
-func TestRemoveGroupRoleRequestAndResponse(t *testing.T) {
+// RemoveGroupRoleRequest carries the addressed entry into its command.
+func TestRemoveGroupRoleRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveGroupRoleRequest{GroupRoleID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().GroupRoleID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveGroupRoleResponse{}).FromResult(commands.RemoveGroupRoleResult{GroupID: ownerID}).GroupID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }

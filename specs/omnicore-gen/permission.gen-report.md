@@ -95,7 +95,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `permissions` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `PermissionKey` (`Resource` + `Action`) — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `PermissionAlreadyExistsNotification`. Unique as a TUPLE: the parts identify together, so a row differing in either one is a different value — a constraint over a single part would refuse rows the domain accepts. |
 | Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
@@ -124,9 +124,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.59.0)
+Verdict: **exact** (project pins v0.62.0)
 
-framework v0.59.0 meets the required v0.59.0
+framework v0.62.0 meets the required v0.62.0
 
 Verify what was generated:
 

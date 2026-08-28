@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:965add613f59f8427dacaf4bed1da4e35581e9bff33d619a0c45cc388a5ceb1b
+// generated:  2026-08-28
+// checksum:   sha256:4e0817206fdafda352b40b470f06ef3793d849e6791cbb1af866dd3e02e5f2bb
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -37,9 +37,10 @@ func (c *ArchiveRoleCommand) ApplyTo(ctx *configuration.AppContext, e *appdomain
 	if id := ctx.Identity(); id != nil {
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil

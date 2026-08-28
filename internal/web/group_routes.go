@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:d50e03e96187771d56031b9bbd4bfbe4cd823d0bd88d6a2eaa537233966a156f
+// generated:  2026-08-28
+// checksum:   sha256:2d1fbe486061bb8c408ba02e3263b9fbae481b365817cbebf15b3f81417fdae9
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -140,15 +140,15 @@ func MountGroups(
 
 	hRemoveGroupRole, sRemoveGroupRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveGroupRoleRequest{},
-		requests.RemoveGroupRoleResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Group, *commands.RemoveGroupRoleCommand, commands.RemoveGroupRoleResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.Group, *commands.RemoveGroupRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/roles/:groupRoleId/archive",
 		hRemoveGroupRole, sRemoveGroupRole,
 		fwopenapi.Doc{
 			Summary:     "Archive one GroupRole of a Group",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Groups"},
 		},
 		fwopenapi.RequirePermission("group:grant"))

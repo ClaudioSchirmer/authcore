@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:d12226f701109fecf7bba634fd16775d8ab591990d95ab8b630ed4a5fd053b12
+// generated:  2026-08-28
+// checksum:   sha256:0d2731531cb46e6301deb6f19973b2026e31029162dba51ea5f4e7fdc88c7074
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -52,9 +52,10 @@ func (c *InsertGroupCommand) ToEntity(ctx *configuration.AppContext) (*appdomain
 	if id := ctx.Identity(); id != nil {
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return e, nil
@@ -82,6 +83,6 @@ func (c *InsertGroupCommand) FromEntity(_ *configuration.AppContext, e *appdomai
 		Key:         e.Key.Value(),
 		Name:        e.Name.Value(),
 		Description: e.Description.Value(),
-		Roles:       projectRoles(e),
+		Roles:       projectGroupRoles(e),
 	}, nil
 }

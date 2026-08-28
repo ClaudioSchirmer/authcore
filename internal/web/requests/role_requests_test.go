@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:951c0b289c2012ad28da1059eab10a8a26de627e4f222c914305d47ea5c6a957
+// generated:  2026-08-28
+// checksum:   sha256:89c0bf2d0e4ff4a7222821f2a8aa57b04a53c0fe0546ca79d9ba07420f88d432
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -193,14 +193,10 @@ func TestAddRolePermissionResponse_CarriesTheStoredEntry(t *testing.T) {
 	}
 }
 
-// RemoveRolePermission answers with the owner, which is all it has to carry.
-func TestRemoveRolePermissionRequestAndResponse(t *testing.T) {
+// RemoveRolePermissionRequest carries the addressed entry into its command.
+func TestRemoveRolePermissionRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveRolePermissionRequest{RolePermissionID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().RolePermissionID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
-	}
-	ownerID := domain.NewRandomID()
-	if (RemoveRolePermissionResponse{}).FromResult(commands.RemoveRolePermissionResult{RoleID: ownerID}).RoleID != ownerID {
-		t.Error("the owner id did not reach the response")
 	}
 }

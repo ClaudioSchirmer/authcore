@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:3308155d634c4476e52cbf47845b7741d98863854cd06deb60f86dd525343869
+// generated:  2026-08-28
+// checksum:   sha256:ca79ddbaab6f4027e890b629be10fb924903ebcaab2e0bf4f1917b6cf985a8d8
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,6 +21,7 @@ import (
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -305,9 +306,13 @@ func TestAddClientRoleCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveClientRoleCommand takes the entry out and answers with the owner alone
-// — the entry it names is gone, so there is nothing to project.
-func TestRemoveClientRoleCommand_AppliesAndProjects(t *testing.T) {
+// RemoveClientRoleCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveClientRoleCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -337,12 +342,13 @@ func TestRemoveClientRoleCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingClientID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingClientID)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.ClientRole](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.ClientID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }
 
@@ -388,9 +394,13 @@ func TestAddClientAllowedCIDRCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveClientAllowedCIDRCommand takes the entry out and answers with the
-// owner alone — the entry it names is gone, so there is nothing to project.
-func TestRemoveClientAllowedCIDRCommand_AppliesAndProjects(t *testing.T) {
+// RemoveClientAllowedCIDRCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveClientAllowedCIDRCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -420,11 +430,12 @@ func TestRemoveClientAllowedCIDRCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingClientID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingClientID)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.ClientID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }

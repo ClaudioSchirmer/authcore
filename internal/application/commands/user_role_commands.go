@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:360999a5d6fcd527958f4b73792fbbb421985af250ee93dd559b9f55d32aaebd
+// generated:  2026-08-28
+// checksum:   sha256:a126d5c10d082a6981886bdaa6e5515af622832f8f75fff8b13ef1bd35bdbf03
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -98,13 +99,11 @@ func (cmd *RemoveUserRoleCommand) ApplyTo(ctx *configuration.AppContext, e *appd
 	return nil
 }
 
-// RemoveUserRoleResult carries only the owner: the entry it names is gone.
-type RemoveUserRoleResult struct {
-	UserID domain.ID
-}
-
-func (cmd *RemoveUserRoleCommand) FromEntity(_ *configuration.AppContext, e *appdomain.User) (RemoveUserRoleResult, error) {
-	return RemoveUserRoleResult{UserID: *e.GetID()}, nil
+// FromEntity projects nothing: the entry RemoveUserRoleCommand named is
+// gone, so the endpoint answers 204 — and the framework's NoBody projection
+// is paired with a None on this side.
+func (cmd *RemoveUserRoleCommand) FromEntity(_ *configuration.AppContext, _ *appdomain.User) (fwresults.None, error) {
+	return fwresults.None{}, nil
 }
 
 // projectOneUserRole renders one stored entry.
