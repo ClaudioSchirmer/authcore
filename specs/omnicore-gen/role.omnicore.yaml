@@ -695,9 +695,10 @@ read:
 surfaces:
   rest: true
   graphql:
+    # enabled alone is the whole declaration: both reads, every write verb the entity
+    # mounts, and the collection's grant/revoke. A schema that can create a role and
+    # never grant it a permission is half an aggregate.
     enabled: true
-    connection: true
-    mutations: [insert, update, archive]
   # No CSV/XLSX exports: operator-facing and small, the call Permission already made.
 
 authz:

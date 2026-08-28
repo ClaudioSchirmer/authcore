@@ -256,13 +256,26 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. On the entity and OFF the wire: TenantStatus — read by the rules, in no response body and in no export. |
 | Read join → Role | `InnerJoin` on `role_id`, from ClientRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 
+### Where each endpoint answers
+
+Surfaces enabled: **REST · GraphQL**. The three are independent, and every endpoint below is generated from ONE command with ONE permission — a surface is a way in, never a second implementation.
+
+| endpoint | REST | GraphQL |
+|---|---|---|
+| Create a client | `POST /clients` | `createClient` |
+| Update a client (partial) | `PATCH /clients/:id` | `patchClient` |
+| Archive a client | `PATCH /clients/:id/archive` | `archiveClient` |
+| List clients | `GET /clients` | `clients` |
+| Get a client by id | `GET /clients/:id` | `client` |
+| Add one `ClientRole` | `POST /clients/:id/roles` | `addClientRole` |
+| Take out one `ClientRole` | `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` |
+| Add one `ClientAllowedCIDR` | `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` |
+| Take out one `ClientAllowedCIDR` | `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` |
+
 ## What was generated
 
 | What | File |
 |---|---|
-| the per-entry commands for client_allowed_cidrs | `internal/application/commands/client_allowed_cidr_commands.go` |
-| tests for the command mappers | `internal/application/commands/client_commands_test.go` |
-| the per-entry commands for client_roles | `internal/application/commands/client_role_commands.go` |
 | the 5 client endpoints | `internal/web/client_routes.go` |
 | the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
 | the request mapper tests | `internal/web/requests/client_requests_test.go` |
@@ -275,7 +288,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-35 file(s) were already up to date.
+38 file(s) were already up to date.
 
 ## What was NOT generated
 

@@ -905,9 +905,11 @@ read:
 surfaces:
   rest: true
   graphql:
+    # enabled alone is the whole declaration: both reads, every write verb the entity
+    # mounts, and the per-entry verbs of BOTH collections (roles, allowedCidrs).
+    # mutations and connection exist to SUBTRACT; nothing here is meant to be off, and
+    # a verb added to modes later reaches the schema without a second edit.
     enabled: true
-    connection: true
-    mutations: [insert, update, archive]
 
 authz:
   resource: client

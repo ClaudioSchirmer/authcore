@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:89c0bf2d0e4ff4a7222821f2a8aa57b04a53c0fe0546ca79d9ba07420f88d432
+// checksum:   sha256:4db07e1f033c7df9dc0506555a59ec4e70d9a5c621fba89abb58ff80d438b1b5
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -198,5 +199,25 @@ func TestRemoveRolePermissionRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveRolePermissionRequest{RolePermissionID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().RolePermissionID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveRolePermissionGraphQLRequest names the entry through its input.
+func TestRemoveRolePermissionGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveRolePermissionGraphQLRequest{RolePermissionID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().RolePermissionID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveRolePermissionGraphQLResponse acknowledges, since a mutation must
+// answer something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveRolePermissionGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveRolePermissionGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
 	}
 }

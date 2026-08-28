@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:32e07e8ad8877d73bd7cf54b472b1170535d9c62855e68c24b951ba342457c56
+// checksum:   sha256:4d007f72da28af3dc4a2169abbc47f101e6f2e14b6f89c72838556c294c6cf04
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -18,6 +18,7 @@ package requests
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
@@ -80,4 +81,46 @@ type RemoveUserGroupRequest struct {
 // reshaping would drop the marker and write ToCommand by hand instead.
 func (r RemoveUserGroupRequest) ToCommand() *commands.RemoveUserGroupCommand {
 	return fwrequests.AutoFromRequest[*commands.RemoveUserGroupCommand](r)
+}
+
+// RemoveUserGroupGraphQLRequest names the entry to take out.
+//
+// The entry id is an input field rather than a path segment: GraphQL has no
+// path, and the framework's decoder skips a path-tagged field instead of
+// inventing a value for it.
+type RemoveUserGroupGraphQLRequest struct {
+	fwrequests.Auto
+
+	UserGroupID string `json:"userGroupId"`
+}
+
+// ToCommand hands the body to the application layer unchanged. No
+// normalisation happens here: the domain is what decides a value's final form.
+//
+// The embedded marker opts this Request into the framework's generic
+// Request→Command mapping: every field travels to the same-named Command
+// field, and the pair is checked at boot. A shape that needed renaming or
+// reshaping would drop the marker and write ToCommand by hand instead.
+func (r RemoveUserGroupGraphQLRequest) ToCommand() *commands.RemoveUserGroupCommand {
+	return fwrequests.AutoFromRequest[*commands.RemoveUserGroupCommand](r)
+}
+
+// RemoveUserGroupGraphQLResponse acknowledges the removal, and says nothing
+// else.
+//
+// The REST verb answers 204 with no body. A GraphQL field cannot: it must
+// resolve to a type, and a payload with no fields is not publishable. So the
+// payload is a single true — the owner id is what the caller passed in, and
+// the entry is gone by definition.
+//
+// No generic mapper here, and it is not an oversight: the command projects the
+// framework's None, so there is no Result field for a mapped one to read.
+type RemoveUserGroupGraphQLResponse struct {
+	Success bool `json:"success"`
+}
+
+// FromResult answers true: the pipeline only projects a result it succeeded
+// with.
+func (RemoveUserGroupGraphQLResponse) FromResult(fwresults.None) RemoveUserGroupGraphQLResponse {
+	return RemoveUserGroupGraphQLResponse{Success: true}
 }

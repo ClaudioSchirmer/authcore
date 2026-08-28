@@ -100,7 +100,23 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 
+### Where each endpoint answers
+
+Surfaces enabled: **REST · GraphQL**. The three are independent, and every endpoint below is generated from ONE command with ONE permission — a surface is a way in, never a second implementation.
+
+| endpoint | REST | GraphQL |
+|---|---|---|
+| Create a permission | `POST /permissions` | `createPermission` |
+| Update a permission (partial) | `PATCH /permissions/:id` | `patchPermission` |
+| Archive a permission | `PATCH /permissions/:id/archive` | `archivePermission` |
+| List permissions | `GET /permissions` | `permissions` |
+| Get a permission by id | `GET /permissions/:id` | `permission` |
+
 ## What was generated
+
+| What | File |
+|---|---|
+| the request mapper tests | `internal/web/requests/permission_requests_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -109,7 +125,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-25 file(s) were already up to date.
+24 file(s) were already up to date.
 
 ## What was NOT generated
 

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:f3e94ec88b667a8c16773460fdba36f0577efeb813fb03de0a804db1755f1f3d
+// checksum:   sha256:8693c466a9304142aa733186191ca4bdd85742aa6f3985ea69a9bd49246a1910
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -201,6 +202,26 @@ func TestRemoveClientRoleRequest_NamesTheEntry(t *testing.T) {
 	}
 }
 
+// RemoveClientRoleGraphQLRequest names the entry through its input.
+func TestRemoveClientRoleGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveClientRoleGraphQLRequest{ClientRoleID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().ClientRoleID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveClientRoleGraphQLResponse acknowledges, since a mutation must answer
+// something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveClientRoleGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveClientRoleGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
+	}
+}
+
 // AddClientAllowedCIDRRequest carries the entry into its command.
 //
 // The body is the same entry shape the root's own body carries, so a field
@@ -253,5 +274,25 @@ func TestRemoveClientAllowedCIDRRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveClientAllowedCIDRRequest{ClientAllowedCIDRID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().ClientAllowedCIDRID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveClientAllowedCIDRGraphQLRequest names the entry through its input.
+func TestRemoveClientAllowedCIDRGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveClientAllowedCIDRGraphQLRequest{ClientAllowedCIDRID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().ClientAllowedCIDRID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveClientAllowedCIDRGraphQLResponse acknowledges, since a mutation must
+// answer something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveClientAllowedCIDRGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveClientAllowedCIDRGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
 	}
 }
