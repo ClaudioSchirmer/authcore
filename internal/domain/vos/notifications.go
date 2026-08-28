@@ -102,3 +102,18 @@ type UnknownClientStatusNotification struct{ domain.DomainNotificationBase }
 // the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type CIDRHasHostBitsSetNotification struct{ domain.DomainNotificationBase }
+
+// InvalidClaimNameNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidClaimNameNotification struct{ domain.DomainNotificationBase }
+
+// UnknownClaimValueTypeNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type UnknownClaimValueTypeNotification struct{ domain.DomainNotificationBase }
+
+// UnknownClaimAppliesToNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type UnknownClaimAppliesToNotification struct{ domain.DomainNotificationBase }

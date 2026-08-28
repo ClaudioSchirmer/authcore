@@ -26,7 +26,7 @@ and a standing "which of these two UUIDs is this?" question, in exchange for hid
 creation timestamp. One key is the better trade.
 
 Go module: `github.com/ClaudioSchirmer/authcore` · Go 1.26.5 · built on
-[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.61.0** (DDD + CQRS framework).
+[omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.62.0** (DDD + CQRS framework).
 
 ---
 
@@ -45,15 +45,16 @@ Honest scope, so nobody reads intent as delivery:
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
 | Effective-permission resolution (group path ∪ direct path) | **built** — `internal/infra/authentication_reader_manual.go` resolves both arrows in ONE statement, composed at construction from the `TableSchema` declarations so a renamed column aborts the boot instead of returning nothing. Archive-gated at every hop: a revoked grant, a retired role, a left group and an archived membership each confer nothing. Proven against the bench with a user holding one permission directly and another only through a group |
-| Reserved platform tenant | not started — and **two** entities now DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration |
+| `Claim` catalog | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/claim.omnicore.yaml` against the model in `specs/scaffold-entity/claim/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come. **It changes no token yet, deliberately** — see `### Claim` below |
+| Reserved platform tenant | not started — and **two** entities DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration. **`Claim` was deliberately built NOT to become the third**: its reserved-prefix rule applies to every definition created through the API with no exception carved for a tenant, so the platform's own nine claims would enter by migration — the same door the `*:*` role enters by — and nothing in that entity needs to know which tenant is reserved |
 | Token issuance with the `tenant_id` claim | **built** — `POST /auth/user/token` and `POST /auth/user/token/refresh`, on the framework's `authcore.Issuer` (RS256, opaque single-use refresh tokens, family revocation on reuse). The `tenant_id` claim carries `tenants.id`, the same value the isolation filter compares, with no translation step. This service is now its own IdP: it publishes `GET /.well-known/jwks.json` and any other service accepts its tokens by pointing `auth.jwt.jwksUrl` at it — configuration only, no code |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
 | Brute-force lockout | **built** — 5 failed attempts for one identity inside 15 minutes answer **429** with the remaining window, auto-releasing as the window ages out. The counter is a COLUMN on a rollup row (`authentication_attempts`, migration `0007`) read by a single point lookup, NOT a column on `users`: keyed by the ATTEMPTED identity, so an address that names no account locks exactly as a real one does. That uniformity is the point — a counter on the user row could only exist for real users, which would have made both the message and the response time an existence oracle. The expiry is never stored: it is the window's anchor plus the window, so nothing has to be cleared and nothing can drift. Because the state is in the table, a restart does not release anybody |
 | Authentication forensics | **built, and it lives in the LOG STREAM** — every sign-in outcome is published as one structured `"event"` record on the service's stdout channel (identity, kind, outcome, origin IP, whether the identity named a real account, and when a lock lifts), so the per-attempt narrative, the cross-IP patterns and the timeline are questions for the observability stack rather than for SQL. The table keeps only what has to be transactional: the lockout counters, the lifetime totals, the last origin, and `total_blocked` — attempts made THROUGH a lock, counted so the persistence stays visible while being unable to extend the lock. The attempted password enters neither the table nor the stream, in any form. Two consequences to own: retention is now the log pipeline's policy, and the record is best-effort — a publish failure is warned and swallowed, because the lockout is the load-bearing half and it is in SQL |
 | Refresh-token storage | **built** — `authentication_refresh_tokens` (migration `0006`), hash-only: the raw value never reaches the table. Single-use with rotation on every redemption; replaying a redeemed value revokes the entire session family. The table sweeps its own expired rows on every write, so there is no scheduled job to forget to deploy |
 | Contract QA suite (`/omnicore:qa`) | not generated |
-| Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential and token path: the password hasher, the two credential operations, the two token routes, the permission resolver, the refresh store and migration `0006` are hand-written. `specs/omnicore-gen/user.gen-report.md` lists the credential pieces; `specs/implement/authentication-token/plan.md` lists the token ones |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` · `:grant` now gate the built role routes too, the two child ops riding `role:grant` since 2026-08-28, when the collection verbs of every entity were aligned on a verb of their own; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `role:grant`, `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the five nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
+| Generated code | **All seven aggregates.** `internal/` holds Tenant, Permission, Role, Group, User, Client and Claim end to end — domain, application, web, infra, migrations `0001` to `0005`, `0008` and `0009`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential and token path: the password hasher, the two credential operations, the two token routes, the permission resolver, the refresh store and migration `0006` are hand-written. `specs/omnicore-gen/user.gen-report.md` lists the credential pieces; `specs/implement/authentication-token/plan.md` lists the token ones |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` · `:grant` now gate the built role routes too, the two child ops riding `role:grant` since 2026-08-28, when the collection verbs of every entity were aligned on a verb of their own; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too; so do `client:*` (**seven** — the five plus `rotate-secret` and `manage-network`) and `claim:*` (**four** — `read` · `insert` · `update` · `archive`, and there is no fifth because the catalog owns no collection). **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `role:grant`, `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the five nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -305,7 +306,7 @@ which is what every authorization note below exists for.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or grant |
-| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.id` — the tenant's only identifier, and the value the `tenant_id` token claim carries |
+| `tenantID` | UUID | the owning tenant. Immutable, and **filled from the caller's `tenant_id` claim** — optional in the create body, where only a `*:*` operator has reason to state one; absent from the patch body entirely. FK to `tenants.id`, the tenant's only identifier and the value the claim carries |
 | `key` | string(64) | the stable machine handle (`billing-manager`). Immutable, and unique **per tenant**, not globally. Stored in `role_key` |
 | `name` | string(120) | the display name. Not unique — two tenants, or two roles, may share a label |
 | `description` | string(500) | required, and validated for substance |
@@ -423,7 +424,7 @@ of it, and three of them are the interesting part.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID v7 | the row id. Internal, but **returned** — a caller needs it to patch, archive or attach |
-| `tenantID` | UUID | the owning tenant. Immutable. FK to `tenants.id` — the tenant's only identifier, and the value the `tenant_id` token claim carries |
+| `tenantID` | UUID | the owning tenant. Immutable, and **filled from the caller's `tenant_id` claim** — optional in the create body, where only a `*:*` operator has reason to state one; absent from the patch body entirely. FK to `tenants.id` |
 | `key` | string(64) | the stable machine handle (`engineering`). Immutable, and unique **per tenant**, not globally. Stored in `group_key` |
 | `name` | string(120) | the display name. Not unique — two groups in one tenant may share a label; the `key` is what disambiguates |
 | `description` | string(500) | required, and validated for substance |
@@ -770,6 +771,79 @@ whoever granted it (the escalation and wildcard rules), the tenant scope, and `a
 which records the actor of every write.
 
 
+### Claim
+
+The **tenant-owned catalog of claim definitions**: the vocabulary of extra facts a token may
+carry that are neither permissions nor platform identity — `x_cost_center`, `x_region`,
+`x_plan_tier`, `x_erp_id`. One row is one claim NAME. Flat aggregate, table `claims`, no
+collections. Its approved model, with the alternatives that were rejected and why, is in
+`specs/scaffold-entity/claim/spec.md`.
+
+It exists because consumers keep asking authorization questions that are not permission
+questions. Modelling each one as a permission inflates the catalog with values that gate
+nothing.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID v7 | the row id |
+| `tenantID` | UUID | the owning tenant. Immutable, and **filled from the caller's `tenant_id` claim** — optional in the create body, where only a `*:*` operator has reason to state one; absent from the patch body entirely. A stated value that is not the caller's meets the guard, not a silent overwrite |
+| `name` | string(64) | the exact name a token would carry. Unique **per tenant** over active rows, immutable, and it carries the reserved prefix — see below |
+| `valueType` | `string` / `number` / `bool` | what a value for this claim must parse as. **Immutable**: flipping it would retro-invalidate every value already set on a principal, with no cascade and no migration path |
+| `appliesTo` | `user` / `client` / `both` | which identity kinds may hold a value. Mutable, because widening is the ordinary operational move |
+| `defaultValue` | string(256)? | the default. **Null means there is no default and the claim is simply absent from the token** — absent and empty are not the same thing to a consumer |
+| `description` | string(500) | what the value means, for the operator filling it in |
+
+**Two levels, and this run built only the second one.**
+
+```
+  user_claims.value / client_claims.value    level 1 — the specialised value, per principal
+       ↓ if null
+  claims.default_value                       level 2 — the tenant's default (THIS entity)
+       ↓ if null
+  the claim does not enter the token at all
+```
+
+Level 1 is two owned collections on `User` and on `Client`, and **neither exists yet**. So the
+catalog can be filled, read and audited today with **no observable change to any token**:
+nothing here touches `buildClaims`. That is the first step, not half a feature — and it is why
+`appliesTo` currently states as data something the code does not yet enforce.
+
+**Why the registry is called `Claim` and not `Attribute`.** The industry distinction is real
+— AD FS keeps the data in an *attribute store* and a *Claim Description* names what leaves in
+the token — but it does not apply here, because in this service the row exists **to be
+minted**. An `Attribute` registry would carry a `key` and a `claimName` that are always 1:1,
+with no transformation and no N:1: two fields for one value, which is what a postiche internal
+name looks like. Called `Claim`, they collapse into one.
+
+**The reserved prefix is `x_`, and it is CALLER-OWNED.** The caller types `x_cost_center`, the
+column stores `x_cost_center`, and a token would mint `x_cost_center`. **Nothing anywhere
+prepends the prefix and nothing strips it** — one string on the wire, in the column, in the
+token and in whatever a consuming service greps for. The alternative (sending a bare
+`cost_center` and letting the server prefix it) was weighed and refused: it would make the
+wire name and the token name differ, which is the same two-name shape the paragraph above
+rejects, just hidden inside a prefix instead of stated as a second column. A name whose
+remainder itself begins with `x_` is refused too — the paste error a caller-owned prefix makes
+possible.
+
+That rule is also what keeps the platform's own nine claims (`identity_kind`, `tenant_id`,
+`tenant_workspace`, `email`, `name`, `permissions`, `groups`, `roles`,
+`must_change_password`) un-writable through this API: none of them carries the prefix. Two of
+them, `permissions` and `tenant_id`, are read by the framework across the whole mesh, so
+letting a tenant define one would not merely confuse a consumer — it would change what every
+service authorizes.
+
+Permissions: `claim:read` · `claim:insert` · `claim:update` · `claim:archive`. **Four verbs,
+not five.** `Role`, `Group` and `User` each carry a `:grant` because each owns a collection
+whose contents change what a principal can DO, and "may rename it" and "may change what it
+confers" are separately grantable. This entity owns no collection and confers nothing, so a
+fifth verb would gate nothing. The verb that eventually sets a VALUE on a principal is a real
+question, and it belongs to those collections rather than here.
+
+Archive is one-way, as everywhere but `Tenant`: a retired definition comes back as a **new row
+with a new id**, so a principal-level value holding the old id cannot silently re-attach to the
+recreated definition. That is the same property that made `role_permissions` store the
+permission's id and not its string.
+
 ## Running it locally
 
 Requires Docker and a Go toolchain.
@@ -939,6 +1013,42 @@ PATCH  /groups/{id}/archive                  removal — ONE-WAY, there is no un
 POST   /groups/{id}/roles                    attach one role      — group:grant
 PATCH  /groups/{id}/roles/{entryId}/archive  detach one — never DELETE — group:grant
 ```
+
+```
+GET    /claims/                  list, filter, paginate
+POST   /claims/                  create
+GET    /claims/{id}              read one
+PATCH  /claims/{id}              partial update (appliesTo, defaultValue, description)
+PATCH  /claims/{id}/archive      removal — ONE-WAY, there is no unarchive
+```
+
+`PATCH /claims/{id}` carries **three** fields and no more. `tenantID`, `name` and `valueType`
+are not merely refused there — they are absent from the request shape, so there is no body in
+which a caller can propose one. The immutability rules stay in the domain behind them: the
+exclusion closes the PATCH door, the rules guard the value on every update path whatever door
+it came through. This is the first tenant-owned registry in the service built that way from
+the start; `Role` and `Group` were brought level for `tenantID` on 2026-08-28 and still
+advertise `key`, which is a separate open decision.
+
+**`tenantID` is server-assigned across every tenant-owned entity** — `Role`, `Group`, `User`,
+`Client` and `Claim` alike. It is filled from the caller's `tenant_id` claim and appears in the
+create body as an OPTIONAL value: omit it and the row is filed under your own tenant, state it
+and the row-scope guard refuses anything that is not yours. The field exists there for exactly
+one caller — the `*:*` operator supporting a customer, who otherwise could read and repair a
+customer's rows and never create one. Nothing is checked in the mapper: a stated value is
+applied whoever sent it, and `refuseForeignTenant` is what answers, with the same 403 a write
+into a foreign row meets. *(`Role` and `Group` carried it as a required field in both bodies
+until 2026-08-28; the `bypassMaySet` key is what let the claim fill it without costing the
+operator the ability to create.)*
+
+Claim serves the same five listing controls as the others. Filters served, per field:
+`tenantId` (eq, in) · `name` (eq, ne, in, prefix, contains, and the case-insensitive twins) ·
+`valueType` and `appliesTo` (eq, in) · `defaultValue` (eq, in, contains, icontains) ·
+`description` (contains, icontains) · `tenantWorkspace` (eq, in, prefix, iprefix) ·
+`tenantStatus` (eq, in) · `createdAt` and `updatedAt` (gte, lte). `?orderBy` admits `name`,
+`valueType`, `appliesTo`, `tenantId`, `tenantWorkspace`, `createdAt` and `updatedAt` —
+`description` and `defaultValue` are deliberately not sortable, for the reason Role's
+`description` is not. `?search=` is not served.
 
 Permission serves the same five listing controls as Tenant, and `?orderBy` over
 `resource`, `action` and `description`. Filters served, per field: `resource` (eq, ne, in,

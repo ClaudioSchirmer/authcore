@@ -45,6 +45,7 @@ func Wire(d bootstrap.Deps) bootstrap.Wiring {
 			authentication,
 			NewClientSecretsFeature(d),
 			NewClientsFeature(d),
+			NewClaimsFeature(d),
 		},
 
 		OpenAPI: &openapi.Config{

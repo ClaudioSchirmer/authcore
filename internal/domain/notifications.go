@@ -466,3 +466,48 @@ type ClientMayOnlyRotateItsOwnSecretNotification struct {
 func (ClientMayOnlyRotateItsOwnSecretNotification) Semantic() domain.NotificationSemantic {
 	return domain.SemanticForbidden
 }
+
+// ClaimNameAlreadyExistsNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClaimNameAlreadyExistsNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClaimNameAlreadyExistsNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// ClaimNameIsImmutableNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type ClaimNameIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// ClaimTenantIsImmutableNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimTenantIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// ClaimValueTypeIsImmutableNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimValueTypeIsImmutableNotification struct{ domain.DomainNotificationBase }
+
+// ClaimTenantDoesNotExistNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimTenantDoesNotExistNotification struct{ domain.DomainNotificationBase }
+
+// DefaultValueDoesNotMatchValueTypeNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+type DefaultValueDoesNotMatchValueTypeNotification struct{ domain.DomainNotificationBase }
+
+// DefaultValueTooLongNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type DefaultValueTooLongNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}

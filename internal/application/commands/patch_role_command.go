@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:bf864b13a716240da50e5969e9812e18eae394c7e626407cbb004e4a4aab903f
+// checksum:   sha256:e5280a2bfed50401abcdfb50d17b30cec01c100c6859e0e59f785d757e1931ea
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -32,7 +32,6 @@ import (
 // value.
 type PatchRoleCommand struct {
 	pipeline.CommandWithBodyIDBase
-	TenantID    *domain.ID
 	Key         *string
 	Name        *string
 	Description *string
@@ -44,9 +43,6 @@ type PatchRoleCommand struct {
 // Note the consequence: this verb can never set a value back to null, because
 // an absent field and an explicit null are indistinguishable here.
 func (c *PatchRoleCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *appdomain.Role) error {
-	if c.TenantID != nil {
-		e.TenantID = *c.TenantID
-	}
 	if c.Key != nil {
 		e.Key = vos.RoleKey(*c.Key)
 	}

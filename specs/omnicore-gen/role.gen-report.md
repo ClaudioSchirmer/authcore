@@ -138,6 +138,12 @@ A new pair goes in every dialect this service targets (postgres), numbered after
 
 If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
+### The tenant is server-assigned, and the insert accepts one anyway
+
+`TenantID` is declared `assignedFrom: identity-claim` with `bypassMaySet: true`, so it is filled from the caller's identity on every insert and is in no update or patch body. The INSERT body carries it as an OPTIONAL value, for one reason: a super-admin (`*:*`) crosses the row scope, and without a field to name the tenant in they could repair a customer's records and never create one.
+
+**Check the guard, not the mapper.** The mapper applies whatever was sent, deliberately: what refuses a caller who may not state a tenant is `refuseForeignTenant` in `internal/domain/role.go`, which compares `TenantID` against the caller's own and stands down only for the bypass. Two things follow. A caller who names someone else's tenant gets the same refusal a write into that tenant gets — not a silent 201 filed under their own. And if that guard is ever removed or narrowed, this field becomes a tenant anyone can choose.
+
 ### Rules that END the validation pass
 
 `tenant-is-a-usable-id` (in `IfInsertOrUpdate`) — declared `guard: true`. After each of them the pass stops if anything has already been rejected: the rules below it, this entity's automatic value-object validation, and the `BuildRules` and value objects of every collection. A clean write is unaffected — the barrier fires only where something was ALREADY refused — so what changes is the SHAPE of a 422: it carries what was found up to the barrier, not that plus every other field the write would have failed on. Check that against what the API consumers expect to receive in one response.
@@ -145,6 +151,10 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 ### Value objects validated with the rules, not after them
 
 `TenantID` (in `IfInsertOrUpdate`) — declared `kind: valueObject`. The framework validates every value-object field on every write, but that pass runs AFTER `BuildRules`, so a value object cannot be the premise of the rules below it. Each field above is checked where it is declared instead — by the value object's own answer, never a second one — and excluded from the automatic pass in those verbs, so nothing is reported twice. Two consequences worth checking: the value is now validated BEFORE any barrier that follows, so a 422 that used to hide it behind another failure now carries both; and in the verbs this rule does not cover, the field is still validated at the end, exactly as before.
+
+### Fields the server fills
+
+- **`TenantID`** — written on insert from the `tenant_id` claim of the caller's token. It is **absent from every write request and command**: a client cannot set it, and an update does not touch it. Confirm the callers are authenticated on the insert route — with no identity the field stays empty, and nothing else will say so.
 
 ### Per-entry command tests are generated now
 
@@ -187,7 +197,12 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the 5 role endpoints | `internal/web/role_routes.go` |
+| the insert command and result | `internal/application/commands/insert_role_command.go` |
+| the patch command and result | `internal/application/commands/patch_role_command.go` |
+| tests for the command mappers | `internal/application/commands/role_commands_test.go` |
+| the insert request and response | `internal/web/requests/insert_role.go` |
+| the patch request and response | `internal/web/requests/patch_role.go` |
+| the request mapper tests | `internal/web/requests/role_requests_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -197,7 +212,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+29 file(s) were already up to date.
 
 ## What was NOT generated
 

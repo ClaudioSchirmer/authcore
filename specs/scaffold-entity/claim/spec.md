@@ -11,6 +11,16 @@
   plugin `omnicore` 0.48.0 (current)
 - **Language:** English (all artifacts) · Portuguese (chat) — per `../../../CLAUDE.md` rule 3
 - **Generation:** **omnicore-gen** — chosen by the maintainer at gate 1d, 2026-08-28
+- **Amended:** 2026-08-28, after the build, on the maintainer's explicit approval — **§10:
+  `TenantID` moved from an ordinary wire field to `assignedFrom: identity-claim` +
+  `bypassMaySet: true`**, and §8's `patchExcludes` dropped it as a consequence. The model
+  gate had approved "on the wire, as on `Role`"; that reading was inherited from `Role`'s
+  own comment, which rejected `assignedFrom` for two reasons — the operator losing
+  cross-tenant creation, and a token-less dev bench with nothing to fill the field. The
+  first is exactly what `bypassMaySet` answers, and the second expired on 2026-08-26 when
+  `auth.mode` became `jwt` in both profiles. **The same amendment was applied to `Role` and
+  `Group` in the same pass**; `User` and `Client` already had it. Nothing else in the model
+  changed, and no migration was needed — the column does not move
 
 The **tenant-owned catalog of claim definitions**: the vocabulary of extra facts a token may
 carry that are neither permissions nor platform identity (`cost_center`, `region`,
@@ -346,11 +356,13 @@ PATCH therefore carries: `appliesTo`, `defaultValue`, `description`.
   - writes: the domain refuses a row whose `tenant_id` is not the caller's
     (`TenantMismatchNotification`, 403) — the guard, not the read filter, is what stands between
     a caller and another tenant's definition;
-  - `tenantID` travels **on the wire** in the insert body, as on `Role`: the guard already
-    refuses a foreign value, so the claim decides what you MAY write without being the only
-    thing that CAN write it — which is what lets a `*:*` operator create a definition in a
-    customer's tenant, and what keeps the dev bench (`auth.mode: disabled`) able to write at
-    all. It is excluded from PATCH by §8;
+  - `tenantID` is **server-assigned from the caller's claim, and stateable only by the caller
+    who crosses the scope** — `assignedFrom: identity-claim` + `bypassMaySet: true`
+    *(amended 2026-08-28, after the maintainer approved the change; see the amendment note
+    below)*. It appears in the INSERT body as an OPTIONAL value — absent means "mine" — and
+    in no update body at all, so §8 no longer needs to exclude it. Nothing is checked in the
+    mapper: a stated value is applied whoever sent it, and the guard above is what answers,
+    with the same 403 a foreign write meets;
   - **bypass: `*:*`** — a platform operator supporting a customer crosses the row scope; a
     resource wildcard (`claim:*`) does not;
   - **`noIdentity: stand-down`** — `ctx.Identity()` nil happens only under `auth.mode: disabled`,

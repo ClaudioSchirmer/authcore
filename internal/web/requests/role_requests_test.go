@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:4db07e1f033c7df9dc0506555a59ec4e70d9a5c621fba89abb58ff80d438b1b5
+// checksum:   sha256:d96a0449d75b2370f7deef6bc99ca6ce03ddfdada788ec098f349cb605f663b3
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -32,10 +32,10 @@ import (
 // and the value the caller sent is not in the row.
 func TestInsertRoleRequest_CarriesEveryField(t *testing.T) {
 	r := InsertRoleRequest{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 	}
 	r.Permissions = []RolePermissionRequest{{
 		PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
@@ -46,9 +46,6 @@ func TestInsertRoleRequest_CarriesEveryField(t *testing.T) {
 	}
 	if len(cmd.Permissions) != 1 {
 		t.Errorf("the RolePermission collection did not reach the command")
-	}
-	if cmd.TenantID != r.TenantID {
-		t.Errorf("TenantID did not reach the command")
 	}
 	if cmd.Key != r.Key {
 		t.Errorf("Key did not reach the command")
@@ -76,9 +73,8 @@ func TestInsertRoleResponse_CarriesTheResult(t *testing.T) {
 // and the value the caller sent is not in the row.
 func TestPatchRoleRequest_CarriesEveryField(t *testing.T) {
 	r := PatchRoleRequest{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("billing-manager"); return &v }(),
-		Name:     func() *string { v := string("Billing Manager"); return &v }(),
+		Key:  func() *string { v := string("billing-manager"); return &v }(),
+		Name: func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
 			v := string("Grants read access to the tenant registry and the permission catalog, without any write verb.")
 			return &v

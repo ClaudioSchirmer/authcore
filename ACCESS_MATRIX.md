@@ -2,7 +2,7 @@
 
 Who reaches what, per endpoint. The code as it stands.
 
-Status: **in progress**. Mapped: Permission, Tenant, Role, Group, User, Client.
+Status: **in progress**. Mapped: Permission, Tenant, Role, Group, User, Client, Claim.
 Pending: Authentication.
 
 ## Columns
@@ -73,7 +73,7 @@ The two collection endpoints answer on BOTH surfaces, same command and same perm
 
 Granting and revoking ride `role:grant`, a verb of their own — not the root's `role:update`. A principal holding `role:update` alone may relabel a role and gets **403** on both collection endpoints. Same split as `Group` and `User`: "may rename it" and "may change what it confers" are separately grantable across the whole service.
 
-`tenantID` travels in the insert and patch bodies. On insert the guard refuses any value that is not the caller's; on update `RoleTenantIsImmutableNotification` refuses any change to it. A role never moves between tenants.
+`tenantID` is **server-assigned from the caller's `tenant_id` claim** and travels in the INSERT body as an OPTIONAL value: omit it and the row is filed under your own tenant; state it and the guard refuses anything that is not yours, which is what lets a `*:*` operator create a role inside a customer's tenant. It is **absent from the patch body entirely** — a role does not change tenant by being edited — so `RoleTenantIsImmutableNotification` is now a backstop on the paths a request cannot reach rather than a refusal callers meet. *(Until 2026-08-28 the value was an ordinary required field in both bodies; `bypassMaySet` is what let the claim fill it without costing the operator the ability to create.)*
 
 Writes load the row through the repository, which the read filter never touches — the guard is what stands between a caller and another tenant's role.
 
@@ -111,7 +111,9 @@ The two collection endpoints answer on BOTH surfaces, same command and same perm
 
 No unarchive mounted, on the root or per entry. A detached entry does not come back: attaching the same role again mints a NEW entry with a new id.
 
-`tenantID` travels in the insert and the patch bodies; `key` travels in both as well. On insert the guard refuses a `tenantID` that is not the caller's; on update `GroupTenantIsImmutableNotification` and `GroupKeyIsImmutableNotification` refuse any change to either. So the PATCH contract advertises two fields the domain then refuses — the same asymmetry that `patchExcludes: [Key]` closed on Permission. `Name` and `Description` are what an update actually changes.
+`tenantID` is **server-assigned from the caller's `tenant_id` claim** and travels in the INSERT body as an OPTIONAL value: omit it and the row is filed under your own tenant; state it and the guard refuses anything that is not yours, which is what lets a `*:*` operator create a group inside a customer's tenant. It is **absent from the patch body entirely**, so `GroupTenantIsImmutableNotification` is a backstop rather than a refusal callers meet.
+
+**`key` is the half that is still asymmetric.** It travels in both bodies, and `GroupKeyIsImmutableNotification` refuses any change on update — so the PATCH contract still advertises one field the domain then refuses, the asymmetry `patchExcludes: [Key]` closed on Permission. `Name` and `Description` are what an update actually changes. The 2026-08-28 pass that made `tenantID` server-assigned deliberately left `key` alone: it is a separate decision, and the same one is open on `Role`.
 
 Writes load the row through the repository, which the read filter never touches — the guard is what stands between a caller and another tenant's group.
 
@@ -239,6 +241,30 @@ Judged on the entries a write ADDS. The same three questions `User` asks of a di
 | no-escalation | The caller must hold every permission the role grants. `*:*` satisfies it by construction |
 
 Caps: 50 roles, 20 CIDRs. A client caller may grant itself a role and gains nothing by it — the escalation rule bounds the grant to what it already holds.
+
+---
+
+## Claim
+
+Tenant-scoped: `claims.tenant_id`. The catalog of claim definitions a tenant's tokens may carry. Owns **no** collection.
+
+| Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached |
+|---|---|---|---|---|---|---|---|
+| `POST /claims` | `createClaim` | `claim:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /claims/:id` | `patchClaim` | `claim:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `PATCH /claims/:id/archive` | `archiveClaim` | `claim:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
+| `GET /claims` | `claims` | `claim:read` | JWT + claim | filter TenantID | — | yes | own tenant |
+| `GET /claims/:id` | `claim` | `claim:read` | JWT + claim | filter TenantID | — | yes | own tenant |
+
+**Four verbs, not five, and it is not an oversight.** `Role`, `Group` and `User` each carry a `:grant` because each owns a collection whose contents change what a principal can DO — "may rename it" and "may change what it confers" are separately grantable across this whole service. This entity owns no collection and confers nothing, so a fifth verb would gate nothing. The verb that eventually sets a claim VALUE on a principal is a real question, and it belongs to the two collections that will live on `User` and `Client`, not here.
+
+**There is no "What a claim may be granted" sub-section below this table**, and the absence is meaningful: no in-catalog check, no wildcard refusal, no escalation rule, because nothing is granted. A claim definition is vocabulary.
+
+**PATCH carries only what it can change.** `tenantID`, `name` and `valueType` are absent from the request shape entirely, so the domain's three immutability rules guard the values without the API ever offering them. `Claim` is the first tenant-owned registry here built that way from the start; `Role` and `Group` were brought level for `tenantID` on 2026-08-28 and still advertise `key`, which is a separate open decision.
+
+`tenantID` is **server-assigned from the caller's `tenant_id` claim** and travels in the INSERT body as an OPTIONAL value: omit it and the definition is filed under your own tenant; state it and the guard refuses anything that is not yours, which is what lets a `*:*` operator create a definition inside a customer's tenant. Nothing is checked in the mapper — the stated value is applied whoever sent it, and `refuseForeignTenant` is what answers.
+
+No unarchive and no `DELETE`, on the root or anywhere — so a retired definition comes back only as a new row with a new id, and `?includeArchived` on the listing is the only way to see one. A by-id read of another tenant's definition answers **404**, not 403: it does not exist for this caller, which leaks nothing about who else exists.
 
 ---
 

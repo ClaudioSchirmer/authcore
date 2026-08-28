@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:fcba32eecf9a483f22542cdfbe93919756ee3732a5ab199384405a0c702b60e0
+// generated:  2026-08-28
+// checksum:   sha256:145f924e8e2ca2a08bc7d175d637306b36274ed950909eb62a009aa650db9816
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -29,10 +29,9 @@ import (
 type PatchRoleRequest struct {
 	fwrequests.Auto
 
-	TenantID    *domain.ID `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         *string    `json:"key,omitempty" example:"billing-manager"`
-	Name        *string    `json:"name,omitempty" example:"Billing Manager"`
-	Description *string    `json:"description,omitempty" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
+	Key         *string `json:"key,omitempty" example:"billing-manager"`
+	Name        *string `json:"name,omitempty" example:"Billing Manager"`
+	Description *string `json:"description,omitempty" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
 }
 
 // ToCommand hands the body to the application layer unchanged. No

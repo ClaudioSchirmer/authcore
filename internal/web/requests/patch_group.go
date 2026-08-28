@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:595235c9a9e92b95e8fabebbd20f890d3996b3eed812e0ada65178bde44d3ce6
+// generated:  2026-08-28
+// checksum:   sha256:a12c5d501ce8eaf18df8b966862f18e27dcb4ecdaf8abc47c5d3baf9de338cb6
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -29,10 +29,9 @@ import (
 type PatchGroupRequest struct {
 	fwrequests.Auto
 
-	TenantID    *domain.ID `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         *string    `json:"key,omitempty" example:"engineering"`
-	Name        *string    `json:"name,omitempty" example:"Engineering"`
-	Description *string    `json:"description,omitempty" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
+	Key         *string `json:"key,omitempty" example:"engineering"`
+	Name        *string `json:"name,omitempty" example:"Engineering"`
+	Description *string `json:"description,omitempty" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
 }
 
 // ToCommand hands the body to the application layer unchanged. No

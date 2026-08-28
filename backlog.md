@@ -129,8 +129,41 @@ client later makes to other services.
 
 ## Custom claims via a `Claim` catalog (tenant-owned, two levels)
 
-**Status:** open question — raised 2026-08-28, not approved, not specified. The shape below
-was drafted from a survey of how other identity systems solve it; nothing here is decided.
+**Status: PROMOTED — the catalog was approved and built on 2026-08-28.** The approved model is
+`specs/scaffold-entity/claim/spec.md`; the generator spec is
+`specs/omnicore-gen/claim.omnicore.yaml`; the entity is described in the README under
+`### Claim` and its reach in `ACCESS_MATRIX.md` under `## Claim`. This entry stays rather than
+being deleted, because most of what it asks is still open — what changed is that those
+questions are now reachable instead of blocked.
+
+**What the model gate settled, and what the answers cost:**
+
+- **The reserved prefix is `x_`.** `ext_` was two runes dearer, a URI namespace (Auth0's
+  answer) safest and by far the most expensive per token, and an explicit reserved LIST of the
+  nine platform names cheapest of all — and refused, because it protects only against the names
+  that exist NOW: the tenth platform claim would collide with a definition a customer already
+  created, and there is no migration out of that.
+- **The prefix is CALLER-OWNED, not server-owned.** The caller types it, the column stores it,
+  a token would mint it, and nothing prepends or strips it anywhere. The alternative — a bare
+  `cost_center` on the wire that the server prefixes — is this entry's own argument against a
+  postiche internal name, wearing a prefix instead of a second column: the wire name and the
+  token name would differ, so a consumer reading `x_cost_center` out of a JWT and searching the
+  catalog for it would find nothing.
+- **The reserved-platform-tenant dependency was BROKEN, not inherited.** This entry predicted
+  the catalog would become the third entity blocked on that tenant. It is not: the prefix rule
+  applies to every definition created through the API with no exception carved for a tenant, so
+  the platform's own nine would enter by migration — the same door the `*:*` role enters by —
+  and nothing in the entity needs to know which tenant is reserved.
+- **Scope: the catalog only.** The two owned collections below are children of `User` and of
+  `Client`, which already exist, so they are `/omnicore:evolve-entity` work — one run per
+  parent — not this one.
+
+**What is still open is most of this entry**, and none of it got easier: the two edge
+collections, the emission merge into `buildClaims`, the third-level question, removal semantics
+on the edge, the audit allowlist, and which verb sets a value on a principal. The catalog
+changes no token today, by design.
+
+The rest of this entry is the original draft, kept because it is where the reasoning lives.
 
 Consumers need extra facts on a token that are neither permissions nor platform identity:
 `cost_center`, `region`, `plan_tier`, `erp_id`. Two cases have to hold **at the same time**: a
@@ -308,4 +341,7 @@ specialised" without it.
 
 The earlier `Custom claims on Group` entry asks a related question through a different
 carrier; this shape does not answer it, since a user reaches several groups and the collision
-returns there.
+returns there. That entry therefore stays open on its own terms: the built catalog removes the
+collision by construction only along the chain it defines — one name is one definition, and a
+principal holds at most one value per definition — and a group carrier reintroduces exactly the
+multiplicity that construction avoids.

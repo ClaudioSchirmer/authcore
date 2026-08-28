@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:f0502357a3613728d57faa7b17293a19aa8e3aa3299d016d1cb77bfa85b0e3a8
+// checksum:   sha256:f5b1cde9ac7c40e87692fff7a969a51837a6f494ab4a8856690d750ab1431d75
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -32,10 +32,10 @@ import (
 // and the value the caller sent is not in the row.
 func TestInsertGroupRequest_CarriesEveryField(t *testing.T) {
 	r := InsertGroupRequest{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "engineering",
 		Name:        "Engineering",
 		Description: "Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 	}
 	r.Roles = []GroupRoleRequest{{
 		RoleID: domain.NewID("0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"),
@@ -46,9 +46,6 @@ func TestInsertGroupRequest_CarriesEveryField(t *testing.T) {
 	}
 	if len(cmd.Roles) != 1 {
 		t.Errorf("the GroupRole collection did not reach the command")
-	}
-	if cmd.TenantID != r.TenantID {
-		t.Errorf("TenantID did not reach the command")
 	}
 	if cmd.Key != r.Key {
 		t.Errorf("Key did not reach the command")
@@ -76,9 +73,8 @@ func TestInsertGroupResponse_CarriesTheResult(t *testing.T) {
 // and the value the caller sent is not in the row.
 func TestPatchGroupRequest_CarriesEveryField(t *testing.T) {
 	r := PatchGroupRequest{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("engineering"); return &v }(),
-		Name:     func() *string { v := string("Engineering"); return &v }(),
+		Key:  func() *string { v := string("engineering"); return &v }(),
+		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")
 			return &v

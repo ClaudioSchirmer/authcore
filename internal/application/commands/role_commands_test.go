@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:3beababb76bdbe9c08ae5dbaa28487baa2e58fd98c1af4ff0e70741f237de8cc
+// checksum:   sha256:4286a147ff1a1066b4e2668fac488c593b784cd591797331694e1f2a55c1fbb4
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
@@ -41,10 +42,10 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 		},
 	})
 	c := &InsertRoleCommand{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Permissions: []dtos.RolePermissionInput{{
 			PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 		}},
@@ -56,9 +57,6 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID did not survive the mapper")
-	}
 	if e.Key.Value() != "billing-manager" {
 		t.Errorf("Key did not survive the mapper")
 	}
@@ -67,6 +65,9 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 	}
 	if e.Description.Value() != "Grants read access to the tenant registry and the permission catalog, without any write verb." {
 		t.Errorf("Description did not survive the mapper")
+	}
+	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
+		t.Errorf("TenantID did not survive the mapper")
 	}
 }
 
@@ -85,10 +86,10 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 func TestInsertRoleCommandResultCarriesWhatWasWritten(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	c := &InsertRoleCommand{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "billing-manager",
 		Name:        "Billing Manager",
 		Description: "Grants read access to the tenant registry and the permission catalog, without any write verb.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Permissions: []dtos.RolePermissionInput{{
 			PermissionID: domain.NewID("0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"),
 		}},
@@ -102,9 +103,6 @@ func TestInsertRoleCommandResultCarriesWhatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
 	}
-	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID did not reach the result")
-	}
 	if res.Key != "billing-manager" {
 		t.Errorf("Key did not reach the result")
 	}
@@ -113,6 +111,9 @@ func TestInsertRoleCommandResultCarriesWhatWasWritten(t *testing.T) {
 	}
 	if res.Description != "Grants read access to the tenant registry and the permission catalog, without any write verb." {
 		t.Errorf("Description did not reach the result")
+	}
+	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
+		t.Errorf("TenantID did not reach the result")
 	}
 	if len(res.Permissions) != 1 {
 		t.Errorf("the Permissions collection reached the result with %d entries, want 1", len(res.Permissions))
@@ -134,13 +135,13 @@ func TestPatchRoleLeavesAbsentFieldsAlone(t *testing.T) {
 		},
 	})
 	e := &appdomain.Role{}
-	orig := domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")
-	e.TenantID = orig
+	orig := vos.RoleKey("billing-manager")
+	e.Key = orig
 	c := &PatchRoleCommand{} // nothing sent
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
 	}
-	if e.TenantID != orig {
+	if e.Key != orig {
 		t.Error("an absent field was overwritten")
 	}
 }
@@ -161,9 +162,8 @@ func TestPatchRoleAppliesWhatItCarries(t *testing.T) {
 	})
 	e := &appdomain.Role{}
 	c := &PatchRoleCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("billing-manager"); return &v }(),
-		Name:     func() *string { v := string("Billing Manager"); return &v }(),
+		Key:  func() *string { v := string("billing-manager"); return &v }(),
+		Name: func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
 			v := string("Grants read access to the tenant registry and the permission catalog, without any write verb.")
 			return &v
@@ -171,9 +171,6 @@ func TestPatchRoleAppliesWhatItCarries(t *testing.T) {
 	}
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
-	}
-	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID was sent and not applied")
 	}
 	if e.Key.Value() != "billing-manager" {
 		t.Errorf("Key was sent and not applied")
@@ -195,9 +192,8 @@ func TestPatchRoleCommandResultCarriesWhatWasApplied(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	e := &appdomain.Role{}
 	c := &PatchRoleCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("billing-manager"); return &v }(),
-		Name:     func() *string { v := string("Billing Manager"); return &v }(),
+		Key:  func() *string { v := string("billing-manager"); return &v }(),
+		Name: func() *string { v := string("Billing Manager"); return &v }(),
 		Description: func() *string {
 			v := string("Grants read access to the tenant registry and the permission catalog, without any write verb.")
 			return &v
@@ -210,9 +206,6 @@ func TestPatchRoleCommandResultCarriesWhatWasApplied(t *testing.T) {
 	res, err := c.FromEntity(ctx, e)
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
-	}
-	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID was applied and did not reach the result")
 	}
 	if res.Key != "billing-manager" {
 		t.Errorf("Key was applied and did not reach the result")

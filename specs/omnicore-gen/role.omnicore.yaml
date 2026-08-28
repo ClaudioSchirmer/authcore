@@ -46,17 +46,34 @@ fields:
     type: id
     column: tenant_id
     livesOn: root
-    # ON THE WIRE, deliberately — assignedFrom: identity-claim was tried and is
-    # WRONG for this entity, in two ways that only showed up against a running
-    # bench. It removes the field from every write DTO, so (1) a super-admin can
-    # never create a role in a tenant other than their own, which §10 of the
-    # approved model explicitly promises, and (2) on a dev bench with
-    # auth.mode disabled nothing fills it and the write dies on an empty id.
+    # SERVER-ASSIGNED, with the one caller who crosses the scope able to state
+    # it. Changed on 2026-08-28; what was here before is worth keeping in view,
+    # because the reasoning did not become wrong so much as incomplete.
     #
-    # The row scope is not lost by putting it back: refuseForeignTenant already
-    # refuses a value that is not the caller's claim (403), and the super-admin
-    # bypass already crosses it. The claim decides what you MAY write; it does
-    # not have to be the only thing that CAN write it.
+    # assignedFrom: identity-claim was tried alone, and it WAS wrong: it removes
+    # the field from every write DTO, so (1) a super-admin could never create a
+    # role in a tenant other than their own, which §10 of the approved model
+    # explicitly promises, and (2) on a dev bench with auth.mode disabled
+    # nothing filled it and the write died on an empty id. The escape taken then
+    # was to put the value in the body with a rule — which made every ordinary
+    # caller send their own tenant id and left that rule as the only thing
+    # between them and their neighbour's data.
+    #
+    # bypassMaySet is the key that answers (1): the field rejoins the INSERT
+    # body as an OPTIONAL value, so absent means "mine" and a *:* operator can
+    # still name the customer's tenant. And (2) expired on 2026-08-26, when
+    # auth.mode became jwt in BOTH profiles and the token-less dev bench was
+    # closed — there is no longer a profile in which nothing fills it.
+    #
+    # Nothing is checked in the mapper, by design: the stated value is applied
+    # whoever sent it, and refuseForeignTenant is what answers. A caller who may
+    # not cross the scope meets the same 403 they met before. It stays out of
+    # the patch — a role does not change tenant by being edited — which is also
+    # what closes the asymmetry ACCESS_MATRIX.md records here: the PATCH body no
+    # longer advertises a field the domain then refuses.
+    assignedFrom: identity-claim
+    claim: tenant_id
+    bypassMaySet: true
     example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
     description: >-
       The tenant that owns this role. Immutable after creation — a role never moves between

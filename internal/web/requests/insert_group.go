@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:0cc13a27c37b5daca454443dc871556e04f8ca035c90cd79d36b2d501a8ff01d
+// generated:  2026-08-28
+// checksum:   sha256:9bc8dfe13bf4066918da36563815c61f43391d8938a9e44a9e511c67864a4ada
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -27,11 +27,18 @@ import (
 type InsertGroupRequest struct {
 	fwrequests.Auto
 
-	TenantID    domain.ID          `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         string             `json:"key" example:"engineering"`
-	Name        string             `json:"name" example:"Engineering"`
-	Description string             `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
-	Roles       []GroupRoleRequest `json:"roles"`
+	Key         string `json:"key" example:"engineering"`
+	Name        string `json:"name" example:"Engineering"`
+	Description string `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
+	// Optional, and server-assigned for almost everyone: leave it out and
+	// the value is read from the caller's own identity. It is here for a
+	// super-admin (*:*), who crosses the row scope and has to be able to
+	// say which one a NEW record belongs to. A value from anyone else is
+	// not ignored — it reaches the aggregate, where the row-scope guard
+	// refuses it exactly as it refuses a write into a record that is not
+	// the caller's.
+	TenantID *domain.ID         `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Roles    []GroupRoleRequest `json:"roles"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:84f23347a3fc85e5875b470ff414cc30e7af46bb9e034084eacf3b5c12acc646
+// checksum:   sha256:47ce25423d5f4decd2a6430c858019b3eaa93f4518c1d8cc637d566e1d07575b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
@@ -41,10 +42,10 @@ func TestInsertGroupMapsEveryField(t *testing.T) {
 		},
 	})
 	c := &InsertGroupCommand{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "engineering",
 		Name:        "Engineering",
 		Description: "Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Roles: []dtos.GroupRoleInput{{
 			RoleID: domain.NewID("0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"),
 		}},
@@ -56,9 +57,6 @@ func TestInsertGroupMapsEveryField(t *testing.T) {
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID did not survive the mapper")
-	}
 	if e.Key.Value() != "engineering" {
 		t.Errorf("Key did not survive the mapper")
 	}
@@ -67,6 +65,9 @@ func TestInsertGroupMapsEveryField(t *testing.T) {
 	}
 	if e.Description.Value() != "Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights." {
 		t.Errorf("Description did not survive the mapper")
+	}
+	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
+		t.Errorf("TenantID did not survive the mapper")
 	}
 }
 
@@ -85,10 +86,10 @@ func TestInsertGroupMapsEveryField(t *testing.T) {
 func TestInsertGroupCommandResultCarriesWhatWasWritten(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	c := &InsertGroupCommand{
-		TenantID:    domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"),
 		Key:         "engineering",
 		Name:        "Engineering",
 		Description: "Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
 		Roles: []dtos.GroupRoleInput{{
 			RoleID: domain.NewID("0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"),
 		}},
@@ -102,9 +103,6 @@ func TestInsertGroupCommandResultCarriesWhatWasWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
 	}
-	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID did not reach the result")
-	}
 	if res.Key != "engineering" {
 		t.Errorf("Key did not reach the result")
 	}
@@ -113,6 +111,9 @@ func TestInsertGroupCommandResultCarriesWhatWasWritten(t *testing.T) {
 	}
 	if res.Description != "Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights." {
 		t.Errorf("Description did not reach the result")
+	}
+	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
+		t.Errorf("TenantID did not reach the result")
 	}
 	if len(res.Roles) != 1 {
 		t.Errorf("the Roles collection reached the result with %d entries, want 1", len(res.Roles))
@@ -134,13 +135,13 @@ func TestPatchGroupLeavesAbsentFieldsAlone(t *testing.T) {
 		},
 	})
 	e := &appdomain.Group{}
-	orig := domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")
-	e.TenantID = orig
+	orig := vos.GroupKey("engineering")
+	e.Key = orig
 	c := &PatchGroupCommand{} // nothing sent
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
 	}
-	if e.TenantID != orig {
+	if e.Key != orig {
 		t.Error("an absent field was overwritten")
 	}
 }
@@ -161,9 +162,8 @@ func TestPatchGroupAppliesWhatItCarries(t *testing.T) {
 	})
 	e := &appdomain.Group{}
 	c := &PatchGroupCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("engineering"); return &v }(),
-		Name:     func() *string { v := string("Engineering"); return &v }(),
+		Key:  func() *string { v := string("engineering"); return &v }(),
+		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")
 			return &v
@@ -171,9 +171,6 @@ func TestPatchGroupAppliesWhatItCarries(t *testing.T) {
 	}
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
-	}
-	if e.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID was sent and not applied")
 	}
 	if e.Key.Value() != "engineering" {
 		t.Errorf("Key was sent and not applied")
@@ -195,9 +192,8 @@ func TestPatchGroupCommandResultCarriesWhatWasApplied(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	e := &appdomain.Group{}
 	c := &PatchGroupCommand{
-		TenantID: func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
-		Key:      func() *string { v := string("engineering"); return &v }(),
-		Name:     func() *string { v := string("Engineering"); return &v }(),
+		Key:  func() *string { v := string("engineering"); return &v }(),
+		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")
 			return &v
@@ -210,9 +206,6 @@ func TestPatchGroupCommandResultCarriesWhatWasApplied(t *testing.T) {
 	res, err := c.FromEntity(ctx, e)
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
-	}
-	if res.TenantID != domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410") {
-		t.Errorf("TenantID was applied and did not reach the result")
 	}
 	if res.Key != "engineering" {
 		t.Errorf("Key was applied and did not reach the result")

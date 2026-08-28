@@ -1,0 +1,712 @@
+# Claim — the tenant-owned catalog of claim definitions.
+#
+# Model authority: scaffold-entity/claim/spec.md (Status: APPROVED). Nothing here
+# re-decides the model; where this file and that spec disagree, the spec wins.
+#
+# The one idea to hold while reading: THIS IS LEVEL 2 OF A TWO-LEVEL CHAIN, and only
+# level 2 is built here.
+#
+#   user_claims.value / client_claims.value    level 1 — the specialised value, per
+#        ↓ if null                                       principal. NOT in this run: those
+#   claims.default_value                                 are collections of User and of
+#        ↓ if null                                       Client, and adding a collection to
+#   the claim does not enter the token                   a living aggregate is evolve-entity
+#
+# So this entity can be filled, read and audited with no observable change to any token:
+# nothing here touches buildClaims. That is the first step, not half a feature.
+#
+# THE RESERVED PREFIX IS `x_` AND IT IS CALLER-OWNED. The caller types the full name,
+# prefix included; the column stores it verbatim; the token would mint it verbatim.
+# NOTHING PREPENDS IT AND NOTHING STRIPS IT — one string on the wire, in the column and
+# in whatever a consumer greps for. The alternative (the server prepending a bare name)
+# was weighed and refused at the model gate: it would make the wire name and the token
+# name differ, which is the postiche-internal-name shape backlog.md rejects by name.
+#
+# The rule lives in the value object, so it applies to every write through the domain and
+# to nothing else. The platform's own nine claims (identity_kind, tenant_id,
+# tenant_workspace, email, name, permissions, groups, roles, must_change_password) carry
+# no prefix and therefore cannot be written through this API at all — they would enter by
+# migration, the same door the platform's *:* role enters by. That is what frees this
+# entity from the reserved-platform-tenant dependency Role and Group both carry.
+#
+# Discovered from the project: dialect postgres · read backing relational.
+
+specVersion: 1
+entity: Claim
+plural: Claims
+language: en-US
+
+storage:
+  kind: flat
+  table: claims
+  description: >-
+    The vocabulary of tenant-defined claims: one row per claim name a token of this tenant
+    may carry, holding the type its values must have, which identity kinds may hold one,
+    and the default used when no principal-level value is set.
+  managed:
+    revision: revision
+    createdAt: created_at
+    updatedAt: updated_at
+    archivedAt: deleted_at
+
+fields:
+  # The owning tenant, by PRIMARY KEY — the same shape Role carries, and the tenant_id JWT
+  # claim holds this same value, so the Layer 3 isolation filter compares a plain local
+  # column with no translation step.
+  #
+  # assignedFrom: identity-claim fills it from the caller's token, so no ordinary caller
+  # sends a value the server already knows — and none can file a definition under someone
+  # else's tenant. bypassMaySet lets the ONE caller authz.bypass admits — the platform
+  # operator supporting a customer — state which tenant a new definition belongs to.
+  #
+  # THE SECOND KEY IS WHAT MAKES THE FIRST SAFE TO USE. assignedFrom alone removes the
+  # field from every write DTO, and then the operator can read and repair a customer's
+  # definitions and never create one: there is nowhere left to say which tenant a new row
+  # belongs to. That is the trap this spec originally escaped by putting the value in the
+  # body with a rule — the same escape Role and Group took — which made every ordinary
+  # caller send their own tenant id and left that rule as the only thing between them and
+  # their neighbour's data.
+  #
+  # It rejoins the INSERT body only, as an OPTIONAL value: absent means "mine". It stays
+  # out of the patch on purpose — a definition does not change tenant by being edited —
+  # which is also why TenantID no longer needs naming under update.patchExcludes.
+  #
+  # Nothing is checked in the mapper, by design: the stated value is applied whoever sent
+  # it, and the row-scope guard the entity already carries is what answers. A caller who
+  # may not cross the scope meets the same 403 a foreign write meets today.
+  #
+  # The FK itself is appended to the migration by hand: a reference to ANOTHER aggregate is
+  # outside this language.
+  - name: TenantID
+    type: id
+    column: tenant_id
+    livesOn: root
+    assignedFrom: identity-claim
+    claim: tenant_id
+    bypassMaySet: true
+    example: 0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410
+    description: >-
+      The tenant that owns this claim definition. Immutable after creation — a claim never
+      moves between tenants.
+    labelKey: ClaimTenantIDField
+    text:
+      eng: Tenant
+      ptbr: Inquilino
+      esp: Inquilino
+      fra: Locataire
+      deu: Mandant
+      ita: Tenant
+      nld: Tenant
+
+  # The claim name, stored in a column called `name` like every other display column in
+  # this service (roles.name, groups.name, tenants.name). The rename this project really
+  # made is Role's key -> role_key and Permission's resource -> resource_name, because
+  # THOSE words are reserved across the engine set; `name` is not, so there is no
+  # exposed-vs-stored split to carry here.
+  #
+  # unique WITHIN the tenant, not globally: a token carries exactly one tenant, so two
+  # customers both naming a claim x_region is harmless. active-only, because with no
+  # unarchive verb re-inserting is the only way a retired definition comes back.
+  - name: Name
+    type: string
+    column: name
+    length: 64
+    livesOn: root
+    vo: {kind: manual, ref: ClaimName}
+    unique:
+      enforce: service-precheck+constraint
+      notification: ClaimNameAlreadyExistsNotification
+      scope: active-only
+      within: [TenantID]
+    example: x_cost_center
+    description: >-
+      The exact name minted into the token, carrying the reserved x_ prefix. Unique within
+      its tenant and immutable — every consuming service branches on this string.
+    labelKey: ClaimNameField
+    text:
+      eng: Name
+      ptbr: Nome
+      esp: Nombre
+      fra: Nom
+      deu: Name
+      ita: Nome
+      nld: Naam
+
+  # A closed set, so an enum and not a raw shape: the caller gets the list in OpenAPI, the
+  # reader gets named constants, and an out-of-set value converges to Unknown instead of
+  # being stored.
+  - name: ValueType
+    type: string
+    column: value_type
+    length: 16
+    livesOn: root
+    vo: {kind: enum, ref: ClaimValueType}
+    example: string
+    description: >-
+      What a value for this claim must parse as. The default below and every
+      principal-level value are validated against it.
+    labelKey: ClaimValueTypeField
+    text:
+      eng: Value type
+      ptbr: Tipo do valor
+      esp: Tipo de valor
+      fra: Type de valeur
+      deu: Werttyp
+      ita: Tipo di valore
+      nld: Waardetype
+
+  # Also a closed set. It states as DATA what the client-token contract states as prose:
+  # a client token carries no email, no groups and no must_change_password.
+  - name: AppliesTo
+    type: string
+    column: applies_to
+    length: 16
+    livesOn: root
+    vo: {kind: enum, ref: ClaimAppliesTo}
+    example: both
+    description: >-
+      Which identity kinds may hold a value for this claim: a user, a machine client, or
+      both.
+    labelKey: ClaimAppliesToField
+    text:
+      eng: Applies to
+      ptbr: Aplica-se a
+      esp: Se aplica a
+      fra: S'applique à
+      deu: Gilt für
+      ita: Si applica a
+      nld: Geldt voor
+
+  # PLAIN, and that is a decision rather than an omission. Its rule is "parse as whatever
+  # ValueType says" — a rule that reads ANOTHER field, which a value object cannot see. A
+  # composite TypedValue{Type, Value} was weighed and rejected: ValueType also governs the
+  # values on the two edge collections, in other aggregates, so it is a type declaration
+  # the whole chain reads and not half of a private pair — and the two halves have
+  # different nullability, which a composite handles badly.
+  #
+  # The 256 is the CLAIM-SIZE BUDGET made concrete: whatever this adds rides in a header on
+  # every request to every service, on top of a budget the shipped token already argued
+  # down to group and role KEYS rather than display names.
+  #
+  # Nullable, and null is a legitimate state rather than a missing value: it means the
+  # claim has no default, so it simply does not enter the token. An absent claim and an
+  # empty one are not the same thing to a consumer.
+  - name: DefaultValue
+    type: string
+    column: default_value
+    length: 256
+    nullable: true
+    livesOn: root
+    example: "1000"
+    description: >-
+      Level 2 of the resolution chain: the value every principal of this tenant gets when
+      none is set on the principal itself. Null means there is no default and the claim is
+      absent from the token.
+    labelKey: ClaimDefaultValueField
+    text:
+      eng: Default value
+      ptbr: Valor padrão
+      esp: Valor predeterminado
+      fra: Valeur par défaut
+      deu: Standardwert
+      ita: Valore predefinito
+      nld: Standaardwaarde
+
+  - name: Description
+    type: string
+    column: description
+    length: 500
+    livesOn: root
+    vo: {kind: reuse, ref: Description}
+    example: >-
+      Internal cost center this account is billed against, as the ERP knows it.
+    description: What the value means, in the tenant's own words, for the operator filling it in.
+    labelKey: ClaimDescriptionField
+    text:
+      eng: Description
+      ptbr: Descrição
+      esp: Descripción
+      fra: Description
+      deu: Beschreibung
+      ita: Descrizione
+      nld: Beschrijving
+
+valueObjects:
+  # kind: manual — a scalar the generator does not write, and it has to be: the rule is a
+  # COMPOSITION of a shape, this project's shared anti-junk predicates (a distinct-rune
+  # floor, a cap on identical runs) and the reserved-prefix pair, which no regex and no
+  # member list states. Reusing RoleKey instead would be wrong twice over: a claim name is
+  # snake_case where a role key is a hyphen slug, and RoleKey has no prefix rule at all.
+  - name: ClaimName
+    kind: manual
+    backing: string
+    description: >-
+      A claim's name as a token carries it: lowercase snake_case of 2-64 runes matching
+      ^[a-z][a-z0-9_]*$, carrying the reserved x_ prefix, whose remainder must not itself
+      begin with x_ (the paste error a caller-owned prefix makes possible). Reuses this
+      project's shared anti-junk predicates. NO NORMALIZATION — a value that does not
+      already comply is refused, never repaired, prepended or stripped: the name is
+      immutable and a caller who believes they registered one string has no second chance.
+
+  - name: ClaimValueType
+    kind: enum
+    backing: string
+    description: >-
+      What a value for a claim must parse as. Three members and no more: anything richer
+      would be a JSON column and a validation surface, which backlog.md weighed and left
+      out.
+    unknownNotification: UnknownClaimValueTypeNotification
+    members:
+      - name: String
+        value: string
+        text:
+          eng: Text
+          ptbr: Texto
+          esp: Texto
+          fra: Texte
+          deu: Text
+          ita: Testo
+          nld: Tekst
+      - name: Number
+        value: number
+        text:
+          eng: Number
+          ptbr: Número
+          esp: Número
+          fra: Nombre
+          deu: Zahl
+          ita: Numero
+          nld: Getal
+      - name: Bool
+        value: bool
+        text:
+          eng: Boolean
+          ptbr: Booleano
+          esp: Booleano
+          fra: Booléen
+          deu: Boolescher Wert
+          ita: Booleano
+          nld: Boolean
+
+  - name: ClaimAppliesTo
+    kind: enum
+    backing: string
+    description: >-
+      Which identity kinds may hold a value for a claim. The two kinds this service mints
+      tokens for, plus the case that covers both.
+    unknownNotification: UnknownClaimAppliesToNotification
+    members:
+      - name: User
+        value: user
+        text:
+          eng: User
+          ptbr: Usuário
+          esp: Usuario
+          fra: Utilisateur
+          deu: Benutzer
+          ita: Utente
+          nld: Gebruiker
+      - name: Client
+        value: client
+        text:
+          eng: Client
+          ptbr: Cliente
+          esp: Cliente
+          fra: Client
+          deu: Client
+          ita: Client
+          nld: Client
+      - name: Both
+        value: both
+        text:
+          eng: Both
+          ptbr: Ambos
+          esp: Ambos
+          fra: Les deux
+          deu: Beide
+          ita: Entrambi
+          nld: Beide
+
+notifications:
+  - name: InvalidClaimNameNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A claim name that is not lowercase snake_case of 2-64 runes, that is missing the
+      reserved x_ prefix, that doubles it, or that reads as keyboard junk under this
+      project's shared anti-junk predicates.
+    text:
+      eng: The claim name is not valid.
+      ptbr: O nome do claim não é válido.
+      esp: El nombre del claim no es válido.
+      fra: Le nom du claim n'est pas valide.
+      deu: Der Claim-Name ist ungültig.
+      ita: Il nome del claim non è valido.
+      nld: De claimnaam is ongeldig.
+
+  - name: UnknownClaimValueTypeNotification
+    package: vos
+    semantic: validation
+    description: A value type outside the three the catalog accepts.
+    text:
+      eng: The value type is not one of the accepted types.
+      ptbr: O tipo do valor não é um dos tipos aceitos.
+      esp: El tipo de valor no es uno de los tipos aceptados.
+      fra: Le type de valeur ne fait pas partie des types acceptés.
+      deu: Der Werttyp gehört nicht zu den akzeptierten Typen.
+      ita: Il tipo di valore non è uno dei tipi accettati.
+      nld: Het waardetype is geen van de geaccepteerde types.
+
+  - name: UnknownClaimAppliesToNotification
+    package: vos
+    semantic: validation
+    description: An identity kind outside the three the catalog accepts.
+    text:
+      eng: The identity kind is not one of the accepted values.
+      ptbr: O tipo de identidade não é um dos valores aceitos.
+      esp: El tipo de identidad no es uno de los valores aceptados.
+      fra: Le type d'identité ne fait pas partie des valeurs acceptées.
+      deu: Die Identitätsart gehört nicht zu den akzeptierten Werten.
+      ita: Il tipo di identità non è uno dei valori accettati.
+      nld: Het identiteitstype is geen van de geaccepteerde waarden.
+
+  - name: ClaimNameAlreadyExistsNotification
+    semantic: conflict
+    description: >-
+      An ACTIVE claim in this tenant already holds this name. Archived rows do not block it
+      — re-inserting is how a retired definition comes back.
+    text:
+      eng: A claim with this name already exists in this tenant.
+      ptbr: Já existe um claim com este nome neste inquilino.
+      esp: Ya existe un claim con este nombre en este inquilino.
+      fra: Un claim avec ce nom existe déjà dans ce locataire.
+      deu: In diesem Mandanten existiert bereits ein Claim mit diesem Namen.
+      ita: Esiste già un claim con questo nome in questo tenant.
+      nld: Er bestaat al een claim met deze naam in deze tenant.
+
+  - name: ClaimNameIsImmutableNotification
+    semantic: validation
+    description: >-
+      An attempt to change the name after creation. The name IS what every issued token
+      carries and every consuming service branches on; editing it would rewrite the meaning
+      of every token retroactively and invisibly.
+    text:
+      eng: The claim name cannot be changed.
+      ptbr: O nome do claim não pode ser alterado.
+      esp: El nombre del claim no se puede modificar.
+      fra: Le nom du claim ne peut pas être modifié.
+      deu: Der Claim-Name kann nicht geändert werden.
+      ita: Il nome del claim non può essere modificato.
+      nld: De claimnaam kan niet worden gewijzigd.
+
+  - name: ClaimTenantIsImmutableNotification
+    semantic: validation
+    description: An attempt to move a claim definition from one tenant to another after creation.
+    text:
+      eng: The owning tenant cannot be changed.
+      ptbr: O inquilino proprietário não pode ser alterado.
+      esp: El inquilino propietario no se puede modificar.
+      fra: Le locataire propriétaire ne peut pas être modifié.
+      deu: Der besitzende Mandant kann nicht geändert werden.
+      ita: Il tenant proprietario non può essere modificato.
+      nld: De eigenaar-tenant kan niet worden gewijzigd.
+
+  - name: ClaimValueTypeIsImmutableNotification
+    semantic: validation
+    description: >-
+      An attempt to change the declared value type after creation. Flipping string to
+      number retro-invalidates every value already stored on the edges, with no cascade and
+      no migration path.
+    text:
+      eng: The value type cannot be changed.
+      ptbr: O tipo do valor não pode ser alterado.
+      esp: El tipo de valor no se puede modificar.
+      fra: Le type de valeur ne peut pas être modifié.
+      deu: Der Werttyp kann nicht geändert werden.
+      ita: Il tipo di valore non può essere modificato.
+      nld: Het waardetype kan niet worden gewijzigd.
+
+  - name: ClaimTenantDoesNotExistNotification
+    semantic: validation
+    description: >-
+      The owning tenant does not exist, has been archived, or is commercially suspended. A
+      TRIAL tenant is a live customer and is accepted.
+    text:
+      eng: The owning tenant does not exist, is archived or is suspended.
+      ptbr: O inquilino proprietário não existe, está arquivado ou está suspenso.
+      esp: El inquilino propietario no existe, está archivado o está suspendido.
+      fra: Le locataire propriétaire n'existe pas, est archivé ou est suspendu.
+      deu: Der besitzende Mandant existiert nicht, ist archiviert oder ist gesperrt.
+      ita: Il tenant proprietario non esiste, è archiviato o è sospeso.
+      nld: De eigenaar-tenant bestaat niet, is gearchiveerd of is opgeschort.
+
+  - name: DefaultValueDoesNotMatchValueTypeNotification
+    semantic: validation
+    description: >-
+      The default value does not parse as the declared value type: a number that is not a
+      number, or a boolean that is neither true nor false. A NULL default is always valid —
+      "no default" is a legitimate state and skips the check entirely.
+    text:
+      eng: The default value does not match the declared value type.
+      ptbr: O valor padrão não corresponde ao tipo de valor declarado.
+      esp: El valor predeterminado no corresponde al tipo de valor declarado.
+      fra: La valeur par défaut ne correspond pas au type de valeur déclaré.
+      deu: Der Standardwert entspricht nicht dem angegebenen Werttyp.
+      ita: Il valore predefinito non corrisponde al tipo di valore dichiarato.
+      nld: De standaardwaarde komt niet overeen met het opgegeven waardetype.
+
+  - name: DefaultValueTooLongNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      The default value is longer than a claim value may be. The cap is a claim-size budget
+      before it is a column width: this value rides in a header on every request.
+    text:
+      eng: The default value may be at most {max} characters long.
+      ptbr: O valor padrão pode ter no máximo {max} caracteres.
+      esp: El valor predeterminado puede tener como máximo {max} caracteres.
+      fra: La valeur par défaut peut comporter au maximum {max} caractères.
+      deu: Der Standardwert darf höchstens {max} Zeichen lang sein.
+      ita: Il valore predefinito può contenere al massimo {max} caratteri.
+      nld: De standaardwaarde mag maximaal {max} tekens lang zijn.
+
+# The traversal into the OWNER, the same one Role declares. inner is correct because
+# tenant_id is NOT NULL and FK-backed. A ROOT join's fields ARE addressable in a criteria,
+# so these two are filterable and sortable like any column of this table — which is what
+# makes "claims of acme-comercio" answerable without a second call.
+#
+# Neither carries a domain type, by construction: the value belongs to Tenant, arrives
+# read-only and is never validated here. Status is the plain string the column stores, not
+# vos.TenantStatus — reconstructing the enum would hand back an instance no rule of the
+# owning aggregate ever approved.
+joins:
+  - kind: inner
+    to: Tenant
+    on: tenant_id
+    fields:
+      - name: TenantWorkspace
+        column: workspace
+        example: acme-comercio
+        description: >-
+          The owning tenant's immutable handle — what URLs, logs and support conversations
+          say. Read-only, filled on every load, never written through this aggregate.
+        labelKey: ClaimTenantWorkspaceField
+        text:
+          eng: Workspace
+          ptbr: Workspace
+          esp: Workspace
+          fra: Espace de travail
+          deu: Workspace
+          ita: Workspace
+          nld: Workspace
+      - name: TenantStatus
+        column: status
+        example: active
+        description: >-
+          The owning tenant's commercial lifecycle — trial, active or suspended. Read-only,
+          filled on every load, never written through this aggregate.
+        labelKey: ClaimTenantStatusField
+        text:
+          eng: Tenant status
+          ptbr: Situação do inquilino
+          esp: Situación del inquilino
+          fra: Statut du locataire
+          deu: Mandantenstatus
+          ita: Stato del tenant
+          nld: Tenantstatus
+
+# No delete: a claim name that ever reached a token has to stay auditable. No unarchive,
+# matching every entity in this service except Tenant — and the consequence is deliberate,
+# mirroring the README's Permission rule 3: a retired definition comes back as a NEW row
+# with a NEW id, so an edge holding the old id cannot silently re-attach to the recreated
+# definition and must be re-set explicitly.
+modes: [display, insert, update, archive]
+
+update:
+  shape: patch
+  # The immutable fields are removed from the partial body, so the OpenAPI request schema
+  # never advertises them as editable. The immutability rules below STAY and are not
+  # redundant with this: the exclusion closes the PATCH door, the rules guard the value on
+  # every update path whatever door it came through. That is permission.omnicore.yaml's
+  # reading, and it closes the asymmetry ACCESS_MATRIX.md records against Role and Group,
+  # which still advertise fields the domain then refuses.
+  #
+  # TenantID is NOT named here, and its absence is not an oversight: assignedFrom keeps it
+  # out of the update and the patch already, so listing it would be a second spelling of
+  # one exclusion — and two spellings can disagree. Same reading user.omnicore.yaml takes.
+  patchExcludes: [Name, ValueType]
+
+delete:
+  root: soft
+
+rules:
+  list:
+    # Pull the owner's OWN validation forward, and make it the BARRIER.
+    #
+    # Everything after this depends on the owner being a usable id — most sharply the
+    # uniqueness pre-check, which is scoped BY it and hands it straight to a criterion. The
+    # automatic value-object pass runs AFTER the rules, so without this the owner is still
+    # unchecked here: "" and junk both sail through, bind to a UUID column, and die as a 500
+    # instead of the 422 they deserve.
+    #
+    # It replaces a `required` rule rather than joining one: domain.ID validates itself, and
+    # a required rule beside it would tell the caller the same thing twice.
+    - id: tenant-is-a-usable-id
+      kind: valueObject
+      scope: [insertOrUpdate]
+      fields: [TenantID]
+      guard: true
+
+    - id: name-immutable
+      kind: immutable
+      scope: [update]
+      fields: [Name]
+      notification: ClaimNameIsImmutableNotification
+      description: >-
+        The name IS what every issued token carries and what every consuming service
+        branches on. Editing it would rewrite the meaning of every reference to this claim,
+        retroactively and invisibly. AppliesTo, DefaultValue and Description stay editable.
+
+    - id: tenant-immutable
+      kind: immutable
+      scope: [update]
+      fields: [TenantID]
+      notification: ClaimTenantIsImmutableNotification
+      description: A claim definition never moves between tenants.
+
+    - id: value-type-immutable
+      kind: immutable
+      scope: [update]
+      fields: [ValueType]
+      notification: ClaimValueTypeIsImmutableNotification
+      description: >-
+        Flipping the declared type retro-invalidates every value already stored on the two
+        edge collections, with no cascade and no migration path. Immutable is the only
+        answer that does not depend on an aggregate that does not exist yet.
+
+    - id: default-value-length
+      kind: length
+      scope: [insertOrUpdate]
+      fields: [DefaultValue]
+      max: 256
+      skipWhen: 'null'
+      notification: DefaultValueTooLongNotification
+      description: >-
+        The claim-size budget, enforced before the column width answers it as a 500. Stands
+        down on a null default, which is a legitimate state rather than a missing value.
+
+  manual:
+    - id: tenant-must-exist
+      description: >-
+        The owning tenant must exist, must not be archived and must not be commercially
+        SUSPENDED. Ask TenantIsUnavailable; a read join cannot answer this, because on an
+        insert a joined field is blank. A TRIAL tenant is a live customer and passes.
+      scope: [insert]
+      notification: ClaimTenantDoesNotExistNotification
+      attachTo: TenantID
+
+    - id: default-value-matches-value-type
+      description: >-
+        The default value must parse as the declared ValueType: `number` accepts a valid
+        decimal number, `bool` accepts exactly "true" or "false", `string` accepts any
+        non-empty value. A NULL default is ALWAYS valid and skips the check entirely — "no
+        default" is a legitimate state, and level 2 of the chain simply does not fire. Read
+        the enum member off ValueType rather than the raw string, so an unknown type (which
+        the value object already refused) does not reach a second answer here.
+      scope: [insertOrUpdate]
+      notification: DefaultValueDoesNotMatchValueTypeNotification
+      attachTo: DefaultValue
+
+service:
+  required: true
+  facts:
+    # The pre-check half of unique.enforce on Name. Filtered by the tenant as well as the
+    # name, because the uniqueness is per tenant. The comparison is over the STORED string,
+    # prefix included — there is no normalization step anywhere in this entity.
+    - name: ClaimNameTaken
+      kind: exists
+      filters: [TenantID, Name]
+      excludeSelf: true
+      activeOnly: true
+      description: >-
+        Reports whether another ACTIVE claim in the same tenant already holds this name.
+        Excludes the row being updated.
+
+    # Named for the PROBLEM, never for the healthy state: the generated suite stubs the
+    # service so every probe answers "nothing found". TenantIsActive would read false under
+    # that stub and mean "the tenant is gone", turning a correct spec red on the day it is
+    # written.
+    - name: TenantIsUnavailable
+      kind: manual
+      returns: bool
+      filters: [TenantID]
+      description: >-
+        Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
+        the tenants table by its primary key. A trial tenant is a live customer and is
+        available.
+
+read:
+  backing: relational
+  view:
+    name: claims
+  managed: [CreatedAt, UpdatedAt]
+  byId: true
+  byParams:
+    filters:
+      - {field: TenantID, ops: [eq, in]}
+      - {field: Name, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
+      - {field: ValueType, ops: [eq, in]}
+      - {field: AppliesTo, ops: [eq, in]}
+      - {field: DefaultValue, ops: [eq, in, contains, icontains]}
+      - {field: Description, ops: [contains, icontains]}
+      - {field: TenantWorkspace, ops: [eq, in, startswith, istartswith]}
+      - {field: TenantStatus, ops: [eq, in]}
+      - {field: CreatedAt, ops: [gte, lte]}
+      - {field: UpdatedAt, ops: [gte, lte]}
+    sort: [Name, ValueType, AppliesTo, TenantID, TenantWorkspace, CreatedAt, UpdatedAt]
+    controls:
+      pagination: true
+      orderBy: true
+      fields: true
+      onlyTotal: true
+      # A retired definition must stay auditable, and with no unarchive verb this listing is
+      # the only way to see one.
+      includeArchived: true
+      # search is deliberately absent — a relational-served view answers free text with a
+      # typed 400, and declaring it would promise what this posture cannot serve.
+
+surfaces:
+  rest: true
+  graphql:
+    # enabled alone is the whole declaration: both reads and every write verb the entity
+    # mounts. A schema that can create a definition and never correct its default is half
+    # an aggregate.
+    enabled: true
+  # No CSV/XLSX exports: operator-facing and small, the call Permission and Role both made.
+
+authz:
+  resource: claim
+  # Every row is tenant-scoped, on READS and on WRITES both. A *:* superadmin bypasses it —
+  # which is what lets a platform operator support a customer. A by-id read of another
+  # tenant's definition answers 404 rather than 403: it does not exist for this caller,
+  # which leaks nothing about who else exists.
+  dataAccess: tenant
+  tenantField: TenantID
+  # WHO crosses the row scope: the platform operator supporting a customer. A *:* holder
+  # reads and repairs rows that are not theirs; a resource wildcard (claim:*) does NOT.
+  bypass: "*:*"
+  # Two states, not one. ctx.Identity() nil happens only under auth.mode: disabled, which
+  # the framework's own boot guard allows ONLY in dev — so a stand-down here cannot reach
+  # prd. Collapsing it into `refuse` would make the entity unusable in the dev profile,
+  # where there are no tokens at all. An identity that IS present with an empty or
+  # insufficient claim still refuses.
+  noIdentity: stand-down
+  # FOUR verbs, not five. Role, Group and User each carry a :grant because each owns a
+  # collection whose contents change what a principal can DO — "may rename it" and "may
+  # change what it confers" are separately grantable. This entity owns no collection and
+  # confers nothing, so a fifth verb would gate nothing.
+  permissions:
+    insert: claim:insert
+    patch: claim:update
+    archive: claim:archive
+    read: claim:read

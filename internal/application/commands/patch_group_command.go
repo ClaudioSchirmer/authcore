@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:bb8129fd09fee891fb11507fa039808ac42c17049fc18664a9296e3a55f5c79b
+// checksum:   sha256:6dfe98af17d7c515f774351690a090b62d18acd80e7a3d96f7fb12863db7678a
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -32,7 +32,6 @@ import (
 // value.
 type PatchGroupCommand struct {
 	pipeline.CommandWithBodyIDBase
-	TenantID    *domain.ID
 	Key         *string
 	Name        *string
 	Description *string
@@ -44,9 +43,6 @@ type PatchGroupCommand struct {
 // Note the consequence: this verb can never set a value back to null, because
 // an absent field and an explicit null are indistinguishable here.
 func (c *PatchGroupCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *appdomain.Group) error {
-	if c.TenantID != nil {
-		e.TenantID = *c.TenantID
-	}
 	if c.Key != nil {
 		e.Key = vos.GroupKey(*c.Key)
 	}

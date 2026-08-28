@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:0d2731531cb46e6301deb6f19973b2026e31029162dba51ea5f4e7fdc88c7074
+// checksum:   sha256:d590ecdd287fb8376e92de1796d6f253fa26d9e11f73c1f6cff60f8266323093
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -30,22 +30,38 @@ import (
 // InsertGroupCommand carries the writable fields of the request.
 type InsertGroupCommand struct {
 	pipeline.CommandWithBodyBase
-	TenantID    domain.ID
 	Key         string
 	Name        string
 	Description string
+	TenantID    *domain.ID
 	Roles       []dtos.GroupRoleInput
 }
 
 // ToEntity builds the aggregate the framework will validate and persist.
 func (c *InsertGroupCommand) ToEntity(ctx *configuration.AppContext) (*appdomain.Group, error) {
 	e := &appdomain.Group{}
-	e.TenantID = c.TenantID
 	e.Key = vos.GroupKey(c.Key)
 	e.Name = vos.DisplayName(c.Name)
 	e.Description = vos.Description(c.Description)
 	for _, item := range c.Roles {
 		e.AddGroupRole(item.ToGroupRole())
+	}
+
+	// Filled from the caller's identity, never from the request: these fields
+	// are not part of any write DTO. Only an insert sets them.
+	if id := ctx.Identity(); id != nil {
+		if raw, ok := id.Claims["tenant_id"].(string); ok {
+			e.TenantID = domain.NewID(raw)
+		}
+	}
+
+	// …unless the caller stated the tenant themselves. Absent means
+	// "mine", which the line above already wrote. Present, it is applied
+	// HERE and judged in BuildRules: a caller who may not cross the row
+	// scope meets the same refusal a write into a foreign tenant meets,
+	// instead of having the value quietly replaced by their own.
+	if c.TenantID != nil {
+		e.TenantID = *c.TenantID
 	}
 
 	// Identity-derived state the rules read. It is never persisted.
