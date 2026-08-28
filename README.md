@@ -53,7 +53,7 @@ Honest scope, so nobody reads intent as delivery:
 | Refresh-token storage | **built** — `authentication_refresh_tokens` (migration `0006`), hash-only: the raw value never reaches the table. Single-use with rotation on every redemption; replaying a redeemed value revokes the entire session family. The table sweeps its own expired rows on every write, so there is no scheduled job to forget to deploy |
 | Contract QA suite (`/omnicore:qa`) | not generated |
 | Generated code | **All five aggregates.** `internal/` holds Tenant, Permission, Role, Group and User end to end — domain, application, web, infra, migrations `0001` to `0005`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential and token path: the password hasher, the two credential operations, the two token routes, the permission resolver, the refresh store and migration `0006` are hand-written. `specs/omnicore-gen/user.gen-report.md` lists the credential pieces; `specs/implement/authentication-token/plan.md` lists the token ones |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` now gate the built role routes too, the two child ops riding `role:update`; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the four nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` · `:grant` now gate the built role routes too, the two child ops riding `role:grant` since 2026-08-28, when the collection verbs of every entity were aligned on a verb of their own; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too. **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `role:grant`, `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the five nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -450,11 +450,12 @@ this entry": its single field IS its identity, so an edit would keep one row id 
 changing what it means, which an audit trail reads as one grant *becoming* another instead of
 as two events.
 
-**3. `group:grant` is a fifth verb, and this is where the taxonomy diverges from `Role`'s.**
-The two collection routes do **not** ride `group:update`. `Role` weighed a `role:grant` and
-declined it to keep four verbs per resource; `Group` takes it, because the group→role edge
-reaches further — a group hands a member every permission of every role it carries. Entra
-guards a role-assignable group behind Privileged Role Administrator rather than Groups
+**3. `group:grant` is a fifth verb, and it is now the shape of the whole service.**
+The two collection routes do **not** ride `group:update`. `Group` took this first, because the
+group→role edge reaches further — a group hands a member every permission of every role it
+carries; `Role` had declined a `role:grant` only to keep four verbs per resource, and on
+2026-08-28 it took one too, so no collection in the service rides its root's update any more.
+Entra guards a role-assignable group behind Privileged Role Administrator rather than Groups
 Administrator, and AWS spells `iam:AttachGroupPolicy` apart from `iam:UpdateGroup`. So a
 principal with `group:update` may rename and re-describe a group and gets **403** on both
 collection verbs, and a principal with only `group:grant` may attach and detach on a group
@@ -732,26 +733,41 @@ rotation call. That gap and its three ways out are in
 `specs/scaffold-entity/client/tasks.md`.
 
 Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
-`client:grant` (the two role verbs) · **`client:rotate-secret`**, which is its own verb for
-the reason `user:reset-password` is — whoever may fix a typo in a description is not
-automatically whoever may hand out a production credential. Editing the allow-list is
-`client:update`: it grants the client nothing it does not already hold, it only narrows or
-widens where from.
+`client:grant` (the two role verbs) · **`client:rotate-secret`** · **`client:manage-network`**
+(the two allow-list verbs). The last two are their own for the reason `user:reset-password`
+is — whoever may fix a typo in a description is not automatically whoever may hand out a
+production credential, nor whoever may decide where that credential works from.
 
-Row scope is `User`'s, plus two: a **client token may not create a client**, and it **writes
-only its own row** (`sub == id`). Both are written and **inert** — they read an
-`identity_kind` claim nothing mints until the token route exists, and an absent claim reads as
-a user.
+`client:manage-network` was `client:update` until 2026-08-28. The first reading called the
+allow-list configuration rather than privilege — it grants the client nothing it does not
+already hold, it only narrows or widens where from — which is true and beside the point: the
+direction that matters is the one that RELAXES. An empty collection is how "no restriction" is
+spelled, so archiving the last entry opens the credential to every address on the internet.
+One verb covers both directions, as everywhere else in this service: the add only tightens, and
+splitting the pair would leave an operator unable to undo their own change.
 
-**The first one is asymmetric with `User` on purpose**, and the asymmetry is worth stating
-because it is not a security principle applied evenly: a user holding `user:insert` creates an
-account whose password they chose, which is the same persistence mechanism, and that stays
-open. What separates them is attendance — a compromised machine credential mints replacements
-in a loop unattended, while a person can be refused and asked what they were doing. Closing
-the `User` side needs an invite flow, not a rule, and has not been started. Meanwhile a client
-can never be granted more than whoever granted it (the escalation and wildcard rules), and
-"who created this row" is answered from `audit_events`, which records the actor of every
-write.
+Row scope is `User`'s, plus one: a **client token rotates only its own secret** (`sub == id`).
+It is written and **inert** — it reads an `identity_kind` claim nothing mints until the token
+route exists, and an absent claim reads as a user. A USER token never meets it: an operator
+holding `client:rotate-secret` rotates any client in their tenant, which is the mirror of
+`User`'s reset.
+
+**It used to be two rules covering far more**, and they were narrowed on 2026-08-28: a
+client-subject caller was refused the creation of any client, and refused every update and
+archive of a row that was not its own. That left a machine unable to administer its tenant's
+other clients at all — closed past the point of usefulness, and not where the boundary
+belongs. Creating, editing, archiving, granting a role and editing the allow-list are ordinary
+tenant-scoped writes now, gated by the permission the caller carries, exactly as they are for a
+user token.
+
+**Rotation is the exception because it is not editing a row.** The call mints a credential AND
+starts retiring the one in use, so a machine able to rotate another machine's secret could lock
+it out and take its place — one call that is both a denial of service and an impersonation,
+made by something unattended. What was given up with the create rule is stated plainly: a
+compromised client holding `client:insert` can mint sibling clients, and revoking the original
+leaves them working. What still bounds it is that a client can never be granted more than
+whoever granted it (the escalation and wildcard rules), the tenant scope, and `audit_events`,
+which records the actor of every write.
 
 
 ## Running it locally
@@ -877,8 +893,8 @@ POST   /roles/                                    create
 GET    /roles/{id}                                read one
 PATCH  /roles/{id}                                partial update (name, description)
 PATCH  /roles/{id}/archive                        removal — ONE-WAY, there is no unarchive
-POST   /roles/{id}/permissions                    grant one permission
-PATCH  /roles/{id}/permissions/{entryId}/archive  revoke one — never DELETE
+POST   /roles/{id}/permissions                    grant one permission  — role:grant
+PATCH  /roles/{id}/permissions/{entryId}/archive  revoke one — never DELETE — role:grant
 ```
 
 ```
@@ -969,10 +985,15 @@ one and granting another — expressing it as an edit would keep the old row's i
 changing what it means, which an audit trail reads as one grant *becoming* another instead of
 as two events. Re-granting a revoked permission is a fresh `POST` with a fresh entry id.
 
-Both collection verbs ride the parent's permission, `role:update`, rather than inventing a
-verb the rest of the service does not have. A distinct `role:grant` — so that "may rename the
-role" and "may change what the role can do" are separately grantable — is a real distinction
-and a one-line change if it is wanted.
+Both collection verbs ride **`role:grant`**, a verb of their own rather than the parent's
+`role:update` — so that "may rename the role" and "may change what the role can do" are
+separately grantable. The first reading of this spec proposed `role:update` for both and
+named the alternative, declining it only because it "adds a verb the rest of the service does
+not have". `Group` and `User` then took `group:grant` and `user:grant`, which left Role as the
+only collection in the service still riding its root's update — so on 2026-08-28 the word was
+said and the verb taken. A principal holding `role:update` alone may relabel a role and gets
+**403** on both collection verbs. Like its siblings, `role:grant` is a catalog row somebody
+has to insert and a grant somebody has to make.
 
 The **GraphQL surface mirrors REST end to end**: the two reads (`roles`, `role`), the three
 root verbs (`createRole`, `patchRole`, `archiveRole`) and the two collection verbs
@@ -982,8 +1003,11 @@ which gave a collection its own seat on the schema; the specs declare no narrowi
 entity in this service publishes on both surfaces what it mounts on either. Two shapes differ
 where the surfaces genuinely do: on GraphQL the entry id travels in the input
 (`rolePermissionId`) because there is no path segment to carry it, and the revoke resolves to
-`success: true` where REST answers `204`. The hand-written routes — authentication, the user
-credential verbs, the client secret rotation — stay REST-only; nothing generated mounts them.
+`success: true` where REST answers `204`. The hand-written writes now answer on GraphQL too — `changeUserPassword`, `resetUserPassword`
+and `rotateClientSecret`, mounted by hand beside the generated fields, reusing their REST
+handlers and permissions. The two password verbs answer `success: true` where REST answers
+`204`; the rotation projects the same payload on both surfaces, so the plaintext is shown
+once there as well. Authentication is the only REST-only surface left.
 
 Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?fields`,
 `?onlyTotal`, `?includeArchived`. A control that is not declared is answered with a typed

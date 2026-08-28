@@ -163,7 +163,6 @@ func (nld) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Ongeldig netwerkbereik. Gebruik CIDR-notatie, zoals 203.0.113.0/24 of 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "Een bereik dat het hele internet omvat, wordt niet geaccepteerd. Laat de lijst leeg om niets te beperken.",
 		"UnknownClientStatusNotification":                  "Onbekende clientstatus.",
-		"ClientMayOnlyModifyItselfNotification":            "Een clienttoken mag alleen het eigen record wijzigen.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Tenant",
 		"ClientNameField":                                  "Naam",
@@ -191,6 +190,6 @@ func (nld) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "Het netwerkbereik moet in canonieke vorm worden opgegeven, met de hostbits op nul.",
 		"InvalidGracePeriodNotification":                   "Het overgangsvenster moet tussen 0 en {max} seconden liggen.",
 		"ClientMustBeActiveToRotateNotification":           "Alleen bij een actieve client kan het geheim worden geroteerd. Activeer hem eerst.",
-		"ClientsMayNotCreateClientsNotification":           "Een clienttoken kan geen clients aanmaken.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "Een clienttoken mag alleen het eigen geheim roteren.",
 	}
 }

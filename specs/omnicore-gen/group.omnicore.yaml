@@ -346,7 +346,8 @@ children:
     # attachment that duplicates a stored one, which is the duplicate guard failing open.
     businessIdentity: [RoleID]
     duplicateNotification: GroupAlreadyGrantsRoleNotification
-    # The FIFTH verb, and the one place this taxonomy diverges from Role's. Entra guards a
+    # The FIFTH verb. It diverged from Role's taxonomy until 2026-08-28, when Role took
+    # role:grant and every collection in the service came to carry a verb of its own. Entra guards a
     # role-assignable group behind Privileged Role Administrator rather than Groups
     # Administrator; AWS spells iam:AttachGroupPolicy as its own action rather than part of
     # UpdateGroup. "May rename the group" and "may change what the group confers" are

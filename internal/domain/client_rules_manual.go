@@ -90,7 +90,10 @@ func (e *Client) customRules(actionName string, service domain.Service, r *domai
 	svc, _ := service.(ClientService)
 
 	r.IfInsert(func() {
-		e.refuseClientCallerCreating(r)
+		// NO CLIENT-CALLER REFUSAL HERE, and its absence is a decision rather than an
+		// omission. A client-subject caller holding client:insert creates clients in its
+		// tenant like any other caller — see the rotation branch below for the one act
+		// that stays on the caller's own row.
 		e.refuseUnavailableTenant(svc, r)
 		// LAST in the gate, deliberately. Minting derives a hash, and deriving
 		// one for a secret the rules above refused is a write nobody asked for
@@ -104,20 +107,23 @@ func (e *Client) customRules(actionName string, service domain.Service, r *domai
 	})
 
 	r.IfUpdate(func() {
-		e.refuseForeignClientCaller(r)
-
 		// The ordinary PATCH and the rotation both dispatch ModeUpdate, so the
 		// ACTION NAME is what tells them apart. Without this switch the rotation
 		// would fire on a rename, replacing a live credential because somebody
 		// fixed a typo in a description.
+		//
+		// THE ROW RULE LIVES INSIDE THIS BRANCH and no longer wraps the whole verb:
+		// an ordinary patch by a client-subject caller is an ordinary tenant-scoped
+		// write. The row decision comes FIRST here, as it does on User's two
+		// credential verbs — there is no point validating a window for a rotation
+		// the caller may not perform.
 		if actionName == ActionRotateSecret {
+			e.refuseRotatingAnotherClientsSecret(r)
 			e.rotateSecretRules(svc, r)
 		}
 	})
 
 	r.IfArchive(func() {
-		e.refuseForeignClientCaller(r)
-
 		// ── archive-forces-suspended ──
 		// A MUTATION, not a validation: set the field and raise nothing. An
 		// archived client is never active, so archived+active becomes an
@@ -256,49 +262,31 @@ func (e *Client) refuseUnavailableTenant(service ClientService, r *domain.Rules)
 	}
 }
 
-// refuseClientCallerCreating refuses a CLIENT-subject caller the creation of a
-// client, and it is a DECLARED rule rather than a consequence.
+// refuseRotatingAnotherClientsSecret keeps a CLIENT-subject caller from minting
+// a credential for a client that is not itself.
 //
-// The own-row rule below would refuse the insert too — a row being created has
-// no id for `sub == id` to match — and shipping it that way was the first
-// version. It is wrong twice: a refusal that falls out of another rule's
-// arithmetic reads as an accident to whoever maintains it, and the message the
-// caller receives talks about MODIFYING a record they were trying to create.
+// THE ROW RULES OF THIS SERVICE, stated once: a tenant token writes inside its
+// own tenant (the generated refuseForeignTenant), a `*:*` token crosses that
+// scope, and a client token rotates only its own secret. This is the third.
 //
-// WHY IT IS REFUSED, decided by the maintainer on 2026-08-26 when he asked the
-// question this rule now answers out loud — "um client pode criar outro client
-// do mesmo tenant, tipo um user que pode criar outro user?". The answer is no,
-// and the asymmetry with User is deliberate rather than an oversight: a machine
-// credential is unattended, so a compromised one can mint replacements in a loop
-// at three in the morning, and revoking the original leaves every one of them
-// working. The human path is not safer in kind — a user holding user:insert
-// creates an account whose password they chose, which is the same persistence
-// mechanism — but there is a person in it who can be refused, suspended and
-// asked what they were doing.
+// IT USED TO COVER EVERY UPDATE AND THE ARCHIVE, and a companion rule refused a
+// client-subject INSERT outright. Both were narrowed away on 2026-08-28: they
+// left a client unable to administer its tenant's other clients at all, which is
+// closed past the point of usefulness and is not where the boundary belongs.
+// Creating, editing, archiving, granting a role and editing the allow-list are
+// ordinary tenant-scoped writes — the permission the caller carries is what says
+// whether they may, exactly as it does for a user token.
 //
-// WHAT ALREADY BOUNDS THE DAMAGE, so this rule is not the only lock: C9 and C10
-// mean a client can never be granted more than whoever granted it, and
-// client:insert is held by nobody today.
+// WHAT STAYS, AND WHY ONLY THIS. Rotating a secret is not editing a row: it mints
+// a credential AND starts retiring the one in use. A machine that could rotate
+// another machine's secret could lock it out and take its place — one call that
+// is both a denial of service and an impersonation, executed by something
+// unattended. That is a different act from every other verb here, and it is the
+// one that stays on the caller's own row.
 //
-// Stands down with an absent claim and with no identity at all, for the reasons
-// the own-row rule gives below.
-func (e *Client) refuseClientCallerCreating(r *domain.Rules) {
-	if e.RequestingIdentityPresent && e.RequestingIdentityKind == identityKindClient {
-		r.AddNotification("ID", ClientsMayNotCreateClientsNotification{})
-	}
-}
-
-// refuseForeignClientCaller keeps a CLIENT-subject caller inside its own row.
-//
-// The three row rules of this service, stated once: a tenant token writes
-// inside its own tenant (the generated refuseForeignTenant), a `*:*` token
-// crosses that scope, and a CLIENT token writes only the row it IS. This is the
-// third, and it covers UPDATE and ARCHIVE — creation has its own rule above,
-// because "no" deserves to be said rather than computed.
-//
-// What it leaves a client able to do is edit itself, which is what it should be
-// able to do, and grant itself a role — bounded by C9 to roles whose permissions
-// it already holds, so the grant can add nothing.
+// A USER TOKEN NEVER MEETS THIS. The early return is on the KIND, so an operator
+// holding client:rotate-secret rotates any client in their tenant, which is the
+// helpdesk case and the mirror of User's reset.
 //
 // IT IS INERT TODAY, AND THAT IS DELIBERATE. RequestingIdentityKind is fed from
 // the `identity_kind` claim, which only POST /auth/client/token mints and which
@@ -311,7 +299,7 @@ func (e *Client) refuseClientCallerCreating(r *domain.Rules) {
 // this service takes, and provably a development bench: the middleware is only
 // bypassable with auth.mode disabled, which the framework refuses outside
 // APP_PROFILE=dev.
-func (e *Client) refuseForeignClientCaller(r *domain.Rules) {
+func (e *Client) refuseRotatingAnotherClientsSecret(r *domain.Rules) {
 	if !e.RequestingIdentityPresent || e.RequestingIdentityKind != identityKindClient {
 		return
 	}
@@ -321,7 +309,7 @@ func (e *Client) refuseForeignClientCaller(r *domain.Rules) {
 		rowID = id.Value()
 	}
 	if e.RequestingClientID == "" || e.RequestingClientID != rowID {
-		r.AddNotification("ID", ClientMayOnlyModifyItselfNotification{})
+		r.AddNotification("ID", ClientMayOnlyRotateItsOwnSecretNotification{})
 	}
 }
 

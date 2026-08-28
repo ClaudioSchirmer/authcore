@@ -26,6 +26,7 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwweb "github.com/ClaudioSchirmer/omnicore/web"
+	fwgraphql "github.com/ClaudioSchirmer/omnicore/web/graphql"
 	fwopenapi "github.com/ClaudioSchirmer/omnicore/web/openapi"
 	"github.com/gofiber/fiber/v3"
 )
@@ -94,3 +95,30 @@ func MountClientSecrets(
 
 // intPtr exists for the OpenAPI examples above, which need addressable values.
 func intPtr(v int) *int { return &v }
+
+// MountClientSecretsGraphQL exposes the rotation on the GraphQL surface.
+//
+// Its own mount for the reason the REST route has one: the generated
+// MountClientsGraphQL is a file the generator owns and rewrites, so a field
+// added there would be an edit the next run refuses. The handler and the
+// permission are the REST route's own — one implementation, two surfaces.
+//
+// NO PAYLOAD TYPE OF ITS OWN, unlike the two user credential fields. Those
+// mirror a 204 and had to invent an acknowledgement; this one already answers
+// with a body, so the REST Response projects the same Result here. The secret is
+// therefore shown once on this surface too, and nowhere else.
+//
+// THE GRACE WINDOW STAYS NULLABLE IN THE SCHEMA, which is not cosmetic: the
+// command distinguishes ZERO ("kill the old secret now" — the leaked case) from
+// ABSENT ("use the default day"). A non-null Int would collapse the two and turn
+// an omitted argument into an immediate revocation.
+func MountClientSecretsGraphQL(
+	reg *fwgraphql.Registry,
+	store commands.ClientSecretStore,
+	svc domain.Service,
+) {
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RotateClientSecretRequest](
+		"rotateClientSecret", requests.RotateClientSecretResponse{}.FromResult,
+		&commands.RotateClientSecretHandler{Store: store, Service: svc},
+		fwgraphql.RequirePermission("client:rotate-secret")))
+}

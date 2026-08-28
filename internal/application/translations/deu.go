@@ -163,7 +163,6 @@ func (deu) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Ungültiger Netzbereich. Verwenden Sie die CIDR-Notation, etwa 203.0.113.0/24 oder 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "Ein Bereich, der das gesamte Internet umfasst, wird nicht akzeptiert. Lassen Sie die Liste leer, um nichts einzuschränken.",
 		"UnknownClientStatusNotification":                  "Unbekannter Client-Status.",
-		"ClientMayOnlyModifyItselfNotification":            "Ein Client-Token darf nur den eigenen Datensatz ändern.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Mandant",
 		"ClientNameField":                                  "Name",
@@ -191,6 +190,6 @@ func (deu) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "Der Netzbereich muss in kanonischer Form angegeben werden, mit genullten Host-Bits.",
 		"InvalidGracePeriodNotification":                   "Das Übergangsfenster muss zwischen 0 und {max} Sekunden liegen.",
 		"ClientMustBeActiveToRotateNotification":           "Nur bei einem aktiven Client kann das Geheimnis rotiert werden. Aktivieren Sie ihn zuerst.",
-		"ClientsMayNotCreateClientsNotification":           "Ein Client-Token kann keine Clients anlegen.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "Ein Client-Token darf nur das eigene Geheimnis rotieren.",
 	}
 }

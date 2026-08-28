@@ -303,7 +303,7 @@ func TestArchivingAClientForcesSuspended(t *testing.T) {
 	}
 }
 
-// ── client-modifies-only-itself ─────────────────────────────────────────────
+// ── client-rotates-only-its-own-secret ──────────────────────────────────────
 
 // TestTheRowRuleIsInertWithoutTheClaim is the deliberate part, not an oversight:
 // nothing mints identity_kind yet, so the field reads "" and the rule stands
@@ -315,40 +315,66 @@ func TestTheRowRuleIsInertWithoutTheClaim(t *testing.T) {
 	e.RequestingIdentityKind = "" // nothing mints it today
 	e.RequestingClientID = someOtherClientID
 
-	updateClient(t, e, &probingClientService{}, "Patch")
+	updateClient(t, e, &probingClientService{}, ActionRotateSecret)
 
-	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
 		t.Fatal("the row rule fired without the claim; it must read an absent claim as a user")
 	}
 }
 
+// TestAUserSubjectCallerIsUnaffectedByTheRowRule is the helpdesk case, and the
+// mirror of User's reset: an operator holding client:rotate-secret rotates any
+// client in their tenant. The early return is on the KIND, so a person never
+// meets this rule at all.
 func TestAUserSubjectCallerIsUnaffectedByTheRowRule(t *testing.T) {
 	e := validClient()
 	e.SetID(domain.NewID(clientRowID))
 	e.RequestingIdentityKind = "user"
 	e.RequestingClientID = someOtherClientID
 
-	updateClient(t, e, &probingClientService{}, "Patch")
+	updateClient(t, e, &probingClientService{}, ActionRotateSecret)
 
-	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
 		t.Fatal("a user-subject caller was refused by the client row rule")
 	}
 }
 
-func TestAClientSubjectCallerMayEditItsOwnRow(t *testing.T) {
+func TestAClientSubjectCallerMayRotateItsOwnSecret(t *testing.T) {
 	e := validClient()
 	e.SetID(domain.NewID(clientRowID))
 	e.RequestingIdentityKind = "client"
 	e.RequestingClientID = clientRowID
 
-	updateClient(t, e, &probingClientService{}, "Patch")
+	updateClient(t, e, &probingClientService{}, ActionRotateSecret)
 
-	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
-		t.Fatal("a client was refused its own row")
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
+		t.Fatal("a client was refused the rotation of its own secret")
 	}
 }
 
-func TestAClientSubjectCallerMayNotEditAnotherRow(t *testing.T) {
+// TestAClientSubjectCallerMayNotRotateAnotherSecret is what the rule narrowed
+// DOWN to on 2026-08-28. Rotating is not editing: the call mints a credential and
+// starts retiring the one in use, so a machine able to do it to another machine
+// could lock it out and take its place — one call that is both a denial of
+// service and an impersonation.
+func TestAClientSubjectCallerMayNotRotateAnotherSecret(t *testing.T) {
+	e := validClient()
+	e.SetID(domain.NewID(clientRowID))
+	e.RequestingIdentityKind = "client"
+	e.RequestingClientID = someOtherClientID
+
+	updateClient(t, e, &probingClientService{}, ActionRotateSecret)
+
+	if !clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
+		t.Fatalf("a client rotated somebody else's secret; got %v", clientNotificationKeys(e))
+	}
+}
+
+// TestAClientSubjectCallerMayEditAnotherRow is the other half of that narrowing,
+// and it is a test rather than an absence because the old behaviour was
+// deliberate too: editing a sibling client is an ordinary tenant-scoped write,
+// gated by the permission the caller carries and by nothing else.
+func TestAClientSubjectCallerMayEditAnotherRow(t *testing.T) {
 	e := validClient()
 	e.SetID(domain.NewID(clientRowID))
 	e.RequestingIdentityKind = "client"
@@ -356,63 +382,49 @@ func TestAClientSubjectCallerMayNotEditAnotherRow(t *testing.T) {
 
 	updateClient(t, e, &probingClientService{}, "Patch")
 
-	if !clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
-		t.Fatalf("a client edited somebody else's row; got %v", clientNotificationKeys(e))
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
+		t.Fatalf("a client was refused an ordinary edit of a sibling row; got %v", clientNotificationKeys(e))
 	}
 }
 
-// TestAClientSubjectCallerCannotCreateAClient is the self-replication answer,
-// and it has a rule of its own on purpose. The own-row rule would refuse the
-// insert too — a row being created has no id to match — but the MESSAGE is what
-// makes this a separate rule: a caller told "you may only modify your own
-// record" while trying to CREATE one has been answered about the wrong verb.
-func TestAClientSubjectCallerCannotCreateAClient(t *testing.T) {
+// TestAClientSubjectCallerMayCreateAClient replaces a rule that used to refuse
+// this outright. The refusal was dropped on 2026-08-28 for the same reason the
+// edit was: a client-subject caller holding client:insert creates clients in its
+// tenant like any other caller, and the permission is what says whether it may.
+//
+// What bounded the damage before still bounds it: a client can be granted no role
+// whose permissions its grantor does not already hold, and the tenant scope
+// applies to a machine exactly as it does to a person.
+func TestAClientSubjectCallerMayCreateAClient(t *testing.T) {
 	e := validClient()
 	e.RequestingIdentityKind = "client"
 	e.RequestingClientID = someOtherClientID
 
 	insertClient(t, e, &probingClientService{})
 
-	keys := clientNotificationKeys(e)
-	if !clientHasKey(keys, "ClientsMayNotCreateClientsNotification") {
-		t.Fatalf("a machine credential minted another machine credential; got %v", keys)
-	}
-	if clientHasKey(keys, "ClientMayOnlyModifyItselfNotification") {
-		t.Fatalf("a refused CREATION was answered as a refused modification; got %v", keys)
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
+		t.Fatalf("the rotation rule fired on an insert; it guards one action and no other; got %v", clientNotificationKeys(e))
 	}
 }
 
-// TestAClientSubjectCallerCannotCreateEvenItsOwnID closes the reading that would
-// make the rule above vacuous: it is the SUBJECT KIND that refuses, not a
-// mismatched id, so a caller cannot get through by naming itself.
-func TestAClientSubjectCallerCannotCreateEvenItsOwnID(t *testing.T) {
-	e := validClient()
-	e.RequestingIdentityKind = "client"
-	e.RequestingClientID = clientRowID
-
-	insertClient(t, e, &probingClientService{})
-
-	if !clientHasKey(clientNotificationKeys(e), "ClientsMayNotCreateClientsNotification") {
-		t.Fatalf("a client created a client by naming itself; got %v", clientNotificationKeys(e))
-	}
-}
-
-// TestAUserSubjectCallerMayStillCreateAClient is the other half, and it is the
-// asymmetry stated as a test: the restriction is on the SUBJECT KIND, and a
-// person holding client:insert creates clients in their tenant like they always
-// did.
+// TestAUserSubjectCallerMayStillCreateAClient outlived the rule it was written
+// against: with the client refusal gone, both kinds create clients, and the test
+// stays because "a person may" is worth pinning on its own.
 func TestAUserSubjectCallerMayStillCreateAClient(t *testing.T) {
 	e := validClient()
 	e.RequestingIdentityKind = "user"
 
 	insertClient(t, e, &probingClientService{})
 
-	if clientHasKey(clientNotificationKeys(e), "ClientsMayNotCreateClientsNotification") {
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
 		t.Fatalf("a person was refused the creation of a client; got %v", clientNotificationKeys(e))
 	}
 }
 
-func TestAClientSubjectCallerMayNotArchiveAnotherRow(t *testing.T) {
+// TestAClientSubjectCallerMayArchiveAnotherRow: the archive gate no longer
+// carries the row rule at all. Archiving a sibling is an ordinary tenant-scoped
+// write — it takes a client out of service, it does not take it over.
+func TestAClientSubjectCallerMayArchiveAnotherRow(t *testing.T) {
 	e := validClient()
 	e.SetID(domain.NewID(clientRowID))
 	e.RequestingIdentityKind = "client"
@@ -420,8 +432,8 @@ func TestAClientSubjectCallerMayNotArchiveAnotherRow(t *testing.T) {
 
 	_, _ = domain.GetArchivable(e, &probingClientService{}, "Archive")
 
-	if !clientHasKey(clientNotificationKeys(e), "ClientMayOnlyModifyItselfNotification") {
-		t.Fatalf("a client archived somebody else's row; got %v", clientNotificationKeys(e))
+	if clientHasKey(clientNotificationKeys(e), "ClientMayOnlyRotateItsOwnSecretNotification") {
+		t.Fatalf("a client was refused the archive of a sibling row; got %v", clientNotificationKeys(e))
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	appinfra "github.com/ClaudioSchirmer/authcore/internal/infra"
 	appweb "github.com/ClaudioSchirmer/authcore/internal/web"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
+	fwgraphql "github.com/ClaudioSchirmer/omnicore/web/graphql"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -43,4 +44,15 @@ func NewUserCredentialsFeature(d bootstrap.Deps) *UserCredentialsFeature {
 // profile read.
 func (f *UserCredentialsFeature) Mount(app *fiber.App, d bootstrap.Deps) {
 	appweb.MountUserCredentials(app, f.repo, f.svc, d)
+}
+
+// MountGraphQL opts this feature into the GraphQL surface, the same way
+// UsersFeature does.
+//
+// The framework discovers the method by type assertion and builds the single
+// shared registry itself, so the two credential fields land on the same schema
+// as the nine generated user fields — nothing about GraphQL is wired in the
+// composition root.
+func (f *UserCredentialsFeature) MountGraphQL(reg *fwgraphql.Registry, _ bootstrap.Deps) {
+	appweb.MountUserCredentialsGraphQL(reg, f.repo, f.svc)
 }

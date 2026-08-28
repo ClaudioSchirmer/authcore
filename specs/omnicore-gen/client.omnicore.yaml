@@ -210,6 +210,11 @@ fields:
     type: string
     runtime: true
     source: manual
+    # RENDERED BY THE CREATE, and by no other generated verb. The insert is the operation
+    # that MINTS this value, and a secret nobody can read is a client that authenticates
+    # nobody: the hash lands on the row and the plaintext would otherwise die with the
+    # entity. The rotation renders it too, from its own hand-written response.
+    renderIn: [insert]
     livesOn: root
     example: acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM
     description: >-
@@ -410,28 +415,21 @@ rules:
         Unarchive on this entity, so this is a one-way door by construction.
       scope: [archive]
 
-    - id: client-may-not-create-clients
+    - id: client-rotates-only-its-own-secret
       description: >-
-        When RequestingIdentityKind is exactly "client", refuse the creation outright. A
-        machine credential that mints machine credentials is a persistence mechanism:
-        revoking the original leaves the ones it created working. It is DECLARED here rather
-        than left to fall out of the own-row rule below — that rule would refuse the insert
-        too, because a row being created has no id to match, but a refusal by side effect
-        reads as an accident and answers with the wrong message. Stands down when the claim
-        is absent (it reads as a user) and when no identity is present at all.
-      scope: [insert]
-      notification: ClientsMayNotCreateClientsNotification
-      attachTo: ID
-
-    - id: client-modifies-only-itself
-      description: >-
-        When RequestingIdentityKind is exactly "client", refuse any write whose row id is not
-        RequestingClientID. Stands down when the claim is absent (it reads as a user), and
-        when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token
-        MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the
-        subject kind from another claim's absence.
-      scope: [update, archive]
-      notification: ClientMayOnlyModifyItselfNotification
+        When RequestingIdentityKind is exactly "client", refuse a SECRET ROTATION whose row id
+        is not RequestingClientID. Narrowed to the rotation on 2026-08-28: it used to cover
+        every update and the archive, which left a client-subject caller unable to administer
+        its tenant's other clients at all — too closed, and not the boundary that matters.
+        Creating, editing, archiving and granting are ordinary tenant-scoped writes, gated by
+        the permission the caller carries; handing out a CREDENTIAL is the act that must stay
+        on the caller's own row, because a machine that can rotate another machine's secret
+        can lock it out and take its place. Stands down when the claim is absent (it reads as
+        a user), and when no identity is present at all. THIS RULE IS INERT UNTIL
+        POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a
+        fallback that infers the subject kind from another claim's absence.
+      scope: [update]
+      notification: ClientMayOnlyRotateItsOwnSecretNotification
       attachTo: ID
 
 notifications:
@@ -598,27 +596,16 @@ notifications:
       ita: Solo un client attivo può ruotare il proprio segreto. Riattivarlo prima.
       nld: Alleen bij een actieve client kan het geheim worden geroteerd. Activeer hem eerst.
 
-  - name: ClientsMayNotCreateClientsNotification
+  - name: ClientMayOnlyRotateItsOwnSecretNotification
     semantic: forbidden
     text:
-      ptbr: Um token de client não pode criar clients.
-      eng: A client token cannot create clients.
-      esp: Un token de client no puede crear clients.
-      fra: Un jeton de client ne peut pas créer de clients.
-      deu: Ein Client-Token kann keine Clients anlegen.
-      ita: Un token di client non può creare client.
-      nld: Een clienttoken kan geen clients aanmaken.
-
-  - name: ClientMayOnlyModifyItselfNotification
-    semantic: forbidden
-    text:
-      ptbr: Um token de client só pode alterar o próprio registro.
-      eng: A client token may only modify its own record.
-      esp: Un token de client sólo puede modificar su propio registro.
-      fra: Un jeton de client ne peut modifier que son propre enregistrement.
-      deu: Ein Client-Token darf nur den eigenen Datensatz ändern.
-      ita: Un token di client può modificare solo il proprio record.
-      nld: Een clienttoken mag alleen het eigen record wijzigen.
+      ptbr: Um token de client só pode rotacionar o próprio secret.
+      eng: A client token may only rotate its own secret.
+      esp: Un token de client sólo puede rotar su propio secreto.
+      fra: Un jeton de client ne peut faire pivoter que son propre secret.
+      deu: Ein Client-Token darf nur das eigene Geheimnis rotieren.
+      ita: Un token di client può ruotare solo il proprio segreto.
+      nld: Een clienttoken mag alleen het eigen geheim roteren.
 
   # Reused verbatim from ../omnicore-gen/user.omnicore.yaml and group.omnicore.yaml so the
   # three entities cannot drift apart about what these mean.
@@ -711,11 +698,29 @@ children:
     archivedAt: deleted_at
     businessIdentity: [CIDR]
     duplicateNotification: ClientAlreadyAllowsCIDRNotification
-    # Editing the allow-list is configuration rather than privilege: it grants the client
-    # nothing it does not already hold, it only narrows or widens WHERE FROM.
+    # A verb of its own, NOT the root's update, reopened on 2026-08-28.
+    #
+    # The first reading called this configuration rather than privilege: the list grants the
+    # client nothing it does not already hold, it only narrows or widens WHERE FROM. True,
+    # and beside the point — WHERE FROM is a security control, and the direction that
+    # matters is the one that RELAXES it. An empty collection is how "no restriction" is
+    # spelled (see the universal-prefix rule below, which refuses 0.0.0.0/0 so that there is
+    # exactly one spelling), so archiving the last entry opens the credential to every
+    # address on the internet. That must not be reachable by whoever may fix a typo in the
+    # description.
+    #
+    # ONE verb for both directions, as on every other collection in this service. Adding a
+    # range only tightens, so gating the add is cheap; splitting the pair would make this the
+    # only collection whose two verbs disagree, and the operator who tightened would not be
+    # able to undo their own change.
+    #
+    # NOT client:grant, deliberately. That verb answers "may this principal confer privilege
+    # on the client" — the roles collection. Folding the network list into it would hand
+    # everyone who manages roles the power to open the credential to the internet, which is a
+    # different job with a different blast radius.
     permissions:
-      add: client:update
-      remove: client:update
+      add: client:manage-network
+      remove: client:manage-network
     description: >-
       The network ranges this client may authenticate from. An EMPTY collection means any
       address: the restriction is opt-in, so a newly created client is not born unable to

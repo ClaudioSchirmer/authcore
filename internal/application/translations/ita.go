@@ -163,7 +163,6 @@ func (ita) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Intervallo di rete non valido. Usare la notazione CIDR, come 203.0.113.0/24 o 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "Non è accettato un intervallo che copre l'intera internet. Lasciare la lista vuota per non porre restrizioni.",
 		"UnknownClientStatusNotification":                  "Stato del client sconosciuto.",
-		"ClientMayOnlyModifyItselfNotification":            "Un token di client può modificare solo il proprio record.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Tenant",
 		"ClientNameField":                                  "Nome",
@@ -191,6 +190,6 @@ func (ita) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "L'intervallo di rete deve essere indicato nella forma canonica, con i bit host azzerati.",
 		"InvalidGracePeriodNotification":                   "La finestra di tolleranza deve essere compresa tra 0 e {max} secondi.",
 		"ClientMustBeActiveToRotateNotification":           "Solo un client attivo può ruotare il proprio segreto. Riattivarlo prima.",
-		"ClientsMayNotCreateClientsNotification":           "Un token di client non può creare client.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "Un token di client può ruotare solo il proprio segreto.",
 	}
 }

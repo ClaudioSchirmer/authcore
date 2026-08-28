@@ -163,7 +163,6 @@ func (ptbr) Translations() map[string]string {
 		"InvalidCIDRBlockNotification":                     "Faixa de rede inválida. Use notação CIDR, como 203.0.113.0/24 ou 2001:db8::/32.",
 		"UniversalCIDRNotAllowedNotification":              "Uma faixa que cobre toda a internet não é aceita. Deixe a lista vazia para não restringir.",
 		"UnknownClientStatusNotification":                  "Situação de client desconhecida.",
-		"ClientMayOnlyModifyItselfNotification":            "Um token de client só pode alterar o próprio registro.",
 		"Client":                                           "Client",
 		"ClientTenantIDField":                              "Inquilino",
 		"ClientNameField":                                  "Nome",
@@ -191,6 +190,6 @@ func (ptbr) Translations() map[string]string {
 		"CIDRHasHostBitsSetNotification":                   "A faixa de rede precisa vir na forma canônica, com os bits de host zerados.",
 		"InvalidGracePeriodNotification":                   "A janela de carência deve ficar entre 0 e {max} segundos.",
 		"ClientMustBeActiveToRotateNotification":           "Só um client ativo pode ter o segredo rotacionado. Reative-o antes.",
-		"ClientsMayNotCreateClientsNotification":           "Um token de client não pode criar clients.",
+		"ClientMayOnlyRotateItsOwnSecretNotification":      "Um token de client só pode rotacionar o próprio secret.",
 	}
 }

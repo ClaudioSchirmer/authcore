@@ -19,7 +19,8 @@ Model: `spec.md` §3, §8, §9, §10. Convention: `conventions/web.md` +
 
 **Operations, per §10's table** — five on the root (create, patch, archive, list, by id) and
 two on the child (grant, revoke). Every one of them declares its permission on BOTH surfaces;
-the child pair rides the root's update verb per §10.
+the child pair carries `role:grant`, a verb of its own, per §10 (it rode the root's update
+until 2026-08-28).
 
 **Route shapes.** The child operations take an extra path segment for the child id. That
 segment is **never** named as the reserved id path token — the by-id specification owns that

@@ -61,17 +61,11 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfArchive`
 
-**`client-may-not-create-clients`**
+**`client-rotates-only-its-own-secret`**
 
-> When RequestingIdentityKind is exactly "client", refuse the creation outright. A machine credential that mints machine credentials is a persistence mechanism: revoking the original leaves the ones it created working. It is DECLARED here rather than left to fall out of the own-row rule below — that rule would refuse the insert too, because a row being created has no id to match, but a refusal by side effect reads as an accident and answers with the wrong message. Stands down when the claim is absent (it reads as a user) and when no identity is present at all.
+> When RequestingIdentityKind is exactly "client", refuse a SECRET ROTATION whose row id is not RequestingClientID. Narrowed to the rotation on 2026-08-28: it used to cover every update and the archive, which left a client-subject caller unable to administer its tenant's other clients at all — too closed, and not the boundary that matters. Creating, editing, archiving and granting are ordinary tenant-scoped writes, gated by the permission the caller carries; handing out a CREDENTIAL is the act that must stay on the caller's own row, because a machine that can rotate another machine's secret can lock it out and take its place. Stands down when the claim is absent (it reads as a user), and when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the subject kind from another claim's absence.
 
-- fires under `IfInsert` · raise `ClientsMayNotCreateClientsNotification{}` · attach it to `ID`
-
-**`client-modifies-only-itself`**
-
-> When RequestingIdentityKind is exactly "client", refuse any write whose row id is not RequestingClientID. Stands down when the claim is absent (it reads as a user), and when no identity is present at all. THIS RULE IS INERT UNTIL POST /auth/client/token MINTS THE CLAIM, and that is deliberate — do not add a fallback that infers the subject kind from another claim's absence.
-
-- fires under `IfUpdate`, `IfArchive` · raise `ClientMayOnlyModifyItselfNotification{}` · attach it to `ID`
+- fires under `IfUpdate` · raise `ClientMayOnlyRotateItsOwnSecretNotification{}` · attach it to `ID`
 
 The tests for them are yours too, and the same check applies.
 
@@ -109,6 +103,13 @@ Declared `runtime: true` with `source: manual`. Each one is on the aggregate so 
 |---|---|---|
 | `Secret` | `string` | The plaintext secret, minted by the rules and rendered by the operation that minted it — and nowhere else, ever. No column, no payload, no audit event, no listing. |
 | `GracePeriodSeconds` | `int` | How long the retiring secret stays valid, in seconds. Zero is an immediate kill and is a legitimate answer, not an omission. |
+
+**One of these leaves the service in a response, and it is the only place it ever will.** `renderIn` puts the value the rules minted into the write verb's own answer — the Result reads it off the entity after the write, the Response renders it, and a GraphQL mutation reusing that Response renders it too. Nothing else does: no read, no listing, no `?fields=`, no export column, no audit event, no sync payload. Whatever the row keeps of the value — a hash, normally — is a separate, persisted field.
+
+- `Secret` — rendered by: insert
+
+So the assignment below is not optional for these: a verb that mints nothing answers with the zero value, and the caller receives an empty credential from a `201` that looks like every other one. Check the response of that verb against a real request before calling it done — it is the whole reason the field is declared.
+
 
 Write the assignment in the operation that owns it — the hand-written command whose mapper has both the request and the entity. The shape this exists for is an operation that dispatches the same mode a generated verb does and is told apart by its action name: it needs the value on the aggregate, and the ordinary write bodies must not grow a field for it.
 
@@ -247,7 +248,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Storage | flat table `clients` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
-| Collection `AllowedCIDRs` | `add` → `client:update` (declared); `remove` → `client:update` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `AllowedCIDRs` | `add` → `client:manage-network` (declared); `remove` → `client:manage-network` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
@@ -276,10 +277,8 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the 5 client endpoints | `internal/web/client_routes.go` |
-| the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
-| the request mapper tests | `internal/web/requests/client_requests_test.go` |
-| the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
+| the insert command and result | `internal/application/commands/insert_client_command.go` |
+| the insert request and response | `internal/web/requests/insert_client.go` |
 
 **Left untouched** (yours, by design):
 
@@ -288,7 +287,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-38 file(s) were already up to date.
+40 file(s) were already up to date.
 
 ## What was NOT generated
 
