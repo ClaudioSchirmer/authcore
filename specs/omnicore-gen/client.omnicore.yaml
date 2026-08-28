@@ -210,6 +210,11 @@ fields:
     type: string
     runtime: true
     source: manual
+    # RENDERED BY THE CREATE, and by no other generated verb. The insert is the operation
+    # that MINTS this value, and a secret nobody can read is a client that authenticates
+    # nobody: the hash lands on the row and the plaintext would otherwise die with the
+    # entity. The rotation renders it too, from its own hand-written response.
+    renderIn: [insert]
     livesOn: root
     example: acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM
     description: >-

@@ -3,7 +3,7 @@
   "entities": {
     "Client": {
       "spec": "specs/omnicore-gen/client.omnicore.yaml",
-      "specHash": "c723f40a7f49113b7eb0525fcbd1b62e652c0a351ec995c47ebb90d8ee1964fa",
+      "specHash": "1ee9746abc955f3518be63881d16827709d787bf0571902bd9f396d43b6e80b2",
       "framework": "v0.62.0",
       "files": {
         "bootstrap/clients_feature.go": {
@@ -32,7 +32,7 @@
         },
         "internal/application/commands/insert_client_command.go": {
           "class": "owned",
-          "hash": "7c6ffa1a2969e8df9d95e247769e760e197a8376f6173975c4648613d782a91d"
+          "hash": "feb01fabd0d6dcb6b3679628e9392bf9622c3f21d8e2611c3eeea5cdec7108e1"
         },
         "internal/application/commands/patch_client_command.go": {
           "class": "owned",
@@ -176,7 +176,7 @@
         },
         "internal/web/requests/insert_client.go": {
           "class": "owned",
-          "hash": "5254aa74a4911a04fcb41ca307a799eebe5665e8b5bd94a6feb59fda84e9b51b"
+          "hash": "ae701b7a2110c1fb68bdaa7a9c9c2fc65a99c6e0808d425e132cb302b106c944"
         },
         "internal/web/requests/patch_client.go": {
           "class": "owned",

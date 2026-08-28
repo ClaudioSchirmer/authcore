@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:b8add7d3b3ce2b74a973a1e6a162cbb400ccc7a1afc6c928983c773dba240a15
+// generated:  2026-08-28
+// checksum:   sha256:a9e796069373e5f043b44e3d2a7b146be640c107c4ed0b74e63c2c034bbaa5ad
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -100,8 +100,11 @@ type InsertClientResult struct {
 	PreviousSecretHash      *string
 	PreviousSecretExpiresAt *time.Time
 	Status                  string
-	Roles                   []ClientRoleResult
-	AllowedCIDRs            []ClientAllowedCIDRResult
+	// Secret is RUNTIME: no column holds it, and FromEntity reads it off the
+	// entity after the write — whatever the rules minted there.
+	Secret       string
+	Roles        []ClientRoleResult
+	AllowedCIDRs []ClientAllowedCIDRResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -109,6 +112,10 @@ type InsertClientResult struct {
 // It reads the entity, never the command: the domain may have normalised or
 // defaulted a value, and echoing the input back would hide that from the
 // caller.
+//
+// That is also what makes the runtime fields here possible: nothing persisted
+// them, so the entity in hand is the only place they exist. Whatever the rules
+// put there is what the caller receives, once.
 func (c *InsertClientCommand) FromEntity(_ *configuration.AppContext, e *appdomain.Client) (InsertClientResult, error) {
 	return InsertClientResult{
 		ID:                      *e.GetID(),
@@ -120,6 +127,7 @@ func (c *InsertClientCommand) FromEntity(_ *configuration.AppContext, e *appdoma
 		PreviousSecretHash:      e.PreviousSecretHash,
 		PreviousSecretExpiresAt: e.PreviousSecretExpiresAt,
 		Status:                  e.Status.Value(),
+		Secret:                  e.Secret,
 		Roles:                   projectClientRoles(e),
 		AllowedCIDRs:            projectClientAllowedCIDRs(e),
 	}, nil

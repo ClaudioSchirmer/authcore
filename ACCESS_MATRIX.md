@@ -192,18 +192,18 @@ Cap of 50 per collection, counted over the whole collection. The escalation gate
 
 Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`roles`, `allowedCIDRs`) and a hand-written secret rotation. The only entity whose rules ask what KIND of caller is on the token.
 
-| Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached |
-|---|---|---|---|---|---|---|---|
-| `POST /clients` | `createClient` | `client:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /clients/:id` | `patchClient` | `client:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /clients/:id/archive` | `archiveClient` | `client:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `POST /clients/:id/roles` | `addClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant |
-| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` (dormant) | yes | own tenant |
-| `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
-| `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
+| Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached | Secret |
+|---|---|---|---|---|---|---|---|---|
+| `POST /clients` | `createClient` | `client:insert` | JWT + claim | guard foreign-tenant | — | yes | own tenant | **generated** |
+| `PATCH /clients/:id` | `patchClient` | `client:update` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /clients/:id/archive` | `archiveClient` | `client:archive` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /clients/:id/roles` | `addClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` (dormant) | yes | own tenant | **generated** |
+| `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
+| `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 
 **One row rule, and it is about MACHINES rather than ownership.** A user token of the tenant meets it on no route at all: it holds the permission, the row is in its tenant, and it writes — so an operator with `client:rotate-secret` rotates the secret of any client in their tenant, the mirror of User's reset. What it bounds is a CLIENT-subject caller, and only on the rotation.
 
@@ -211,6 +211,7 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 
 **`dormant` means nothing reaches it yet**: it reads `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Until it does the field reads `""`, the rule stands down, and that cell behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
 
+- **Secret**: the endpoint mints a credential AND renders the plaintext in its own answer — the create issues the first one, the rotation every one after it. Nowhere else, ever: no read, no listing, no export, no `?fields=`. Shown once, because nothing stores it. See *The secret* below.
 - `client:rotate-secret` is a **sixth verb**, for the reason `user:reset-password` is its own: handing out a production credential is not editing a label.
 - **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.
 - **An empty `allowedCIDRs` means ANY address** — `0.0.0.0/0` and `::/0` are refused so there is exactly one spelling of "no restriction". So archiving the last entry opens the credential to the whole internet, which is why the pair left `client:update` on 2026-08-28. Nothing enforces the list yet: it is read by no code until `POST /auth/client/token` exists.
@@ -221,7 +222,7 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 
 | | |
 |---|---|
-| Where the plaintext is readable | **The rotation response, and nowhere else.** The insert mints a credential and returns only `secretChangedAt` — so a usable secret comes from `POST /:id/secret`, including the first one |
+| Where the plaintext is readable | **The response of whichever operation minted it, and nowhere else.** Two do: `POST /clients` returns the first secret in its `201`, `POST /clients/:id/secret` returns every one after it. No read, no listing, no export and no `?fields=` renders the field — nothing stores the plaintext, so no endpoint could |
 | Rotation shape | OVERLAP, not swap: the old secret keeps working until `previousSecretExpiresAt` |
 | `gracePeriodSeconds` | 0 to 604800, default 86400. **0 retires the old secret immediately** — the leaked case |
 | Row state required | `active`. A suspended client is not handed a fresh credential |

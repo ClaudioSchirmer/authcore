@@ -364,3 +364,44 @@ func TestARotationWithNoStandingSecretRetiresNothing(t *testing.T) {
 		t.Fatal("an empty hash was moved into the retiring slot")
 	}
 }
+
+// TestTheInsertResultCarriesTheMintedSecret guards the hop the rotation does not
+// have to make.
+//
+// The create mints a credential too — `mintCredential` under the insert gate —
+// and the plaintext lives on a runtime field that no column, payload or audit
+// event holds. `FromEntity` reading it off the entity is therefore the ONLY
+// thing standing between a minted secret and a secret that dies with the
+// request: drop that one line and the row still gets its hash, the write still
+// answers 201, and the client it created can authenticate nobody.
+//
+// The value is a sentinel rather than a real mint. What the rules put there is
+// proven next door in the domain suite; what is unproven here is that whatever
+// they put there travels.
+func TestTheInsertResultCarriesTheMintedSecret(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	c := &InsertClientCommand{
+		Name:        "Billing integration",
+		Description: "Posts invoices from the billing system into the ledger.",
+		Status:      "active",
+		TenantID:    func() *domain.ID { v := domain.ID(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")); return &v }(),
+	}
+	e, err := c.ToEntity(ctx)
+	if err != nil {
+		t.Fatalf("ToEntity: %v", err)
+	}
+	e.SetID(domain.NewRandomID())
+
+	// Stand where the rules stand: the plaintext on the entity, the hash on the
+	// row, and the two deliberately different.
+	e.Secret = "acs_sentinel_plaintext"
+	e.SecretHash = "sha256:acs_sentinel_plaintext"
+
+	res, err := c.FromEntity(ctx, e)
+	if err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+	if res.Secret != "acs_sentinel_plaintext" {
+		t.Fatalf("the minted secret reached the result as %q; a create that answers without it leaves a client nobody can authenticate as", res.Secret)
+	}
+}

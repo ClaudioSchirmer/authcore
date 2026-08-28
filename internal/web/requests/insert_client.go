@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:de23e2aa3fad891caab6702a72a6cefbdbf59150c51b42cdb62cb8a389ea90b2
+// generated:  2026-08-28
+// checksum:   sha256:09e67abe36640f69b04a51d5239c320ca8b356c1abe03570be309e230d8bd420
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -65,6 +65,7 @@ type InsertClientResponse struct {
 	SecretChangedAt         time.Time                   `json:"secretChangedAt" example:"2026-08-26T14:03:11Z"`
 	PreviousSecretExpiresAt *time.Time                  `json:"previousSecretExpiresAt,omitempty" example:"2026-08-27T14:03:11Z"`
 	Status                  string                      `json:"status" example:"active"`
+	Secret                  string                      `json:"secret" example:"acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM"`
 	Roles                   []ClientRoleResponse        `json:"roles"`
 	AllowedCIDRs            []ClientAllowedCIDRResponse `json:"allowedCIDRs"`
 }

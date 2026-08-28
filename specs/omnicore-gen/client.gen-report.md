@@ -104,6 +104,13 @@ Declared `runtime: true` with `source: manual`. Each one is on the aggregate so 
 | `Secret` | `string` | The plaintext secret, minted by the rules and rendered by the operation that minted it — and nowhere else, ever. No column, no payload, no audit event, no listing. |
 | `GracePeriodSeconds` | `int` | How long the retiring secret stays valid, in seconds. Zero is an immediate kill and is a legitimate answer, not an omission. |
 
+**One of these leaves the service in a response, and it is the only place it ever will.** `renderIn` puts the value the rules minted into the write verb's own answer — the Result reads it off the entity after the write, the Response renders it, and a GraphQL mutation reusing that Response renders it too. Nothing else does: no read, no listing, no `?fields=`, no export column, no audit event, no sync payload. Whatever the row keeps of the value — a hash, normally — is a separate, persisted field.
+
+- `Secret` — rendered by: insert
+
+So the assignment below is not optional for these: a verb that mints nothing answers with the zero value, and the caller receives an empty credential from a `201` that looks like every other one. Check the response of that verb against a real request before calling it done — it is the whole reason the field is declared.
+
+
 Write the assignment in the operation that owns it — the hand-written command whose mapper has both the request and the entity. The shape this exists for is an operation that dispatches the same mode a generated verb does and is told apart by its action name: it needs the value on the aggregate, and the ordinary write bodies must not grow a field for it.
 
 **Until something assigns it, the field is the zero value on every write, and nothing says so.** A rule reading it does not fail — it judges `""` (or `false`, or `0`) and answers accordingly, which for a possession check is the answer that looks like a pass. Value objects are the one part already handled: the automatic pass would judge this field on every generated write, so its validation is excluded under every gate, and what checks the value is the rule you write.
@@ -270,16 +277,8 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
-| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| tests for Client's rules | `internal/domain/client_test.go` |
-| 14 notification declaration(s) | `internal/domain/notifications.go` |
+| the insert command and result | `internal/application/commands/insert_client_command.go` |
+| the insert request and response | `internal/web/requests/insert_client.go` |
 
 **Left untouched** (yours, by design):
 
