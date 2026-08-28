@@ -240,6 +240,60 @@ Caps: 50 roles, 20 CIDRs. A client caller may grant itself a role and gains noth
 
 ---
 
+## Implicit restrictions
+
+Every line below is a request that **carries the permission** and is refused anyway. The `Permission` column in the tables above answers *who may attempt*; this section answers *what still does not pass*.
+
+### By WHO is calling
+
+A token of kind `user`, holding every permission:
+
+| | id = you | id = somebody else |
+|---|---|---|
+| `PATCH /users/:id/password` (change) | ✅ | ❌ **403** |
+| `PATCH /users/:id/password-reset` | ❌ **403** | ✅ |
+
+A token of kind `client`, holding every permission *(dormant: no endpoint mints a client token yet)*:
+
+| | id = itself | id = another row |
+|---|---|---|
+| `POST /clients/:id/secret` (rotate) | ✅ | ❌ **403** |
+| `PATCH /users/:id/password` (change) | ❌ **403** | ❌ **403** |
+
+The change refuses a client on both sides because the rule compares the token's subject against the `users` row id, and a client subject is never one.
+
+### By WHAT is being written
+
+| Request | Answer | Why |
+|---|---|---|
+| Grant a permission with `*` in either part to a role | **403** | No wildcard is grantable through this API, `*:*` callers included |
+| Attach a role that grants a `*` permission to a group, a user or a client | **403** | Same rule one level up — which is why the platform's own superadmin group and user are not creatable here |
+| Grant a role or permission the caller does not hold | **403** | No-escalation. A `*:*` claim satisfies every concrete permission, so it passes |
+| Attach a role or group that belongs to another tenant | **422** | One notification for absent, archived and foreign alike — otherwise it is an existence oracle over another tenant |
+| Change `email`, `key`, `workspace`, `resource`/`action`, or any `tenantID` | **422** | Immutable after creation; no request reaches them |
+| Exceed a cap: 50 roles per group/user/client, 50 groups per user, 20 CIDRs per client | **422** | |
+| Move a status anywhere but `active ⇄ suspended` | **422** | |
+
+### By the STATE of the row
+
+| Request | Answer | Why |
+|---|---|---|
+| Rotate the secret of a client that is not `active` | **422** | A suspended client was switched off deliberately; a fresh credential is the opposite of that |
+| Create a group, a user or a client under an archived or `suspended` tenant | **422** | A `trial` tenant passes — unavailable is not the same question as not active |
+| Unarchive anything but a tenant | **404** | No such route exists; archive is one-way everywhere else |
+
+### By the TOKEN itself
+
+| Condition | Effect |
+|---|---|
+| `must_change_password` is true | The token is signed carrying **only `user:change-password`**, `*:*` included. Different in kind from everything above: the permission does not travel at all, so the account may hold it while the session does not |
+
+### And the scope nobody's permission crosses
+
+Holding every concrete permission does not leave your tenant — only `IsSuperAdmin()` does, and it answers **false** for a resource wildcard like `user:*`. `*:*` is the one claim that crosses, and it still meets every refusal in this section except the no-escalation one.
+
+---
+
 ## Public routes
 
 No JWT, no claim, no permission.
