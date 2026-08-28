@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:cccf1344e1eadb6792bf03b4db6b971745ed6406f59f2c06ec6b110e384cac46
+// generated:  2026-08-28
+// checksum:   sha256:400d673e86f2884f1d36d0f7d9677b1ac8d2e72b1d884c8b9f7927168ac0b2d0
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -21,6 +21,7 @@ import (
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -316,9 +317,13 @@ func TestAddUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveUserGroupCommand takes the entry out and answers with the owner alone
-// — the entry it names is gone, so there is nothing to project.
-func TestRemoveUserGroupCommand_AppliesAndProjects(t *testing.T) {
+// RemoveUserGroupCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveUserGroupCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -347,12 +352,13 @@ func TestRemoveUserGroupCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.UserGroup](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.UserID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }
 
@@ -393,9 +399,13 @@ func TestAddUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	}
 }
 
-// RemoveUserRoleCommand takes the entry out and answers with the owner alone
-// — the entry it names is gone, so there is nothing to project.
-func TestRemoveUserRoleCommand_AppliesAndProjects(t *testing.T) {
+// RemoveUserRoleCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveUserRoleCommand_TakesTheEntryOut(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	// A request has a caller. With no identity the mappers' identity feed is
 	// skipped entirely, and what a scoped write is checked against is exactly
@@ -424,11 +434,12 @@ func TestRemoveUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
-	out, err := cmd.FromEntity(ctx, e)
-	if err != nil {
-		t.Fatalf("FromEntity: %v", err)
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.UserRole](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
 	}
-	if out.UserID.Value() != "019ffd00-0000-7000-8000-000000000000" {
-		t.Error("the result does not carry the owner id")
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
 	}
 }

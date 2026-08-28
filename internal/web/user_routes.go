@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:31750dc7588196843fbe6ea9f63d46860e64b80dc13bb2caac5bd4df493a0914
+// generated:  2026-08-28
+// checksum:   sha256:e123660381d319228ea1a3dfb16f74c076cfa20ea59a77617ab34b517572c4fd
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -140,15 +140,15 @@ func MountUsers(
 
 	hRemoveUserGroup, sRemoveUserGroup := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveUserGroupRequest{},
-		requests.RemoveUserGroupResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserGroupCommand, commands.RemoveUserGroupResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserGroupCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/groups/:userGroupId/archive",
 		hRemoveUserGroup, sRemoveUserGroup,
 		fwopenapi.Doc{
 			Summary:     "Archive one UserGroup of a User",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Users"},
 		},
 		fwopenapi.RequirePermission("user:grant"))
@@ -170,15 +170,15 @@ func MountUsers(
 
 	hRemoveUserRole, sRemoveUserRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveUserRoleRequest{},
-		requests.RemoveUserRoleResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserRoleCommand, commands.RemoveUserRoleResult]{
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
-		}, fiber.StatusOK)
+		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/roles/:userRoleId/archive",
 		hRemoveUserRole, sRemoveUserRole,
 		fwopenapi.Doc{
 			Summary:     "Archive one UserRole of a User",
-			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — reversible, which is why this is not a DELETE. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Users"},
 		},
 		fwopenapi.RequirePermission("user:grant"))

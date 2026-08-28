@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:62f5f62228b64e46c746b53fcafbac469da38107709c0a3d18d1304cc3ae71d3
+// generated:  2026-08-28
+// checksum:   sha256:32e07e8ad8877d73bd7cf54b472b1170535d9c62855e68c24b951ba342457c56
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -63,7 +63,8 @@ func (AddUserGroupResponse) FromResult(r commands.AddUserGroupResult) AddUserGro
 
 // RemoveUserGroupRequest names the entry to take out.
 //
-// There is no body: everything the verb needs is in the path.
+// There is no body: everything the verb needs is in the path. Nothing comes
+// back either — the endpoint answers 204.
 type RemoveUserGroupRequest struct {
 	fwrequests.Auto
 
@@ -79,21 +80,4 @@ type RemoveUserGroupRequest struct {
 // reshaping would drop the marker and write ToCommand by hand instead.
 func (r RemoveUserGroupRequest) ToCommand() *commands.RemoveUserGroupCommand {
 	return fwrequests.AutoFromRequest[*commands.RemoveUserGroupCommand](r)
-}
-
-// RemoveUserGroupResponse answers with the owner alone.
-type RemoveUserGroupResponse struct {
-	fwresponses.Auto
-
-	UserID domain.ID `json:"userId"`
-}
-
-// FromResult projects the application Result onto RemoveUserGroupResponse.
-//
-// The embedded marker opts this Response into the framework's generic
-// Result→Response mapping: every field is read from the same-named Result
-// field, and the pair is checked at boot. A shape that needed renaming or
-// reshaping would drop the marker and write FromResult by hand instead.
-func (RemoveUserGroupResponse) FromResult(r commands.RemoveUserGroupResult) RemoveUserGroupResponse {
-	return fwresponses.AutoFromResult[RemoveUserGroupResponse](r)
 }

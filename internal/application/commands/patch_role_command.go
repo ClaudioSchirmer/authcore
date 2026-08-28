@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:22d187b3a1cd3136bfd3db30d833bea6deb83a510101ca4fd0a897f7bed7682b
+// generated:  2026-08-28
+// checksum:   sha256:bf864b13a716240da50e5969e9812e18eae394c7e626407cbb004e4a4aab903f
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -61,9 +61,10 @@ func (c *PatchRoleCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *ap
 	if id := ctx.Identity(); id != nil {
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil
@@ -91,6 +92,6 @@ func (c *PatchRoleCommand) FromEntity(_ *configuration.AppContext, e *appdomain.
 		Key:         e.Key.Value(),
 		Name:        e.Name.Value(),
 		Description: e.Description.Value(),
-		Permissions: projectPermissions(e),
+		Permissions: projectRolePermissions(e),
 	}, nil
 }

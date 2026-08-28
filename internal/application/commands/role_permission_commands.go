@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:47afbd02bf1325508e52c5b35a4585d38d61ca64f873d987227c4a5019c1a78f
+// generated:  2026-08-28
+// checksum:   sha256:2622fd365e5af56193f7286e4b6d7d8c8f21ed6026e031e8b1001894c281352d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -45,9 +46,10 @@ func (cmd *AddRolePermissionCommand) ApplyTo(ctx *configuration.AppContext, e *a
 	if id := ctx.Identity(); id != nil {
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil
@@ -86,21 +88,20 @@ func (cmd *RemoveRolePermissionCommand) ApplyTo(ctx *configuration.AppContext, e
 	if id := ctx.Identity(); id != nil {
 		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
-		// A super-admin crosses the scope. Not asked through
-		// HasPermission, which panics on the *:* the claim carries —
-		// the wildcard has its own question, and this is it.
+		// The super-admin grant, not asked through HasPermission: that
+		// method panics on a wildcard, since the CLAIM wildcards and the
+		// question does not. The framework gives the wildcard its own
+		// question, and this is it.
 		e.RequestingMayCrossScope = id.IsSuperAdmin()
 	}
 	return nil
 }
 
-// RemoveRolePermissionResult carries only the owner: the entry it names is gone.
-type RemoveRolePermissionResult struct {
-	RoleID domain.ID
-}
-
-func (cmd *RemoveRolePermissionCommand) FromEntity(_ *configuration.AppContext, e *appdomain.Role) (RemoveRolePermissionResult, error) {
-	return RemoveRolePermissionResult{RoleID: *e.GetID()}, nil
+// FromEntity projects nothing: the entry RemoveRolePermissionCommand named is
+// gone, so the endpoint answers 204 — and the framework's NoBody projection
+// is paired with a None on this side.
+func (cmd *RemoveRolePermissionCommand) FromEntity(_ *configuration.AppContext, _ *appdomain.Role) (fwresults.None, error) {
+	return fwresults.None{}, nil
 }
 
 // projectOneRolePermission renders one stored entry.

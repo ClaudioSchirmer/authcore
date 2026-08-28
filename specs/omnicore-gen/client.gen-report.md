@@ -246,9 +246,9 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `clients` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
-| Collection `AllowedCIDRs` | `add` → `client:update` (declared); `remove` → `client:update` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. |
-| Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. |
+| Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `AllowedCIDRs` | `add` → `client:update` (declared); `remove` → `client:update` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
 | Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
@@ -260,16 +260,13 @@ These are the decisions the spec made that are expensive to change later. Read t
 
 | What | File |
 |---|---|
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
-| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| tests for Client's rules | `internal/domain/client_test.go` |
-| 15 notification declaration(s) | `internal/domain/notifications.go` |
+| the per-entry commands for client_allowed_cidrs | `internal/application/commands/client_allowed_cidr_commands.go` |
+| tests for the command mappers | `internal/application/commands/client_commands_test.go` |
+| the per-entry commands for client_roles | `internal/application/commands/client_role_commands.go` |
+| the 5 client endpoints | `internal/web/client_routes.go` |
+| the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
+| the request mapper tests | `internal/web/requests/client_requests_test.go` |
+| the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
 
 **Left untouched** (yours, by design):
 
@@ -278,7 +275,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-40 file(s) were already up to date.
+35 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -293,9 +290,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **ahead** (project pins v0.61.0)
+Verdict: **exact** (project pins v0.62.0)
 
-the project pins framework v0.61.0, ahead of the v0.60.0 this generator targets. Generating anyway. Read the changelog of the pinned version and ask two questions: was there a breaking change, and does it touch what the generator emits? Then build — go vet and go build settle it faster than reading can. A small fix is fine (adopt it with `omnicore-gen adopt <path>` so the next run keeps it); a capability that changed shape entirely is a generator bump, not a patch
+framework v0.62.0 meets the required v0.62.0
 
 Verify what was generated:
 
