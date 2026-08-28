@@ -748,10 +748,11 @@ read:
 surfaces:
   rest: true
   graphql:
+    # enabled alone is the whole declaration: both reads, every write verb the entity
+    # mounts, and the collection's own attach/detach. The two collection verbs were
+    # REST-only until the language grew a seat for them, and a group nobody can grant a
+    # role to is half an aggregate, not a surface.
     enabled: true
-    connection: true
-    # Root verbs only. The two collection verbs are REST-only, exactly as Role ships them.
-    mutations: [insert, update, archive]
   # No CSV/XLSX exports: operator-facing and small, the call all three existing entities
   # made. An access-review export is the plausible reason to want one; it is one flag.
 

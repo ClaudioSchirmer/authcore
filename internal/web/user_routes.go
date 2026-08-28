@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:e123660381d319228ea1a3dfb16f74c076cfa20ea59a77617ab34b517572c4fd
+// checksum:   sha256:069f4eac3d643d30f57dd586fce5bd17be52bb32994fa3ed4fdcc5d45a040c45
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -237,5 +237,45 @@ func MountUsersGraphQL(
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("user:archive")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddUserGroupRequest](
+		"addUserGroup", requests.AddUserGroupResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.AddUserGroupCommand, commands.AddUserGroupResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:grant")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserGroupGraphQLRequest](
+		"removeUserGroup", requests.RemoveUserGroupGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserGroupCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:grant")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddUserRoleRequest](
+		"addUserRole", requests.AddUserRoleResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.AddUserRoleCommand, commands.AddUserRoleResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:grant")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserRoleGraphQLRequest](
+		"removeUserRole", requests.RemoveUserRoleGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserRoleCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:grant")))
 
 }

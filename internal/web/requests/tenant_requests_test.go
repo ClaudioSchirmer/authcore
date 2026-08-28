@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:67895fbf623b53321a52d85d8cfe25c166ede8ca2cb358158594969574eb3c74
+// generated:  2026-08-28
+// checksum:   sha256:aad1b32bb08dee7b385fe9b88a69fb2dfad17042251d3f8693d15b4bab4ca16e
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -19,9 +19,10 @@ package requests
 import (
 	"testing"
 
+	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
-	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 )
 
 // InsertTenantRequest must carry every field into the command.

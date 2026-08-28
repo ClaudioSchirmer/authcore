@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:09d27ae5eaf7f73de99196f37558e75ab5c821ded1e4fe843073403d50194005
+// checksum:   sha256:f0502357a3613728d57faa7b17293a19aa8e3aa3299d016d1cb77bfa85b0e3a8
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -198,5 +199,25 @@ func TestRemoveGroupRoleRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveGroupRoleRequest{GroupRoleID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().GroupRoleID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveGroupRoleGraphQLRequest names the entry through its input.
+func TestRemoveGroupRoleGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveGroupRoleGraphQLRequest{GroupRoleID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().GroupRoleID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveGroupRoleGraphQLResponse acknowledges, since a mutation must answer
+// something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveGroupRoleGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveGroupRoleGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
 	}
 }

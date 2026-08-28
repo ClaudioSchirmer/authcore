@@ -385,9 +385,9 @@ read:
 surfaces:
   rest: true
   graphql:
+    # enabled alone is the whole declaration: both reads and every write verb the catalog
+    # mounts. mutations and connection exist to SUBTRACT; nothing here is meant to be off.
     enabled: true
-    connection: true
-    mutations: [insert, update, archive]
   # No CSV/XLSX exports: the catalog is small and operator-facing.
 
 authz:

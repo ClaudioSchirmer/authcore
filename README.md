@@ -974,8 +974,16 @@ verb the rest of the service does not have. A distinct `role:grant` — so that 
 role" and "may change what the role can do" are separately grantable — is a real distinction
 and a one-line change if it is wanted.
 
-The **GraphQL surface carries the root verbs only** (`roles`, `role`, `createRole`,
-`patchRole`, `archiveRole`). The two collection verbs are REST-only.
+The **GraphQL surface mirrors REST end to end**: the two reads (`roles`, `role`), the three
+root verbs (`createRole`, `patchRole`, `archiveRole`) and the two collection verbs
+(`addRolePermission`, `removeRolePermission`) — one command and one permission behind each
+pair, never a second implementation. The grants were REST-only until omnicore-gen 0.47.0,
+which gave a collection its own seat on the schema; the specs declare no narrowing, so every
+entity in this service publishes on both surfaces what it mounts on either. Two shapes differ
+where the surfaces genuinely do: on GraphQL the entry id travels in the input
+(`rolePermissionId`) because there is no path segment to carry it, and the revoke resolves to
+`success: true` where REST answers `204`. The hand-written routes — authentication, the user
+credential verbs, the client secret rotation — stay REST-only; nothing generated mounts them.
 
 Listing controls served: pagination (`?first`/`?after`/…), `?orderBy`, `?fields`,
 `?onlyTotal`, `?includeArchived`. A control that is not declared is answered with a typed

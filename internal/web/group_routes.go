@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:2d1fbe486061bb8c408ba02e3263b9fbae481b365817cbebf15b3f81417fdae9
+// checksum:   sha256:16ba383821e868ae4c1cde0d8ed3eda8bab998cb3871d2a496958eee413650fd
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -207,5 +207,25 @@ func MountGroupsGraphQL(
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("group:archive")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddGroupRoleRequest](
+		"addGroupRole", requests.AddGroupRoleResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Group, *commands.AddGroupRoleCommand, commands.AddGroupRoleResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("group:grant")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveGroupRoleGraphQLRequest](
+		"removeGroupRole", requests.RemoveGroupRoleGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Group, *commands.RemoveGroupRoleCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("group:grant")))
 
 }

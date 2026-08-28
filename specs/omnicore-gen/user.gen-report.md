@@ -315,13 +315,26 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read join → Group | `InnerJoin` on `group_id`, from UserGroup | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 | Read join → Role | `InnerJoin` on `role_id`, from UserRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 
+### Where each endpoint answers
+
+Surfaces enabled: **REST · GraphQL**. The three are independent, and every endpoint below is generated from ONE command with ONE permission — a surface is a way in, never a second implementation.
+
+| endpoint | REST | GraphQL |
+|---|---|---|
+| Create an user | `POST /users` | `createUser` |
+| Update an user (partial) | `PATCH /users/:id` | `patchUser` |
+| Archive an user | `PATCH /users/:id/archive` | `archiveUser` |
+| List users | `GET /users` | `users` |
+| Get an user by id | `GET /users/:id` | `user` |
+| Add one `UserGroup` | `POST /users/:id/groups` | `addUserGroup` |
+| Take out one `UserGroup` | `PATCH /users/:id/groups/:userGroupId/archive` | `removeUserGroup` |
+| Add one `UserRole` | `POST /users/:id/roles` | `addUserRole` |
+| Take out one `UserRole` | `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` |
+
 ## What was generated
 
 | What | File |
 |---|---|
-| tests for the command mappers | `internal/application/commands/user_commands_test.go` |
-| the per-entry commands for user_groups | `internal/application/commands/user_group_commands.go` |
-| the per-entry commands for user_roles | `internal/application/commands/user_role_commands.go` |
 | the per-entry wire types for user_groups | `internal/web/requests/user_group_requests.go` |
 | the request mapper tests | `internal/web/requests/user_requests_test.go` |
 | the per-entry wire types for user_roles | `internal/web/requests/user_role_requests.go` |
@@ -335,7 +348,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-36 file(s) were already up to date.
+39 file(s) were already up to date.
 
 ## What was NOT generated
 

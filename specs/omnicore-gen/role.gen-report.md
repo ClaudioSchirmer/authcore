@@ -169,16 +169,24 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 | Read join → Permission | `InnerJoin` on `permission_id`, from RolePermission | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. On the entity and OFF the wire: Resource, Action — read by the rules, in no response body and in no export. |
 
+### Where each endpoint answers
+
+Surfaces enabled: **REST · GraphQL**. The three are independent, and every endpoint below is generated from ONE command with ONE permission — a surface is a way in, never a second implementation.
+
+| endpoint | REST | GraphQL |
+|---|---|---|
+| Create a role | `POST /roles` | `createRole` |
+| Update a role (partial) | `PATCH /roles/:id` | `patchRole` |
+| Archive a role | `PATCH /roles/:id/archive` | `archiveRole` |
+| List roles | `GET /roles` | `roles` |
+| Get a role by id | `GET /roles/:id` | `role` |
+| Add one `RolePermission` | `POST /roles/:id/permissions` | `addRolePermission` |
+| Take out one `RolePermission` | `PATCH /roles/:id/permissions/:rolePermissionId/archive` | `removeRolePermission` |
+
 ## What was generated
 
 | What | File |
 |---|---|
-| the archive command and result | `internal/application/commands/archive_role_command.go` |
-| the insert command and result | `internal/application/commands/insert_role_command.go` |
-| the patch command and result | `internal/application/commands/patch_role_command.go` |
-| the shapes for 1 child collection(s) | `internal/application/commands/role_child_results.go` |
-| tests for the command mappers | `internal/application/commands/role_commands_test.go` |
-| the per-entry commands for role_permissions | `internal/application/commands/role_permission_commands.go` |
 | the per-entry wire types for role_permissions | `internal/web/requests/role_permission_requests.go` |
 | the request mapper tests | `internal/web/requests/role_requests_test.go` |
 | the 5 role endpoints | `internal/web/role_routes.go` |
@@ -191,7 +199,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-26 file(s) were already up to date.
+32 file(s) were already up to date.
 
 ## What was NOT generated
 

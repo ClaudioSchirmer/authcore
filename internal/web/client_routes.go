@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:f65ede3db740b1ad5bc4271619e9f69d33e8cf6781c87adbbc3893c9b0a1635a
+// checksum:   sha256:7442e2068f6c6bb3c2f37cb3113b9bbdf5a49ef36f0a9e5e473adbf333234ddc
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -237,5 +237,45 @@ func MountClientsGraphQL(
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("client:archive")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddClientRoleRequest](
+		"addClientRole", requests.AddClientRoleResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.AddClientRoleCommand, commands.AddClientRoleResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("client:grant")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveClientRoleGraphQLRequest](
+		"removeClientRole", requests.RemoveClientRoleGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientRoleCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("client:grant")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddClientAllowedCIDRRequest](
+		"addClientAllowedCIDR", requests.AddClientAllowedCIDRResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.AddClientAllowedCIDRCommand, commands.AddClientAllowedCIDRResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("client:update")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveClientAllowedCIDRGraphQLRequest](
+		"removeClientAllowedCIDR", requests.RemoveClientAllowedCIDRGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("client:update")))
 
 }

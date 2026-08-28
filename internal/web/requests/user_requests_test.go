@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:6b1dca7c615d43f2ce639b0b06fb81992d5800a109d9701cb9b1cace9af6a240
+// checksum:   sha256:0c4af35e6b7bfe4356e15907d7e80755a9fd722fc7e9a9acca364e7423cd7cab
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -22,6 +22,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -212,6 +213,26 @@ func TestRemoveUserGroupRequest_NamesTheEntry(t *testing.T) {
 	}
 }
 
+// RemoveUserGroupGraphQLRequest names the entry through its input.
+func TestRemoveUserGroupGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveUserGroupGraphQLRequest{UserGroupID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().UserGroupID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveUserGroupGraphQLResponse acknowledges, since a mutation must answer
+// something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveUserGroupGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveUserGroupGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
+	}
+}
+
 // AddUserRoleRequest carries the entry into its command.
 //
 // The body is the same entry shape the root's own body carries, so a field
@@ -256,5 +277,25 @@ func TestRemoveUserRoleRequest_NamesTheEntry(t *testing.T) {
 	r := RemoveUserRoleRequest{UserRoleID: "01890000-0000-7000-8000-000000000000"}
 	if r.ToCommand().UserRoleID != "01890000-0000-7000-8000-000000000000" {
 		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveUserRoleGraphQLRequest names the entry through its input.
+func TestRemoveUserRoleGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveUserRoleGraphQLRequest{UserRoleID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().UserRoleID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveUserRoleGraphQLResponse acknowledges, since a mutation must answer
+// something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveUserRoleGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveUserRoleGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
 	}
 }

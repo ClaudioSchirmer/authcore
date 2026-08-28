@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:8f19f5dd27874096d0811a719fab540cc0284d545b4b868476c802328c4730f8
+// generated:  2026-08-28
+// checksum:   sha256:025f7c0234cfd7f404dc6b3ef8cfaf993f515177073afc683c36cae38cb6f232
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -19,9 +19,10 @@ package requests
 import (
 	"testing"
 
+	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
-	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 )
 
 // InsertPermissionRequest must carry every field into the command.

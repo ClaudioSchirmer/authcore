@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:da5857dfb6373cfb64331a1e23045442b5d603d262d819e135849c32ec78acca
+// checksum:   sha256:2520ae5e16dbd43396fb5363b1fc1287d1f84b59165a7ea8ded42cf621fc0682
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -18,6 +18,7 @@ package requests
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
@@ -80,4 +81,46 @@ type RemoveClientRoleRequest struct {
 // reshaping would drop the marker and write ToCommand by hand instead.
 func (r RemoveClientRoleRequest) ToCommand() *commands.RemoveClientRoleCommand {
 	return fwrequests.AutoFromRequest[*commands.RemoveClientRoleCommand](r)
+}
+
+// RemoveClientRoleGraphQLRequest names the entry to take out.
+//
+// The entry id is an input field rather than a path segment: GraphQL has no
+// path, and the framework's decoder skips a path-tagged field instead of
+// inventing a value for it.
+type RemoveClientRoleGraphQLRequest struct {
+	fwrequests.Auto
+
+	ClientRoleID string `json:"clientRoleId"`
+}
+
+// ToCommand hands the body to the application layer unchanged. No
+// normalisation happens here: the domain is what decides a value's final form.
+//
+// The embedded marker opts this Request into the framework's generic
+// Request→Command mapping: every field travels to the same-named Command
+// field, and the pair is checked at boot. A shape that needed renaming or
+// reshaping would drop the marker and write ToCommand by hand instead.
+func (r RemoveClientRoleGraphQLRequest) ToCommand() *commands.RemoveClientRoleCommand {
+	return fwrequests.AutoFromRequest[*commands.RemoveClientRoleCommand](r)
+}
+
+// RemoveClientRoleGraphQLResponse acknowledges the removal, and says nothing
+// else.
+//
+// The REST verb answers 204 with no body. A GraphQL field cannot: it must
+// resolve to a type, and a payload with no fields is not publishable. So the
+// payload is a single true — the owner id is what the caller passed in, and
+// the entry is gone by definition.
+//
+// No generic mapper here, and it is not an oversight: the command projects the
+// framework's None, so there is no Result field for a mapped one to read.
+type RemoveClientRoleGraphQLResponse struct {
+	Success bool `json:"success"`
+}
+
+// FromResult answers true: the pipeline only projects a result it succeeded
+// with.
+func (RemoveClientRoleGraphQLResponse) FromResult(fwresults.None) RemoveClientRoleGraphQLResponse {
+	return RemoveClientRoleGraphQLResponse{Success: true}
 }

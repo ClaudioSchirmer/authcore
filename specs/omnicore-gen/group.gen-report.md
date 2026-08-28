@@ -149,16 +149,24 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 | Read join → Role | `InnerJoin` on `role_id`, from GroupRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 
+### Where each endpoint answers
+
+Surfaces enabled: **REST · GraphQL**. The three are independent, and every endpoint below is generated from ONE command with ONE permission — a surface is a way in, never a second implementation.
+
+| endpoint | REST | GraphQL |
+|---|---|---|
+| Create a group | `POST /groups` | `createGroup` |
+| Update a group (partial) | `PATCH /groups/:id` | `patchGroup` |
+| Archive a group | `PATCH /groups/:id/archive` | `archiveGroup` |
+| List groups | `GET /groups` | `groups` |
+| Get a group by id | `GET /groups/:id` | `group` |
+| Add one `GroupRole` | `POST /groups/:id/roles` | `addGroupRole` |
+| Take out one `GroupRole` | `PATCH /groups/:id/roles/:groupRoleId/archive` | `removeGroupRole` |
+
 ## What was generated
 
 | What | File |
 |---|---|
-| the archive command and result | `internal/application/commands/archive_group_command.go` |
-| the shapes for 1 child collection(s) | `internal/application/commands/group_child_results.go` |
-| tests for the command mappers | `internal/application/commands/group_commands_test.go` |
-| the per-entry commands for group_roles | `internal/application/commands/group_role_commands.go` |
-| the insert command and result | `internal/application/commands/insert_group_command.go` |
-| the patch command and result | `internal/application/commands/patch_group_command.go` |
 | the 5 group endpoints | `internal/web/group_routes.go` |
 | the request mapper tests | `internal/web/requests/group_requests_test.go` |
 | the per-entry wire types for group_roles | `internal/web/requests/group_role_requests.go` |
@@ -170,7 +178,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-26 file(s) were already up to date.
+32 file(s) were already up to date.
 
 ## What was NOT generated
 
