@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:7442e2068f6c6bb3c2f37cb3113b9bbdf5a49ef36f0a9e5e473adbf333234ddc
+// checksum:   sha256:4631585d5288045709b3ae2c3a879935ccd095f3f4ff769ab2c9643a82ac4f36
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -166,7 +166,7 @@ func MountClients(
 			Description: "Adds ONE entry to the allowedCIDRs collection of an existing Client, in the owner's transaction. 404 when the owner is not there. The response carries the entry AS STORED, including the id the server minted for it — that id is how the caller addresses it afterwards.",
 			Tags:        []string{"Clients"},
 		},
-		fwopenapi.RequirePermission("client:update"))
+		fwopenapi.RequirePermission("client:manage-network"))
 
 	hRemoveClientAllowedCIDR, sRemoveClientAllowedCIDR := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveClientAllowedCIDRRequest{},
@@ -181,7 +181,7 @@ func MountClients(
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Clients"},
 		},
-		fwopenapi.RequirePermission("client:update"))
+		fwopenapi.RequirePermission("client:manage-network"))
 
 }
 
@@ -265,7 +265,7 @@ func MountClientsGraphQL(
 		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.AddClientAllowedCIDRCommand, commands.AddClientAllowedCIDRResult]{
 			Repo: repo, Service: svc,
 		},
-		fwgraphql.RequirePermission("client:update")))
+		fwgraphql.RequirePermission("client:manage-network")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
 	// so the payload is the acknowledgement and nothing more. Whether the
@@ -276,6 +276,6 @@ func MountClientsGraphQL(
 		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
-		fwgraphql.RequirePermission("client:update")))
+		fwgraphql.RequirePermission("client:manage-network")))
 
 }

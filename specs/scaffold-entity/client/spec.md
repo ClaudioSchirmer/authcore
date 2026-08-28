@@ -654,8 +654,8 @@ reaches them — the rotate operation is the only writer), `id`.
 | **rotate secret** | `POST /clients/{id}/secret` | **`client:rotate-secret`** |
 | grant role | `POST /clients/{id}/roles` | `client:grant` |
 | revoke role | `PATCH /clients/{id}/roles/{childId}/archive` | `client:grant` |
-| allow a range | `POST /clients/{id}/allowed-cidrs` | `client:update` (proposed) |
-| remove a range | `PATCH /clients/{id}/allowed-cidrs/{childId}/archive` | `client:update` (proposed) |
+| allow a range | `POST /clients/{id}/allowed-cidrs` | **`client:manage-network`** |
+| remove a range | `PATCH /clients/{id}/allowed-cidrs/{childId}/archive` | **`client:manage-network`** |
 
 - **Reserved read controls:** pagination + `orderBy` (defaults) · `?fields=` **yes** ·
   `?search=` **no** (no text index will serve it; `name` filtering covers the need) ·
@@ -694,19 +694,28 @@ reaches them — the rotate operation is the only writer), `id`.
 ## 10. Authorization                          [required]
 
 **Layer 1 — the permission gate.** The `<resource>:<verb>` taxonomy this service already
-grants, extended by one verb: `client:read` · `client:insert` · `client:update` ·
-`client:archive` · `client:grant` · **`client:rotate-secret`**.
+grants, extended by two verbs: `client:read` · `client:insert` · `client:update` ·
+`client:archive` · `client:grant` · **`client:rotate-secret`** · **`client:manage-network`**.
 
 **`client:rotate-secret` is its own verb and not `client:update`**, for the same reason
 `user:reset-password` is its own: replacing a credential is not editing a label, and an
 operator who may fix a typo in an integration's description is not automatically an operator
 who may hand out a new production credential.
 
-**The allow-list pair is proposed under `client:update`** (alternative: its own
-`client:network` verb). It is configuration rather than privilege — it cannot grant a client
-anything it does not already hold; it only narrows or widens *where from*. The counter-case
-is that widening it is a security-relevant act and `client:update` is otherwise a rather
-tame permission.
+**The allow-list pair was proposed under `client:update`** (alternative: its own
+`client:network` verb), on the reading that it is configuration rather than privilege — it
+cannot grant a client anything it does not already hold; it only narrows or widens *where
+from*. The counter-case was named right here: widening it is a security-relevant act and
+`client:update` is otherwise a rather tame permission.
+
+**Decided 2026-08-28: `client:manage-network`, and the counter-case is why.** The direction
+that matters is the one that RELAXES. C16 refuses `0.0.0.0/0` and `::/0` so that an empty
+collection is the single spelling of "no restriction" — which makes archiving the last entry
+the act that opens the credential to every address on the internet. That must not ride the
+same permission as fixing a typo. ONE verb for both directions, as on every other collection
+in this service: the add only tightens, and splitting the pair would leave an operator unable
+to undo their own change. Named `manage-network` rather than `network` because every other
+action in the taxonomy is a verb.
 
 **Layer 2/3 — data access.** Three cases, stated by the maintainer at the gate and written
 out here because they are easy to leave in prose:

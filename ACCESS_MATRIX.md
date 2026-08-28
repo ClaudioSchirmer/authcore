@@ -198,8 +198,8 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 | `PATCH /clients/:id/archive` | `archiveClient` | `client:archive` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
 | `POST /clients/:id/roles` | `addClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
 | `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:update` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
-| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:update` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
+| `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
+| `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
 | `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | client: **self only** (dormant) | yes | own tenant |
 | `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 | `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant |
@@ -207,7 +207,8 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 **What `dormant` means here**: the two rules exist and are tested, but nothing reaches them yet. Both read `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Under a user token the field reads `""`, both stand down, and every cell above behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
 
 - `client:rotate-secret` is a **sixth verb**, for the reason `user:reset-password` is its own: handing out a production credential is not editing a label.
-- `allowedCIDRs` rides `client:update`, not `client:grant` — the CIDR list narrows where a credential works, it confers nothing. The `roles` collection is the privilege edge, and it is the one that carries `:grant`.
+- **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.
+- **An empty `allowedCIDRs` means ANY address** — `0.0.0.0/0` and `::/0` are refused so there is exactly one spelling of "no restriction". So archiving the last entry opens the credential to the whole internet, which is why the pair left `client:update` on 2026-08-28. Nothing enforces the list yet: it is read by no code until `POST /auth/client/token` exists.
 - **Insert**: `tenantID` optional, absent means the claim's. `name` unique per tenant. **Patch** carries `name`, `description`, `status` (`active` ⇄ `suspended`); `tenantID` is immutable.
 - **Archive** forces `status = suspended`. No unarchive, on the root or per entry.
 

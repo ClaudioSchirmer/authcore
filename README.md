@@ -733,11 +733,18 @@ rotation call. That gap and its three ways out are in
 `specs/scaffold-entity/client/tasks.md`.
 
 Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
-`client:grant` (the two role verbs) · **`client:rotate-secret`**, which is its own verb for
-the reason `user:reset-password` is — whoever may fix a typo in a description is not
-automatically whoever may hand out a production credential. Editing the allow-list is
-`client:update`: it grants the client nothing it does not already hold, it only narrows or
-widens where from.
+`client:grant` (the two role verbs) · **`client:rotate-secret`** · **`client:manage-network`**
+(the two allow-list verbs). The last two are their own for the reason `user:reset-password`
+is — whoever may fix a typo in a description is not automatically whoever may hand out a
+production credential, nor whoever may decide where that credential works from.
+
+`client:manage-network` was `client:update` until 2026-08-28. The first reading called the
+allow-list configuration rather than privilege — it grants the client nothing it does not
+already hold, it only narrows or widens where from — which is true and beside the point: the
+direction that matters is the one that RELAXES. An empty collection is how "no restriction" is
+spelled, so archiving the last entry opens the credential to every address on the internet.
+One verb covers both directions, as everywhere else in this service: the add only tightens, and
+splitting the pair would leave an operator unable to undo their own change.
 
 Row scope is `User`'s, plus two: a **client token may not create a client**, and it **writes
 only its own row** (`sub == id`). Both are written and **inert** — they read an

@@ -711,11 +711,29 @@ children:
     archivedAt: deleted_at
     businessIdentity: [CIDR]
     duplicateNotification: ClientAlreadyAllowsCIDRNotification
-    # Editing the allow-list is configuration rather than privilege: it grants the client
-    # nothing it does not already hold, it only narrows or widens WHERE FROM.
+    # A verb of its own, NOT the root's update, reopened on 2026-08-28.
+    #
+    # The first reading called this configuration rather than privilege: the list grants the
+    # client nothing it does not already hold, it only narrows or widens WHERE FROM. True,
+    # and beside the point — WHERE FROM is a security control, and the direction that
+    # matters is the one that RELAXES it. An empty collection is how "no restriction" is
+    # spelled (see the universal-prefix rule below, which refuses 0.0.0.0/0 so that there is
+    # exactly one spelling), so archiving the last entry opens the credential to every
+    # address on the internet. That must not be reachable by whoever may fix a typo in the
+    # description.
+    #
+    # ONE verb for both directions, as on every other collection in this service. Adding a
+    # range only tightens, so gating the add is cheap; splitting the pair would make this the
+    # only collection whose two verbs disagree, and the operator who tightened would not be
+    # able to undo their own change.
+    #
+    # NOT client:grant, deliberately. That verb answers "may this principal confer privilege
+    # on the client" — the roles collection. Folding the network list into it would hand
+    # everyone who manages roles the power to open the credential to the internet, which is a
+    # different job with a different blast radius.
     permissions:
-      add: client:update
-      remove: client:update
+      add: client:manage-network
+      remove: client:manage-network
     description: >-
       The network ranges this client may authenticate from. An EMPTY collection means any
       address: the restriction is opt-in, so a newly created client is not born unable to

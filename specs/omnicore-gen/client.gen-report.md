@@ -247,7 +247,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Storage | flat table `clients` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
-| Collection `AllowedCIDRs` | `add` → `client:update` (declared); `remove` → `client:update` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `AllowedCIDRs` | `add` → `client:manage-network` (declared); `remove` → `client:manage-network` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
@@ -277,9 +277,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 | What | File |
 |---|---|
 | the 5 client endpoints | `internal/web/client_routes.go` |
-| the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
-| the request mapper tests | `internal/web/requests/client_requests_test.go` |
-| the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
 
 **Left untouched** (yours, by design):
 
@@ -288,7 +285,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-38 file(s) were already up to date.
+41 file(s) were already up to date.
 
 ## What was NOT generated
 
