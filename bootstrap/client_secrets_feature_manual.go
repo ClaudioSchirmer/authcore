@@ -13,6 +13,7 @@ import (
 	appinfra "github.com/ClaudioSchirmer/authcore/internal/infra"
 	appweb "github.com/ClaudioSchirmer/authcore/internal/web"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
+	fwgraphql "github.com/ClaudioSchirmer/omnicore/web/graphql"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -39,4 +40,14 @@ func NewClientSecretsFeature(d bootstrap.Deps) *ClientSecretsFeature {
 // with is not a projection of anything — no column holds it.
 func (f *ClientSecretsFeature) Mount(app *fiber.App, d bootstrap.Deps) {
 	appweb.MountClientSecrets(app, f.repo, f.svc, d)
+}
+
+// MountGraphQL opts this feature into the GraphQL surface, the same way
+// ClientsFeature does.
+//
+// The framework discovers the method by type assertion, so the rotation lands on
+// the single shared schema beside the nine generated client fields — nothing
+// about GraphQL is wired in the composition root.
+func (f *ClientSecretsFeature) MountGraphQL(reg *fwgraphql.Registry, _ bootstrap.Deps) {
+	appweb.MountClientSecretsGraphQL(reg, f.repo, f.svc)
 }

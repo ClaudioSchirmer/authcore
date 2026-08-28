@@ -35,6 +35,7 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwweb "github.com/ClaudioSchirmer/omnicore/web"
+	fwgraphql "github.com/ClaudioSchirmer/omnicore/web/graphql"
 	fwopenapi "github.com/ClaudioSchirmer/omnicore/web/openapi"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 	"github.com/gofiber/fiber/v3"
@@ -138,4 +139,39 @@ func MountUserCredentials(
 			},
 		},
 		fwopenapi.RequirePermission("user:reset-password"))
+}
+
+// MountUserCredentialsGraphQL exposes the two credential operations on the
+// GraphQL surface.
+//
+// It exists as its own mount for the reason the REST pair does: the generated
+// MountUsersGraphQL is a file the generator owns and rewrites, and adding a
+// field inside it would be an edit the next run refuses. Nothing is duplicated
+// — both fields reuse the handler their REST twin uses, with the same
+// permission, so the two surfaces cannot drift about who may do what.
+//
+// THE ROW RULES TRAVEL UNCHANGED, and that is the whole reason this is safe to
+// mirror. "Must be self" and "must not be self" live in the aggregate, fed by
+// feedRowScope from the identity on the AppContext — not by anything the
+// transport does. A caller reaching changeUserPassword with somebody else's id
+// meets the same refusal here as on REST.
+//
+// Both answer a single `success`, the shape every other mutation in this
+// service uses to mirror a 204.
+func MountUserCredentialsGraphQL(
+	reg *fwgraphql.Registry,
+	store commands.UserCredentialStore,
+	svc domain.Service,
+) {
+	// The id rides the field's own `id` argument, which the framework hands to
+	// SetPathID — the same value the route took from its path segment.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ChangePasswordRequest](
+		"changeUserPassword", requests.ChangeUserPasswordGraphQLResponse{}.FromResult,
+		&commands.ChangePasswordHandler{Store: store, Service: svc},
+		fwgraphql.RequirePermission("user:change-password")))
+
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ResetPasswordRequest](
+		"resetUserPassword", requests.ResetUserPasswordGraphQLResponse{}.FromResult,
+		&commands.ResetPasswordHandler{Store: store, Service: svc},
+		fwgraphql.RequirePermission("user:reset-password")))
 }

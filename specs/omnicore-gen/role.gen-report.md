@@ -160,7 +160,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 |---|---|---|
 | Storage | flat table `roles` | A field group that should be shared with another role later would need a real migration to extract. |
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
-| Collection `Permissions` | `add` → `role:update` (inherited); `remove` → `role:update` (inherited) | These routes hang off `/roles/:id/permissions`. They inherit the root's update permission, which is the default. If changing what this collection holds is a different job from editing the record — a role assignment, a grant — declare `children[].permissions` so one does not carry the other. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `Permissions` | `add` → `role:grant` (declared); `remove` → `role:grant` (declared) | These routes hang off `/roles/:id/permissions`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Key` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `RoleKeyAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
@@ -187,8 +187,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the per-entry wire types for role_permissions | `internal/web/requests/role_permission_requests.go` |
-| the request mapper tests | `internal/web/requests/role_requests_test.go` |
 | the 5 role endpoints | `internal/web/role_routes.go` |
 
 **Left untouched** (yours, by design):
@@ -199,7 +197,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-32 file(s) were already up to date.
+34 file(s) were already up to date.
 
 ## What was NOT generated
 

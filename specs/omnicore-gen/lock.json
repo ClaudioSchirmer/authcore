@@ -530,7 +530,7 @@
     },
     "Group": {
       "spec": "specs/omnicore-gen/group.omnicore.yaml",
-      "specHash": "b954ad32ecdd09cfcfba280ea6ee5876f7075809e24148be85a4a435b37437aa",
+      "specHash": "5cbe5c363b31f8226cac25ede8907eca7bd56b0b939328f6b5cccbde38dfedb0",
       "framework": "v0.62.0",
       "files": {
         "bootstrap/groups_feature.go": {
@@ -1116,7 +1116,7 @@
     },
     "Role": {
       "spec": "specs/omnicore-gen/role.omnicore.yaml",
-      "specHash": "e952d6d2da8a27948b34e2564c1fb16f18bfcdcb2da9a03d89fddacbc76b358f",
+      "specHash": "2746b2b736bb1a41945b21cfcb0eee4b04be7bb18b1348cbe4653035510cf199",
       "framework": "v0.62.0",
       "files": {
         "bootstrap/roles_feature.go": {
@@ -1269,7 +1269,7 @@
         },
         "internal/web/role_routes.go": {
           "class": "owned",
-          "hash": "22a157c1fabae9bf9225951495cb8de4a6fa2050729ca79817716bc8cba41e78"
+          "hash": "de9a1abf3f58b9f3cc476950dbed688714f168df866bd7d1b7f759b3b4ec71e6"
         }
       },
       "ordinals": {

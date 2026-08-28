@@ -780,6 +780,9 @@ too if §5 gains it.
 **`group:grant` is the one place this entity's taxonomy diverges from `Role`'s, and the
 divergence is the decision, not an oversight.** `Role` weighed a `role:grant` verb and
 declined it to keep four verbs per resource; `Group` takes it, because §A-6 is the reason —
+*(the divergence ended on 2026-08-28: `Role` took `role:grant` and `User` had already taken
+`user:grant`, so this is now the shape of every collection in the service — the paragraph
+below still records why `Group` moved first.)*
 Entra and AWS both split "manage the group" from "change what the group confers", and the
 group→role edge reaches further than the role→permission one (a group hands a member every
 permission of every role it carries). Consequences worth stating:

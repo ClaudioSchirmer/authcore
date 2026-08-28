@@ -14,7 +14,10 @@
 
 package requests
 
-import "github.com/ClaudioSchirmer/authcore/internal/application/commands"
+import (
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
+)
 
 // ChangePasswordRequest is the body of the self-service change.
 //
@@ -56,4 +59,41 @@ func (r ResetPasswordRequest) ToCommand() *commands.ResetPasswordCommand {
 		Password:             r.Password,
 		PasswordConfirmation: r.PasswordConfirmation,
 	}
+}
+
+// ── the GraphQL payloads ────────────────────────────────────────────────────
+//
+// TWO TYPES AND NOT ONE SHARED ACKNOWLEDGEMENT, for the reason the two request
+// bodies are also two types: the schema names a payload after the field it
+// answers, so a shared Go type would still publish two SDL types — and the day
+// one of them grows a field, the other would grow it too, silently.
+//
+// The REST verbs answer 204 with no body. A GraphQL field cannot: it must
+// resolve to a type, and a payload with no fields is not publishable. So each is
+// a single true, exactly as every other mutation in this service that mirrors a
+// 204. Nothing about the credential is echoed back — that is as true here as it
+// is on REST, and for the same reason.
+
+// ChangeUserPasswordGraphQLResponse acknowledges the change, and says nothing
+// else.
+type ChangeUserPasswordGraphQLResponse struct {
+	Success bool `json:"success"`
+}
+
+// FromResult answers true: the pipeline only projects a result it succeeded
+// with.
+func (ChangeUserPasswordGraphQLResponse) FromResult(fwresults.None) ChangeUserPasswordGraphQLResponse {
+	return ChangeUserPasswordGraphQLResponse{Success: true}
+}
+
+// ResetUserPasswordGraphQLResponse acknowledges the reset, and says nothing
+// else.
+type ResetUserPasswordGraphQLResponse struct {
+	Success bool `json:"success"`
+}
+
+// FromResult answers true: the pipeline only projects a result it succeeded
+// with.
+func (ResetUserPasswordGraphQLResponse) FromResult(fwresults.None) ResetUserPasswordGraphQLResponse {
+	return ResetUserPasswordGraphQLResponse{Success: true}
 }

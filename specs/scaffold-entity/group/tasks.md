@@ -51,8 +51,9 @@ Carried here from the spec so no layer has to rediscover them:
    All three questions answer with **one** notification, deliberately: a distinct
    "belongs to another tenant" message is an existence oracle over a competitor's org chart.
 2. **`group:grant` is a fifth verb.** The two collection operations do NOT ride
-   `group:update`. This is the one place the taxonomy diverges from `Role`'s, and it is the
-   decision (spec §10), not an oversight.
+   `group:update`. This was the one place the taxonomy diverged from `Role`'s, and it was the
+   decision (spec §10), not an oversight — `Role` took `role:grant` on 2026-08-28, so the
+   shape is now the service's own.
 3. **G10a is transitive.** The escalation check resolves a role to its permission keys and
    requires the caller to hold every one of them — not one key, a set.
 4. **One-way archive hurts more here.** Unarchiving would re-authorize a whole team at once.

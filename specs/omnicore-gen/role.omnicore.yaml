@@ -321,6 +321,29 @@ children:
     archivedAt: deleted_at
     businessIdentity: [PermissionID]
     duplicateNotification: RoleAlreadyGrantsPermissionNotification
+    # A verb of its own, NOT the root's update, and this was reopened on 2026-08-28.
+    # The original reading proposed role:update for both child verbs and named the
+    # alternative: "a real distinction — the second is the privilege-escalation surface —
+    # but it adds a verb the rest of the service does not have". That last clause is what
+    # has since expired. Group took group:grant and User took user:grant, so Role was the
+    # only collection in the service still riding its parent's update, and the asymmetry
+    # cost more than the extra verb ever did.
+    #
+    # The distinction it buys is the same one Entra and AWS draw: "may rename the role" and
+    # "may change what the role can do" are different jobs. A principal holding role:update
+    # alone may relabel a role and gets 403 on both collection verbs.
+    #
+    # ONE verb for both directions, as on Group and User: splitting grant from revoke would
+    # only move the asymmetry rather than remove it.
+    #
+    # It does NOT replace the domain rules below: Layer 1 asks whether this principal may
+    # touch the edge at all, the no-escalation rule asks whether they may grant THIS
+    # permission. Named honestly: role:grant is a catalog row somebody has to insert and a
+    # grant somebody has to make, and until they do nobody attaches a permission to a role
+    # while auth.authorization is on. That is the correct failure direction here.
+    permissions:
+      add: role:grant
+      remove: role:grant
     # The rendered resource:action token, ONE PER GRANT. Sources are the entry's
     # own join fields, named bare. The body rebuilds vos.PermissionKey and calls
     # String() rather than joining two strings — the separator keeps exactly one

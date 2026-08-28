@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:648c52114a2ed8ec352e1ae8f101b9b72a5b4db9e514f2f82b18edd3b73f5931
+// checksum:   sha256:941e2bbc2c30533037f3800772107764bc632682a3fc773435ee9ab5ee1364d9
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -136,7 +136,7 @@ func MountRoles(
 			Description: "Adds ONE entry to the permissions collection of an existing Role, in the owner's transaction. 404 when the owner is not there. The response carries the entry AS STORED, including the id the server minted for it — that id is how the caller addresses it afterwards.",
 			Tags:        []string{"Roles"},
 		},
-		fwopenapi.RequirePermission("role:update"))
+		fwopenapi.RequirePermission("role:grant"))
 
 	hRemoveRolePermission, sRemoveRolePermission := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RemoveRolePermissionRequest{},
@@ -151,7 +151,7 @@ func MountRoles(
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
 			Tags:        []string{"Roles"},
 		},
-		fwopenapi.RequirePermission("role:update"))
+		fwopenapi.RequirePermission("role:grant"))
 
 }
 
@@ -215,7 +215,7 @@ func MountRolesGraphQL(
 		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.AddRolePermissionCommand, commands.AddRolePermissionResult]{
 			Repo: repo, Service: svc,
 		},
-		fwgraphql.RequirePermission("role:update")))
+		fwgraphql.RequirePermission("role:grant")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
 	// so the payload is the acknowledgement and nothing more. Whether the
@@ -226,6 +226,6 @@ func MountRolesGraphQL(
 		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.RemoveRolePermissionCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
-		fwgraphql.RequirePermission("role:update")))
+		fwgraphql.RequirePermission("role:grant")))
 
 }

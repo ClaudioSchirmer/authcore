@@ -165,12 +165,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the 5 group endpoints | `internal/web/group_routes.go` |
-| the request mapper tests | `internal/web/requests/group_requests_test.go` |
-| the per-entry wire types for group_roles | `internal/web/requests/group_role_requests.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/domain/group_rules_manual.go` — hand-written rules live here, by design
@@ -178,7 +172,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-32 file(s) were already up to date.
+35 file(s) were already up to date.
 
 ## What was NOT generated
 

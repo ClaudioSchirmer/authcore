@@ -769,12 +769,13 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
 
 ### Layer 1 — the permission gate
 
-`role:insert` · `role:update` · `role:archive` · `role:read` (proposed) — the taxonomy the
-service already grants on its other eight routes, extended with no new verb. The action
+`role:insert` · `role:update` · `role:archive` · `role:read` — the taxonomy the
+service already grants on its other eight routes. The action
 spells the operation; `:update` covers PATCH; `:archive` would cover unarchive too if §5
-gains it.
+gains it. A **fifth**, `role:grant`, was added on 2026-08-28 for the two child ops — see the
+note under the table.
 
-The two child ops ride the parent's verb rather than inventing their own:
+The two child ops carry a verb of their own:
 
 | Operation | Route | Permission |
 |---|---|---|
@@ -783,13 +784,22 @@ The two child ops ride the parent's verb rather than inventing their own:
 | archive | `PATCH /roles/:id/archive` | `role:archive` |
 | list | `GET /roles` | `role:read` |
 | by id | `GET /roles/:id` | `role:read` |
-| grant a permission | `POST /roles/:id/permissions` | `role:update` |
-| revoke a permission | `PATCH /roles/:id/permissions/:childId/archive` | `role:update` |
+| grant a permission | `POST /roles/:id/permissions` | **`role:grant`** |
+| revoke a permission | `PATCH /roles/:id/permissions/:childId/archive` | **`role:grant`** |
 
-Alternative worth naming: a distinct `role:grant` for the two child ops, so "may edit the
-role's label" and "may change what the role can do" are separately grantable. That is a real
-distinction — the second is the privilege-escalation surface — but it adds a verb the rest of
-the service does not have. **Proposed: `role:update` for both**; say the word for `role:grant`.
+This reading originally proposed `role:update` for both child ops and named the alternative:
+a distinct `role:grant`, so "may edit the role's label" and "may change what the role can do"
+are separately grantable. The distinction was real — the second is the privilege-escalation
+surface — and the only argument against it was that it "adds a verb the rest of the service
+does not have".
+
+**Decided 2026-08-28: `role:grant`.** That last argument expired. `Group` took `group:grant`
+and `User` took `user:grant`, which left Role as the only collection in the service still
+riding its root's update. ONE verb covers both directions, as on the siblings — splitting
+grant from revoke would move the asymmetry rather than remove it. A principal holding
+`role:update` alone may relabel a role and gets 403 on both child routes. Layer 1 is
+unchanged in kind: `role:grant` asks whether the principal may touch the edge at all, and the
+no-escalation rule below still asks whether they may grant *this* permission.
 
 ### Layer 2/3 — data access
 
