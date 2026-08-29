@@ -3,7 +3,7 @@
   "entities": {
     "Claim": {
       "spec": "specs/omnicore-gen/claim.omnicore.yaml",
-      "specHash": "9010e24755f0b7536195316f7cfc2ec9f8554377e43fdbde18c69d709b96944b",
+      "specHash": "4cef4bf6bdfddaa8d1b129bb335c6fc3da3ef33b170076135bb9eadf7dca5c1b",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/claims_feature.go": {
@@ -40,7 +40,7 @@
         },
         "internal/application/translations/claim_translations_test.go": {
           "class": "owned",
-          "hash": "7f87754843ef2febdbd2021278cb6807e5bb5baf418316cca54ae24ad58be0af"
+          "hash": "2cf3a84e5c95c0bd850a7b94442ef64ffbacd63cb06e1593633ef019add10d73"
         },
         "internal/domain/claim.go": {
           "class": "owned",
@@ -52,11 +52,11 @@
         },
         "internal/domain/claim_service.go": {
           "class": "owned",
-          "hash": "4579f8aaa02ac76bf1987fe098ea8013a6476a3b01eb6e6358d1ee005629b42b"
+          "hash": "2871354df3377eb363e57a5b1626bf8f73a698499da0d7a5c1095872105e69bd"
         },
         "internal/domain/claim_test.go": {
           "class": "owned",
-          "hash": "c3abe28e99705dc069c486e5c1dceb6581df214261d56e1a7908b9b0760a9404"
+          "hash": "aa3580b8bf9f3b8462d86910177e5a6b38549104c3626ff5e3dff24f98e476bf"
         },
         "internal/domain/vos/claim_applies_to.go": {
           "class": "owned",
@@ -80,7 +80,7 @@
         },
         "internal/infra/claim_service.go": {
           "class": "owned",
-          "hash": "e2c1d704d239ab1498042b3671cafc5c515baa099c6e2e1e4aa922210eb07a9d"
+          "hash": "1275ca0caeb5123c8c0b8fffb854bc9679bc8d7a3e7b38b1e207df31c012f1f9"
         },
         "internal/infra/claim_service_manual.go": {
           "class": "hook",
@@ -159,6 +159,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "b88d916abe8b37cab8b197766ecc43f79ba8f06d52cdaaedb286a7813ba4ee0b",
           "DefaultValueTooLongNotification": "301f4309c8bd4a086ca6fd4f787384ca87459af832ff7127f527190983669b93",
           "InvalidClaimNameNotification": "cf17ac67f4b49cd82a910f7aa915d01c8f048d1c4104aefb75544bea389887c9",
+          "TooManyClientClaimsInTenantNotification": "2e451ef1de2e8e0c3159140b3410ac254fd2816e4f8f04be991f9c015c0212e0",
+          "TooManyUserClaimsInTenantNotification": "f71213fe51944148945626d8230b2d0cb35f3e7e31aa9d9f6b928d51329d5b1b",
           "UnknownClaimAppliesToNotification": "3abce12bf21cbc5f6ff57dc3784aaccc6de90e055ace55ae875f75c6f3d0f498",
           "UnknownClaimValueTypeNotification": "3f8ede989bc10787e8223d94f9d95360602eaa24085feb9e191be24efff06a4d"
         },
@@ -189,6 +191,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "0af533c37548f140b0fd520575f7700ff2b7fdf3d0231d36e6266fdc69f4785d",
           "DefaultValueTooLongNotification": "e30d15e3dc187965e6ee7764f7fe1af4d6f665461c640ee7d108e142df749ab8",
           "InvalidClaimNameNotification": "d1e4aeb8b0d4914955a277ba262df4aa5775f95bb22fd82a8fff057a5a37ddbd",
+          "TooManyClientClaimsInTenantNotification": "b35e1a0e2c632d2420ce77f3ae0ec523ebc6670b61ce655f8b20dc8bc9988773",
+          "TooManyUserClaimsInTenantNotification": "19e6f78cf936b31591a796458316dade825543cfdd4a8b8f56fbcd38ebb4ac17",
           "UnknownClaimAppliesToNotification": "d8372ffe7fdf1157d68652a236c4550d60daaf9ca56509d03aa7daf3ef561716",
           "UnknownClaimValueTypeNotification": "5f51aa0aea895f88f839938927cc7c3734876ce7e77dfb982b447a01b99616ba"
         },
@@ -219,6 +223,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "7f996964a39a0cc3998b9d2d1ae7003b228ddd28409232edd23714adb5af2abc",
           "DefaultValueTooLongNotification": "6b0b037c31ba00be445dbb9ed91894749f67a6004dbed37fb1cc0d3b12daa94b",
           "InvalidClaimNameNotification": "d9b850546bfc4c106afd2bf8abe24b3c75e6162757a2ae8f8137a584ef13a2c7",
+          "TooManyClientClaimsInTenantNotification": "6fb7480d4a9c564ecf9b20edbf7686c50cd31bcbdefe4922a7197f001e969c41",
+          "TooManyUserClaimsInTenantNotification": "0c9b2628082f6bbd6a5340d19a038de3258dbdd55b00f6854f9390e0c7b6d893",
           "UnknownClaimAppliesToNotification": "6c56ed6785ece5fb96174acd81506f502dc1e5b98581b5c27106350beb3a8382",
           "UnknownClaimValueTypeNotification": "7ad4c35f1d8a5ebdc4d341e21418cfd6d2c92161ca7cce84226216b8d5090f36"
         },
@@ -249,6 +255,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "e8ef92a3e911eb5da464f60a837d128b1c1e9140a9b9394806ec9828d565a2a5",
           "DefaultValueTooLongNotification": "952e808a4694484be9e49cb917cc67d867af1ca7fffbe4f2180550fd79a23999",
           "InvalidClaimNameNotification": "1188456b7f355a7fcbc4f273f3de8473ab86e6157b243e10eeb5027a1a9130f1",
+          "TooManyClientClaimsInTenantNotification": "d23a00c6b9f0e7a6bd38275179554b8094794d8293e33794af73ab3ae200e66b",
+          "TooManyUserClaimsInTenantNotification": "f9c3c7a52a8affe2d6d5cb07b061f1ca13add2931f3178fdf66599cc851e6a3f",
           "UnknownClaimAppliesToNotification": "cdc5ac255bba7a3393ccb5dc31d8bb88fce49abd3fef65edf537599d772447d9",
           "UnknownClaimValueTypeNotification": "13348245b35cd25f7f003683500256ea99623c771963f2cee2a4c8011705bc11"
         },
@@ -279,6 +287,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "ffa44f7ea5632a5ef4e31638233b941d50173e514838147b6ddf065f493e363f",
           "DefaultValueTooLongNotification": "18e396e6a07a78604044a4ec695e70e0711b16462087ccccc4eac222e36c1940",
           "InvalidClaimNameNotification": "10e9404e03a80abfda58780c5214419fcc4113c6d404bd4758207a50de80902c",
+          "TooManyClientClaimsInTenantNotification": "5b99852ead15b0458ad525d0f074579a7e49f6790977b4f17227a451ca71ac9c",
+          "TooManyUserClaimsInTenantNotification": "2472b34094b80cb2688b1ffe0f2ea679650d4e83073019a1ab4c4f0199d136d8",
           "UnknownClaimAppliesToNotification": "d1fd8a17bb3e602433233bd732d728fd2a699d15c29ef9f339f9b339bd39a236",
           "UnknownClaimValueTypeNotification": "d41c62d42c61eab2fe6ad6e2766cebb7440762c20441f33ab851609be6182d93"
         },
@@ -309,6 +319,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "86de4e9668e03b1c782efac7283257fee58d55dc4fec81a0deaa350018041c46",
           "DefaultValueTooLongNotification": "69ed34aa4593cec4f2e62be27055f0570c7ea0e0151ec92ae1c3ba7584040e5d",
           "InvalidClaimNameNotification": "77991108de38f2b2c8c9f4c1982cbad3efca495382fff4c8d7f686ecc0a75609",
+          "TooManyClientClaimsInTenantNotification": "76f8a515f00c513dd04c77649b2d142e5f445e6f45ea72f3989d33382de854dc",
+          "TooManyUserClaimsInTenantNotification": "8e01be476dd2457bd7da670a23378a45eae473a83cc7c99ed0221bd9706eecd8",
           "UnknownClaimAppliesToNotification": "ee0d0ada3e8657078576368600afe9af313bf78cbd1b5a8596f5598e03ab32dd",
           "UnknownClaimValueTypeNotification": "bfac93270170d8f76c927bf38bf6ff702e33fc21c11616378338b9a6b262b4e5"
         },
@@ -339,6 +351,8 @@
           "DefaultValueDoesNotMatchValueTypeNotification": "8f8d0a590acc88c61710ec407ca2b2a61cda0ae838394a2db98495a0e2fc9990",
           "DefaultValueTooLongNotification": "d37091e240b771f6fd2d3858757fffa61fadf50ed48ede0bf1183afde992e394",
           "InvalidClaimNameNotification": "bd0e3e88137c808cd985599d9242cc7d78e7214d9bf601d64e07258558a26d5f",
+          "TooManyClientClaimsInTenantNotification": "65ad5e06ac4b434ae196ef89e86c3f181749f8a4a5c8fe474f783c2a1868c0df",
+          "TooManyUserClaimsInTenantNotification": "0b5dae735f7e0a6cd967106460b6d7aa7fc2250fa2ff06d08082e67bbcafc091",
           "UnknownClaimAppliesToNotification": "74e150d142e06b6d43396922241c88501a3ee6267c5f35afc4d61ae4825468cc",
           "UnknownClaimValueTypeNotification": "6259f8c4a44df2fb0eab58f611f727861b727206d1e2dc8e928f953daaae3ca4"
         },
@@ -350,7 +364,9 @@
           "ClaimTenantIsImmutableNotification": "9512f0dd95f5f58677b2b87319bf35c1601742e3b92dbff9ec76168867fabd25",
           "ClaimValueTypeIsImmutableNotification": "75ae575b058198881bab28bbba5551d0b458350eba1255c3cff869a1c2d74587",
           "DefaultValueDoesNotMatchValueTypeNotification": "7ecc6510eab0f828923d0d1977b9815624a53d853a7896b1fbb508bf9344ec37",
-          "DefaultValueTooLongNotification": "dae64ab4fda28f6eee3b557190a74d401655e3748436b4e2f839018dd9ad11f2"
+          "DefaultValueTooLongNotification": "dae64ab4fda28f6eee3b557190a74d401655e3748436b4e2f839018dd9ad11f2",
+          "TooManyClientClaimsInTenantNotification": "95cc486748b7d73674ed6fc02c6228da4d267c6b4c2f9b3fe2b7f02c82b991b0",
+          "TooManyUserClaimsInTenantNotification": "fc2feb58f45d7ac9480f61ab7b4b612cc60a28cdf616041f63422d306b598c0a"
         },
         "internal/domain/vos/notifications.go": {
           "InvalidClaimNameNotification": "2ac8bd30dda8d2b702a781d9b2c787d50c15ec1e47189070646f03e47a716b71",

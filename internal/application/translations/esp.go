@@ -236,5 +236,7 @@ func (esp) Translations() map[string]string {
 		"ClientClaimValueField":                             "Valor",
 		"ClientClaimClaimNameField":                         "Nombre del claim",
 		"ClientClaimClaimValueTypeField":                    "Tipo de valor",
+		"TooManyUserClaimsInTenantNotification":             "Este inquilino ya tiene el máximo de {max} claims aplicables a usuarios.",
+		"TooManyClientClaimsInTenantNotification":           "Este inquilino ya tiene el máximo de {max} claims aplicables a clientes.",
 	}
 }

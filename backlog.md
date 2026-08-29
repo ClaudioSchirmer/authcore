@@ -229,11 +229,14 @@ decisions above were taken there, and each one cost something:
 - **The size budget is 20 per token**, the same number the per-principal cap carries, with values
   set on the user spent before any tenant-wide default and the overflow dropped under a `Warn` that
   NAMES what it dropped. Truncating is the fail-closed direction here — a custom claim only ever
-  ADDS a fact, so dropping one can deny a consumer and can never grant. **What it does not do is
-  close the hole**, and that is the gap this run found: the catalog has no cap on definitions per
-  tenant, so a tenant can still create more claims carrying defaults than a token can hold. The loud
-  answer — refusing that definition at the moment an operator creates it — is a change to `Claim`
-  and a run of its own. **Recorded here as open.**
+  ADDS a fact, so dropping one can deny a consumer and can never grant. **The hole it did not close
+  is now closed** (`specs/evolve-entity/claim-catalog-cap/spec.md`, 2026-08-28): the catalog caps
+  itself at **20 ACTIVE definitions per tenant per identity kind** — `user`+`both` on one side,
+  `client`+`both` on the other, so a `both` definition spends a slot on each. The bucket it caps is
+  the SAME predicate `ClaimDefinitionsOfTenant` walks, so the truncation above is now unreachable
+  through the API and remains only as the seatbelt for rows a migration or a direct `UPDATE` wrote.
+  The cap asks only about the kinds a write ADDS, which is what keeps a tenant already over the line
+  able to repair its own catalog rather than being frozen out of every update.
 - **A `mustChangePassword` session carries none of them**, the same line already drawn for its
   permissions, and the response body mirrors the token exactly, restriction included — one
   resolution per request with two readers, because a body advertising claims the token omits is the
@@ -244,8 +247,7 @@ seatbelt: the `x_` prefix stops a collision at the API, and the merge assigns th
 that a definition written straight into the table by migration cannot displace `permissions` or
 `tenant_id` either. The two guards fail in opposite directions on purpose.
 
-**What is still open**: the third-level question, the audit allowlist, the catalog cap named above,
-and the client half — `ClientClaim` reaches no token because `POST /auth/client/token` does not
+**What is still open**: the third-level question, the audit allowlist, and the client half — `ClientClaim` reaches no token because `POST /auth/client/token` does not
 exist, which is the entry two sections up rather than a loose end here.
 
 The rest of this entry is the original draft, kept because it is where the reasoning lives.

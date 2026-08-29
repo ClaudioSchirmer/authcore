@@ -236,5 +236,7 @@ func (fra) Translations() map[string]string {
 		"ClientClaimValueField":                             "Valeur",
 		"ClientClaimClaimNameField":                         "Nom du claim",
 		"ClientClaimClaimValueTypeField":                    "Type de valeur",
+		"TooManyUserClaimsInTenantNotification":             "Ce locataire a déjà le maximum de {max} claims applicables aux utilisateurs.",
+		"TooManyClientClaimsInTenantNotification":           "Ce locataire a déjà le maximum de {max} claims applicables aux clients.",
 	}
 }
