@@ -470,6 +470,23 @@ notifications:
       ita: Il valore predefinito può contenere al massimo {max} caratteri.
       nld: De standaardwaarde mag maximaal {max} tekens lang zijn.
 
+  - name: ClaimAppliesToCannotExcludeHeldValuesNotification
+    semantic: validation
+    description: >-
+      An attempt to narrow AppliesTo so it no longer admits an identity kind for which an
+      ACTIVE edge still holds a value. Widening is the ordinary operational move and always
+      passes; narrowing against held values would strand those rows — they stay in the
+      table, stay readable, and would be refused if anyone tried to write them, with nothing
+      anywhere complaining.
+    text:
+      ptbr: Este claim ainda possui valores definidos em contas do tipo que seria excluído.
+      eng: The claim still has values set on principals of the identity kind being excluded.
+      esp: El claim todavía tiene valores definidos en cuentas del tipo que se excluiría.
+      fra: Le claim a encore des valeurs définies sur des comptes du type qui serait exclu.
+      deu: Für diesen Claim sind noch Werte bei Konten der auszuschließenden Art gesetzt.
+      ita: Il claim ha ancora valori impostati su account del tipo che verrebbe escluso.
+      nld: De claim heeft nog waarden op accounts van het type dat zou worden uitgesloten.
+
 # The traversal into the OWNER, the same one Role declares. inner is correct because
 # tenant_id is NOT NULL and FK-backed. A ROOT join's fields ARE addressable in a criteria,
 # so these two are filterable and sortable like any column of this table — which is what
@@ -605,6 +622,38 @@ rules:
       notification: ClaimTenantDoesNotExistNotification
       attachTo: TenantID
 
+    # The other half of value-type-immutable, found while building level 1 and promoted to
+    # its own run rather than folded silently into either parent's.
+    #
+    # NOT a `transition` rule, though that is the reflex: the declarative kind compiles a
+    # fixed state machine, and it can say `both` may move to `user` or that it may not —
+    # nothing in between. This rule's answer depends on ROWS IN TWO OTHER AGGREGATES'
+    # TABLES, which no edge list can express.
+    #
+    # ARCHIVE is deliberately not covered. Archiving a definition while principals hold
+    # values is an ALREADY-ACCEPTED state: archive is one-way here, a retired definition
+    # comes back as a new row with a new id precisely so an edge holding the old id cannot
+    # silently re-attach, and new writes against an archived definition are already refused
+    # by claim-available-in-tenant on both parents. Narrowing is different because it leaves
+    # the definition LIVE and the values INVISIBLE — the row is neither refused nor retired,
+    # it just quietly stops meaning anything.
+    - id: applies-to-narrowing-refused
+      description: >-
+        Refuse a change to AppliesTo that would stop admitting an identity kind for which an
+        ACTIVE edge still holds a value. Ask only about the kinds the NEW value DROPS, and
+        only when the value actually changed: if the new value no longer admits `client`, ask
+        ClaimIsHeldByAClient; if it no longer admits `user`, ask ClaimIsHeldByAUser; refuse
+        when either answers true. Six transitions are possible and four of them narrow —
+        both->user and both->client drop one kind each, user->client and client->user drop
+        one each as well, and user->both and client->both are widenings that must ask NOTHING
+        and always pass. A definition no one holds a value for narrows freely, and that has
+        to keep working: refusing every narrowing would make the field effectively immutable,
+        which the model gate decided the other way. Read the enum member off AppliesTo rather
+        than its raw string.
+      scope: [update]
+      notification: ClaimAppliesToCannotExcludeHeldValuesNotification
+      attachTo: AppliesTo
+
     - id: default-value-matches-value-type
       description: >-
         The default value must parse as the declared ValueType: `number` accepts a valid
@@ -644,6 +693,49 @@ service:
         Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries
         the tenants table by its primary key. A trial tenant is a live customer and is
         available.
+
+    # The two halves of applies-to-narrowing-refused. Each reads ONE of the two edge
+    # collections built on 2026-08-28 — user_claims and client_claims — by the claim_id
+    # index those migrations add by hand, which is the second thing that index is for
+    # beside the read join.
+    #
+    # ACTIVE ONLY, on both, and that is the direct consequence of choosing softRemove on
+    # the two collections: a soft-removed edge is history, and history must not freeze a
+    # definition's shape forever.
+    #
+    # NAMED FOR THE PROBLEM, and here that takes a moment's care. The generated suite stubs
+    # the service so every probe answers "nothing found": these read FALSE under the stub,
+    # meaning "nobody holds it", so the narrowing is allowed and the happy path passes. The
+    # healthy-state spelling (ClaimIsFreeOfUserValues) would read false too — and would then
+    # mean "somebody holds it", turning a correct spec red on the day it is written.
+    # FILTERED BY THE NATURAL KEY, not by the row id, and that is the language rather than a
+    # preference: a fact filter must name a declared field, and the primary key is not one of
+    # this spec's fields. (TenantID, Name) identifies the definition exactly — both are
+    # immutable, and Name is unique per tenant over ACTIVE rows.
+    #
+    # That last word is load-bearing in the BODY: uniqueness is scoped to the active rows, so
+    # an archived definition can share the pair with the live one. Both queries must therefore
+    # join with `claims.deleted_at IS NULL` as well, or a retired definition's leftover edges
+    # would block a narrowing on the live row that replaced it.
+    - name: ClaimIsHeldByAUser
+      kind: manual
+      returns: bool
+      filters: [TenantID, Name]
+      description: >-
+        Whether any ACTIVE user_claims row references the ACTIVE claim definition identified by
+        this tenant and name. Join user_claims to claims on claim_id and require
+        user_claims.deleted_at IS NULL AND claims.deleted_at IS NULL — archived edges do not
+        count, because a value somebody removed must not freeze the definition's shape, and the
+        archived-definition half is what keeps a retired row's leftovers out of the answer.
+
+    - name: ClaimIsHeldByAClient
+      kind: manual
+      returns: bool
+      filters: [TenantID, Name]
+      description: >-
+        Whether any ACTIVE client_claims row references the ACTIVE claim definition identified
+        by this tenant and name. Same join and the same two archive predicates as its user
+        twin.
 
 read:
   backing: relational

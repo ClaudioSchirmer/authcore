@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:97efe9c0a8522e0b5b1bc0f7a38d144ebdbe9fb9f49a2baf9a0187ce767e160d
+// generated:  2026-08-28
+// checksum:   sha256:9fe067c09b690050aed5431025c42031c5d5cd24d14b4e4fe93d8e7e60351f0d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -91,6 +91,7 @@ type FindUsersResponse struct {
 	FullName *string        `json:"fullName,omitempty" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups   []UserGroupRow `json:"groups,omitempty"`
 	Roles    []UserRoleRow  `json:"roles,omitempty"`
+	Claims   []UserClaimRow `json:"claims,omitempty"`
 }
 
 // FromResult projects the application Result onto FindUsersResponse.

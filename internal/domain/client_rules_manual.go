@@ -104,6 +104,7 @@ func (e *Client) customRules(actionName string, service domain.Service, r *domai
 
 	r.IfInsertOrUpdate(func() {
 		e.refuseUngrantableRoles(svc, r)
+		e.refuseUnsettableClaims(svc, r)
 	})
 
 	r.IfUpdate(func() {
@@ -414,4 +415,79 @@ func newClientSecret() string {
 		panic("Client: the random source failed while minting a secret")
 	}
 	return clientSecretPrefix + base64.RawURLEncoding.EncodeToString(buf)
+}
+
+// refuseUnsettableClaims judges every claim value this write ADDS or CHANGES.
+//
+// The twin of User.refuseUnsettableClaims, and deliberately a separate method
+// rather than something generic over both parents: the two ask DIFFERENT
+// service facts (ClaimDoesNotApplyToClient here, ...ToUser there), and folding
+// them together would hide which side a refusal came from.
+//
+// ADDED **and** CHANGED. The change verb is a PATCH carrying only `value`
+// (`change.shape: patch`, `patchExcludes: [ClaimID]`), so a correction
+// arrives with the definition read off the stored entry and a value nothing
+// has judged yet — exactly as unjudged as a new one. Judging only the
+// additions would let a correction write anything at all.
+//
+// NO wildcard probe and NO escalation probe, unlike the roles loop above.
+// Those exist because a role confers permissions and a machine credential
+// carrying *:* is the worst thing this entity could mint. A claim confers
+// nothing inside this service — no BuildRules reads it, no route is gated on
+// it, and there is no permission set to compare a caller against.
+//
+// It also has nothing to do with refuseRotatingAnotherClientsSecret: that rule
+// is about handing out a CREDENTIAL, and setting a claim value is ordinary
+// tenant-scoped administration.
+func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) {
+	if service == nil {
+		return
+	}
+
+	touched := append(
+		domain.GetAddedItemsOf[aggregatevos.ClientClaim](&e.AggregateRoot),
+		domain.GetChangedItemsOf[aggregatevos.ClientClaim](&e.AggregateRoot)...,
+	)
+
+	for _, held := range touched {
+		// USABLE, not merely non-empty — every probe below hands this id to a
+		// criterion against a UUID column. It raises nothing: the framework's
+		// own child validation reports the bad id.
+		if _, err := held.ClaimID.UUID(); err != nil {
+			continue
+		}
+
+		// NEVER read held.ClaimName / held.ClaimValueType here — read-join
+		// fields, blank on an entry this write just added. The type check asks
+		// the SERVICE for the definition's value type instead of reading the
+		// field sitting right there, which on an added entry is "" and would
+		// refuse every value for the wrong reason.
+
+		// ── claim-available-in-tenant ──
+		// Present, active, and owned by THIS CLIENT's tenant. One notification
+		// for all three: a distinct "belongs to another tenant" reply is an
+		// existence oracle over a competitor's claim vocabulary.
+		if service.ClaimIsUnavailableInTenant(e.TenantID, held.ClaimID) {
+			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
+			continue
+		}
+
+		// ── claim-applies-to-client ──
+		// A definition declaring appliesTo: user is refused here, and its twin
+		// on User refuses appliesTo: client. The pair is what makes that column
+		// mean something instead of merely stating it.
+		if service.ClaimDoesNotApplyToClient(held.ClaimID) {
+			r.AddNotification("Claims", ClaimDoesNotApplyToClientNotification{}, held.ClaimID.String())
+			continue
+		}
+
+		// ── claim-value-matches-value-type ──
+		// The same three readings the catalog's own default-value check uses.
+		// The rejected VALUE is echoed rather than the id: the caller knows
+		// which entry they sent, and what they need told back is the string
+		// that did not parse.
+		if service.ClaimValueDoesNotMatchValueType(held.ClaimID, held.Value.Value()) {
+			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
+		}
+	}
 }

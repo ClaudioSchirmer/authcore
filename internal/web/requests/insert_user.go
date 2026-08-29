@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:6e8bb08c0b66b2e77f215d09d46f5ea7a353ce0e65d3af048a0ef98678dd1666
+// generated:  2026-08-28
+// checksum:   sha256:bb94575b8edd870af8956a2d15ba56f461fa9bd591ee1121651e92336f8cf33b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -44,6 +44,7 @@ type InsertUserRequest struct {
 	TenantID *domain.ID         `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
 	Groups   []UserGroupRequest `json:"groups"`
 	Roles    []UserRoleRequest  `json:"roles"`
+	Claims   []UserClaimRequest `json:"claims"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No
@@ -73,6 +74,7 @@ type InsertUserResponse struct {
 	FullName           string              `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups             []UserGroupResponse `json:"groups"`
 	Roles              []UserRoleResponse  `json:"roles"`
+	Claims             []UserClaimResponse `json:"claims"`
 }
 
 // FromResult projects the application Result onto InsertUserResponse.

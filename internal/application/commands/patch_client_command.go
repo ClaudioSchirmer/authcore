@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:797031fb3f2268720ce35c3b2e8b557d2568d23c2fc1e0f0bfef133a0d8dcba2
+// generated:  2026-08-28
+// checksum:   sha256:4bb327e72b7bc83c9814fd5f233a54eb6c68ef90a8ecc23ea40f306ffdd287c3
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -87,6 +87,7 @@ type PatchClientResult struct {
 	Status                  string
 	Roles                   []ClientRoleResult
 	AllowedCIDRs            []ClientAllowedCIDRResult
+	Claims                  []ClientClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -107,5 +108,6 @@ func (c *PatchClientCommand) FromEntity(_ *configuration.AppContext, e *appdomai
 		Status:                  e.Status.Value(),
 		Roles:                   projectClientRoles(e),
 		AllowedCIDRs:            projectClientAllowedCIDRs(e),
+		Claims:                  projectClientClaims(e),
 	}, nil
 }

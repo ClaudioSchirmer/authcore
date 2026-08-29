@@ -156,12 +156,64 @@ questions are now reachable instead of blocked.
   and nothing in the entity needs to know which tenant is reserved.
 - **Scope: the catalog only.** The two owned collections below are children of `User` and of
   `Client`, which already exist, so they are `/omnicore:evolve-entity` work — one run per
-  parent — not this one.
+  parent — not this one. *(Both runs landed on 2026-08-28, plus a third
+  on `Claim` itself for the narrowing hole they exposed.)*
 
-**What is still open is most of this entry**, and none of it got easier: the two edge
-collections, the emission merge into `buildClaims`, the third-level question, removal semantics
-on the edge, the audit allowlist, and which verb sets a value on a principal. The catalog
-changes no token today, by design.
+**The two edge collections were built on 2026-08-28**, one run per parent —
+`specs/evolve-entity/user/spec.md` and `specs/evolve-entity/client/spec.md`. Four of the
+questions above are therefore answered, and they are recorded here as decisions rather than
+struck out, because each one cost something:
+
+- **Which verb sets a value: a new one.** `user:set-claim` and `client:set-claim`, not
+  `user:grant` / `client:grant`. The criterion was the one this entry states — "riding
+  `user:grant` means whoever may hand out roles may also set claims, and those are not
+  obviously the same job" — settled by the precedent `ClientAllowedCIDR` had just set two days
+  earlier with `client:manage-network`, and by one turn more: authcore cannot see what a
+  consumer does with `x_cost_center`, so setting a value is potentially conferring privilege
+  **in a way this service cannot audit**. Cost: two more literals nobody guesses from the
+  pattern, taking that list from five to seven.
+- **The correction verb is a PATCH carrying only `value`**, and getting there took two passes.
+  The first pass mounted the generator's `change`, which emits a full-body PUT: it made the
+  caller re-send `claimID` on every correction AND made the definition an entry points at
+  mutable — this entry's own `role_permissions` argument turned back on it. The verb was
+  dropped, the gap reported, and omnicore-gen 0.49.0 (on framework v0.63.0) added
+  `children[].change` with `shape` and `patchExcludes`. The collection now declares
+  `shape: patch` and `patchExcludes: [ClaimID]`: the definition is read off the stored entry,
+  so there is no field in which to send a different one. Framework v0.63.0 sits underneath,
+  refusing a child change that collides with another ACTIVE entry's identity (409) — the
+  duplicate half, for every consumer.
+
+- *(Superseded by the bullet above, kept because it is where the reasoning lives.)* **No
+  `change` verb, decided on review the same day.** The entry was going to mount one, on
+  the argument two paragraphs above — the identity is the `ClaimID`, `Value` is a separate
+  mutable column, so a correction is one entry changing. The verb the generator emits does not
+  honour that: it is a PUT whose body carries the whole entry, `claimID` included, so it makes
+  the caller re-send what the server already knows AND makes the definition an entry points at
+  mutable — which is this entry's own `role_permissions` argument turned back on it. The right
+  shape is a PATCH carrying only `value`, and the spec language cannot say it (the root has
+  `update.patchExcludes`, a collection entry has nothing). **Recorded as an omnicore-gen gap.**
+  Correcting a value is archive + add meanwhile, which also keeps the old value readable on the
+  archived row instead of overwriting it — `value` is one column with no history.
+
+- **Removal on the edge: soft, like every other collection here.** The argument for a hard
+  delete was "a claim value is not a privilege", and it falls with the verb decision above: if
+  a consumer authorizes on `x_plan_tier`, an access review has to be able to read what a past
+  value meant.
+- **Type of the value: string, validated against the definition.** `valueType` is enforced at
+  BOTH levels by one function, so the two cannot disagree about what a `bool` is.
+- **A per-principal cap: 20.** A header budget before it is a count — 20 × 256 runes is ~5 KB
+  of level-1 values riding on every request, which fits the 8 KB buffer most proxies default
+  to. Fifty, the cap `groups` and `roles` carry, would be ~12.8 KB and would stop being a cap.
+
+**One thing the build FOUND rather than inherited**, and it is closed too
+(`specs/evolve-entity/claim/spec.md`): `appliesTo` was mutable in both directions, and
+narrowing it while an edge held a value stranded that value invisibly — present, readable, and
+un-writable. It is now refused for all four narrowing transitions; widening is untouched.
+
+**What is still open**: the emission merge into `buildClaims`, the third-level question, the
+audit allowlist, and the size budget the merge has to come with. Both levels of the chain can
+now be filled, read and audited — **and no token has changed**, which is the same deliberate
+line the catalog drew and the reason emission is a run of its own rather than a loose end.
 
 The rest of this entry is the original draft, kept because it is where the reasoning lives.
 

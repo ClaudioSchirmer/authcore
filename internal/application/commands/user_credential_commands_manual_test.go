@@ -85,6 +85,11 @@ func (s *credentialService) CallerLacksAnyPermissionOfGroup(domain.ID) bool     
 func (s *credentialService) RoleIsUnavailableInTenant(domain.ID, domain.ID) bool  { return false }
 func (s *credentialService) RoleGrantsWildcard(domain.ID) bool                    { return false }
 func (s *credentialService) CallerLacksAnyPermissionOfRole(domain.ID) bool        { return false }
+func (s *credentialService) ClaimIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
+func (s *credentialService) ClaimDoesNotApplyToUser(domain.ID) bool               { return false }
+func (s *credentialService) ClaimValueDoesNotMatchValueType(domain.ID, string) bool {
+	return false
+}
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 

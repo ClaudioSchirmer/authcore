@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:f1e52650c654a35b60eb2f517244e5c659da38724d33ebea205cebb8e382e49b
+// generated:  2026-08-28
+// checksum:   sha256:c742bf9ba34f24756a60ad192d086564d7f37aa0bddab9e94ab47dd272b725d8
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -98,4 +98,5 @@ type FindClientsByParamsResult struct {
 	TenantStatus            *string
 	Roles                   []ClientRoleRowResult
 	AllowedCIDRs            []ClientAllowedCIDRRowResult
+	Claims                  []ClientClaimRowResult
 }

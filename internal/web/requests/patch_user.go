@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:4a895eb2cbb320384f112ee624e5d2878c7e14e2de439d9be836861be0d73269
+// generated:  2026-08-28
+// checksum:   sha256:57fc2d3798a49f8ed120d3a8e5efdaa2ebf38fd22de0b8b0509968c79374cc3b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -62,6 +62,7 @@ type PatchUserResponse struct {
 	FullName           string              `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups             []UserGroupResponse `json:"groups"`
 	Roles              []UserRoleResponse  `json:"roles"`
+	Claims             []UserClaimResponse `json:"claims"`
 }
 
 // FromResult projects the application Result onto PatchUserResponse.

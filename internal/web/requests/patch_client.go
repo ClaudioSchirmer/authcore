@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:ca2d5efe9b8459efc0528c126377104194f69b96fb225db65c98b2df8d3a2ffd
+// generated:  2026-08-28
+// checksum:   sha256:d137aaeec14050d1788206f398ed9784918ebd39ef4e4ec24a91fd335b9ed87a
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -59,6 +59,7 @@ type PatchClientResponse struct {
 	Status                  string                      `json:"status" example:"active"`
 	Roles                   []ClientRoleResponse        `json:"roles"`
 	AllowedCIDRs            []ClientAllowedCIDRResponse `json:"allowedCIDRs"`
+	Claims                  []ClientClaimResponse       `json:"claims"`
 }
 
 // FromResult projects the application Result onto PatchClientResponse.

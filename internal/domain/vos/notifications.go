@@ -117,3 +117,8 @@ type UnknownClaimValueTypeNotification struct{ domain.DomainNotificationBase }
 // is the translation key, so renaming it here without renaming it in the seven
 // catalogs leaves the message untranslated.
 type UnknownClaimAppliesToNotification struct{ domain.DomainNotificationBase }
+
+// InvalidClaimValueNotification reaches the caller as 422. The struct NAME is
+// the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated.
+type InvalidClaimValueNotification struct{ domain.DomainNotificationBase }

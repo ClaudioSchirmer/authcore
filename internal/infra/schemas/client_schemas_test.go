@@ -6,8 +6,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:d9a0163abfabdc47a4123584bd9ac3d95a0a12148044fccabb4463f7f81d6967
+// generated:  2026-08-28
+// checksum:   sha256:3b688e30fb082e71adb832d2ae8c5c28792e5d71994086f4fc9bb7af508d0c28
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -35,6 +35,7 @@ func TestClientSchemasBuild(t *testing.T) {
 		"Client":            ClientSchema,
 		"ClientRole":        ClientRoleSchema,
 		"ClientAllowedCIDR": ClientAllowedCIDRSchema,
+		"ClientClaim":       ClientClaimSchema,
 	} {
 		schema := build()
 		if schema == nil {
@@ -65,6 +66,7 @@ func TestClientCollectionsKeepTheirNames(t *testing.T) {
 	for _, tc := range []struct{ got, want string }{
 		{aggregatevos.ClientRole{}.CollectionName(), "Roles"},
 		{aggregatevos.ClientAllowedCIDR{}.CollectionName(), "AllowedCIDRs"},
+		{aggregatevos.ClientClaim{}.CollectionName(), "Claims"},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("a collection answers %q, the spec says %q", tc.got, tc.want)

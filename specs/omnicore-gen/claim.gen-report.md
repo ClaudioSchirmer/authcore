@@ -24,6 +24,12 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfInsert` · raise `ClaimTenantDoesNotExistNotification{}` · attach it to `TenantID`
 
+**`applies-to-narrowing-refused`**
+
+> Refuse a change to AppliesTo that would stop admitting an identity kind for which an ACTIVE edge still holds a value. Ask only about the kinds the NEW value DROPS, and only when the value actually changed: if the new value no longer admits `client`, ask ClaimIsHeldByAClient; if it no longer admits `user`, ask ClaimIsHeldByAUser; refuse when either answers true. Six transitions are possible and four of them narrow — both->user and both->client drop one kind each, user->client and client->user drop one each as well, and user->both and client->both are widenings that must ask NOTHING and always pass. A definition no one holds a value for narrows freely, and that has to keep working: refusing every narrowing would make the field effectively immutable, which the model gate decided the other way. Read the enum member off AppliesTo rather than its raw string.
+
+- fires under `IfUpdate` · raise `ClaimAppliesToCannotExcludeHeldValuesNotification{}` · attach it to `AppliesTo`
+
 **`default-value-matches-value-type`**
 
 > The default value must parse as the declared ValueType: `number` accepts a valid decimal number, `bool` accepts exactly "true" or "false", `string` accepts any non-empty value. A NULL default is ALWAYS valid and skips the check entirely — "no default" is a legitimate state, and level 2 of the chain simply does not fire. Read the enum member off ValueType rather than the raw string, so an unknown type (which the value object already refused) does not reach a second answer here.
@@ -39,6 +45,14 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 **`TenantIsUnavailable(tenantID domain.ID) bool`**
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
+
+**`ClaimIsHeldByAUser(tenantID domain.ID, name string) bool`**
+
+> Whether any ACTIVE user_claims row references the ACTIVE claim definition identified by this tenant and name. Join user_claims to claims on claim_id and require user_claims.deleted_at IS NULL AND claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape, and the archived-definition half is what keeps a retired row's leftovers out of the answer.
+
+**`ClaimIsHeldByAClient(tenantID domain.ID, name string) bool`**
+
+> Whether any ACTIVE client_claims row references the ACTIVE claim definition identified by this tenant and name. Same join and the same two archive predicates as its user twin.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
 
@@ -131,13 +145,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| tests for the command mappers | `internal/application/commands/claim_commands_test.go` |
-| the insert command and result | `internal/application/commands/insert_claim_command.go` |
-| the request mapper tests | `internal/web/requests/claim_requests_test.go` |
-| the insert request and response | `internal/web/requests/insert_claim.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/domain/claim_rules_manual.go` — hand-written rules live here, by design
@@ -145,7 +152,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-24 file(s) were already up to date.
+28 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -160,9 +167,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.62.0)
+Verdict: **exact** (project pins v0.63.0)
 
-framework v0.62.0 meets the required v0.62.0
+framework v0.63.0 meets the required v0.63.0
 
 Verify what was generated:
 

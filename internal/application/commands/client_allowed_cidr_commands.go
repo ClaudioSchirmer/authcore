@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:6ca8bc6602b5326da0e09d6c0be5aa2be9f67f2b9b4d66c2fa630d25d8c1c119
+// checksum:   sha256:32ba0ee45c51a781daceef6b307026cdccf650bc0d5c658a0093ade58d760510
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,13 +17,14 @@
 package commands
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 )
 
 // AddClientAllowedCIDRCommand adds ONE entry to Client's allowedCIDRs.

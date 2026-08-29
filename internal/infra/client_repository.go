@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:977746bf15407a23a686085430dae6569a82e595bb73b60542f43111ff724dfb
+// generated:  2026-08-28
+// checksum:   sha256:d0006997689387192ff318afbe715e681e4e4b9553010928c343cb26d49be13e
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -51,6 +51,7 @@ func NewClientRepository(engine core.RelationalEngine) *ClientRepository {
 		"clients_tenant_id_name_key":              {Notification: appdomain.ClientNameAlreadyExistsNotification{}, Field: "name"},
 		"client_roles_client_id_role_id_key":      {Notification: appdomain.ClientAlreadyGrantsRoleNotification{}, Field: "roles"},
 		"client_allowed_cidrs_client_id_cidr_key": {Notification: appdomain.ClientAlreadyAllowsCIDRNotification{}, Field: "allowedCIDRs"},
+		"client_claims_client_id_claim_id_key":    {Notification: appdomain.ClientAlreadyHoldsClaimNotification{}, Field: "claims"},
 	}
 
 	r.WithSchema(schemas.ClientSchema())
@@ -72,6 +73,12 @@ func NewClientRepository(engine core.RelationalEngine) *ClientRepository {
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name"),
+		// ClientClaim → Claim, on every loaded entry. No counterpart drops the
+		// ENTRY, not the root — a hole in the collection.
+		read.InnerJoinInChild(schemas.ClientClaimSchema()).To(schemas.ClaimSchema()).
+			On("claim_id").
+			Field("ClaimName", "name").
+			Field("ClaimValueType", "value_type"),
 	)
 	return r
 }

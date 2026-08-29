@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:a1c9983669310599a293f5138b62045af5eacd903fb170a8a0a211e743045a63
+// generated:  2026-08-28
+// checksum:   sha256:d357001791917d66dc66ff27dc231c0481faa6cdea81ac6c52cd19d1a497b54c
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -109,4 +109,5 @@ type FindUsersByParamsResult struct {
 	FullName *string
 	Groups   []UserGroupRowResult
 	Roles    []UserRoleRowResult
+	Claims   []UserClaimRowResult
 }

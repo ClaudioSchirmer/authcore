@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:b0dd9e043ae1b6ceb4f019feeb02a213b55f88d013cdf728b71a27a263fca644
+// generated:  2026-08-28
+// checksum:   sha256:a3a53be361cb2d76c03594d9a7db5d6228e3e39c9c8e6132dd14fee9354eb99e
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -35,6 +35,7 @@ func ClientSchema() *core.TableSchema {
 		Revision("revision").
 		Child(ClientRoleSchema()).
 		Child(ClientAllowedCIDRSchema()).
+		Child(ClientClaimSchema()).
 		Field("TenantID", "tenant_id").
 		Field("Name", "name").
 		Field("Description", "description").

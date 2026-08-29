@@ -6,8 +6,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:2b258718966c6d9f3972d4c895f0a8b8ef9115d4cab69b7fa263a66edc527e37
+// generated:  2026-08-28
+// checksum:   sha256:8f771a11ac021641a6e19f7c6bd8e1fbc1d1ec80531589ae1bece6bb9c113eae
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -35,6 +35,7 @@ func TestUserSchemasBuild(t *testing.T) {
 		"User":      UserSchema,
 		"UserGroup": UserGroupSchema,
 		"UserRole":  UserRoleSchema,
+		"UserClaim": UserClaimSchema,
 	} {
 		schema := build()
 		if schema == nil {
@@ -65,6 +66,7 @@ func TestUserCollectionsKeepTheirNames(t *testing.T) {
 	for _, tc := range []struct{ got, want string }{
 		{aggregatevos.UserGroup{}.CollectionName(), "Groups"},
 		{aggregatevos.UserRole{}.CollectionName(), "Roles"},
+		{aggregatevos.UserClaim{}.CollectionName(), "Claims"},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("a collection answers %q, the spec says %q", tc.got, tc.want)

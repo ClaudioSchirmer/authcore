@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:873c3e3e1ecd22436149bfd500b543b7090c3e8a439ad8018d0b83331b0c25eb
+// generated:  2026-08-28
+// checksum:   sha256:3b2b1b4ad4aaffe38894e087291540107971e1d6fa0215df49d9304540cc98ba
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -36,6 +36,7 @@ func UserSchema() *core.TableSchema {
 		Revision("revision").
 		Child(UserGroupSchema()).
 		Child(UserRoleSchema()).
+		Child(UserClaimSchema()).
 		Field("TenantID", "tenant_id").
 		Composite(core.NewCompositeValueObject[vos.PersonName]().
 			Field("Given", "given_name").As("GivenName").

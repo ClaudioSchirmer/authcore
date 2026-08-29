@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:82fddfbe8e9c08c9503a074b634243f084f03fd7dfc6d9ee30c5bed25bd9f742
+// generated:  2026-08-28
+// checksum:   sha256:d7b92e619f868ced51b13dfc8682c7ba9c5d0606cfd2e0fa42b7f46456c705e2
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -41,6 +41,7 @@ type InsertUserCommand struct {
 	TenantID             *domain.ID
 	Groups               []dtos.UserGroupInput
 	Roles                []dtos.UserRoleInput
+	Claims               []dtos.UserClaimInput
 }
 
 // ToEntity builds the aggregate the framework will validate and persist.
@@ -59,6 +60,9 @@ func (c *InsertUserCommand) ToEntity(ctx *configuration.AppContext) (*appdomain.
 	}
 	for _, item := range c.Roles {
 		e.AddUserRole(item.ToUserRole())
+	}
+	for _, item := range c.Claims {
+		e.AddUserClaim(item.ToUserClaim())
 	}
 
 	// Filled from the caller's identity, never from the request: these fields
@@ -109,6 +113,7 @@ type InsertUserResult struct {
 	FullName string
 	Groups   []UserGroupResult
 	Roles    []UserRoleResult
+	Claims   []UserClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -132,6 +137,7 @@ func (c *InsertUserCommand) FromEntity(ctx *configuration.AppContext, e *appdoma
 		Status:             e.Status.Value(),
 		Groups:             projectUserGroups(e),
 		Roles:              projectUserRoles(e),
+		Claims:             projectUserClaims(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family

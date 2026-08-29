@@ -3,8 +3,8 @@
   "entities": {
     "Claim": {
       "spec": "specs/omnicore-gen/claim.omnicore.yaml",
-      "specHash": "7c5c6efd9a409e23a715cc2f4036496f03a99c3541bbf28123cf9601cd1f335b",
-      "framework": "v0.62.0",
+      "specHash": "9010e24755f0b7536195316f7cfc2ec9f8554377e43fdbde18c69d709b96944b",
+      "framework": "v0.63.0",
       "files": {
         "bootstrap/claims_feature.go": {
           "class": "owned",
@@ -40,7 +40,7 @@
         },
         "internal/application/translations/claim_translations_test.go": {
           "class": "owned",
-          "hash": "90ce8adc9c601d8daef81c876cd7d4813ecdbfcc72ff952e565cef3f67701d77"
+          "hash": "7f87754843ef2febdbd2021278cb6807e5bb5baf418316cca54ae24ad58be0af"
         },
         "internal/domain/claim.go": {
           "class": "owned",
@@ -52,11 +52,11 @@
         },
         "internal/domain/claim_service.go": {
           "class": "owned",
-          "hash": "e1791de263a2d08ee196901b80a39ded7f94fcf82edf6eee826558debd78e3dc"
+          "hash": "4579f8aaa02ac76bf1987fe098ea8013a6476a3b01eb6e6358d1ee005629b42b"
         },
         "internal/domain/claim_test.go": {
           "class": "owned",
-          "hash": "56751f7f41f46262f7f6a835f80825b115bd1663c5c29e5850cd80657b267ce4"
+          "hash": "c3abe28e99705dc069c486e5c1dceb6581df214261d56e1a7908b9b0760a9404"
         },
         "internal/domain/vos/claim_applies_to.go": {
           "class": "owned",
@@ -137,6 +137,7 @@
           "ClaimAppliesTo.both": "a31aed100eabd11b642134778cb5816c0b0d2d3821173e2198145242e66fd16d",
           "ClaimAppliesTo.client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClaimAppliesTo.user": "80033f8258eb0e27bae769f87dc61600b5336211492d75e13024d59bf87cb2ed",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "9d701da5f4a4137605ab16323a41690654c33926b85b2cd36f2ee4329c579866",
           "ClaimAppliesToField": "de499889c5c6451b6936fb1a3bd2a537943dcc9dbd5765356522f22e75a8eecd",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "1058bb6b626726aeb1a6f13de905d52cfda32951373afbca23e56f7b008dd3d8",
@@ -166,6 +167,7 @@
           "ClaimAppliesTo.both": "b6c1d862f9f75ec31eb9829b6a5968eb291dc8785e7fb59d4bc6ef00f292d3f7",
           "ClaimAppliesTo.client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClaimAppliesTo.user": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "02e73adc07726350728546bb530a670f6d920ab699d8b049c078493d8bbd52f8",
           "ClaimAppliesToField": "6687458beee57a58a82d748251b86704c07e978e1bc15863879868e024ae4c9f",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "e6fdffbb82b605ae5e6e49e3aef0d7114b57792358ecd84f68be6fafde57e319",
@@ -195,6 +197,7 @@
           "ClaimAppliesTo.both": "727f1e0235032a5e69d5c6be8b675ac3d3e005700ec911c7a2c1e7664f4bc4b4",
           "ClaimAppliesTo.client": "f851d9a83ab0e0b98ec70876284df326df5b692656f1eb7982dc3f3656f1a17d",
           "ClaimAppliesTo.user": "63614ffde2d350df40e2c69689693d0612835b1370e0e2037d4d198939bb5184",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "26d91ec444bb383adda45a9df9c018ae9f4552c5e7cac6c13e2bb15412fd416e",
           "ClaimAppliesToField": "9090f600ec57506b959fb65e16871e191a54770262b81f76b5eeec60d43bc8f7",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "ead23458b7cd857d3c3d3f34cfbe8db57df8f721e9f9f9d6b265939542d3ba08",
@@ -224,6 +227,7 @@
           "ClaimAppliesTo.both": "a4f7b73e6cf7d2917af8d13ece8d7232fe59be1911b7fbd7613d07027072a2cc",
           "ClaimAppliesTo.client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClaimAppliesTo.user": "721e5b29ababb5190f8619abaff97f0801d01b3c94ded914bb26241584b60382",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "4075f91bc641fa9cc4eaf30f73f8982cd3e9dc0d45c389b00c4d0d1b33f29b16",
           "ClaimAppliesToField": "f7b66f134da1f563afb3858c17f96f58cbd09fa0890d7613d35c5c393d56ebdb",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "4e42d6603e47145793e772faf9eff85004efb1505da0542ba9b91879511007c9",
@@ -253,6 +257,7 @@
           "ClaimAppliesTo.both": "70e35bbc361378b70fe390fdf5bf643236ea5dcf92f3da84ae18a0bb10c78b2d",
           "ClaimAppliesTo.client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClaimAppliesTo.user": "cacbd25f723d75b1482c6bb61e140674efe256490611108bf14a11bc1172bdf4",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "21ec2cb264181f7ad63f12c959c52c8d393146c8fde6fbdb6dda911385fa8c19",
           "ClaimAppliesToField": "c75d9a49ec35850ffab1aa4c9e00fa5c0940cdfdc67963d26882587297895011",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "f14e320cd78e4e2fcb379dae30288fb1392b15b2b5ac8f805d47e3648d758e71",
@@ -282,6 +287,7 @@
           "ClaimAppliesTo.both": "a31aed100eabd11b642134778cb5816c0b0d2d3821173e2198145242e66fd16d",
           "ClaimAppliesTo.client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClaimAppliesTo.user": "48d7b90e728a759b02418ca0374664780b7cd9c60aea57ae92fc8c3d70a278dd",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "c2e198d5396cb6f197552c74a3699226d49437e9fe856f4ca97329e62165dcf6",
           "ClaimAppliesToField": "edcfb0009d2b8f6e975acff9a347c3e6302db759a988eb264872a3619bcb8a90",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "7213ac0551613f69792d6bf60a59861c0054ee5f52810d4119308c4b8c038365",
@@ -311,6 +317,7 @@
           "ClaimAppliesTo.both": "727f1e0235032a5e69d5c6be8b675ac3d3e005700ec911c7a2c1e7664f4bc4b4",
           "ClaimAppliesTo.client": "f851d9a83ab0e0b98ec70876284df326df5b692656f1eb7982dc3f3656f1a17d",
           "ClaimAppliesTo.user": "f53bbaa05faef8e20f9a492a1fa067990e19c0aafd3746fbe9072c253f885ce6",
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "523b2d6faa4fd3d12de55216755335f5790fcd9a7693b595e5f3ada8be645ea2",
           "ClaimAppliesToField": "b634235c011a136d030715ee8dcb17590433d8d9ae5556ca6604f4aa38561046",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "3f9fee46634431721f4f68e2559b22962e82264783e2b1e83b4b9ced69defcc7",
@@ -336,6 +343,7 @@
           "UnknownClaimValueTypeNotification": "6259f8c4a44df2fb0eab58f611f727861b727206d1e2dc8e928f953daaae3ca4"
         },
         "internal/domain/notifications.go": {
+          "ClaimAppliesToCannotExcludeHeldValuesNotification": "6c1dee27ea17ca9dcd791401eb59b4d6799984232c4808b4778f0a9788464eb1",
           "ClaimNameAlreadyExistsNotification": "5a10ec94fc874bd64c4acb34967466681045ae786b8852c13d672e230c88bde1",
           "ClaimNameIsImmutableNotification": "75af1ea586783d51926f9bf78bd603ae5847e8cc1e342ff6164b837111fb9fb6",
           "ClaimTenantDoesNotExistNotification": "405280d9e2fc801ac66d80c207961fcd38aafdfaea49531b49d9602cc62e7f25",
@@ -353,8 +361,8 @@
     },
     "Client": {
       "spec": "specs/omnicore-gen/client.omnicore.yaml",
-      "specHash": "1ee9746abc955f3518be63881d16827709d787bf0571902bd9f396d43b6e80b2",
-      "framework": "v0.62.0",
+      "specHash": "8c027e88decc4363f2914452901af5d0cf48477cc123d10cac8f4dc3096ae40e",
+      "framework": "v0.63.0",
       "files": {
         "bootstrap/clients_feature.go": {
           "class": "owned",
@@ -366,35 +374,43 @@
         },
         "internal/application/commands/client_allowed_cidr_commands.go": {
           "class": "owned",
-          "hash": "a57d421e866a773ec5bb51e6acf93e0377fc1f80658d163e84f6afa4c48da7fd"
+          "hash": "64fac430478e707cb2e73f3b1de99b3f2a56470ced1d3d2fc52411a57fb50c47"
         },
         "internal/application/commands/client_child_results.go": {
           "class": "owned",
-          "hash": "eb9c3a6ff99f5f33bacc2963a171af1030b04dd3aaa95181d7168d0e808255e3"
+          "hash": "ce7bb88984935539233abe4524359d713381bc6cbedb3e58a51534b67fb7b40c"
+        },
+        "internal/application/commands/client_claim_commands.go": {
+          "class": "owned",
+          "hash": "23ce4319e65adde729d2cbe9978374710cd3a1116f5c240d281c7a9b3eb2fc9e"
         },
         "internal/application/commands/client_commands_test.go": {
           "class": "owned",
-          "hash": "3458005f46e7a44bc12ba73e8e596169c277ad8c2891287b85bc4c6df7136120"
+          "hash": "3f5b3368b7d80eaab8fff1149859f75a8dd763795a835e5767f8733343f11b08"
         },
         "internal/application/commands/client_role_commands.go": {
           "class": "owned",
-          "hash": "a7d3d4e56e5464fd2329e687ec7d899981b018b48ea3183370500d83232ceff2"
+          "hash": "4a185d49c135e69a2f59803e0611ade11f99426f80d7f16378864729093e703d"
         },
         "internal/application/commands/insert_client_command.go": {
           "class": "owned",
-          "hash": "feb01fabd0d6dcb6b3679628e9392bf9622c3f21d8e2611c3eeea5cdec7108e1"
+          "hash": "2d05e064b41af71ae7dc6159402a72a373c27a420cf2eac0a72cd600ab348b34"
         },
         "internal/application/commands/patch_client_command.go": {
           "class": "owned",
-          "hash": "4672f33de4d7c4f10e0af9f25a46795aab78ec73cbca3cda69972ee1c4997016"
+          "hash": "69fbf114b0054cbd9a221f11c9d9de6110b08f1961b1689d57c8789925a9c393"
         },
         "internal/application/dtos/client_allowed_cidr_input.go": {
           "class": "owned",
           "hash": "90765b57da7d2b5baeefcd82d59da5d953ecb5463a3f87384be8925cf2e6d9e5"
         },
+        "internal/application/dtos/client_claim_input.go": {
+          "class": "owned",
+          "hash": "2132f808d4fb88ba31003aa4c9d075cf8fb6428864dce90260723b65b5bdf99f"
+        },
         "internal/application/dtos/client_dtos_test.go": {
           "class": "owned",
-          "hash": "b13eddd1636982090663d7fde6731dd767164c27053e095b6b3696447f686fa0"
+          "hash": "66441ef5e21d11e690cec844dcded56b6ca126726b592bbc7486386bcd738a1d"
         },
         "internal/application/dtos/client_role_input.go": {
           "class": "owned",
@@ -406,19 +422,19 @@
         },
         "internal/application/queries/client_row_results.go": {
           "class": "owned",
-          "hash": "fbccf90d4fd8202560186e13d431b6a124975e57edd5c23fd64fb9ea05ff354c"
+          "hash": "0bd5b772215e66811da3bb411673247baf22f44431515165885766c143bb4039"
         },
         "internal/application/queries/find_client_by_id_query.go": {
           "class": "owned",
-          "hash": "ead630459f8d41490736f442226b4a0ac9f5e4014c15024c6ff51c26a186bffb"
+          "hash": "8169b01d6e122070c95ffd7f4fea000e8e7aaf8a5bc5031b9baa6628ed6123a8"
         },
         "internal/application/queries/find_clients_by_params_query.go": {
           "class": "owned",
-          "hash": "0d2519680954a24b5a65335863791029d0ede813e01ae68adcaf076c6397c159"
+          "hash": "b3290bfcb5a29105fb0ed834430772f7ae2aef36d6d8684d54eebcdeee825e09"
         },
         "internal/application/translations/client_translations_test.go": {
           "class": "owned",
-          "hash": "78d7febb50d4b7907e0dd8fa7a6f508121cc0cb60c77dd15af854701a706031b"
+          "hash": "48e73623435970c6acf5a19532784ccf339b88b62cf073d027e4fdb01b9d44da"
         },
         "internal/domain/aggregatevos/client_allowed_cidr.go": {
           "class": "owned",
@@ -426,7 +442,11 @@
         },
         "internal/domain/aggregatevos/client_children_test.go": {
           "class": "owned",
-          "hash": "ea84630d0562a717e4152394892221dbfac22753f63c85d6470e769d1c7d28da"
+          "hash": "bc93890ab27d9bf06a9414497feb4a9f9d931bfa57d2f8770e5ee8221078387e"
+        },
+        "internal/domain/aggregatevos/client_claim.go": {
+          "class": "owned",
+          "hash": "d31120ec80882da6c3a07298bff12c2b5be1631e6bb01e3b62a891af53cb02fe"
         },
         "internal/domain/aggregatevos/client_role.go": {
           "class": "owned",
@@ -434,7 +454,7 @@
         },
         "internal/domain/client.go": {
           "class": "owned",
-          "hash": "cc6ccca5a088e1de28dafce6dc0b01e0b657477c8fa756b2f2b90d9d5e510ca0"
+          "hash": "2b6c3604f5d908c908e574d9c6c01d131ca7daebee175d5dd62a9cdf05d1bd34"
         },
         "internal/domain/client_rules_manual.go": {
           "class": "hook",
@@ -442,11 +462,11 @@
         },
         "internal/domain/client_service.go": {
           "class": "owned",
-          "hash": "093598024e23f763aa399b545fe9fed6ffeb3dac734afc7510654c617986b0a7"
+          "hash": "8ce2fa2a49de934de3fa29704175c08e078bf685db062a8b99121f2517e2edfd"
         },
         "internal/domain/client_test.go": {
           "class": "owned",
-          "hash": "76d7f46c783470946f965358f29e4c87df599499c7dfa0209335243825a0d41a"
+          "hash": "246185add28b76b30d396b22e572813019b3180d9c34e7133c5ce8834f72d4e4"
         },
         "internal/domain/vos/client_status.go": {
           "class": "owned",
@@ -462,7 +482,7 @@
         },
         "internal/infra/client_repository.go": {
           "class": "owned",
-          "hash": "4c8ed44c3980290b91fa327591184a25ecb57a87f7b7fd45d62ac40a631f25a8"
+          "hash": "8d8f20bebe5b5086d93a31962954e4dc637448503744e1fd4c930a6914556817"
         },
         "internal/infra/client_service.go": {
           "class": "owned",
@@ -476,17 +496,21 @@
           "class": "owned",
           "hash": "993ac38c775d247a9fe69165223d864c6309536744ab48ad1dbdf91ac72c4f8d"
         },
+        "internal/infra/schemas/client_claim_schema.go": {
+          "class": "owned",
+          "hash": "295516576661988a224864a164fb7d262ac1506f233d52b8aa78dadc778b4252"
+        },
         "internal/infra/schemas/client_role_schema.go": {
           "class": "owned",
           "hash": "97be8c5eff481b2eaa169dac04faebaec1a12ccdcbc03a2d6d156a72ac6976d0"
         },
         "internal/infra/schemas/client_schema.go": {
           "class": "owned",
-          "hash": "94817aa567015dabe7eb188b8a64edb933ee2e43030353e2b349c6383fe2d1c0"
+          "hash": "2c86fb4447d1b32839a4d289cbfee76f6c9b772d2a0cd17a6db490b0fb4fa32d"
         },
         "internal/infra/schemas/client_schemas_test.go": {
           "class": "owned",
-          "hash": "324babdcd276f5a8de5edc5fc9887109e1c45c65a5592f58f6b8ef812f4135e1"
+          "hash": "04ca696bf8dbbee9ff28634bb920d090daeaa59acb32e897f4848f10c66d5f92"
         },
         "internal/infra/views/client_view.go": {
           "class": "owned",
@@ -498,39 +522,43 @@
         },
         "internal/web/client_routes.go": {
           "class": "owned",
-          "hash": "55f43cff444d503776602cda88534e12ea08fb9d617b6f1f8c38f61d01343e1d"
+          "hash": "514bb8e7e41fcc7bf54560a7f3ced4feacb683a1d0667320a522221b2c045687"
         },
         "internal/web/requests/client_allowed_cidr_requests.go": {
           "class": "owned",
-          "hash": "d2d87f36e79afa3b9b978d9ddedb2769d6135b0c6e4cf18d6b434b614ca792ca"
+          "hash": "b23cb556217ea82370fc676b118591e2a42d635046a76911cd4a6d1ec60a9c63"
         },
         "internal/web/requests/client_children.go": {
           "class": "owned",
-          "hash": "ad83f8e669214199adfb23f0542d5b8e675417da31a63ff10b7c0250e2d3b6b7"
+          "hash": "d7be8bf03037c080f9298814a40802fd16fed6aabf1cfbf975ea680053d0764d"
+        },
+        "internal/web/requests/client_claim_requests.go": {
+          "class": "owned",
+          "hash": "9862c2fc3e1741bb45096ef82529b37be46ab15c4c762e3da4d8cc3be289a2de"
         },
         "internal/web/requests/client_requests_test.go": {
           "class": "owned",
-          "hash": "066780f6ea2cc01a057e9afbc79a0f0be1bc96e0a76bce45006559f7a7ef951b"
+          "hash": "2f17f9a3bfbd6ddf977248d86182c8a16077cf569bf779730af621b7569ccfe1"
         },
         "internal/web/requests/client_role_requests.go": {
           "class": "owned",
-          "hash": "96973dbb697fe45521692edf5a5713cb432759412077266c91e7c1def9af9ffc"
+          "hash": "b024fee176a1fd6dbd300a633d3b18c0b1c023d6fa8bebecde73caecb0c4ecff"
         },
         "internal/web/requests/find_client_by_id.go": {
           "class": "owned",
-          "hash": "a7b3d90b5d7c0ce2d7546ea2daea66f6f6940647e0b1f2ef3a3f3fd480924b4b"
+          "hash": "903c1c009975eb53b3f8f56889aad7b83d9d1db58ab118989b0777e0a3113607"
         },
         "internal/web/requests/find_clients_by_params.go": {
           "class": "owned",
-          "hash": "3ea4748ae5e532f7c1aa2618aacc270060f4ae385408a420c8b69c94e123e808"
+          "hash": "32b2ee9fe454a3e728892358cbe5daf31c4913d0a0fc46c677510f8a069bd7e5"
         },
         "internal/web/requests/insert_client.go": {
           "class": "owned",
-          "hash": "ae701b7a2110c1fb68bdaa7a9c9c2fc65a99c6e0808d425e132cb302b106c944"
+          "hash": "e471435551dde15b11cb3d441b7e1380f713dc05ee93f01e24210ca3cf4e7b47"
         },
         "internal/web/requests/patch_client.go": {
           "class": "owned",
-          "hash": "7230a06e98b71b3ba36f270b1553b1c5689f0ec3d1214a93525d23b8dd5bf8e3"
+          "hash": "92f895859da44027b20a0e16e4842bd1131cece9fdbb520427d088c2c59cd85d"
         }
       },
       "ordinals": {
@@ -542,11 +570,19 @@
           "CIDRHasHostBitsSetNotification": "deb88bf959a2a7484cac2aee1a8ee5ba4fdd8cb72f45f4d7a817d1d36010fbbd",
           "CannotGrantRoleWithUnheldPermissionsNotification": "5c84f3b256c48d2a94bf26a80528c484f20cf49bed310488813ddbe8436f7cb6",
           "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
+          "ClaimDoesNotApplyToClientNotification": "d2c81adcb9dd9bd6bb9d801b16083e6ddde37a26a91e6392d253d52c86244fbc",
+          "ClaimNotAvailableInTenantNotification": "e2a71d6d7da192203133307cf8fc56eeb6b0a3f682d7bcf8d71f136bbaf9001e",
+          "ClaimValueDoesNotMatchValueTypeNotification": "4b0981be8bbb4446a0c9b8d4d00a92cc1e4121254653623fabd66f46f15c21ac",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "38f6d7096ca53fb1b8bc67f8d05670e64ecdd242e7bf6ae77649f32cee036fb0",
           "ClientAllowedCIDRLabelField": "97d1e68526b847e94892758b4e8aa84aa130a7f2672e64a30cd12ebe8f9bf2e8",
           "ClientAlreadyAllowsCIDRNotification": "ef08772b45b367e80142b2e4cc4848ef961f3442526559505c3474b359fde2f0",
           "ClientAlreadyGrantsRoleNotification": "740fc9e795b03bdce05299bdd634cc9d1bd635ef771a390ed9654ac48a49ee9e",
+          "ClientAlreadyHoldsClaimNotification": "1e9fe48571eabf26d46c13ba449a74878c4fa7383c62aafbde1d48249aed3c66",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "95835ee87c0e9911f8df69d2bbbaa9ab7061da95f30de0d28dfff6e42d1cbb85",
+          "ClientClaimClaimValueTypeField": "2b1954612391aeaf9db1c1400d722d739b5d5f6e1cb379d443c95a990116cf97",
+          "ClientClaimValueField": "7e347daa5ec7fbe8426998f8523a67670f032e8f308b775db34b8b9e2bf6b89a",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -574,10 +610,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "a92e68a24eb9352038ff356d2ed1ce587e8cfbb6d145362ff605399758a49c52",
+          "InvalidClaimValueNotification": "9e48e6c3e18a2d27d3db10af3b42daf3713a719587213db8b437b06b0f8b078c",
           "InvalidClientStatusTransitionNotification": "29f3e52e598818127b5d41c2e9486ea70dbcd3d7d6cdafc4e97fff973dc2ab58",
           "InvalidGracePeriodNotification": "e9882bf07d65d7fe9f481584a803339c157157c98ac76515ad925a7d6e787ee7",
           "RoleNotAvailableInTenantNotification": "e3ed12bfd66e664d09bede99885e1667699739451e85b683f740c7fd26bfdece",
           "TooManyAllowedCIDRsForClientNotification": "5d53587783017f5eff85ff09a24bb084291f3902cb88a35507f6e7e6d3333e51",
+          "TooManyClaimsForClientNotification": "cf29048337d5ad8437155aaf40447e3f97f72ec6595143e0bf85ae1dafeb7ba8",
           "TooManyRolesForClientNotification": "14d0470f6d2a10f75fd3d917b83275849ed6ac124a6f807f9efd8d201f508692",
           "UniversalCIDRNotAllowedNotification": "af00bbfdfe636f8a2ada7a11c6cdcb0d2da9be5c147c840793bc50011e6f2a96",
           "UnknownClientStatusNotification": "c07858d611b4832e9810e09a7b5229ec0fd38acf2af5e4ad7604ed154b4d3be0"
@@ -586,11 +624,19 @@
           "CIDRHasHostBitsSetNotification": "87e09da88a6c3cbc729418e0604858dae5d014d078d7289db0ffc435aaf31c55",
           "CannotGrantRoleWithUnheldPermissionsNotification": "d59dceb6caf9b684c2720e17a2f66f5ff81425ff7178436ba962b50969219725",
           "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
+          "ClaimDoesNotApplyToClientNotification": "a8195c64e7b7ab2d1f960d47734231ffa0b36e74745c198aa48926c908796311",
+          "ClaimNotAvailableInTenantNotification": "9fe8f0a8910ad25fb164a3f2b567f8f48c441c23ca0ad60ab18ac7ae901b2296",
+          "ClaimValueDoesNotMatchValueTypeNotification": "633e155fd607084c15cc8ca481f4b75cb2734c496d882c95de9e25f06ef6a2ed",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "a7c2af24d90977832fbe774f678988df55f2158c47bae7730db05e6d00882ac7",
           "ClientAllowedCIDRLabelField": "0e66373f45dcf3dd656151e519f7ee5e3d558d9c22cb87df339bbdd2b6c6a3c1",
           "ClientAlreadyAllowsCIDRNotification": "61da14f10ce523dd86e75389cefd75cd75447ecfe0e297f2215949a6470c9461",
           "ClientAlreadyGrantsRoleNotification": "7473c139a7c8ad8431a865f20fc3ce56858e429a8ac4554f115f71c7a467a88f",
+          "ClientAlreadyHoldsClaimNotification": "3e2c4647442e28cb30df50e27aab8b0caa02e45e01d5fb6ab72cdc37cb2590c1",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "aee76de9328d2b73f929cb7b68a82f28286782cb6b8222e61737e6d4f3a85442",
+          "ClientClaimClaimValueTypeField": "5582ca4d29b5eb050577ff4741e7a41b36e1535307364a8f9b5b002c9a95a121",
+          "ClientClaimValueField": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -618,10 +664,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "5c8c727f2d997c5484dfab1825010a7fc60f3716857a621b7edb6d6acd6da201",
+          "InvalidClaimValueNotification": "cf3378560b0b9b28a0a7f74e40d9eb0475326b59dd0047be2828812b62f8f8e2",
           "InvalidClientStatusTransitionNotification": "0c588750fb9232cdd9e8918b1c3b1b4748598487670379b0279ca17c63ad861e",
           "InvalidGracePeriodNotification": "be6941d8c224978ee256e5678559b25731a724cdbd1b53fec621e21b2b98c745",
           "RoleNotAvailableInTenantNotification": "8222431633cde7211925e8a8640822521f9232ae7f6c444489681eddd5a1530c",
           "TooManyAllowedCIDRsForClientNotification": "0a6cc81e8c2d9336e70989283446e3a2c7fb16d8f59dac9411f2b24e1b616178",
+          "TooManyClaimsForClientNotification": "c5bc9681ccb9aa6dea567447f5bdebd4c071f92c0c1adf25a72686718b700099",
           "TooManyRolesForClientNotification": "734efc9075834149119ae848a3eb7d481c47355d75e3d3abea019242aedeb3a0",
           "UniversalCIDRNotAllowedNotification": "2bcec3668fd1743592f5ea82e35c2dbea3f5c6f35b0cf7ec527b5cd9638e6aab",
           "UnknownClientStatusNotification": "b85b8a1eaed98ec462237ee100a7f1cb3dd848ad4664cb5737d7abf50cc48a90"
@@ -630,11 +678,19 @@
           "CIDRHasHostBitsSetNotification": "a699b5306cda73fe3ddf2bde00c8a4abd0827fb931bed2677665cd704bdd99b6",
           "CannotGrantRoleWithUnheldPermissionsNotification": "e3f6cad92d4a19a1533fb9e39d23679832b026064ac123a8a2b0b00c56d17e9f",
           "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
+          "ClaimDoesNotApplyToClientNotification": "fbff388013c66c40dfc71d492949a000b238a0213ab271118d6694e51b117dfa",
+          "ClaimNotAvailableInTenantNotification": "e98f2372e44efe1d1d8b8bef62c836b34e11c1ee10cced7fc63328c95db7993d",
+          "ClaimValueDoesNotMatchValueTypeNotification": "3f087965870f8e3f8173d49247c8c5a8097b320a6d1bff4246ba00b357411db3",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "4de13025c2ae1774423f0206e529ea5efb7f224b0440977d83e847d74ba51a09",
           "ClientAllowedCIDRLabelField": "14fa6745ea2b4ea2a8e11045b556321812fe3543fd51a17438580fadfd433eda",
           "ClientAlreadyAllowsCIDRNotification": "f5154527ca997f428804f8c03936edcc145b5d2885e28569eee56d6428bf0365",
           "ClientAlreadyGrantsRoleNotification": "f9250d5ff4edaf447bc5e980d126e2613637d5f875d52d543ddcada0daae57bc",
+          "ClientAlreadyHoldsClaimNotification": "559f7b6ffc1374d6bcb5cf35c726d9bd7813747d69c4ddb6821daaf4710994e6",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "298b8e5db2344c36127aa449704c3816104fa75594277880a14248629c4af4d9",
+          "ClientClaimClaimValueTypeField": "f7ff8dd110454bd3a914b15eca36ee5876eb55f29502632eeba0724d9b6288de",
+          "ClientClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -662,10 +718,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "6e0e6f92438500361578643a5f4f9f256e2c0557370be132febcb3ff946194ac",
+          "InvalidClaimValueNotification": "398340f916fb4c9d6f43ff3ea4927e70cda923c393e26a6c1fbe14dba1f632b6",
           "InvalidClientStatusTransitionNotification": "7a70bd792f15d963d1d3226ec57239aff33bcb14783deea53a0a49a7abbe6505",
           "InvalidGracePeriodNotification": "55c85a0d94ee9231c1ea29d5d57cd37adf2c8f8daa9a23d53039bc3598c0975f",
           "RoleNotAvailableInTenantNotification": "09ada259b3fd2edf555da524d6a8c528ccdd2ceb5652d3d29d8ceef75692dd5a",
           "TooManyAllowedCIDRsForClientNotification": "88373b04891c39a8ce16284c2c44bc9d2196d4af4229ad5d0ccdf6f822d563b1",
+          "TooManyClaimsForClientNotification": "2f2ba25d8410f12f5ba45a0c1f131579eef2541c8a7a5ee40469f84542c07eb7",
           "TooManyRolesForClientNotification": "77021e23b29a63fd436cc28e60847e359e88067210292cd1e2adadeffb45405d",
           "UniversalCIDRNotAllowedNotification": "22534d984832a9fd4555beb06a548bba326d48b6fb64f269f625c90dd44ed2b7",
           "UnknownClientStatusNotification": "57350140d4acd1dc9f78d8013272512003c5668c22de646b79d165a5bbc325c4"
@@ -674,11 +732,19 @@
           "CIDRHasHostBitsSetNotification": "9fe7c2d11a54f38ec5b87024c76f6a3890a7b1fb02a3d446b90adee949f4e54d",
           "CannotGrantRoleWithUnheldPermissionsNotification": "df5184c5ac362065f4997f1864ae9e0052f1a9c1230593ecb7fc358f47c716eb",
           "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
+          "ClaimDoesNotApplyToClientNotification": "878735930f293da3ad93ad649067f1ce3b304aac40dc27d515b7d2df496ef6d3",
+          "ClaimNotAvailableInTenantNotification": "1af6cc57c4992dccadde3fbb338bb85dcf910cbb0d8da734e97ad1784574bffd",
+          "ClaimValueDoesNotMatchValueTypeNotification": "603c898fd90fee914ef9cda095589e7683576130f96524f927f3f486dc0d2a1a",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "14ac9b74c982dcb394eab241f710d2b38b5fb00b040805f565538757a728443d",
           "ClientAllowedCIDRLabelField": "cd5b832ac5cba84828abf4ad04f4c72e0442eff1ba42b8d7d931be79fe39f99b",
           "ClientAlreadyAllowsCIDRNotification": "8e789e155d88350085aeccff95b4c4bc5f22b146207a080130825b73f73c81dc",
           "ClientAlreadyGrantsRoleNotification": "2850e5bf38fc101c1add7b9f85e978c4b8a44985c86be4b2894079fc826a681e",
+          "ClientAlreadyHoldsClaimNotification": "295efaf605efe58e46287aff1be50ee2f3345539e7ee14a9320433895815efa4",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "234e6f5c5db909b04a75dd2c69d92105d34fa261b470667b996eba23fa13a21f",
+          "ClientClaimClaimValueTypeField": "e4f84c59d3a6f9cabd5d94840ef5be88a8ba97754068fd5487460e9b936d1f4a",
+          "ClientClaimValueField": "6e8f3132d8e2e2a80dc214d69072afde8c645be6f890572a4eaff8b4811b9bde",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -706,10 +772,12 @@
           "ClientTenantWorkspaceField": "3f680c5fc8ca2079f7cee2ad9df2a6dd5923fa8d17607fb9c84f43859efdee93",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "ced5af20fd0bd64636b457b243c94d95820e4e2c9a72e61fbbcb7eee11f0098c",
+          "InvalidClaimValueNotification": "4b74c0891a1edab13b02562bcf1409d856ceb8db0a1a36e7b6a557849e16179f",
           "InvalidClientStatusTransitionNotification": "080d6b1e2728df39aa1259078d98326e189d63ae9d7e93b37eebc18a6430b8a3",
           "InvalidGracePeriodNotification": "601abdacc16a128520977bba15c2a4dd00dc50df0d0c50905a7ce11ca20a251a",
           "RoleNotAvailableInTenantNotification": "54535d4f1ca973aa1d764e060bef390085d52057945f785867293e1dc39d941a",
           "TooManyAllowedCIDRsForClientNotification": "20915f6dda0c246f52f0b135e5e4392c86e53668d5386a18c58e8bcaebe74b4e",
+          "TooManyClaimsForClientNotification": "d6534ba40dcd3b37eec1da9886eb40a3e2e14547d8144198d71c3d66a91cfe3b",
           "TooManyRolesForClientNotification": "d2a63e3e11c88971cf79fcf0049cca660aa1149cf6fcc03ac73a1736cce1ac7b",
           "UniversalCIDRNotAllowedNotification": "e154bd87999fa552d7e1100ea113338882ab8ae8965e53fd39139580fff5eab0",
           "UnknownClientStatusNotification": "fe56f0e646fee182e2228d176c1347969d3706d0c9208ff8d80622e6a0bcec6e"
@@ -718,11 +786,19 @@
           "CIDRHasHostBitsSetNotification": "0d27252f6b8bb2e2d23318b46d7431eb9c71bffe40b758029d74a8467f91b11d",
           "CannotGrantRoleWithUnheldPermissionsNotification": "8917e6fb47bcb8ab27cee787d5695f7fe11bfa21725c72cf62c0bffb5a9a6d45",
           "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
+          "ClaimDoesNotApplyToClientNotification": "46a22df1ad4f8e655b14e879bc2e7f59017c5feef319000f49b0d88ab7c1b7b9",
+          "ClaimNotAvailableInTenantNotification": "49f8c8a9a8fb318f4f6f3cd17ede501845f4230b460ceed0c153d7c7bf2f1531",
+          "ClaimValueDoesNotMatchValueTypeNotification": "381b5364ccd6b6b52b69b54b5255fc185400614c5295b934bdaf12fc3260b520",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "2cee0b8a4ac6125b3c1fe88d07219285a4309fa1475baa5b0abeac2ae858a4eb",
           "ClientAllowedCIDRLabelField": "9fe5b72aa9003436213f15e41eb27fae74ff48cf9940ee9ad92d1a907466366c",
           "ClientAlreadyAllowsCIDRNotification": "328363cdb0fb94c21ac3f5ab7190ea9daf54343a964376932251d1f112661f47",
           "ClientAlreadyGrantsRoleNotification": "57b25aa2d46c6fb41c4edd998233a0f670dafa4d13b2d1851298d6a7bb48d59e",
+          "ClientAlreadyHoldsClaimNotification": "d0b9df95c308a89d342d99debad49c4ee08cf04227bd81f272279aaa709a8172",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "b8f5c8b46248c963ea3e43697b37ca60371cce08f98b33adbdd4439c1620b4de",
+          "ClientClaimClaimValueTypeField": "f43a758a4424cb3583724a7e466d629a5ea8a927d427b91cec109d0c72f4fb38",
+          "ClientClaimValueField": "3b50ed0e6ec244182f4b4d135b47acb095f81c710d5ed782b2173084a3de4533",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -750,10 +826,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "6a75508ac98e52aa30908e9a3e86bfe195ea134f69e7b260d6606f8ed6df44a8",
+          "InvalidClaimValueNotification": "ee949338fd2b37455b6bd0bd7b6365843c2417c4c23da3ebc00a1c0cc62d8273",
           "InvalidClientStatusTransitionNotification": "809f1aa577339516b9acfc63b0a1f2c1ad73f9360584a69fc6df023ae87c7eca",
           "InvalidGracePeriodNotification": "994f599876d7341549924b2d1ad71c6b75076d06d0e297d843e6187fa8947d03",
           "RoleNotAvailableInTenantNotification": "a504ebcf11acf1320e96ad96cae899c8d3cd3cc346960ca21a61ae31a2118741",
           "TooManyAllowedCIDRsForClientNotification": "98e986bd889c2d88bcbd8a835bbf01def8f704fcbf10d72924632cd2b3d1e5d1",
+          "TooManyClaimsForClientNotification": "447b611995cee9e5a850c1c3a587286e797e63fae81f82ef96002ee455f9f87b",
           "TooManyRolesForClientNotification": "ce6de13123fd308023fb1f76ac20b0c2b491a875b2a603f9ff5640c6c57c274c",
           "UniversalCIDRNotAllowedNotification": "b8025f4a009e14c219fe0c40fa2a849886ac3e5e7757219ea559e0a1591e9d55",
           "UnknownClientStatusNotification": "38e0fe3b7d5bc08ce60fb0bfd0ff64e898a564b631ebfa21f33ea20b6c5af196"
@@ -762,11 +840,19 @@
           "CIDRHasHostBitsSetNotification": "5f4e997d97e664eec863f9795f530e92260cab24339d286e22e9a253b5b635c7",
           "CannotGrantRoleWithUnheldPermissionsNotification": "5aaa53203d630b13a253d7809e228f0ccfda3fc90dc2d33ab2c498f4f9c99fe4",
           "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
+          "ClaimDoesNotApplyToClientNotification": "0b8cf0e7b914dbc4e4a9e8a187ca5b5bc96b8d6311c4d6d9a1a1ad9e43887ee6",
+          "ClaimNotAvailableInTenantNotification": "b162e4a080d43f724ec8e03188af91404a79d06ee4cb35883849b1a1ac2a4519",
+          "ClaimValueDoesNotMatchValueTypeNotification": "ee24f0b74b630fee81a8b0dbffba6e25d6877fcb066ef235ce7d38ad4c034d53",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "ab6fcc3512c281f23aae59d818e2675a7f93471b996ec73d82852a3e082df865",
           "ClientAllowedCIDRLabelField": "0e66373f45dcf3dd656151e519f7ee5e3d558d9c22cb87df339bbdd2b6c6a3c1",
           "ClientAlreadyAllowsCIDRNotification": "b28ca48b7182fbf9e8018af623977fcd4f083c9b48f5dd427b1704fe197b7184",
           "ClientAlreadyGrantsRoleNotification": "d865f1ed4b67b5eeaa1e2118c88ace0c3f7ada5456f7b68d9b5563bcb466600e",
+          "ClientAlreadyHoldsClaimNotification": "0d4788756bbcbcef4c12158965f55c83efe9ee357e783a166977e241bb862539",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "92863d8aac8b34c2770fd461e77fb701793ffebf721b464ee4bca1fd1b34a78b",
+          "ClientClaimClaimValueTypeField": "16e6e203c81eea9515ee3a9caa0251efb74b2230006dc22e28b79c7d7706493a",
+          "ClientClaimValueField": "2bea5ab708c74ff971d94327782f04fd2d1c39517676fe756946fb76b783125c",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "9b2cfb9ec6124c06b7796e378d61f78b8e1c34efd72ea87093cdb70ae099342f",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -794,10 +880,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "33feaa25eecfb589d6a0712e4e1e082d971e6b540c6e6108aef090d03de92c80",
+          "InvalidClaimValueNotification": "422eccb50333c7e5df77059df7e82494f205b3ce1dbf1e68788eea3bccf79825",
           "InvalidClientStatusTransitionNotification": "a3a7cb1dab65a36b351191779fb5584c37440784b4963a13cc505baa7df2fb78",
           "InvalidGracePeriodNotification": "9273c91f164a66235c7600a622e33894160216352b4bdafbe2a5a71e0744fa7c",
           "RoleNotAvailableInTenantNotification": "d1ff23480947e06746a163dad3464ec8183e73b91529c58b3746111463e69dab",
           "TooManyAllowedCIDRsForClientNotification": "e53fbe8ddf281640579ff9b5a99352de4c5b80ef3ca664564ddd28708cfb2bf0",
+          "TooManyClaimsForClientNotification": "d7690c8833d0211dfc0852dacd674eb8ac323836873bed221cb3734366a870cd",
           "TooManyRolesForClientNotification": "19894ff804546bafb514f1520feb2723bead5703e483678d621588dae5c8dcfa",
           "UniversalCIDRNotAllowedNotification": "3d47f4f6016b4242c676642a56a557ea2a879058271e79fa0c6f6f7ded6b0883",
           "UnknownClientStatusNotification": "54dd4c8d541d3965ed6bc53373747bfd4a2f92767e599994591da2c05bb729a8"
@@ -806,11 +894,19 @@
           "CIDRHasHostBitsSetNotification": "1721ecd7d10cc860036dc0ca05d24ff21eb52c2a2c8520a67c7888859d85eb73",
           "CannotGrantRoleWithUnheldPermissionsNotification": "ede20bef362340500e4bef973568e6b11c381f5648933e6f7b03c680a6899ece",
           "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
+          "ClaimDoesNotApplyToClientNotification": "1e54033167426f9cb4cad845447e74d01cb4ff9a6f3957d2563dea4c7cbc4159",
+          "ClaimNotAvailableInTenantNotification": "378183824e192c25055a72f433f59fc311d4e23a98d641e675bbdc9c1ab22b65",
+          "ClaimValueDoesNotMatchValueTypeNotification": "4c7812283ec85f4699dd490cff2041ed74bff008c7f422c3c998863a7126a848",
           "Client": "0c77fe09ab336a3e57cc2b6804a9bac65e19a27782b5a9c815d585e894c3b7f2",
           "ClientAllowedCIDRCIDRField": "588f593dfd3484650326fc13a4956cad1763ecbbb60207b30b95c5b0f145a031",
           "ClientAllowedCIDRLabelField": "0e4e4e5d1e1a7700c2e03e66a46debe2992e5a2a51e3bf52c31bfa790eda634e",
           "ClientAlreadyAllowsCIDRNotification": "fe820c19b847b8e227230bb6b6d674ad1603e076b64280463cf905a97d8f9a44",
           "ClientAlreadyGrantsRoleNotification": "24afcffd826cf419bff15d24acaf5d8b247b8c3dee0d1cf49cbd00d0736d5b1e",
+          "ClientAlreadyHoldsClaimNotification": "67b634658a60bcf062518953394a2b869314d16fa27ebbeee8ae1bf11242d00f",
+          "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "ClientClaimClaimNameField": "f8888bb1ce9c45b8755d9745d367bffc9c5c016ae87f3b479a1b00d5dbb8c49d",
+          "ClientClaimClaimValueTypeField": "46a22018675ad53ed993a8132476e50540c1b8cde0466c215523472606dacb85",
+          "ClientClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClientDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
@@ -838,10 +934,12 @@
           "ClientTenantWorkspaceField": "87bb59ba2f92f2a5a9f13e021fd58dd14ae5c065b1046146875e6e68d5ebc8b7",
           "ClientUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
           "InvalidCIDRBlockNotification": "697b5804db377fae604c56ded6cb94f99857ea6f33faf0ee5784ba3490868d6e",
+          "InvalidClaimValueNotification": "b281518098a777f70a95c7d1f1cf6b4d1add1d8c8df662bcf8cd6c1fe139b5b4",
           "InvalidClientStatusTransitionNotification": "89b78eaa0b4a30bcdeb81ecb56d77ff4a258742994a07dfd2ac9a27ae44e217e",
           "InvalidGracePeriodNotification": "f27049493ed06e0382c9080cea2e03974089029a1f9e60ba989b12010e5e1c70",
           "RoleNotAvailableInTenantNotification": "8310c646c18bd3744fa415b87ced63c54870656b6636e2c923a447dba50af665",
           "TooManyAllowedCIDRsForClientNotification": "cb63189a9dec039913119b8c64e8e88fa917c42ae99ba16feb2a7b7a3236a9c2",
+          "TooManyClaimsForClientNotification": "dfe78ac558d271e0a2867acd6e11185a690e4774509050c394d31862f18b8649",
           "TooManyRolesForClientNotification": "487ea740c605f76f1f058ec01ba7e9e9eddada7015868a3c2dcef8ea34d54529",
           "UniversalCIDRNotAllowedNotification": "66fb879b0aca025dcb97c3365a4ade49824062c2e2335932030262b3ea6bae9d",
           "UnknownClientStatusNotification": "78a5551a29ede37579b7d3ebdd5b7f19124ba344525f30933ddfad40c3b3990c"
@@ -849,8 +947,12 @@
         "internal/domain/notifications.go": {
           "CannotGrantRoleWithUnheldPermissionsNotification": "cc8cd97e7eb17840a5c05d9b2a0cf9d829cd6432d7315bd57ead872f43399b2c",
           "CannotGrantWildcardRoleNotification": "d355145da4cea2a0f64df3aa1134355d5e61b1015aefa678f3cd08564643a09d",
+          "ClaimDoesNotApplyToClientNotification": "6854e5d750595501b40819f7cadfe32d19a69e90a83e3a35e0f8e2f73cb60fc9",
+          "ClaimNotAvailableInTenantNotification": "72edd320d5d8cb533751da7536651352ce90752b80f903b73b38620628a0cd09",
+          "ClaimValueDoesNotMatchValueTypeNotification": "e9fdd1ba7ac56c3dc7093ed7a52f585ffc9ea0e51df16a291262de60fd5cfaa4",
           "ClientAlreadyAllowsCIDRNotification": "10ce492961fe63838daa0cbc8ba7c201370d2babfaac6c44a8aa1f63cca0a6a9",
           "ClientAlreadyGrantsRoleNotification": "601bb2178b7fdf2b9fbb522945befbadb98bf2358018eee17ec6a0185903c998",
+          "ClientAlreadyHoldsClaimNotification": "5e276e61597d277e9edb03673240d971c1b55ba49de1a27d4c6a026e6b6fd51f",
           "ClientMayOnlyRotateItsOwnSecretNotification": "185d509f34b0b6a43e61338bedf0d3293b78919ae7a9c09c6361b4316ebe9590",
           "ClientMustBeActiveToRotateNotification": "71abf2673448b7a15d9c2b051c0bc971c4d78cea0a2ec72094e184da563f1e2d",
           "ClientNameAlreadyExistsNotification": "d26e70d41044b4d9bc54b6ef80bc4968c7b82c5f51aba40df099a9e2d321974e",
@@ -860,11 +962,13 @@
           "InvalidGracePeriodNotification": "f8c219d30079d24e48a104cca1d1e79e25b628bc2b512218002e277b732eee47",
           "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",
           "TooManyAllowedCIDRsForClientNotification": "aa8c4a530cf7a9a905d0287d723e0badb284d3a8c47f96013c6461e1cd1e21d1",
+          "TooManyClaimsForClientNotification": "0886f1e2ca6da8b23c9dafcb6d2bdfe06be44b423efac50f1977152ca54e0bc9",
           "TooManyRolesForClientNotification": "2b82eca2a692cf89eb2eac4cdb8c4ae12a72be4f8bdc5a6c60e68bef065e62c0"
         },
         "internal/domain/vos/notifications.go": {
           "CIDRHasHostBitsSetNotification": "aef16ada880271da38b6f9423dcb8bc16efc51fcc74aabe0de0251e3af565504",
           "InvalidCIDRBlockNotification": "b74b95525b515d44a9687a6d85d521e86ef130fa9f83c83cff29c9a45cd4c6eb",
+          "InvalidClaimValueNotification": "fd5b1a272fc8e39f282e8550bed301777af03f0f762858d1bd4bcf3163250d0b",
           "UniversalCIDRNotAllowedNotification": "ae3d5991b66ee336f039c6100907d52a0f501c91920d37bc4e8ad65173a63982",
           "UnknownClientStatusNotification": "61b3080ec23458f2795f7ac009ace79b2c4b5691a9016337e15b27e532861b38"
         }
@@ -2101,8 +2205,8 @@
     },
     "User": {
       "spec": "specs/omnicore-gen/user.omnicore.yaml",
-      "specHash": "46da71675626551cb250e6677b95691ce776eafb4bb54825eef26066072065ad",
-      "framework": "v0.62.0",
+      "specHash": "31c26883fd87fc81ffee76889af811175eb61ee9ab008b4b99b0c2a1a3ac4a51",
+      "framework": "v0.63.0",
       "files": {
         "bootstrap/users_feature.go": {
           "class": "owned",
@@ -2114,31 +2218,39 @@
         },
         "internal/application/commands/insert_user_command.go": {
           "class": "owned",
-          "hash": "61aa284f8ef87715f0d9765abec625e0b9984d1afdfdb90b25997d1e2a8c9a32"
+          "hash": "1541df57ba5d1eb755820c0285b7b23fe7dfdd1339c037c836d615da2aa1e1be"
         },
         "internal/application/commands/patch_user_command.go": {
           "class": "owned",
-          "hash": "191081ea2af8b3414cee2fb33593bc004c6d85b5ea0261ec0f7848af2cefc6fb"
+          "hash": "2f40962c2b2829e0dae68bad146edf36d55335481598d9d164acc2979f8e1ed2"
         },
         "internal/application/commands/user_child_results.go": {
           "class": "owned",
-          "hash": "7bf7c8b9bf904ad96d7a0afbf0682ec4fbd1b34714f0fec1c9da538dafb87717"
+          "hash": "79f48c744cbab443feec16d46849ea6e3a5dcfc3257c4b8e26c3f00ed14bede4"
+        },
+        "internal/application/commands/user_claim_commands.go": {
+          "class": "owned",
+          "hash": "b7aaac68eb3b63232245db1173a5103b44ea67efbfacb9b5fe2714429be3823f"
         },
         "internal/application/commands/user_commands_test.go": {
           "class": "owned",
-          "hash": "89612f102b1596c83b28f52755c97eacacdeba9afb55e119e2473418d653f1c3"
+          "hash": "c4f4a51a25ef178aa1beed03904d6be25d9bdf857d7e99d6ff8230bb53455b22"
         },
         "internal/application/commands/user_group_commands.go": {
           "class": "owned",
-          "hash": "156c13c8a21c58ec26d2f2af9e5cbb0a06a32932fd7bc124ea578abd1158b8e9"
+          "hash": "0583dc1171b482366f1a60ba97124f85696181683c4cec3fcc159051bfc1f394"
         },
         "internal/application/commands/user_role_commands.go": {
           "class": "owned",
-          "hash": "142f764dfc71944600e90fe7c6fdb365ae482fd543dc9a8159f58c320295096c"
+          "hash": "8054b95db7e40f5dbb0437eb6a4f28df5018d85a2a882cd7b36a3668f91c3bc6"
+        },
+        "internal/application/dtos/user_claim_input.go": {
+          "class": "owned",
+          "hash": "4512ce0fd579b65a71d4f5a1dbe2d258cb2794a51155701bf019dc8a3427eaee"
         },
         "internal/application/dtos/user_dtos_test.go": {
           "class": "owned",
-          "hash": "1bd16edf9aaee4dd34ef1c963930d74297783a7b10990e574a676304ffa692cf"
+          "hash": "2b291a8e7ed8c6d817dd8f2b4c974f8a1971b7be5ee19a81f17056b219b7eea3"
         },
         "internal/application/dtos/user_group_input.go": {
           "class": "owned",
@@ -2150,11 +2262,11 @@
         },
         "internal/application/queries/find_user_by_id_query.go": {
           "class": "owned",
-          "hash": "2cffce04bd8387a772ed27de8267c05bea770070c422fba64f6695898638c1eb"
+          "hash": "318f558b93d49bb128fa65bc3e2fa1cf6ecf70ce016bc81c7d4a7679284c49b9"
         },
         "internal/application/queries/find_users_by_params_query.go": {
           "class": "owned",
-          "hash": "a700b2b11ef5edf089425441c800e0e00e2a6dcba68b85ce5d5bbd06d4eb609f"
+          "hash": "4861dd5cadb96ebd64fe2ec2bf408e01c40e6821cbc917db755563d70413fbf1"
         },
         "internal/application/queries/user_computed_manual.go": {
           "class": "hook",
@@ -2166,15 +2278,19 @@
         },
         "internal/application/queries/user_row_results.go": {
           "class": "owned",
-          "hash": "1d263ea5db35c62f4edf010a015e8893aceedfb76883b83ac2fdf58ad19418cc"
+          "hash": "175d774502203d8b66df1c2bd6171ee8c2108e2bba51e693ddeb7869d7708b7e"
         },
         "internal/application/translations/user_translations_test.go": {
           "class": "owned",
-          "hash": "e6240ef1e6d87db238a94906791625993b4ce59dc87dab9edcf90a4eac3337ee"
+          "hash": "a9718d7c4f962c511bb6beb34b690718132d159bca285c9736239710643f3d47"
         },
         "internal/domain/aggregatevos/user_children_test.go": {
           "class": "owned",
-          "hash": "2a9f819b897a96cb285735ab84462ba721b38da7478a6a054bcf2459b09081b4"
+          "hash": "1636ea4b1df34eb1c384e5c74eb21ef0a641514e14201a68d833fa753946a1c0"
+        },
+        "internal/domain/aggregatevos/user_claim.go": {
+          "class": "owned",
+          "hash": "620f0fc4bc112801ac424d4c237ae3d9ce673f7c1706196a134c29751b68a798"
         },
         "internal/domain/aggregatevos/user_group.go": {
           "class": "owned",
@@ -2186,7 +2302,7 @@
         },
         "internal/domain/user.go": {
           "class": "owned",
-          "hash": "1154d61852c54ccb21c8b7b2f26a1bdb665b7492d303e1ad11d70c451bb2b890"
+          "hash": "62158e3bb42af291ffe55028a0a8bcd33307be4ce6f8833d7d9efc0d70ac7111"
         },
         "internal/domain/user_rules_manual.go": {
           "class": "hook",
@@ -2194,11 +2310,15 @@
         },
         "internal/domain/user_service.go": {
           "class": "owned",
-          "hash": "2c2cc570b8a733855a37e3734220d912c3c941189961def122316c7fb0a00df5"
+          "hash": "129f10119246d2352c85f85aa1695666e09039ee7ab3c562d9a0a3258856a93a"
         },
         "internal/domain/user_test.go": {
           "class": "owned",
-          "hash": "6008976e7e92cb74cecb87c1302e55bf879b4eb7fef6b163b02b74a2404587c0"
+          "hash": "6d840991a242ba5770004c65d2d0d467dbfc3d34fa2867dad7234a7be319b8ee"
+        },
+        "internal/domain/vos/claim_value.go": {
+          "class": "owned",
+          "hash": "0c5de47d1be295e68a62a6b7f89c21187f616ab9bbb4773e40095cd3b92cf318"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",
@@ -2214,7 +2334,11 @@
         },
         "internal/domain/vos/user_vos_test.go": {
           "class": "owned",
-          "hash": "edca4c1f526e0531d385b9cb507fae96fac8534ee97bfac3593e7eb6a3295e96"
+          "hash": "3b9c4fcbb8cff62e61efb2d96ce00475be2ed0221132cffaf1cad3e289805a6e"
+        },
+        "internal/infra/schemas/user_claim_schema.go": {
+          "class": "owned",
+          "hash": "4f413983fb0600934c86ecff167bd61db284d963be1f99c1abf87e8e7c865817"
         },
         "internal/infra/schemas/user_group_schema.go": {
           "class": "owned",
@@ -2226,15 +2350,15 @@
         },
         "internal/infra/schemas/user_schema.go": {
           "class": "owned",
-          "hash": "f8d67091d76e825faead901b8cecde9ad162f7f9272ddfc64efb639b714be93e"
+          "hash": "fa257ce3622fd476a0a25e432f66a7f0e018ca62a6680dec0b28f740ecda3590"
         },
         "internal/infra/schemas/user_schemas_test.go": {
           "class": "owned",
-          "hash": "99f4852b3b74ebb08c828a8d623f16efe1eba83ee6a025bdb9092806f8e1c8b9"
+          "hash": "d4ac65163854f85ed4ec51e508e3e3543f6891e3084981ea760de98a7de09d6d"
         },
         "internal/infra/user_repository.go": {
           "class": "owned",
-          "hash": "2dbe3eddac14be337bd1990b6e9c19bf6349b102ed2558a7b6ae3538bddf7e97"
+          "hash": "248d755a0df2f59f96623bbdad1b841aa8b406f15ea1e026931bb400c309de2a"
         },
         "internal/infra/user_service.go": {
           "class": "owned",
@@ -2254,39 +2378,43 @@
         },
         "internal/web/requests/find_user_by_id.go": {
           "class": "owned",
-          "hash": "bfb425e03bff7129fc3edeed7918394c54ecb8e85dd392dc2e49881c012d09fc"
+          "hash": "f70fdb7271e9505849464d48633ba1f38f2236bb1edd4ee57091e6203f980db0"
         },
         "internal/web/requests/find_users_by_params.go": {
           "class": "owned",
-          "hash": "921947c10aa02f45f275b4ed4c344472b0f047ada6d0883c7ba737cc6bd87f78"
+          "hash": "00044768f432d586f868ae99adadfa8ce72f0dd227a7a198b613fbd0dfbe9ada"
         },
         "internal/web/requests/insert_user.go": {
           "class": "owned",
-          "hash": "e99ebc2a1b0e3837bd085d39988baa28a773f6bc1e019e7620c6a1200aa5e6aa"
+          "hash": "5145bac2230f78f01d1a7694f391dd5685dabf79680f1213205da4dbdcb75df4"
         },
         "internal/web/requests/patch_user.go": {
           "class": "owned",
-          "hash": "063c0b34f96b9650e9b5dcad104414f6cc5408b823b962f86bfe17aac31cb976"
+          "hash": "32359621abfb8e67e90ec5f208859c32f30714c786ac86afc1214acbceb8a87c"
         },
         "internal/web/requests/user_children.go": {
           "class": "owned",
-          "hash": "2dde1e41bbf4f7947bbdd5436f4d778d8eb413baf26f8d3f8f1e803ef3cd4c2c"
+          "hash": "9cc40bf9b4af67823595a99d5ac9b4cf44244cfc9f8ccb4a30ef05792db8163c"
+        },
+        "internal/web/requests/user_claim_requests.go": {
+          "class": "owned",
+          "hash": "a6cd346b4d2b36a6479b9b3feb0d8bf149367ec65f94319fcad6b906dc239056"
         },
         "internal/web/requests/user_group_requests.go": {
           "class": "owned",
-          "hash": "40958947f33843df8e610ee5580dd6c63767bab97d64db4dfb8ecb2da7ddb172"
+          "hash": "6b11618d54e65bbcfc96344ecee590b84e4f64cf577283161aa9829060e5e436"
         },
         "internal/web/requests/user_requests_test.go": {
           "class": "owned",
-          "hash": "c222c2fb26e18d60fcb16356a8db977899a7b87e8fcbaae67824668d130e24a1"
+          "hash": "5f7c4d3137a6ca50919968188842860a3d54de76da2a1cb212187a5817041d50"
         },
         "internal/web/requests/user_role_requests.go": {
           "class": "owned",
-          "hash": "09d8f5d8f8faa61c50b1f694bc540b95e324221c618b424f8729b3c7ae8dd266"
+          "hash": "d0433dfa4ea3b7efeabac92950f468d62ddaa2d8b69bfa591c2b0482f686adc2"
         },
         "internal/web/user_routes.go": {
           "class": "owned",
-          "hash": "a79af32ce288896cbef691d12c45dfc2a7162b2bc38b0099f3dc23f1a2b77261"
+          "hash": "ff2f95a2f583734da07252919abca1c0806058d076b0970e8aea53cd47d20575"
         }
       },
       "ordinals": {
@@ -2299,7 +2427,11 @@
           "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
           "CannotJoinGroupWithUnheldPermissionsNotification": "e42545e05d61408597db61c41015d462d61c367706b5b5ce7f377931de861c58",
           "CannotJoinWildcardGroupNotification": "02f40b1d99eba3f18fbbe4efc25f8e1d2b197a5cf74011b573f5d4a6a457c9db",
+          "ClaimDoesNotApplyToUserNotification": "56ec3059dfbe31d89fba743d146ca89ea7d5de35ee51340ac33a9741f033facb",
+          "ClaimNotAvailableInTenantNotification": "e2a71d6d7da192203133307cf8fc56eeb6b0a3f682d7bcf8d71f136bbaf9001e",
+          "ClaimValueDoesNotMatchValueTypeNotification": "4b0981be8bbb4446a0c9b8d4d00a92cc1e4121254653623fabd66f46f15c21ac",
           "GroupNotAvailableInTenantNotification": "6904f245f7aeb10055f19a413720ea3f27b4e645e7f46b760a2d5eaf5cebc389",
+          "InvalidClaimValueNotification": "9e48e6c3e18a2d27d3db10af3b42daf3713a719587213db8b437b06b0f8b078c",
           "InvalidEmailNotification": "52e4f470f6efdcf7cd68f7241aa7ad645174672e837120c406873b3c6793a2ef",
           "InvalidPersonNameNotification": "2f0c241ab39c2250f4f059c8055b9bddabc0d1fe8c149b9a33a87c9565c21627",
           "InvalidUserStatusTransitionNotification": "8654610a22c4a2170b701976a6e0d19eff3ed73f66b82e4166be5bbbf0c378db",
@@ -2307,12 +2439,18 @@
           "PasswordEchoesIdentityNotification": "e555b9eff848a27e8a48f26b16f53e275f4393c728caa1ed43b4e8de835a6744",
           "PasswordUnchangedNotification": "f676dee86e5d1f9c27242d34a82cd16f8b48e2cb1f1dc4b18b5d89a126612abc",
           "RoleNotAvailableInTenantNotification": "e3ed12bfd66e664d09bede99885e1667699739451e85b683f740c7fd26bfdece",
+          "TooManyClaimsForUserNotification": "53de57a34c226007099acc8b92236bc682152e0d5975a73f3884b7ce6d2be07e",
           "TooManyGroupsForUserNotification": "f535983c6858fd32faf072cd99471e683a6ae7ca8dcecedad97c7508630712b7",
           "TooManyRolesForUserNotification": "224b16d70bd9cf0e7837c47bbf824dcc01b82ffcbf12afc46028599040b236fd",
           "UnknownUserStatusNotification": "44c07a9f096d06aa23d291e48e4029a44b6e9c111f3a6569630fbefe3ab9cda2",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "0e2d6d60d4048d3971c347d7dc0f50bf9a77856f9ce919f68d1d25d596d642ed",
+          "UserAlreadyHoldsClaimNotification": "c671ff5cb3edab1ddfdcb038aaa41f3af2fdaad85b95258cacd503a516ea92b1",
           "UserAlreadyInGroupNotification": "cc354803a744150beee8f02ee3ca1f109c060db6e72410da7f3b63831e572074",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "95835ee87c0e9911f8df69d2bbbaa9ab7061da95f30de0d28dfff6e42d1cbb85",
+          "UserClaimClaimValueTypeField": "2b1954612391aeaf9db1c1400d722d739b5d5f6e1cb379d443c95a990116cf97",
+          "UserClaimValueField": "7e347daa5ec7fbe8426998f8523a67670f032e8f308b775db34b8b9e2bf6b89a",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "7bdf6e89701c96379abd8f7d04db640ed05aa9d0a950a7387628091cf46eca78",
           "UserEmailAlreadyExistsNotification": "a3bf3541a27ab0465e0f5d97e8290e161d8e52e3228aadc757fd8ef43c1b3650",
@@ -2351,7 +2489,11 @@
           "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
           "CannotJoinGroupWithUnheldPermissionsNotification": "89de2913ed5f4324994a2d21ef9e7d5a2fff97fd181404d99b41816164e39156",
           "CannotJoinWildcardGroupNotification": "754b835db1bfc94b4e90861274b5b706e08374feab03fe179c35ce5a1b775db6",
+          "ClaimDoesNotApplyToUserNotification": "56a41421e5078f4f6ad46f40f3d3453bb0abc3618af868df98588919e0c6b08c",
+          "ClaimNotAvailableInTenantNotification": "9fe8f0a8910ad25fb164a3f2b567f8f48c441c23ca0ad60ab18ac7ae901b2296",
+          "ClaimValueDoesNotMatchValueTypeNotification": "633e155fd607084c15cc8ca481f4b75cb2734c496d882c95de9e25f06ef6a2ed",
           "GroupNotAvailableInTenantNotification": "21005e510e6efbdd02dd7b1c75ce4365c0277b381ecd8f1e7869421cd31851f4",
+          "InvalidClaimValueNotification": "cf3378560b0b9b28a0a7f74e40d9eb0475326b59dd0047be2828812b62f8f8e2",
           "InvalidEmailNotification": "56f8d9ad988aafa3c9fcffa010136475df065e867f4edca1c68c21bb06066355",
           "InvalidPersonNameNotification": "2c938047bc75f4d97974e2821b13336dc67e459478ab62c06f28824ad9dee657",
           "InvalidUserStatusTransitionNotification": "663bbe4d1abce0dbe9c181995d6d7488d9f82789e54d7719a1451f6d6bcc8ad3",
@@ -2359,12 +2501,18 @@
           "PasswordEchoesIdentityNotification": "806bf13e45325ec550a7c54aeeab1112f2a37fa72ab78a9314f9c84869bca71d",
           "PasswordUnchangedNotification": "7e9f3b594f829f20c8f3ebc3d923c4864762adb73114a59fd4cac5c6247a92bd",
           "RoleNotAvailableInTenantNotification": "8222431633cde7211925e8a8640822521f9232ae7f6c444489681eddd5a1530c",
+          "TooManyClaimsForUserNotification": "b3893d87b1b868884a797078de600b2143a2e4e3550b5fc978ae54f5cb68a961",
           "TooManyGroupsForUserNotification": "6950aef5eeb997aff02dc7793f57fd3ba84eec2b1fcb6d8a059509ca884edcee",
           "TooManyRolesForUserNotification": "2ba3f212df5c7a8f700859ebc4e8079be51a0e4cbcb56458fee0d7c158952d7a",
           "UnknownUserStatusNotification": "3094db9eab42675675de7ef9eb8479e215124a3ed5ffa4fced4fdfe73913282c",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "38701cd9d8535bca5a2d42e367b5820690bacf726f83234616dec1080bcb5040",
+          "UserAlreadyHoldsClaimNotification": "9c1114aa32c599ca11c6d010d5d5cb50f40f08a1bb5992fbfe880238facae71a",
           "UserAlreadyInGroupNotification": "163260aa1f237a17cf6082b624da38f2584a83857908f103eda793a871caad61",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "aee76de9328d2b73f929cb7b68a82f28286782cb6b8222e61737e6d4f3a85442",
+          "UserClaimClaimValueTypeField": "5582ca4d29b5eb050577ff4741e7a41b36e1535307364a8f9b5b002c9a95a121",
+          "UserClaimValueField": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "72ed2bd767cef62711f4293e17fef76dfe2858fe169db0a6b5c757193d45aa0c",
           "UserEmailAlreadyExistsNotification": "177c6e66be69cdca73089bddc72ad532662d1f0001280492954e7c77c4ea4c01",
@@ -2403,7 +2551,11 @@
           "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
           "CannotJoinGroupWithUnheldPermissionsNotification": "bf2ba987fdcc034d1a126913a121ea1912779c5ae408a3b51d98e1d9a2fe62e1",
           "CannotJoinWildcardGroupNotification": "a3aacb7c9137f3771436857fa4a513317381ce2937da57f2051ba8d166ae0bb4",
+          "ClaimDoesNotApplyToUserNotification": "26cf2e9295745f1d90b6fc476496ceae1fcd2570d7bddca7509a79bdbbdbd6dd",
+          "ClaimNotAvailableInTenantNotification": "e98f2372e44efe1d1d8b8bef62c836b34e11c1ee10cced7fc63328c95db7993d",
+          "ClaimValueDoesNotMatchValueTypeNotification": "3f087965870f8e3f8173d49247c8c5a8097b320a6d1bff4246ba00b357411db3",
           "GroupNotAvailableInTenantNotification": "922af761a6ba4bfa2009f3b58c8cb07c8b152defa18922fa8b64ee464426d2db",
+          "InvalidClaimValueNotification": "398340f916fb4c9d6f43ff3ea4927e70cda923c393e26a6c1fbe14dba1f632b6",
           "InvalidEmailNotification": "88b05da8e83a9b1d581055ecf7280b4b1033f41bba682b0a052c83dd3525afeb",
           "InvalidPersonNameNotification": "b36b2b5f4b367e91f186b774f825cb2e38a4e2b4b5c758b72bd91d933b96f10d",
           "InvalidUserStatusTransitionNotification": "ddcfe9f5ad8372550d39eb6d4c7d1545aa4ac1c990edd0abb8ce0d03bd925b7e",
@@ -2411,12 +2563,18 @@
           "PasswordEchoesIdentityNotification": "155b83f36bb0ed240ba65709ecfa6e3f4949f7fc722c46b52d5a293340c25a29",
           "PasswordUnchangedNotification": "7b106ea8dc8ee0b9d3f07c4cb62adea72223f2b753115af9be4cf4f05876cbb2",
           "RoleNotAvailableInTenantNotification": "09ada259b3fd2edf555da524d6a8c528ccdd2ceb5652d3d29d8ceef75692dd5a",
+          "TooManyClaimsForUserNotification": "499b5e2c02c6069a5cba918a1657e32c8ac14577c7bdfe207906cbc8f9bee6ea",
           "TooManyGroupsForUserNotification": "cb41e02b131d55b17276fa118e41e5e5e880af7107d6ffbbeb55a18dc3d9a96a",
           "TooManyRolesForUserNotification": "cde547252972e5a9f3586e40a5d58afd44c37c29fb9c45e646382876ad02864f",
           "UnknownUserStatusNotification": "1e1b3741ac36e4a050f0557eb311823aa7f77204d55da2b88913685916085312",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "cf417fdec1770eda0482e7d6bb79164f6d01826398787db73c964ccf4cbac55e",
+          "UserAlreadyHoldsClaimNotification": "e19ef1df02c73381314dc697542f4bf6314cc3729b76bed3b752e6d8d34cce3b",
           "UserAlreadyInGroupNotification": "64ed17dad09bb62600a487b35363f5aa7d2cbd396e7c24704e9452504687bc43",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "298b8e5db2344c36127aa449704c3816104fa75594277880a14248629c4af4d9",
+          "UserClaimClaimValueTypeField": "f7ff8dd110454bd3a914b15eca36ee5876eb55f29502632eeba0724d9b6288de",
+          "UserClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "14a433147337bb11c36e113f92c9c4aea0ed4048145fe41b4da35665c8b571ed",
           "UserEmailAlreadyExistsNotification": "13c1b25a7e481a7564b298b2bb68a900ce1f6393de370cb4ba1e7148b95c5050",
@@ -2455,7 +2613,11 @@
           "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
           "CannotJoinGroupWithUnheldPermissionsNotification": "756ec10d2f39ea88b7deca134d3757bdbb2169c5d9a82c025d3e0eeb3013075d",
           "CannotJoinWildcardGroupNotification": "23e3601468ed8ca98fba1476d9f8364fbe56ba6c53c3a215114ed0f585ed4bc2",
+          "ClaimDoesNotApplyToUserNotification": "bd68bc7d75b9d9d9e5e76111f0fc15f1ce4e447f8a695c4f1ddb4b3c324914ff",
+          "ClaimNotAvailableInTenantNotification": "1af6cc57c4992dccadde3fbb338bb85dcf910cbb0d8da734e97ad1784574bffd",
+          "ClaimValueDoesNotMatchValueTypeNotification": "603c898fd90fee914ef9cda095589e7683576130f96524f927f3f486dc0d2a1a",
           "GroupNotAvailableInTenantNotification": "140bf899d11a4b6edcbd288dd7c14b35b8bbeff7eaf14a7dd2f7caac81362550",
+          "InvalidClaimValueNotification": "4b74c0891a1edab13b02562bcf1409d856ceb8db0a1a36e7b6a557849e16179f",
           "InvalidEmailNotification": "fff540d4318de83b149e5aa2a102a6413c793084173dd9be3b40776ffc233047",
           "InvalidPersonNameNotification": "ede9e2e4729b99f855fc422393071786abfd4fe46c151e6be86c43e995855ba4",
           "InvalidUserStatusTransitionNotification": "d3558e9cd20ab4df97c665be93c5f7d0055d584a20b31e959d0e92b1a7c50a00",
@@ -2463,12 +2625,18 @@
           "PasswordEchoesIdentityNotification": "a0cbffc15abb7ce10cdbe7b6d948aa1a36998efea423222dfe71d72925197e0f",
           "PasswordUnchangedNotification": "4ad2480bbaa85ee7f9d9c1aa93da6be8c35a7bb68c3baa4cc4b0ec1218730907",
           "RoleNotAvailableInTenantNotification": "54535d4f1ca973aa1d764e060bef390085d52057945f785867293e1dc39d941a",
+          "TooManyClaimsForUserNotification": "b39555043c7b3e926ac0c27b896032a98ff15f87cee4f629e140283abdbb39e3",
           "TooManyGroupsForUserNotification": "1ed58fd9d39462e99cc81aae7ab102c2462f5495616c399c040dc730cf5f5bec",
           "TooManyRolesForUserNotification": "c8f54bc4df9ec930678d2dfe04f7dbe7a3d8bda0b63f2c031b3eb9976b9ef2d4",
           "UnknownUserStatusNotification": "79bcccf89c279da881587e9f1198a42b822f65a0a3d5341185eef87ab325f9d6",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "6c03b6de97361ce7ac16b1671c5f4bffb28c76d8f707c3bcaabbc9635a1f0a92",
+          "UserAlreadyHoldsClaimNotification": "655c155ed9968d496d931412cb8ae6234ae426ca3c6b9b9b6c4ec45572bffa48",
           "UserAlreadyInGroupNotification": "521b0a2034d0fe6c66c146f214a8c97c389141bf3adbca364d2fda7f00ef46c1",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "234e6f5c5db909b04a75dd2c69d92105d34fa261b470667b996eba23fa13a21f",
+          "UserClaimClaimValueTypeField": "e4f84c59d3a6f9cabd5d94840ef5be88a8ba97754068fd5487460e9b936d1f4a",
+          "UserClaimValueField": "6e8f3132d8e2e2a80dc214d69072afde8c645be6f890572a4eaff8b4811b9bde",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "55f685a23ed5787e1435caed5eb3d4ef0942cb01cf72fa1db56a31036ced125c",
           "UserEmailAlreadyExistsNotification": "385f1af72c6feb3b541921890c7efa2e758ee8627f15c6ec2192ee7ce16b1099",
@@ -2507,7 +2675,11 @@
           "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
           "CannotJoinGroupWithUnheldPermissionsNotification": "461cc81113a5c214c4c82585df6e6eb983508dca252591732021ee5394417d4e",
           "CannotJoinWildcardGroupNotification": "6c72ed6e9f18acb5c481f55d6f24037d5d01a1eaa1214900d795f42737d3012f",
+          "ClaimDoesNotApplyToUserNotification": "fc07f1e5bc93816c47e440c9f7016bf8d57eeb80c23a1275a1cbcaeca6ed2c9a",
+          "ClaimNotAvailableInTenantNotification": "49f8c8a9a8fb318f4f6f3cd17ede501845f4230b460ceed0c153d7c7bf2f1531",
+          "ClaimValueDoesNotMatchValueTypeNotification": "381b5364ccd6b6b52b69b54b5255fc185400614c5295b934bdaf12fc3260b520",
           "GroupNotAvailableInTenantNotification": "214e9c73058502b23d4c9706304ef182c70ade3eaefe9242b521842b1d1598fc",
+          "InvalidClaimValueNotification": "ee949338fd2b37455b6bd0bd7b6365843c2417c4c23da3ebc00a1c0cc62d8273",
           "InvalidEmailNotification": "3bfc10d9c70649461886919ba87c46de8d06f02cce62163ddad87446c27c3cd2",
           "InvalidPersonNameNotification": "2f84e70a341142da72f905fecf43942303e8574d0cf01edf33a166e916a16f3d",
           "InvalidUserStatusTransitionNotification": "0b3a6d3fb3a9aec8bf1e33b4885a07e39cef16497e876245823fc298049d1a60",
@@ -2515,12 +2687,18 @@
           "PasswordEchoesIdentityNotification": "ef571925f11c99213e9693afc4cc8151db27fa887c8ae1db581e43efc59ab683",
           "PasswordUnchangedNotification": "56d4f3a221febd3a790514eb76580420b38800e5e0c8115c2a34cbb8834ae8b4",
           "RoleNotAvailableInTenantNotification": "a504ebcf11acf1320e96ad96cae899c8d3cd3cc346960ca21a61ae31a2118741",
+          "TooManyClaimsForUserNotification": "f6643a17b57268f10dc450b42d695eacacffd32e39d694063a94524baeed928b",
           "TooManyGroupsForUserNotification": "1a44064ae49428f3f41948c4c722f0219bead438fe23c80573caa1f3869d4ab5",
           "TooManyRolesForUserNotification": "4bf071700771bc443f402a346296728db367fc4a57cfeff3e42d83eb4ed0b8de",
           "UnknownUserStatusNotification": "2359a4b2dc407fcdd76df3fb422905fa4f07d7b831757fb1d44f3d513c1f8ce3",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "f344519f77f3b6189ebfb54f36d502980a7d3a53db57691c90c29da2ec657555",
+          "UserAlreadyHoldsClaimNotification": "72201443d97b647d05ee31175d2760ec7f0810b2178f936f45d08f84cb8ce671",
           "UserAlreadyInGroupNotification": "703734d89a16c7b7af1b5ebb3bf2e2b2b6e7a1dbc0e66644a6163fe274d496b4",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "b8f5c8b46248c963ea3e43697b37ca60371cce08f98b33adbdd4439c1620b4de",
+          "UserClaimClaimValueTypeField": "f43a758a4424cb3583724a7e466d629a5ea8a927d427b91cec109d0c72f4fb38",
+          "UserClaimValueField": "3b50ed0e6ec244182f4b4d135b47acb095f81c710d5ed782b2173084a3de4533",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "3f72f02a13c746cf4424cab34f2970abf917ec5b53164aa3f80c8f2a6b1e9d49",
           "UserEmailAlreadyExistsNotification": "ac0068261b02fb988d3eaf3d6c5ac7e134353aff0ac5f817272cdba7a4d1280d",
@@ -2559,7 +2737,11 @@
           "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
           "CannotJoinGroupWithUnheldPermissionsNotification": "5127086be31099c1528efc2869b4827dc2453419c10d8241ccdb1237b9a6bb81",
           "CannotJoinWildcardGroupNotification": "1783f9a0a20c36748bc5b60f516aa13262dcca57a897d04fe4bff6939f59c9f3",
+          "ClaimDoesNotApplyToUserNotification": "66d3de70dc36f1e521173de3f0ef19338d7b59c298b446462ba6f5ac5a772d34",
+          "ClaimNotAvailableInTenantNotification": "b162e4a080d43f724ec8e03188af91404a79d06ee4cb35883849b1a1ac2a4519",
+          "ClaimValueDoesNotMatchValueTypeNotification": "ee24f0b74b630fee81a8b0dbffba6e25d6877fcb066ef235ce7d38ad4c034d53",
           "GroupNotAvailableInTenantNotification": "b9b2d8e24c3da831046047bab24f87cdebb549b6baefdc1459c0cc4bce6cc157",
+          "InvalidClaimValueNotification": "422eccb50333c7e5df77059df7e82494f205b3ce1dbf1e68788eea3bccf79825",
           "InvalidEmailNotification": "19b7b9a5a63e791252779079762ff04aa1910c14bb05a464490532f9ba63e677",
           "InvalidPersonNameNotification": "dbdd7b5f11ad44249d99e50769ca81d10bccd569604b586cbb125f088740e91d",
           "InvalidUserStatusTransitionNotification": "335ec7d897220105ab632109fc00a5a069faf3c826fbfeb1a7821578ea8e770a",
@@ -2567,12 +2749,18 @@
           "PasswordEchoesIdentityNotification": "3c5bdb5274a782a0407f38b6eecd8686ef51908b1d724764b26f35a15885306c",
           "PasswordUnchangedNotification": "14dd4f80746587e722d52287be464953c15eea76692c714cff8066518c0451f6",
           "RoleNotAvailableInTenantNotification": "d1ff23480947e06746a163dad3464ec8183e73b91529c58b3746111463e69dab",
+          "TooManyClaimsForUserNotification": "0da87a4cfaa7f9a5d35be88005d4d8b86862c30292d0ad487b3b4a6ab1080211",
           "TooManyGroupsForUserNotification": "48299ff837044d2bd441cd40509c94e8a822ece5e13aa6602983ba65c4aaa74f",
           "TooManyRolesForUserNotification": "d0ab949ec490c058a2e7549967398797c544cc38cafcc14a02ec4e3114af8fe1",
           "UnknownUserStatusNotification": "29ab4c99b2aa8168d9f6513ecaec440ae62593730fd6fac83f7dd50ebd8c2be5",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "d7d6b48743a1888a0d97beafd47d964efd41c2556d1a118790facb93fcd36e38",
+          "UserAlreadyHoldsClaimNotification": "41ea49b1625b46a545e885c5724762d4429c4ff33e69ab00f6fcd318dd03f28f",
           "UserAlreadyInGroupNotification": "ef2527ad772de28bed023e6cbeede605ca8746bb81f80e6181b5494009c76505",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "92863d8aac8b34c2770fd461e77fb701793ffebf721b464ee4bca1fd1b34a78b",
+          "UserClaimClaimValueTypeField": "16e6e203c81eea9515ee3a9caa0251efb74b2230006dc22e28b79c7d7706493a",
+          "UserClaimValueField": "2bea5ab708c74ff971d94327782f04fd2d1c39517676fe756946fb76b783125c",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "46bba9f06496ea930f327e7ecd1a6fd007fa95b5727c5dc1c2b273bf0fa2afe6",
           "UserEmailAlreadyExistsNotification": "29209603faab44e8e2cd502cf2537fea6fbaf0b68ac005dd82f4eb5b2ebc1d40",
@@ -2611,7 +2799,11 @@
           "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
           "CannotJoinGroupWithUnheldPermissionsNotification": "f89594b26e9f1a6e7d92b6bf5a1e959507e1eeb189276ca8e47657dff69dc311",
           "CannotJoinWildcardGroupNotification": "b3d6eeae1918c6192f7a5e097f4bd1d5a11ad24bd809a70c559282b023013dba",
+          "ClaimDoesNotApplyToUserNotification": "aa179d6d07803bbe18973cb2ced044c46aa57dfa9c7d42bb576f1e66e57442fd",
+          "ClaimNotAvailableInTenantNotification": "378183824e192c25055a72f433f59fc311d4e23a98d641e675bbdc9c1ab22b65",
+          "ClaimValueDoesNotMatchValueTypeNotification": "4c7812283ec85f4699dd490cff2041ed74bff008c7f422c3c998863a7126a848",
           "GroupNotAvailableInTenantNotification": "536da32aeee1c04f8adb7ee5d680d5771cf6bddf47ebec67d7a3f450f7f39a39",
+          "InvalidClaimValueNotification": "b281518098a777f70a95c7d1f1cf6b4d1add1d8c8df662bcf8cd6c1fe139b5b4",
           "InvalidEmailNotification": "e15c5f7edc66bcf1a1ea30b316c0c9b1168993592f9a18af375b06096914b7dc",
           "InvalidPersonNameNotification": "251fd4db8acae502160971cc10aadf716292ef29281099a1b814a90b8b778b99",
           "InvalidUserStatusTransitionNotification": "e30fe178a7841ccfa4e98f47ff3da736824fc6c6c07d30c053cc2afe0bfe2c00",
@@ -2619,12 +2811,18 @@
           "PasswordEchoesIdentityNotification": "f46214c5171862631286276491c7e90ca5516d154ff859b2cec879f92423c666",
           "PasswordUnchangedNotification": "2ca819df9b2c221eb2b52b1716027ff5524c9ee61f9b44ed950a5b3b03cc24c2",
           "RoleNotAvailableInTenantNotification": "8310c646c18bd3744fa415b87ced63c54870656b6636e2c923a447dba50af665",
+          "TooManyClaimsForUserNotification": "8c11fc94df645065ffbf7bdb3b167c14a786d7f3271dd9cc2866460f8f75cf08",
           "TooManyGroupsForUserNotification": "453beab14d93b07ad236d64be67d83615537521526f1d3bea67c407c6efe094d",
           "TooManyRolesForUserNotification": "044b83a14603d2b95f3794c5a8182493082be3eb73b1e42536b8f088c17f365e",
           "UnknownUserStatusNotification": "602c6e2eb0d49c3589a424676ac93463c4523f290cc84f3c22e51efb18cad411",
           "User": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "UserAlreadyGrantsRoleNotification": "6ec4d47e5fdd6c7e4303d00c6c1439fcf967de8eaea90ab30571f7479bc6b87b",
+          "UserAlreadyHoldsClaimNotification": "bd38d9bb14f440549d53e067f71900dcaa4e7afdd5b57fa6724152cc4e528f90",
           "UserAlreadyInGroupNotification": "eff8abb233bc3eb405e537e06cb6b12d56d3b56ea454169176697b22904f8727",
+          "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
+          "UserClaimClaimNameField": "f8888bb1ce9c45b8755d9745d367bffc9c5c016ae87f3b479a1b00d5dbb8c49d",
+          "UserClaimClaimValueTypeField": "46a22018675ad53ed993a8132476e50540c1b8cde0466c215523472606dacb85",
+          "UserClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "070b4b3394f4075c1602d65a79baef777b52b1f9bd1db9b8e795271535ae0010",
           "UserEmailAlreadyExistsNotification": "0acee3000c1a49d028d0ddf849ba31e472be58d44ebede913817f71a97b007a7",
@@ -2663,15 +2861,20 @@
           "CannotGrantWildcardRoleNotification": "d355145da4cea2a0f64df3aa1134355d5e61b1015aefa678f3cd08564643a09d",
           "CannotJoinGroupWithUnheldPermissionsNotification": "e8b65afb780527d292822f83f72173d70dc469f0f9dbc8f364efd48a9a007ebd",
           "CannotJoinWildcardGroupNotification": "47f897c6584e876f1600e81d3c4e7196c708c4683c0837068bc3afb3f850a706",
+          "ClaimDoesNotApplyToUserNotification": "d57da892203c84760f28bfdf14a5f87b7436115237dd416df4021f0168bc5a73",
+          "ClaimNotAvailableInTenantNotification": "72edd320d5d8cb533751da7536651352ce90752b80f903b73b38620628a0cd09",
+          "ClaimValueDoesNotMatchValueTypeNotification": "e9fdd1ba7ac56c3dc7093ed7a52f585ffc9ea0e51df16a291262de60fd5cfaa4",
           "GroupNotAvailableInTenantNotification": "253f2f97ac59cb4041ebcdfd55829371a590a4d51d241d7888148ef0dbbb4945",
           "InvalidUserStatusTransitionNotification": "6f86f4ccc9461da7c1c1189c573116414cdd5009ac5a66bf2a188c600ee193f1",
           "PasswordConfirmationMismatchNotification": "2db50190347ac3d620ceb60200bf7f1a0f2cf9de34c1c8a1758590fcffd592a0",
           "PasswordEchoesIdentityNotification": "4243c6b070b97558ae32bad2b16bd01d77efa26edfb407db5cfe27431d178620",
           "PasswordUnchangedNotification": "f074f1cbc7e3c001a06a8197d6687e5fa2042e311bc3e7df176ff7dca12fe3ae",
           "RoleNotAvailableInTenantNotification": "0f9725cf7c7594fc8dbd17b4b4a693b2c5c9af46a098645377bc1183936b3ba2",
+          "TooManyClaimsForUserNotification": "4ff98d235935aa3465b5d12d35e4899c6fa52a5dbe09b7057589bdbcbeb1bcc0",
           "TooManyGroupsForUserNotification": "c3af6af4297cb8e2b3d5150d936a13e7b469ae09c404f8cfbe1eabd8994da72f",
           "TooManyRolesForUserNotification": "d55408f3972b7797d7c4377c06cb50622d9e8b69d066164daed6ea5c97467da8",
           "UserAlreadyGrantsRoleNotification": "c65026bb169504e9e69e4f4edbacaab10317139bce797ac0b0db2c9057909e7e",
+          "UserAlreadyHoldsClaimNotification": "6db8649fdf297601fcd3f6974f73911b6e6bbc2367f5dc1eef66006875ba26ed",
           "UserAlreadyInGroupNotification": "c6597275d515824635250b9efcc30474617db7945099afaaf74c9686f1625463",
           "UserEmailAlreadyExistsNotification": "28c2e3e6b239055bb832375f89c1630073b4e73fa6ccfbe9b3b88c06304a07ac",
           "UserEmailIsImmutableNotification": "b1fc86c8f1e048604074a85baad7c56276fd7c2d989afc7b9afca227118dbdfc",
@@ -2679,6 +2882,7 @@
           "UserTenantIsImmutableNotification": "8bcf420379444b7a659c66327d5fb6e0989353ccd403f2d5719a82f164d712d6"
         },
         "internal/domain/vos/notifications.go": {
+          "InvalidClaimValueNotification": "fd5b1a272fc8e39f282e8550bed301777af03f0f762858d1bd4bcf3163250d0b",
           "InvalidEmailNotification": "0a12c87889a0e4a7cb9c23711cbe1bd03e1d3bbedc0aded1a585514b8249bd24",
           "InvalidPersonNameNotification": "724c6f0c11934f354fe3320ad4276b95d01adb6380ceb367d79f49a0a76ddac0",
           "UnknownUserStatusNotification": "1dce2d6e9cbd6800ef05b165c3bd92fdbbd45ae27f869c8450e3fcc6cdb81b06",

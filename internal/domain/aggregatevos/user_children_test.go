@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:e43ccb1b2db1109c823a6345fbc02ce4306f021f2a82d82a6b0708ec455981a9
+// generated:  2026-08-28
+// checksum:   sha256:a80c3d28f315f4599d4c5407e4ed6d583404a95bda933cd79195d8902d7a9d38
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -19,6 +19,7 @@ package aggregatevos
 import (
 	"testing"
 
+	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -38,6 +39,7 @@ func (h *userRuleHost) AggregateChildren() []domain.AggregateValueObject {
 	return []domain.AggregateValueObject{
 		UserGroup{},
 		UserRole{},
+		UserClaim{},
 	}
 }
 
@@ -162,5 +164,68 @@ func TestUserUserRole_ValidPasses(t *testing.T) {
 	ctx := rulesForUserUserRole(validUserUserRole())
 	if msgs := ctx.Messages(); len(msgs) > 0 {
 		t.Errorf("a valid UserRole was refused: %v", msgs)
+	}
+}
+
+// rulesForUserClaim runs one entry through the framework's own seat.
+//
+// Not %s.BuildRules directly. A rule may end the validation pass — the
+// `guard: true` barrier — and the framework unwinds that from inside the
+// seat that invoked the rules; a body called by hand would let the unwind
+// escape as a panic, and every test below would fail on a rule doing exactly
+// what it was declared to do.
+//
+// The seat also validates the entry's value objects, which is what a write
+// does, so what these tests see is what the service sees.
+func rulesForUserUserClaim(v UserClaim) *domain.NotificationContext {
+	host := &userRuleHost{}
+	domain.ValidateAggregateChild(host, v, domain.ModeInsert, "insert", nil)
+	return host.GetAggregateRoot().NotificationContext()
+}
+
+// validUserClaim is one entry every rule accepts.
+func validUserUserClaim() UserClaim {
+	return UserClaim{
+		ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+		Value:   vos.ClaimValue("1000"),
+	}
+}
+
+// UserClaim's collection name is a PERSISTED key, so it is pinned here.
+//
+// It is the segment the projection nests the collection under and the field a
+// read DTO carries. Changing it is a data migration wearing a rename's
+// clothes: the old documents keep the old key and nothing reads them back.
+func TestUserUserClaim_CollectionNameIsTheDocumentKey(t *testing.T) {
+	if got := (UserClaim{}).CollectionName(); got != "Claims" {
+		t.Errorf("the collection is written under %q, and the documents already say %q", got, "Claims")
+	}
+}
+
+// Two UserClaim entries are the same one when their business identity matches.
+//
+// Sameness is the business identity, never the id: the same entry typed twice
+// in one request carries two ids and is still one entry, and the aggregate
+// refuses the duplicate on exactly this answer.
+func TestUserUserClaim_SamenessIsTheBusinessIdentity(t *testing.T) {
+	a := validUserUserClaim()
+	b := validUserUserClaim()
+	if !a.IsSameBusinessIdentity(b) {
+		t.Error("two entries with the same business identity were seen as different")
+	}
+	b.ClaimID = domain.NewID("00000000-0000-0000-0000-000000000002")
+	if a.IsSameBusinessIdentity(b) {
+		t.Errorf("changing ClaimID did not change the identity")
+	}
+}
+
+// A well-formed UserClaim passes its own rules.
+//
+// The negative cases below are only meaningful if the positive one holds: a
+// builder that never validates would make every rejection vacuous.
+func TestUserUserClaim_ValidPasses(t *testing.T) {
+	ctx := rulesForUserUserClaim(validUserUserClaim())
+	if msgs := ctx.Messages(); len(msgs) > 0 {
+		t.Errorf("a valid UserClaim was refused: %v", msgs)
 	}
 }

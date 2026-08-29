@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:09e67abe36640f69b04a51d5239c320ca8b356c1abe03570be309e230d8bd420
+// checksum:   sha256:83fcc8effbae22334edc9f4d9c13482316c62a26436651c5d4cf59dc1ca1f032
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -41,6 +41,7 @@ type InsertClientRequest struct {
 	TenantID     *domain.ID                 `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
 	Roles        []ClientRoleRequest        `json:"roles"`
 	AllowedCIDRs []ClientAllowedCIDRRequest `json:"allowedCIDRs"`
+	Claims       []ClientClaimRequest       `json:"claims"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No
@@ -68,6 +69,7 @@ type InsertClientResponse struct {
 	Secret                  string                      `json:"secret" example:"acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM"`
 	Roles                   []ClientRoleResponse        `json:"roles"`
 	AllowedCIDRs            []ClientAllowedCIDRResponse `json:"allowedCIDRs"`
+	Claims                  []ClientClaimResponse       `json:"claims"`
 }
 
 // FromResult projects the application Result onto InsertClientResponse.

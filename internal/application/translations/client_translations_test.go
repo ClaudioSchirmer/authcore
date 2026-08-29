@@ -7,7 +7,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:8883a21e972691160489ba4f3cecba203f90bac2ce8e93f3fc41c985fb78b706
+// checksum:   sha256:4cb64a51ebcf185300dad3c3fdf9954f415ff6a1e87b45abccf5ce13d8d5f878
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -49,6 +49,12 @@ func TestClientNotificationsAreTranslated(t *testing.T) {
 		"RoleNotAvailableInTenantNotification",
 		"CannotGrantRoleWithUnheldPermissionsNotification",
 		"CannotGrantWildcardRoleNotification",
+		"InvalidClaimValueNotification",
+		"ClientAlreadyHoldsClaimNotification",
+		"TooManyClaimsForClientNotification",
+		"ClaimNotAvailableInTenantNotification",
+		"ClaimDoesNotApplyToClientNotification",
+		"ClaimValueDoesNotMatchValueTypeNotification",
 	}
 	catalogs := map[string]map[string]string{
 		"ptbr": ptbr{}.Translations(),

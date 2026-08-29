@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:23ac0f818bdf5533e56760e599902a1161a45fc5753c0b96c51b4a1bf127aff5
+// checksum:   sha256:d723894d87b4095038eb790c6c0cb9e2f96c1fafe05e7aa598bf2af63a6890c5
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -72,12 +72,15 @@ type stubClientService struct {
 	domain.ServiceBase
 }
 
-func (stubClientService) NameTaken(_ domain.ID, _ string, _ domain.ID) bool       { return false }
-func (stubClientService) HashSecret(_ string) string                              { return "" }
-func (stubClientService) TenantIsUnavailable(_ domain.ID) bool                    { return false }
-func (stubClientService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool { return false }
-func (stubClientService) RoleGrantsWildcard(_ domain.ID) bool                     { return false }
-func (stubClientService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool         { return false }
+func (stubClientService) NameTaken(_ domain.ID, _ string, _ domain.ID) bool          { return false }
+func (stubClientService) HashSecret(_ string) string                                 { return "" }
+func (stubClientService) TenantIsUnavailable(_ domain.ID) bool                       { return false }
+func (stubClientService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool    { return false }
+func (stubClientService) RoleGrantsWildcard(_ domain.ID) bool                        { return false }
+func (stubClientService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool            { return false }
+func (stubClientService) ClaimIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
+func (stubClientService) ClaimDoesNotApplyToClient(_ domain.ID) bool                 { return false }
+func (stubClientService) ClaimValueDoesNotMatchValueType(_ domain.ID, _ string) bool { return false }
 
 // validClient returns an aggregate that satisfies every declared rule.
 //
@@ -121,7 +124,7 @@ func TestValidClientIsAccepted(t *testing.T) {
 // that quietly saves nothing.
 func TestClientDeclaresItsAggregateContract(t *testing.T) {
 	e := validClient()
-	if got, want := len(e.AggregateChildren()), 2; got != want {
+	if got, want := len(e.AggregateChildren()), 3; got != want {
 		t.Errorf("the aggregate declares %d child collection(s), want %d — the schema binding compares this set", got, want)
 	}
 	e.AddClientRole(aggregatevos.ClientRole{})
@@ -131,6 +134,10 @@ func TestClientDeclaresItsAggregateContract(t *testing.T) {
 	e.AddClientAllowedCIDR(aggregatevos.ClientAllowedCIDR{})
 	if got := len(domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](&e.AggregateRoot)); got != 1 {
 		t.Errorf("AddClientAllowedCIDR left the collection at %d entries — the write would save a root with no children", got)
+	}
+	e.AddClientClaim(aggregatevos.ClientClaim{})
+	if got := len(domain.GetCurrentItemsOf[aggregatevos.ClientClaim](&e.AggregateRoot)); got != 1 {
+		t.Errorf("AddClientClaim left the collection at %d entries — the write would save a root with no children", got)
 	}
 	if !e.RequiresService() {
 		t.Error("the entity stopped requiring the domain service, and the rules that ask it would be handed a nil")
@@ -266,6 +273,12 @@ func TestClientNotificationSemantics(t *testing.T) {
 		{"RoleNotAvailableInTenantNotification", RoleNotAvailableInTenantNotification{}.Semantic(), domain.SemanticValidation},
 		{"CannotGrantRoleWithUnheldPermissionsNotification", CannotGrantRoleWithUnheldPermissionsNotification{}.Semantic(), domain.SemanticForbidden},
 		{"CannotGrantWildcardRoleNotification", CannotGrantWildcardRoleNotification{}.Semantic(), domain.SemanticForbidden},
+		{"InvalidClaimValueNotification", vos.InvalidClaimValueNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClientAlreadyHoldsClaimNotification", ClientAlreadyHoldsClaimNotification{}.Semantic(), domain.SemanticConflict},
+		{"TooManyClaimsForClientNotification", TooManyClaimsForClientNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimNotAvailableInTenantNotification", ClaimNotAvailableInTenantNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimDoesNotApplyToClientNotification", ClaimDoesNotApplyToClientNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimValueDoesNotMatchValueTypeNotification", ClaimValueDoesNotMatchValueTypeNotification{}.Semantic(), domain.SemanticValidation},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s answers %v, the spec says %v", tc.name, tc.got, tc.want)

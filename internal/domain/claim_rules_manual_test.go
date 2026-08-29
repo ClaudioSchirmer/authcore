@@ -29,9 +29,18 @@ type probingClaimService struct {
 
 	nameTaken         bool
 	tenantUnavailable bool
+	heldByAUser       bool
+	heldByAClient     bool
 
 	askedTenant     int
 	askedTenantWith []domain.ID
+
+	// The narrowing guard must ask about the kinds a change DROPS and about
+	// nothing else, so these counters are the assertion for the widening cases:
+	// a widening that queries two tables is a correctness bug no assertion on
+	// the ANSWER would catch, because both answers would be "nobody holds it".
+	askedHeldByAUser   int
+	askedHeldByAClient int
 }
 
 func (s *probingClaimService) ClaimNameTaken(_ domain.ID, _ string, _ domain.ID) bool {
@@ -42,6 +51,16 @@ func (s *probingClaimService) TenantIsUnavailable(tenantID domain.ID) bool {
 	s.askedTenant++
 	s.askedTenantWith = append(s.askedTenantWith, tenantID)
 	return s.tenantUnavailable
+}
+
+func (s *probingClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool {
+	s.askedHeldByAUser++
+	return s.heldByAUser
+}
+
+func (s *probingClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool {
+	s.askedHeldByAClient++
+	return s.heldByAClient
 }
 
 // claimWithDefault returns a valid claim whose declared type and default are
@@ -297,5 +316,154 @@ func TestClaimTenantIsImmutableEvenForACallerWhoCrossesTheScope(t *testing.T) {
 	}
 	if !claimBlames(err, "TenantID") {
 		t.Errorf("the refusal blamed %v, want TenantID", claimRejectedFields(err))
+	}
+}
+
+// ── applies-to-narrowing-refused ────────────────────────────────────────────
+//
+// AppliesTo is mutable in BOTH directions, and only one of them is safe.
+// Widening is the ordinary operational move — a definition that started `user`
+// becoming `both` the day the machine side of an integration arrives. Narrowing
+// against values that are already held STRANDS those rows: they stay in the
+// table, they stay readable, and they would be refused if anybody tried to
+// write them, with nothing anywhere complaining.
+//
+// Six transitions are possible and four of them narrow. Every one of the six
+// has a case below, because a rule written as "did it stop being Both?" passes
+// the obvious pair and misses the cross pair entirely.
+
+// narrowTo runs an update that moves AppliesTo from `from` to `to` and returns
+// the service, so a case can assert BOTH the outcome and what was asked.
+func narrowTo(from, to vos.ClaimAppliesTo, svc *probingClaimService) (*probingClaimService, error) {
+	e := storedClaim()
+	e.AppliesTo = from
+
+	_, err := domain.GetUpdatable(e, func(x *Claim) error {
+		x.AppliesTo = to
+		return nil
+	}, svc, "GetUpdatable")
+	return svc, err
+}
+
+func TestNarrowingBothToUserIsRefusedWhenAClientHoldsAValue(t *testing.T) {
+	_, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToUser,
+		&probingClaimService{heldByAClient: true})
+
+	if err == nil {
+		t.Fatal("a definition was narrowed away from clients that still hold values for it")
+	}
+	if !claimBlames(err, "AppliesTo") {
+		t.Errorf("the refusal blamed %v, want AppliesTo", claimRejectedFields(err))
+	}
+}
+
+func TestNarrowingBothToClientIsRefusedWhenAUserHoldsAValue(t *testing.T) {
+	_, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToClient,
+		&probingClaimService{heldByAUser: true})
+
+	if err == nil {
+		t.Fatal("a definition was narrowed away from users that still hold values for it")
+	}
+}
+
+// THE CROSS PAIR. user -> client keeps neither side of `both`, so it drops
+// users — a rule that only watched for the loss of `both` would wave it
+// through, and this is the case that catches that mistake.
+func TestNarrowingUserToClientIsRefusedWhenAUserHoldsAValue(t *testing.T) {
+	_, err := narrowTo(vos.ClaimAppliesToUser, vos.ClaimAppliesToClient,
+		&probingClaimService{heldByAUser: true})
+
+	if err == nil {
+		t.Fatal("a definition moved from users to clients while users still hold values for it")
+	}
+}
+
+func TestNarrowingClientToUserIsRefusedWhenAClientHoldsAValue(t *testing.T) {
+	_, err := narrowTo(vos.ClaimAppliesToClient, vos.ClaimAppliesToUser,
+		&probingClaimService{heldByAClient: true})
+
+	if err == nil {
+		t.Fatal("a definition moved from clients to users while clients still hold values for it")
+	}
+}
+
+// A definition NOBODY holds a value for narrows freely, and that has to keep
+// working. Refusing every narrowing would make the field effectively immutable,
+// which the model gate decided the other way — so this case is as load-bearing
+// as the four refusals above.
+func TestNarrowingIsAllowedWhenNobodyHoldsAValue(t *testing.T) {
+	svc, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToUser, &probingClaimService{})
+
+	if err != nil {
+		t.Fatalf("a definition nobody holds a value for could not be narrowed: %v", err)
+	}
+	if svc.askedHeldByAClient != 1 {
+		t.Errorf("the client side was asked %d times, want once — that is the kind being dropped",
+			svc.askedHeldByAClient)
+	}
+	// The USER side is not being dropped, so it must not be asked at all.
+	if svc.askedHeldByAUser != 0 {
+		t.Errorf("the user side was asked %d times for a narrowing that keeps users", svc.askedHeldByAUser)
+	}
+}
+
+// A WIDENING ASKS NOTHING, and the assertion is on the CALL COUNT rather than
+// on the outcome. Both probes would answer "nobody holds it" under this stub,
+// so an implementation that queried two tables on every widening would pass an
+// outcome assertion while doing two pointless reads per write, forever.
+func TestWideningAsksNothingAtAll(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		from, to vos.ClaimAppliesTo
+	}{
+		{"user to both", vos.ClaimAppliesToUser, vos.ClaimAppliesToBoth},
+		{"client to both", vos.ClaimAppliesToClient, vos.ClaimAppliesToBoth},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, err := narrowTo(tc.from, tc.to, &probingClaimService{heldByAUser: true, heldByAClient: true})
+
+			if err != nil {
+				t.Fatalf("a widening was refused: %v", err)
+			}
+			if svc.askedHeldByAUser != 0 || svc.askedHeldByAClient != 0 {
+				t.Fatalf("a widening queried the edge tables: user=%d client=%d",
+					svc.askedHeldByAUser, svc.askedHeldByAClient)
+			}
+		})
+	}
+}
+
+// AppliesTo unchanged is not a narrowing, whatever else the update touches.
+func TestAnUpdateThatLeavesAppliesToAloneAsksNothing(t *testing.T) {
+	e := storedClaim()
+	svc := &probingClaimService{heldByAUser: true, heldByAClient: true}
+
+	_, err := domain.GetUpdatable(e, func(x *Claim) error {
+		x.Description = vos.Description("A reworded explanation of the same thing.")
+		return nil
+	}, svc, "GetUpdatable")
+
+	if err != nil {
+		t.Fatalf("an ordinary edit was refused: %v", err)
+	}
+	if svc.askedHeldByAUser != 0 || svc.askedHeldByAClient != 0 {
+		t.Fatalf("an edit that left AppliesTo alone queried the edge tables: user=%d client=%d",
+			svc.askedHeldByAUser, svc.askedHeldByAClient)
+	}
+}
+
+// The rule is scoped to UPDATE. An insert has no old state to narrow from, and
+// a definition being created is held by nobody.
+func TestTheNarrowingGuardNeverFiresOnAnInsert(t *testing.T) {
+	e := validClaim()
+	e.AppliesTo = vos.ClaimAppliesToUser
+	svc := &probingClaimService{heldByAUser: true, heldByAClient: true}
+
+	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err != nil {
+		t.Fatalf("an insert was refused by the narrowing guard: %v", err)
+	}
+	if svc.askedHeldByAUser != 0 || svc.askedHeldByAClient != 0 {
+		t.Fatalf("an insert queried the edge tables: user=%d client=%d",
+			svc.askedHeldByAUser, svc.askedHeldByAClient)
 	}
 }
