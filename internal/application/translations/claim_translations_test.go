@@ -7,7 +7,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:27418d0de6f50ab358bc7c0e811d96402d06cdf3c867d7b8f4811638eb6252a9
+// checksum:   sha256:080394c356e68d8751158d18e96be56e063cda9eb876746b887946330e3d9ace
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -42,6 +42,8 @@ func TestClaimNotificationsAreTranslated(t *testing.T) {
 		"DefaultValueDoesNotMatchValueTypeNotification",
 		"DefaultValueTooLongNotification",
 		"ClaimAppliesToCannotExcludeHeldValuesNotification",
+		"TooManyUserClaimsInTenantNotification",
+		"TooManyClientClaimsInTenantNotification",
 	}
 	catalogs := map[string]map[string]string{
 		"ptbr": ptbr{}.Translations(),

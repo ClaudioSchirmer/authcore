@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:00ba4a98f878863b3e753ca5212664fa6a1559d8aee61f3a5102e9d8dd296bde
+// checksum:   sha256:48f45765b001a0239ee3f6dc9ce4d2646403edda73335fbfe4203b551dd9d965
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -75,6 +75,7 @@ func (stubClaimService) ClaimNameTaken(_ domain.ID, _ string, _ domain.ID) bool 
 func (stubClaimService) TenantIsUnavailable(_ domain.ID) bool                   { return false }
 func (stubClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool          { return false }
 func (stubClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool        { return false }
+func (stubClaimService) ActiveClaimsWithAppliesTo(_ domain.ID, _ string) int64  { return 0 }
 
 // validClaim returns an aggregate that satisfies every declared rule.
 //
@@ -240,6 +241,8 @@ func TestClaimNotificationSemantics(t *testing.T) {
 		{"DefaultValueDoesNotMatchValueTypeNotification", DefaultValueDoesNotMatchValueTypeNotification{}.Semantic(), domain.SemanticValidation},
 		{"DefaultValueTooLongNotification", DefaultValueTooLongNotification{}.Semantic(), domain.SemanticValidation},
 		{"ClaimAppliesToCannotExcludeHeldValuesNotification", ClaimAppliesToCannotExcludeHeldValuesNotification{}.Semantic(), domain.SemanticValidation},
+		{"TooManyUserClaimsInTenantNotification", TooManyUserClaimsInTenantNotification{}.Semantic(), domain.SemanticValidation},
+		{"TooManyClientClaimsInTenantNotification", TooManyClientClaimsInTenantNotification{}.Semantic(), domain.SemanticValidation},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s answers %v, the spec says %v", tc.name, tc.got, tc.want)

@@ -13,6 +13,8 @@
 package domain
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -41,6 +43,13 @@ type probingClaimService struct {
 	// the ANSWER would catch, because both answers would be "nobody holds it".
 	askedHeldByAUser   int
 	askedHeldByAClient int
+
+	// The catalog cap counts ONE enum member per call and adds two answers to
+	// get a bucket. A member absent from the map answers 0 — the same empty
+	// catalog the generated stub reports — so every case written before this
+	// rule existed still passes the cap untouched.
+	activeByAppliesTo map[string]int64
+	askedActiveWith   []string
 }
 
 func (s *probingClaimService) ClaimNameTaken(_ domain.ID, _ string, _ domain.ID) bool {
@@ -61,6 +70,11 @@ func (s *probingClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool {
 func (s *probingClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool {
 	s.askedHeldByAClient++
 	return s.heldByAClient
+}
+
+func (s *probingClaimService) ActiveClaimsWithAppliesTo(_ domain.ID, appliesTo string) int64 {
+	s.askedActiveWith = append(s.askedActiveWith, appliesTo)
+	return s.activeByAppliesTo[appliesTo]
 }
 
 // claimWithDefault returns a valid claim whose declared type and default are
@@ -465,5 +479,222 @@ func TestTheNarrowingGuardNeverFiresOnAnInsert(t *testing.T) {
 	if svc.askedHeldByAUser != 0 || svc.askedHeldByAClient != 0 {
 		t.Fatalf("an insert queried the edge tables: user=%d client=%d",
 			svc.askedHeldByAUser, svc.askedHeldByAClient)
+	}
+}
+
+// ── claims-per-tenant-cap-users / claims-per-tenant-cap-clients ─────────────
+//
+// The catalog budget: at most 20 ACTIVE definitions per tenant may admit a
+// given identity kind. The two buckets OVERLAP — a `both` definition spends a
+// slot on each side — so the cases below are written against the arithmetic
+// (`user` + `both`, `client` + `both`) and not against the enum's members.
+//
+// Which side refused matters as much as whether it refused, so these cases
+// assert the NOTIFICATION TYPE and not only the blamed field: both rules attach
+// to AppliesTo, and a body that always raised the user half would satisfy every
+// field assertion while telling an operator to look at the wrong bucket.
+
+// catalogOf builds a stub whose tenant already holds this many ACTIVE
+// definitions of each enum member.
+func catalogOf(user, client, both int64) *probingClaimService {
+	return &probingClaimService{activeByAppliesTo: map[string]int64{
+		vos.ClaimAppliesToUser.Value():   user,
+		vos.ClaimAppliesToClient.Value(): client,
+		vos.ClaimAppliesToBoth.Value():   both,
+	}}
+}
+
+// claimRaised reports whether the refusal carries a notification of this type.
+// The name is matched on the suffix so the package qualifier %T prints does not
+// have to be spelled at every call site.
+func claimRaised(err error, notification string) bool {
+	var carrier domain.NotificationCarrier
+	if !errors.As(err, &carrier) {
+		return false
+	}
+	for _, ctx := range carrier.NotificationContexts() {
+		for _, msg := range ctx.Messages() {
+			if name := fmt.Sprintf("%T", msg.Notification); name == notification ||
+				strings.HasSuffix(name, "."+notification) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// insertWithAppliesTo creates a definition of one kind into the given catalog.
+func insertWithAppliesTo(to vos.ClaimAppliesTo, svc *probingClaimService) (*probingClaimService, error) {
+	e := validClaim()
+	e.AppliesTo = to
+	_, err := domain.GetInsertable(e, svc, "GetInsertable")
+	return svc, err
+}
+
+// THE BOUNDARY FROM BELOW. Nineteen held plus the row being written is exactly
+// twenty, which is allowed — an off-by-one here would cost every tenant a slot
+// silently, and no other case in this file would notice.
+func TestTheTwentiethUserClaimIsStillAccepted(t *testing.T) {
+	_, err := insertWithAppliesTo(vos.ClaimAppliesToUser, catalogOf(19, 0, 0))
+	if err != nil {
+		t.Fatalf("the 20th user-admitting definition was refused: %v", err)
+	}
+}
+
+func TestTheTwentyFirstUserClaimIsRefused(t *testing.T) {
+	_, err := insertWithAppliesTo(vos.ClaimAppliesToUser, catalogOf(20, 0, 0))
+	if err == nil {
+		t.Fatal("a tenant created a 21st user-admitting claim definition")
+	}
+	if !claimBlames(err, "AppliesTo") {
+		t.Errorf("the refusal blamed %v, want AppliesTo", claimRejectedFields(err))
+	}
+	if !claimRaised(err, "TooManyUserClaimsInTenantNotification") {
+		t.Error("the refusal did not name the USER bucket as the full one")
+	}
+}
+
+// THE BUCKETS ARE INDEPENDENT. A full user side must never block a definition
+// that admits only clients — the two sides ride different tokens.
+func TestAFullUserBucketDoesNotBlockAClientOnlyClaim(t *testing.T) {
+	svc, err := insertWithAppliesTo(vos.ClaimAppliesToClient, catalogOf(20, 0, 0))
+	if err != nil {
+		t.Fatalf("a client-only definition was refused because the USER bucket is full: %v", err)
+	}
+	// The user member is never counted for a write that admits no user.
+	for _, asked := range svc.askedActiveWith {
+		if asked == vos.ClaimAppliesToUser.Value() {
+			t.Errorf("the user member was counted for a client-only insert: %v", svc.askedActiveWith)
+		}
+	}
+}
+
+// `both` SPENDS A SLOT ON BOTH SIDES, which is the arithmetic the whole rule
+// rests on: ten `user` rows plus ten `both` rows is a FULL user bucket, even
+// though no member alone reaches twenty.
+func TestBothCountsTowardsEachBucket(t *testing.T) {
+	_, err := insertWithAppliesTo(vos.ClaimAppliesToUser, catalogOf(10, 5, 10))
+	if err == nil {
+		t.Fatal("the `both` definitions were not counted towards the user bucket")
+	}
+	if !claimRaised(err, "TooManyUserClaimsInTenantNotification") {
+		t.Error("the refusal did not name the USER bucket as the full one")
+	}
+}
+
+// An insert of `both` into a tenant whose two buckets are full is TWO problems,
+// and the caller reads both in one response. A body that returned after the
+// first refusal would leave an operator fixing one bucket only to be refused
+// again by the other.
+func TestInsertingBothIntoTwoFullBucketsReportsBothSides(t *testing.T) {
+	_, err := insertWithAppliesTo(vos.ClaimAppliesToBoth, catalogOf(20, 20, 0))
+	if err == nil {
+		t.Fatal("a `both` definition was created into two full buckets")
+	}
+	if !claimRaised(err, "TooManyUserClaimsInTenantNotification") {
+		t.Error("the user half of the budget did not report")
+	}
+	if !claimRaised(err, "TooManyClientClaimsInTenantNotification") {
+		t.Error("the client half of the budget did not report")
+	}
+}
+
+// A `both` insert asks each member exactly ONCE. The `both` count belongs to
+// both buckets, so a body that read it per side would pay for four queries
+// where three do — invisible to every assertion about the outcome.
+func TestInsertingBothAsksEachMemberOnce(t *testing.T) {
+	svc, err := insertWithAppliesTo(vos.ClaimAppliesToBoth, catalogOf(0, 0, 0))
+	if err != nil {
+		t.Fatalf("a valid `both` definition was refused: %v", err)
+	}
+	seen := map[string]int{}
+	for _, asked := range svc.askedActiveWith {
+		seen[asked]++
+	}
+	for member, count := range seen {
+		if count != 1 {
+			t.Errorf("the %q member was counted %d times, want once: %v", member, count, svc.askedActiveWith)
+		}
+	}
+	if len(svc.askedActiveWith) != 3 {
+		t.Errorf("a `both` insert asked %d counts, want 3: %v", len(svc.askedActiveWith), svc.askedActiveWith)
+	}
+}
+
+// THE WIDENING HOLE. Without this the cap is bypassed in two writes: create a
+// `user` definition while the user bucket has room, then widen it to `both`
+// into a client bucket that is already full.
+func TestWideningIntoAFullBucketIsRefused(t *testing.T) {
+	svc := catalogOf(0, 20, 0)
+	_, err := narrowTo(vos.ClaimAppliesToUser, vos.ClaimAppliesToBoth, svc)
+
+	if err == nil {
+		t.Fatal("a definition was widened into a client bucket that is already full")
+	}
+	if !claimRaised(err, "TooManyClientClaimsInTenantNotification") {
+		t.Error("the refusal did not name the CLIENT bucket as the full one")
+	}
+}
+
+// The mirror: widening into a bucket with room is the ordinary operational
+// move and must keep working.
+func TestWideningIntoABucketWithRoomIsAccepted(t *testing.T) {
+	_, err := narrowTo(vos.ClaimAppliesToUser, vos.ClaimAppliesToBoth, catalogOf(0, 19, 0))
+	if err != nil {
+		t.Fatalf("a widening into a bucket with room was refused: %v", err)
+	}
+}
+
+// A NARROWING ASKS NOTHING. It frees a slot, so a cap that fired on the way
+// down would be a bug — and the assertion is on the CALL COUNT, because a
+// narrowing that queried would pass every outcome assertion while paying for
+// reads that can only ever say "there is room".
+func TestNarrowingAsksTheCatalogNothing(t *testing.T) {
+	svc, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToUser, catalogOf(20, 20, 20))
+	if err != nil {
+		t.Fatalf("a narrowing was refused by the catalog cap: %v", err)
+	}
+	if len(svc.askedActiveWith) != 0 {
+		t.Fatalf("a narrowing counted the catalog: %v", svc.askedActiveWith)
+	}
+}
+
+// THE CASE THE "ONLY WHAT THE WRITE ADDS" READING EXISTS FOR. A tenant already
+// over the line — rows seeded by migration, or written before this rule did —
+// must stay repairable: an edit that leaves AppliesTo alone is not consuming a
+// slot and must neither be refused nor cost a round trip.
+func TestAnEditThatConsumesNoSlotIsAcceptedInAnOverBudgetTenant(t *testing.T) {
+	e := storedClaim()
+	svc := catalogOf(25, 25, 25)
+
+	_, err := domain.GetUpdatable(e, func(x *Claim) error {
+		x.Description = vos.Description("A reworded explanation of the same thing.")
+		return nil
+	}, svc, "GetUpdatable")
+
+	if err != nil {
+		t.Fatalf("an ordinary edit was refused in a tenant that is over the cap: %v", err)
+	}
+	if len(svc.askedActiveWith) != 0 {
+		t.Fatalf("an edit that left AppliesTo alone counted the catalog: %v", svc.askedActiveWith)
+	}
+}
+
+// THE BARRIER, pinned. The counts bind TenantID into a comparison against a
+// UUID column, so an unparseable owner reaching them would be a driver error
+// and a 500 rather than the 422 it deserves. It cannot: the generated
+// `tenant-is-a-usable-id` guard sits in the IfInsertOrUpdate gate ABOVE this
+// rule and ends the pass. That is a property of the ORDER two gates are
+// declared in, invisible in the rule itself, which is why it is asserted here.
+func TestTheCatalogCapIsNeverAskedWithAnUnusableTenant(t *testing.T) {
+	e := validClaim()
+	e.TenantID = domain.NewID("not-a-uuid")
+	svc := catalogOf(20, 20, 20)
+
+	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
+		t.Fatal("a claim was created under an unparseable tenant id")
+	}
+	if len(svc.askedActiveWith) != 0 {
+		t.Fatalf("the catalog was counted under an unparseable tenant id: %v", svc.askedActiveWith)
 	}
 }

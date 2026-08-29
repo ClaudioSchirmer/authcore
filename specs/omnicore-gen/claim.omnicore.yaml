@@ -487,6 +487,50 @@ notifications:
       ita: Il claim ha ancora valori impostati su account del tipo che verrebbe escluso.
       nld: De claim heeft nog waarden op accounts van het type dat zou worden uitgesloten.
 
+  # THE CATALOG BUDGET, and the pair is deliberate rather than one message with a {kind}
+  # placeholder. The write that most needs a clear answer is the one a single sentence
+  # cannot serve: an insert of `both` into a tenant with 20 user-admitting rows and 3
+  # client-admitting ones is refused, and "which side is full?" is the operator's next
+  # question. attachTo is AppliesTo on both, so a generic text would echo `both` back and
+  # leave that unanswered — and a {kind} tvar would ride a raw enum word, untranslated,
+  # inside seven translated sentences.
+  #
+  # The number reaches the texts through tvars, the way DefaultValueTooLongNotification
+  # already does on this entity: 20 is written in the rule and nowhere else.
+  - name: TooManyUserClaimsInTenantNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      The tenant already holds the maximum number of ACTIVE claim definitions that admit a
+      USER. The cap is the token's header budget seen from the catalog: the emission walks
+      exactly this set, so bounding it here is what makes the 20-per-token truncation
+      unreachable through the API.
+    text:
+      eng: This tenant already has the maximum of {max} claims applicable to users.
+      ptbr: Este inquilino já possui o máximo de {max} claims aplicáveis a usuários.
+      esp: Este inquilino ya tiene el máximo de {max} claims aplicables a usuarios.
+      fra: Ce locataire a déjà le maximum de {max} claims applicables aux utilisateurs.
+      deu: Dieser Mandant hat bereits die maximale Anzahl von {max} auf Benutzer anwendbaren Claims.
+      ita: Questo tenant ha già il massimo di {max} claim applicabili agli utenti.
+      nld: Deze tenant heeft al het maximum van {max} claims die op gebruikers van toepassing zijn.
+
+  - name: TooManyClientClaimsInTenantNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      The tenant already holds the maximum number of ACTIVE claim definitions that admit a
+      machine CLIENT. The same budget as its user twin, on the half no token reads yet —
+      POST /auth/client/token does not exist, so capping it now is what makes that route
+      arrive already bounded.
+    text:
+      eng: This tenant already has the maximum of {max} claims applicable to clients.
+      ptbr: Este inquilino já possui o máximo de {max} claims aplicáveis a clientes.
+      esp: Este inquilino ya tiene el máximo de {max} claims aplicables a clientes.
+      fra: Ce locataire a déjà le maximum de {max} claims applicables aux clients.
+      deu: Dieser Mandant hat bereits die maximale Anzahl von {max} auf Clients anwendbaren Claims.
+      ita: Questo tenant ha già il massimo di {max} claim applicabili ai client.
+      nld: Deze tenant heeft al het maximum van {max} claims die op clients van toepassing zijn.
+
 # The traversal into the OWNER, the same one Role declares. inner is correct because
 # tenant_id is NOT NULL and FK-backed. A ROOT join's fields ARE addressable in a criteria,
 # so these two are filterable and sortable like any column of this table — which is what
@@ -666,6 +710,74 @@ rules:
       notification: DefaultValueDoesNotMatchValueTypeNotification
       attachTo: DefaultValue
 
+    # ── THE CATALOG CAP: 20 ACTIVE definitions per tenant, per identity kind ──
+    #
+    # The hole backlog.md recorded as open: nothing bounded how many definitions a tenant
+    # could create, so a tenant could carry more claims than a token can hold and the
+    # overflow was dropped at sign-in under a Warn nobody reads. This refuses the 21st at
+    # the moment an operator creates it.
+    #
+    # IT CLOSES THE HOLE EXACTLY, and that is arithmetic rather than a hope. The emission's
+    # candidate set is ClaimDefinitionsOfTenant — Eq(TenantID) AND In(AppliesTo, user, both)
+    # under the ACTIVE scope — which is the SAME predicate the user-side bucket counts.
+    # Bound that set at 20 and resolveCustomClaims can never see a 21st candidate; the
+    # truncation stays as the seatbelt for rows written by migration or direct SQL, which is
+    # what it was always for.
+    #
+    # TWO BUCKETS THAT OVERLAP, not three disjoint counts of the enum's three members: a
+    # `both` definition spends a slot on BOTH sides, because either kind of principal may
+    # hold a value for it. Two full buckets are therefore between 20 and 40 rows, and that
+    # is correct — a `user`-only definition costs a client token nothing.
+    #
+    # NOT a factRange rule, though that is the reflex. factRange compares the database's
+    # answer against min/max directly, and the number that matters here is the answer PLUS
+    # the row being written — which is not in the table on an insert and carries its OLD
+    # AppliesTo on an update. Expressed as factRange the bound would have to be written as
+    # 19 to mean 20, and {max} would then tell the caller the wrong number.
+    #
+    # ASK ONLY ABOUT THE KINDS THIS WRITE ADDS — the exact mirror of
+    # applies-to-narrowing-refused, which asks only about the kinds a change DROPS. Three
+    # things fall out of it: a tenant already over the line (rows seeded by migration, or
+    # written before this rule existed) stays repairable rather than frozen out of every
+    # update; a description edit asks the database nothing; and self-exclusion never has to
+    # be spelled, because a kind the write ADDS is by construction a kind this row does not
+    # already occupy — on an insert there is no row, and on a widening the stored AppliesTo
+    # does not admit it.
+    #
+    # It counts DEFINITIONS, not definitions that would mint today. A row with a null
+    # default that nobody holds a value for still spends its slot: capping only the ones
+    # that mint would make the budget move under the operator's feet — a slot could vanish
+    # because somebody set a value on a user in another screen — and would make setting a
+    # defaultValue a second place the cap has to fire.
+    - id: claims-per-tenant-cap-users
+      description: >-
+        At most 20 ACTIVE claim definitions per tenant may admit a USER — that is, may carry
+        AppliesTo `user` or `both`. Ask ActiveClaimsWithAppliesTo twice and add the two
+        answers: the `user` member plus the `both` member. Fire ONLY when this write ADDS the
+        user kind — on an insert whose AppliesTo admits users, and on an update whose OLD
+        AppliesTo did not admit users while the new one does. A write that neither inserts
+        nor widens into `user` must ask NOTHING and always pass, including a narrowing and an
+        edit that leaves AppliesTo alone. Refuse when the bucket already holds 20 or more,
+        since the row being written would be the 21st. Read the enum member off AppliesTo
+        through ClaimAdmitsUsers rather than comparing raw strings, so an unknown member —
+        which the value object already refused — reaches no second answer here. The bound
+        reaches the message through the notification's {max} tvar.
+      scope: [insertOrUpdate]
+      notification: TooManyUserClaimsInTenantNotification
+      attachTo: AppliesTo
+
+    - id: claims-per-tenant-cap-clients
+      description: >-
+        The client half of the same budget, and the same contract in every respect: at most
+        20 ACTIVE claim definitions per tenant may admit a machine CLIENT — AppliesTo
+        `client` or `both`. Add the `client` member's count to the `both` member's, fire only
+        when this write ADDS the client kind, read the member through ClaimAdmitsClients, and
+        refuse at 20 or more. The two buckets are independent: a full user side must never
+        block a definition that admits only clients.
+      scope: [insertOrUpdate]
+      notification: TooManyClientClaimsInTenantNotification
+      attachTo: AppliesTo
+
 service:
   required: true
   facts:
@@ -736,6 +848,40 @@ service:
         Whether any ACTIVE client_claims row references the ACTIVE claim definition identified
         by this tenant and name. Same join and the same two archive predicates as its user
         twin.
+
+    # The counting half of the two catalog-cap rules above. ONE fact asked per enum member,
+    # not one per bucket, and that is the language rather than a preference: `filters`
+    # compiles to EQUALITY, so `applies_to IN ('user','both')` is not sayable here.
+    #
+    # That costs nothing worth having, because the bucket definition ALREADY lives in the
+    # domain — ClaimAdmitsUsers and ClaimAdmitsClients, exported beside the narrowing guard
+    # and read by five callers. Summing `user + both` there keeps ONE reading of what a
+    # `both` admits; a hand-written IN in internal/infra would be a second one, written in
+    # SQL, free to drift from the first.
+    #
+    # ACTIVE ONLY, and it is the whole point rather than an inherited default: an archived
+    # definition mints nothing (the emission walks the ACTIVE catalog), so it must not spend
+    # a slot either. Archiving a definition frees its slot, immediately and on both sides if
+    # it was `both`.
+    #
+    # NO excludeSelf, and its absence is deliberate: the rules ask only about the kinds a
+    # write ADDS, so the row being written is never already in the bucket being counted —
+    # on an insert there is no row, and on a widening the stored AppliesTo does not admit
+    # the kind. Excluding self would be a second spelling of a guarantee the rules already
+    # give, and two spellings can disagree.
+    #
+    # Cost: three counts on an insert of `both`, two on a widening, ZERO on an edit that
+    # leaves AppliesTo alone. Each is a COUNT(*) on the leading column of
+    # claims_tenant_id_name_key, on an operator path — the same argument the two held-value
+    # probes above already make for themselves.
+    - name: ActiveClaimsWithAppliesTo
+      kind: count
+      filters: [TenantID, AppliesTo]
+      activeOnly: true
+      description: >-
+        How many ACTIVE claim definitions of this tenant declare EXACTLY this AppliesTo
+        member. The two catalog-cap rules add two of these answers to get a bucket: the
+        user bucket is `user` + `both`, the client bucket is `client` + `both`.
 
 read:
   backing: relational

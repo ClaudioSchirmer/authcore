@@ -236,5 +236,7 @@ func (nld) Translations() map[string]string {
 		"ClientClaimValueField":                             "Waarde",
 		"ClientClaimClaimNameField":                         "Claimnaam",
 		"ClientClaimClaimValueTypeField":                    "Waardetype",
+		"TooManyUserClaimsInTenantNotification":             "Deze tenant heeft al het maximum van {max} claims die op gebruikers van toepassing zijn.",
+		"TooManyClientClaimsInTenantNotification":           "Deze tenant heeft al het maximum van {max} claims die op clients van toepassing zijn.",
 	}
 }

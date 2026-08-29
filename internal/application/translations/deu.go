@@ -236,5 +236,7 @@ func (deu) Translations() map[string]string {
 		"ClientClaimValueField":                             "Wert",
 		"ClientClaimClaimNameField":                         "Claim-Name",
 		"ClientClaimClaimValueTypeField":                    "Werttyp",
+		"TooManyUserClaimsInTenantNotification":             "Dieser Mandant hat bereits die maximale Anzahl von {max} auf Benutzer anwendbaren Claims.",
+		"TooManyClientClaimsInTenantNotification":           "Dieser Mandant hat bereits die maximale Anzahl von {max} auf Clients anwendbaren Claims.",
 	}
 }

@@ -36,6 +36,18 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfInsertOrUpdate` · raise `DefaultValueDoesNotMatchValueTypeNotification{}` · attach it to `DefaultValue`
 
+**`claims-per-tenant-cap-users`**
+
+> At most 20 ACTIVE claim definitions per tenant may admit a USER — that is, may carry AppliesTo `user` or `both`. Ask ActiveClaimsWithAppliesTo twice and add the two answers: the `user` member plus the `both` member. Fire ONLY when this write ADDS the user kind — on an insert whose AppliesTo admits users, and on an update whose OLD AppliesTo did not admit users while the new one does. A write that neither inserts nor widens into `user` must ask NOTHING and always pass, including a narrowing and an edit that leaves AppliesTo alone. Refuse when the bucket already holds 20 or more, since the row being written would be the 21st. Read the enum member off AppliesTo through ClaimAdmitsUsers rather than comparing raw strings, so an unknown member — which the value object already refused — reaches no second answer here. The bound reaches the message through the notification's {max} tvar.
+
+- fires under `IfInsertOrUpdate` · raise `TooManyUserClaimsInTenantNotification{}` · attach it to `AppliesTo`
+
+**`claims-per-tenant-cap-clients`**
+
+> The client half of the same budget, and the same contract in every respect: at most 20 ACTIVE claim definitions per tenant may admit a machine CLIENT — AppliesTo `client` or `both`. Add the `client` member's count to the `both` member's, fire only when this write ADDS the client kind, read the member through ClaimAdmitsClients, and refuse at 20 or more. The two buckets are independent: a full user side must never block a definition that admits only clients.
+
+- fires under `IfInsertOrUpdate` · raise `TooManyClientClaimsInTenantNotification{}` · attach it to `AppliesTo`
+
 The tests for them are yours too, and the same check applies.
 
 ### `internal/infra/claim_service_manual.go`
@@ -145,6 +157,21 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
+| What | File |
+|---|---|
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/claim_translations_test.go` |
+| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
+| tests for Claim's rules | `internal/domain/claim_test.go` |
+| 10 notification declaration(s) | `internal/domain/notifications.go` |
+| the Claim service implementation | `internal/infra/claim_service.go` |
+
 **Left untouched** (yours, by design):
 
 - `internal/domain/claim_rules_manual.go` — hand-written rules live here, by design
@@ -152,7 +179,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-28 file(s) were already up to date.
+24 file(s) were already up to date.
 
 ## What was NOT generated
 

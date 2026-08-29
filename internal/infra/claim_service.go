@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:b55f63c37e1f705e4baa415899cb9f4167541f5b12f248b677fe9a75a5809942
+// checksum:   sha256:df57f88a8622bdb09f862a10f80f17027b010b986a2814277dbef81e6de6724d
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -18,11 +18,11 @@ package infra
 
 import (
 	"context"
+	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/domain"
-
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/command/read"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/criteria"
 )
 
@@ -91,6 +91,35 @@ func (s *ClaimServiceImpl) ClaimNameTaken(tenantID domain.ID, name string, selfI
 		panic("Claim: ClaimNameTaken probe failed")
 	}
 	return found
+}
+
+// ActiveClaimsWithAppliesTo How many ACTIVE claim definitions of this tenant
+// declare EXACTLY this AppliesTo member. The two catalog-cap rules add two of
+// these answers to get a bucket: the user bucket is `user` + `both`, the
+// client bucket is `client` + `both`.
+//
+// It asks the database the question directly instead of loading aggregates and
+// counting them in Go — the probe exists precisely so a yes/no question does
+// not pay for full hydration.
+//
+// On a query failure it PANICS, and that is the intended behaviour: the
+// pipeline turns the panic into a 500 and the write never happens. Returning a
+// plausible answer instead would skip the very invariant this exists to
+// enforce.
+func (s *ClaimServiceImpl) ActiveClaimsWithAppliesTo(tenantID domain.ID, appliesTo string) int64 {
+	conds := []criteria.Expr{
+		criteria.Eq("TenantID", tenantID),
+		criteria.Eq("AppliesTo", appliesTo),
+	}
+	q := criteria.Where(criteria.And(conds...))
+	// Archived rows do not take part: a removed row must not block a new one.
+	// The active scope is the query default, so nothing is added here.
+
+	c := read.Count()
+	if err := s.repo.Loader.Aggregate(s.queryContext(), q, c); err != nil {
+		panic("Claim: ActiveClaimsWithAppliesTo probe failed")
+	}
+	return c.Value
 }
 
 var (

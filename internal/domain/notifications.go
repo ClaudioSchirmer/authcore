@@ -576,3 +576,21 @@ type TooManyClaimsForClientNotification struct {
 // NAME is the translation key, so renaming it here without renaming it in the
 // seven catalogs leaves the message untranslated.
 type ClaimDoesNotApplyToClientNotification struct{ domain.DomainNotificationBase }
+
+// TooManyUserClaimsInTenantNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type TooManyUserClaimsInTenantNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// TooManyClientClaimsInTenantNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated. It interpolates max
+// into the message.
+type TooManyClientClaimsInTenantNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
