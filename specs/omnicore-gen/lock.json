@@ -3,7 +3,7 @@
   "entities": {
     "Claim": {
       "spec": "specs/omnicore-gen/claim.omnicore.yaml",
-      "specHash": "4cef4bf6bdfddaa8d1b129bb335c6fc3da3ef33b170076135bb9eadf7dca5c1b",
+      "specHash": "829139542669ae0aa6a22463790de1d6501c8b87c7a4915384761e495402f445",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/claims_feature.go": {
@@ -52,11 +52,11 @@
         },
         "internal/domain/claim_service.go": {
           "class": "owned",
-          "hash": "c605da053b3456b78e1f89c5d99f1bdb47c5dbf8ebedd270e4d5e7f9ed1694ad"
+          "hash": "c09f00ef075652718cd23935fa0759d5c0032f48a30cd5c5ce48459a11671ade"
         },
         "internal/domain/claim_test.go": {
           "class": "owned",
-          "hash": "813d745730aa97eb1458257b7c8dc8f58006be210e7c29fa5147f909286112e4"
+          "hash": "e2a016efb970fea60f4fef164cc4bfad1d2d44805d8a55c8f5f3d76fd275b246"
         },
         "internal/domain/vos/claim_applies_to.go": {
           "class": "owned",
@@ -80,7 +80,7 @@
         },
         "internal/infra/claim_service.go": {
           "class": "owned",
-          "hash": "f401cca49b50b037d85f25ffb3d12833028cdd5d6590194cd2a0f6ccaacd2a39"
+          "hash": "b089493b040e54aaa04f49dfad4c619bd2f7a998288c8a61a1eaedd36d841f8c"
         },
         "internal/infra/claim_service_manual.go": {
           "class": "hook",

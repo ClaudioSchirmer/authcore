@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:a57e75436a8756dcf1fc4bff79d66a450b6d5546284fed20f31aa36a031f2747
+// checksum:   sha256:39c3999f02513bc5bbc84cc8ce0db63780f30275dac320a091095ad8ad861831
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -61,9 +61,19 @@ type ClaimService interface {
 	// two archive predicates as its user twin.
 	ClaimIsHeldByAClient(tenantID domain.ID, name string) bool
 
-	// How many ACTIVE claim definitions of this tenant declare EXACTLY this
-	// AppliesTo member. The two catalog-cap rules add two of these answers to
-	// get a bucket: the user bucket is `user` + `both`, the client bucket is
-	// `client` + `both`.
-	ActiveClaimsWithAppliesTo(tenantID domain.ID, appliesTo string) int64
+	// How many ACTIVE claim definitions this tenant holds, per AppliesTo
+	// member, in ONE grouped query. The two catalog-cap rules fold the groups
+	// into their overlapping buckets: the user bucket is `user` + `both`, the
+	// client bucket is `client` + `both`.
+	ActiveClaimsByAppliesTo(tenantID domain.ID) []ClaimActiveClaimsByAppliesToGroup
+}
+
+// ClaimActiveClaimsByAppliesToGroup is one group of ActiveClaimsByAppliesTo:
+// the key, and this group's value.
+//
+// A group exists BECAUSE at least one row matched, so an empty set yields no
+// groups at all rather than a row of zeroes. The key is AppliesTo.
+type ClaimActiveClaimsByAppliesToGroup struct {
+	AppliesTo string
+	Value     int64
 }

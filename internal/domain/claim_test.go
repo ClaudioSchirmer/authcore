@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:0de6e4232594b2c92adb435d9adabfbfd2cd54e27afc584a746c2b7756df4ceb
+// checksum:   sha256:061fc719702fe6ec33dab3bca7f5ec503d20a80bd4ef4a4ba8855d4d75ad0d4a
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -86,7 +86,9 @@ func (stubClaimService) ClaimNameTaken(_ domain.ID, _ string, _ domain.ID) bool 
 func (stubClaimService) TenantIsUnavailable(_ domain.ID) bool                   { return false }
 func (stubClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool          { return false }
 func (stubClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool        { return false }
-func (stubClaimService) ActiveClaimsWithAppliesTo(_ domain.ID, _ string) int64  { return 0 }
+func (stubClaimService) ActiveClaimsByAppliesTo(_ domain.ID) []ClaimActiveClaimsByAppliesToGroup {
+	return nil
+}
 
 // validClaim returns an aggregate that satisfies every declared rule.
 //

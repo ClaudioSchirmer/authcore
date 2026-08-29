@@ -358,3 +358,48 @@ generated file changed that the map did not list.
 2. **`ACCESS_MATRIX.md`'s "Exceed a cap" row is incomplete.** It lists 50 roles, 50 groups and 20
    CIDRs but not the 20 claim VALUES per user and per client, which have existed since
    2026-08-28. This run added its own line beside it and did not backfill the missing ones.
+
+---
+
+## Addendum — 2026-08-29: §6's fact superseded by a GROUPED count
+
+**The record above stands as written; this section says what later replaced part of it.**
+
+§6 chose one `kind: count` fact filtered `[TenantID, AppliesTo]`, asked once per enum member,
+and justified the arithmetic living in the domain with this sentence: *"`filters` compiles to
+**equality**, so `applies_to IN ('user','both')` is not sayable in the DSL"*. That was true of
+the generator build this run used. **It is no longer true.** The build shipping with plugin
+0.50.0 (framework v0.63.0) accepts the full criteria vocabulary in `filters` — `in`, `nin`,
+`isnull`, `notnull`, the text operators and nested `any`/`all`/`not` — plus `groupBy:` and
+multi-answer `aggregates:`. The limitation the paragraph rests on is gone, so the paragraph
+is wrong to read today and the cost line under it (*"an insert of a `both` definition asks
+three counts"*) no longer describes the code.
+
+**What replaced it, on 2026-08-29:**
+
+```yaml
+- name: ActiveClaimsByAppliesTo
+  kind: count
+  groupBy: [AppliesTo]
+  filters: [TenantID]
+  activeOnly: true
+```
+
+→ `ActiveClaimsByAppliesTo(tenantID domain.ID) []ClaimActiveClaimsByAppliesToGroup`, one
+`COUNT(*) … GROUP BY applies_to` through the framework's `AggregateBy`, and
+`refuseCatalogBudgetExceeded` folds the groups into the two overlapping buckets through
+`ClaimAdmitsUsers` / `ClaimAdmitsClients`. **One query for every write that consumes a slot**
+(three before, on an insert of `both`; two on a widening) and still **zero** for a write that
+consumes none — the early return is untouched and its tests are untouched with it.
+
+The alternative weighed and dropped a second time: two facts filtered
+`{field: AppliesTo, op: in, values: [User, Both]}` and `[Client, Both]`. Sayable now, two
+queries rather than one, and it would put the definition of a bucket in the YAML beside the
+one the domain already exports — the very duplication §6 refused. The grouped shape is
+cheaper AND keeps that single reading, so §6's conclusion survives its own premise.
+
+Nothing else from §2's impact map moved: no migration, no notification, no translation key, no
+route, no column, no view version. The three generated artifacts (`claim_service.go` on both
+sides, `claim_test.go`) were rewritten by the generator; `claim_rules_manual.go` and
+`claim_rules_manual_test.go` were hand-edited, the latter now pinning **one** round trip on an
+insert of `both` where it used to pin three.

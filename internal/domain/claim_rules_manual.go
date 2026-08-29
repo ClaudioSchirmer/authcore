@@ -104,9 +104,18 @@ const claimsPerTenantCap = 20
 // definition spends a slot on the user side AND on the client side, because
 // either kind of principal may hold a value for it. So the user bucket is
 // `user` + `both` and the client bucket is `client` + `both` — two overlapping
-// counts, never three disjoint ones over the enum's three members. Two full
+// sums over the enum's three members, never three disjoint budgets. Two full
 // buckets are therefore anywhere between 20 and 40 rows, which is correct: a
 // `user`-only definition costs a client token nothing.
+//
+// ONE QUERY ANSWERS BOTH, and the overlap is why the shape is a GROUPED count
+// rather than a count per bucket. ActiveClaimsByAppliesTo asks the database
+// only what the database knows — how many rows carry each member — and the
+// fold below turns that into the two buckets through ClaimAdmitsUsers and
+// ClaimAdmitsClients, the same two functions the narrowing guard reads. A
+// bucket-shaped query (`applies_to IN ('user','both')`) would be two queries
+// AND a second spelling of what those two functions already say, in SQL, free
+// to drift from them.
 //
 // IT CLOSES THE EMISSION'S HOLE EXACTLY rather than approximately. The token's
 // candidate set is ClaimDefinitionsOfTenant — Eq(TenantID) AND
@@ -127,7 +136,8 @@ const claimsPerTenantCap = 20
 //     archived five: the cap would land as a lockout rather than as a budget.
 //   - A write that consumes no new slot queries NOTHING. The early return below
 //     is what makes a `description` edit cost zero round trips, and the tests
-//     assert it on the stub's call count rather than on the outcome.
+//     assert it on the stub's call count rather than on the outcome — as they
+//     assert that a write which DOES consume one pays for exactly one query.
 //   - SELF-EXCLUSION NEVER HAS TO BE SPELLED. A kind this write ADDS is by
 //     construction a kind this row does not already occupy — on an insert there
 //     is no row in the table, and on a widening the STORED AppliesTo does not
@@ -149,7 +159,7 @@ const claimsPerTenantCap = 20
 //
 // TenantID is a usable id by the time this runs: the generated
 // `tenant-is-a-usable-id` barrier sits in the IfInsertOrUpdate gate ABOVE this
-// one and ends the pass when it fails, so the counts below never bind junk into
+// one and ends the pass when it fails, so the count below never binds junk into
 // a UUID comparison. A test pins that, because it is a property of the ORDER
 // two gates are declared in rather than of anything visible here.
 func (e *Claim) refuseCatalogBudgetExceeded(service ClaimService, r *domain.Rules) {
@@ -177,24 +187,39 @@ func (e *Claim) refuseCatalogBudgetExceeded(service ClaimService, r *domain.Rule
 		return
 	}
 
-	// Read ONCE and shared by both halves. `both` belongs to each bucket, so an
-	// insert of a `both` definition would otherwise pay for the same count
-	// twice: three queries at worst, not four.
-	both := service.ActiveClaimsWithAppliesTo(e.TenantID, vos.ClaimAppliesToBoth.Value())
-	max := strconv.Itoa(claimsPerTenantCap)
-
-	if addsUsers {
-		held := service.ActiveClaimsWithAppliesTo(e.TenantID, vos.ClaimAppliesToUser.Value()) + both
-		if held >= claimsPerTenantCap {
-			r.AddNotification("AppliesTo", TooManyUserClaimsInTenantNotification{Max: max}, e.AppliesTo)
+	// THE WHOLE CATALOG IN ONE READ, folded into the two overlapping buckets
+	// here. Both halves are computed even when only one is asked about: the
+	// answer is already in hand, so branching around the arithmetic would save
+	// nothing and would leave the two sums written twice.
+	//
+	// A member nobody carries is ABSENT from the answer rather than present
+	// with a zero — a group exists because a row matched — which is why the
+	// sums start at zero and no case handles the empty catalog.
+	//
+	// The key arrives as the STORED STRING and converges on the Unknown
+	// sentinel when it is not a member, exactly as the reader above does with
+	// the entity's own field. Unknown admits nobody, so a row carrying junk in
+	// that column spends no slot: it mints nothing either, and the two must
+	// agree.
+	var users, clients int64
+	for _, group := range service.ActiveClaimsByAppliesTo(e.TenantID) {
+		member := vos.ClaimAppliesTo(group.AppliesTo)
+		if ClaimAdmitsUsers(member) {
+			users += group.Value
+		}
+		if ClaimAdmitsClients(member) {
+			clients += group.Value
 		}
 	}
 
-	if addsClients {
-		held := service.ActiveClaimsWithAppliesTo(e.TenantID, vos.ClaimAppliesToClient.Value()) + both
-		if held >= claimsPerTenantCap {
-			r.AddNotification("AppliesTo", TooManyClientClaimsInTenantNotification{Max: max}, e.AppliesTo)
-		}
+	max := strconv.Itoa(claimsPerTenantCap)
+
+	if addsUsers && users >= claimsPerTenantCap {
+		r.AddNotification("AppliesTo", TooManyUserClaimsInTenantNotification{Max: max}, e.AppliesTo)
+	}
+
+	if addsClients && clients >= claimsPerTenantCap {
+		r.AddNotification("AppliesTo", TooManyClientClaimsInTenantNotification{Max: max}, e.AppliesTo)
 	}
 }
 

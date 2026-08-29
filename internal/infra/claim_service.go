@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:065454d0abcbcd4a6a525316b5e991b301d546abe85049d4f10c25bbe2dee024
+// checksum:   sha256:8a931d25b9cff549bf11021ce813bc80d69feaec4b774651ac20ab1a23a13073
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -105,10 +105,10 @@ func (s *ClaimServiceImpl) ClaimNameTaken(tenantID domain.ID, name string, selfI
 	return found
 }
 
-// ActiveClaimsWithAppliesTo How many ACTIVE claim definitions of this tenant
-// declare EXACTLY this AppliesTo member. The two catalog-cap rules add two of
-// these answers to get a bucket: the user bucket is `user` + `both`, the
-// client bucket is `client` + `both`.
+// ActiveClaimsByAppliesTo How many ACTIVE claim definitions this tenant holds,
+// per AppliesTo member, in ONE grouped query. The two catalog-cap rules fold
+// the groups into their overlapping buckets: the user bucket is `user` +
+// `both`, the client bucket is `client` + `both`.
 //
 // It asks the database the question directly instead of loading aggregates and
 // counting them in Go — the probe exists precisely so a yes/no question does
@@ -118,20 +118,32 @@ func (s *ClaimServiceImpl) ClaimNameTaken(tenantID domain.ID, name string, selfI
 // pipeline turns the panic into a 500 and the write never happens. Returning a
 // plausible answer instead would skip the very invariant this exists to
 // enforce.
-func (s *ClaimServiceImpl) ActiveClaimsWithAppliesTo(tenantID domain.ID, appliesTo string) int64 {
+func (s *ClaimServiceImpl) ActiveClaimsByAppliesTo(tenantID domain.ID) []appdomain.ClaimActiveClaimsByAppliesToGroup {
 	conds := []criteria.Expr{
 		criteria.Eq("TenantID", tenantID),
-		criteria.Eq("AppliesTo", appliesTo),
 	}
 	q := criteria.Where(criteria.And(conds...))
 	// Archived rows do not take part: a removed row must not block a new one.
 	// The active scope is the query default, so nothing is added here.
 
-	c := read.Count()
-	if err := s.repo.Loader.Aggregate(s.queryContext(), q, c); err != nil {
-		panic("Claim: ActiveClaimsWithAppliesTo probe failed")
+	by := read.By("AppliesTo")
+	agg := read.Count()
+	groups, err := s.repo.Loader.AggregateBy(s.queryContext(), q, by, agg)
+	if err != nil {
+		panic("Claim: ActiveClaimsByAppliesTo probe failed")
 	}
-	return c.Value
+
+	// One entry per distinct key. An empty set yields NO groups at all, so
+	// there is no row of zeroes to tell apart from a real one — and where a
+	// group's own scalar can still be null, its Found says so.
+	out := make([]appdomain.ClaimActiveClaimsByAppliesToGroup, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, appdomain.ClaimActiveClaimsByAppliesToGroup{
+			AppliesTo: g.KeyString("AppliesTo"),
+			Value:     read.GroupResult(g, agg).Value,
+		})
+	}
+	return out
 }
 
 var (
