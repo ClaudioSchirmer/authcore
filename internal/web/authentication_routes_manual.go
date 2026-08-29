@@ -124,9 +124,20 @@ func MountAuthentication(
 				"here, so the message is deliberately one message — and the response takes the " +
 				"same time in every case, because a faster refusal would have answered the " +
 				"question the wording refuses to answer.\n\n" +
+				"**The token also carries the tenant's own claims**, under the reserved `x_` " +
+				"namespace and never under a platform name. Each one is resolved down a " +
+				"two-level chain: the value set on this user wins, the definition's " +
+				"tenant-wide default fills in when none is, and a claim with neither is " +
+				"absent from the token entirely — an absent claim and an empty one are not " +
+				"the same thing. Values are rendered in the type their definition declares, " +
+				"so a `number` claim is a number and not a quoted string. A retired " +
+				"definition mints nothing, including for a user who still holds a value for " +
+				"it. At most 20 of them ride on one token: a claim rides in a header on " +
+				"every request to every service, and the values set on this user are spent " +
+				"before any tenant-wide default.\n\n" +
 				"**When `mustChangePassword` is true the token is restricted**: it carries " +
-				"`user:change-password` and nothing else, so an expired credential can be " +
-				"rotated and nothing else can be done until it is.",
+				"`user:change-password` and nothing else — no tenant claims either — so an " +
+				"expired credential can be rotated and nothing else can be done until it is.",
 			RequestExamples: map[string]fwopenapi.Example{
 				"signIn": {
 					Summary:     "Sign in",
@@ -162,9 +173,10 @@ func MountAuthentication(
 				"**The claims are rebuilt from the database on every rotation**, never copied " +
 				"from the previous token. A permission revoked while a session is live " +
 				"therefore reaches the whole mesh at the next rotation — minutes — instead of " +
-				"waiting for the next full sign-in. The restriction that applies to a " +
-				"`mustChangePassword` account applies here too, so a limited session cannot " +
-				"widen itself by refreshing.\n\n" +
+				"waiting for the next full sign-in, and **a corrected claim value propagates " +
+				"the same way**, with no invalidation step anywhere. The restriction that " +
+				"applies to a `mustChangePassword` account applies here too, so a limited " +
+				"session cannot widen itself by refreshing.\n\n" +
 				"**Presenting an already-redeemed token revokes the entire session family** — " +
 				"every token descended from that sign-in — because a value being replayed means " +
 				"either the holder or somebody else has a copy, and there is no way to tell " +

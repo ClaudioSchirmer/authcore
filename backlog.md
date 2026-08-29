@@ -210,10 +210,43 @@ struck out, because each one cost something:
 narrowing it while an edge held a value stranded that value invisibly — present, readable, and
 un-writable. It is now refused for all four narrowing transitions; widening is untouched.
 
-**What is still open**: the emission merge into `buildClaims`, the third-level question, the
-audit allowlist, and the size budget the merge has to come with. Both levels of the chain can
-now be filled, read and audited — **and no token has changed**, which is the same deliberate
-line the catalog drew and the reason emission is a run of its own rather than a loose end.
+**The emission landed on 2026-08-28** — `specs/implement/emit-custom-claims-on-user-token/plan.md`.
+`buildClaims` now resolves the chain for a USER and mints it beside the fixed nine. Four of the
+decisions above were taken there, and each one cost something:
+
+- **The value is TYPED on the wire**, not a string. That is what makes `valueType` mean something
+  at emission rather than only at write time, and it is why the read join carries `ClaimValueType`
+  up to the entry at all. The gate is the domain's own `ClaimValueMatchesValueType`, so there is no
+  fourth reading of what a `bool` is and a value the catalog accepted as a default can never be one
+  the emission refuses. Cost: a value written by direct SQL that does not parse has to go somewhere,
+  and it is omitted with a `Warn` rather than coerced — a wrong answer being worse than no answer.
+- **The walk is over the CATALOG, not over the user's entries**, and that was the one thing the
+  build found rather than decided. Level 1 arrives free — the read join fills the name and the type
+  on every loaded entry — so iterating the entries would have been the cheap shape. It is wrong
+  twice: level 2's defaults belong to definitions the user holds no entry for, so they would never
+  be reached; and a read join is deliberately not archive-gated on its target, so an entry whose
+  definition was RETIRED would keep minting. Driving from the catalog drops both, fail-closed.
+- **The size budget is 20 per token**, the same number the per-principal cap carries, with values
+  set on the user spent before any tenant-wide default and the overflow dropped under a `Warn` that
+  NAMES what it dropped. Truncating is the fail-closed direction here — a custom claim only ever
+  ADDS a fact, so dropping one can deny a consumer and can never grant. **What it does not do is
+  close the hole**, and that is the gap this run found: the catalog has no cap on definitions per
+  tenant, so a tenant can still create more claims carrying defaults than a token can hold. The loud
+  answer — refusing that definition at the moment an operator creates it — is a change to `Claim`
+  and a run of its own. **Recorded here as open.**
+- **A `mustChangePassword` session carries none of them**, the same line already drawn for its
+  permissions, and the response body mirrors the token exactly, restriction included — one
+  resolution per request with two readers, because a body advertising claims the token omits is the
+  bug that made `effectivePermissions` a single function in the first place.
+
+The reserved-name question the entry above raises turned out to need no runtime answer beyond a
+seatbelt: the `x_` prefix stops a collision at the API, and the merge assigns the fixed set LAST so
+that a definition written straight into the table by migration cannot displace `permissions` or
+`tenant_id` either. The two guards fail in opposite directions on purpose.
+
+**What is still open**: the third-level question, the audit allowlist, the catalog cap named above,
+and the client half — `ClientClaim` reaches no token because `POST /auth/client/token` does not
+exist, which is the entry two sections up rather than a loose end here.
 
 The rest of this entry is the original draft, kept because it is where the reasoning lives.
 

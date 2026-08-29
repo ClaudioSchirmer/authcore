@@ -91,13 +91,39 @@ func TestTokenResponse_EmptyCollectionsMarshalAsArrays(t *testing.T) {
 	}
 	body := string(encoded)
 
-	for _, field := range []string{`"groups":[]`, `"roles":[]`, `"permissions":[]`} {
+	for _, field := range []string{`"groups":[]`, `"roles":[]`, `"permissions":[]`, `"claims":{}`} {
 		if !strings.Contains(body, field) {
 			t.Errorf("expected %s in the body, got:\n%s\n\nnull here makes a client guard for it", field, body)
 		}
 	}
 	if strings.Contains(body, "null") {
 		t.Errorf("no field of this response should ever be null:\n%s", body)
+	}
+}
+
+// The tenant claims reach the wire under their own names and IN THEIR OWN JSON
+// TYPES — a number as a number, a bool as a bool. Rendering them as strings
+// would make every consumer parse what the definition already declared.
+func TestTokenResponse_CarriesTenantClaimsInTheirDeclaredTypes(t *testing.T) {
+	resp := TokenResponse{}.FromResult(commands.TokenResult{
+		User: commands.AuthenticatedUserResult{
+			Claims: map[string]any{
+				"x_cost_center":  float64(1000),
+				"x_beta_enabled": true,
+				"x_region":       "emea",
+			},
+		},
+	})
+
+	encoded, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshalling: %v", err)
+	}
+	body := string(encoded)
+	for _, fragment := range []string{`"x_cost_center":1000`, `"x_beta_enabled":true`, `"x_region":"emea"`} {
+		if !strings.Contains(body, fragment) {
+			t.Errorf("expected %s in the body, got:\n%s", fragment, body)
+		}
 	}
 }
 
