@@ -820,34 +820,36 @@ service:
     # meaning "nobody holds it", so the narrowing is allowed and the happy path passes. The
     # healthy-state spelling (ClaimIsFreeOfUserValues) would read false too — and would then
     # mean "somebody holds it", turning a correct spec red on the day it is written.
-    # FILTERED BY THE NATURAL KEY, not by the row id, and that is the language rather than a
-    # preference: a fact filter must name a declared field, and the primary key is not one of
-    # this spec's fields. (TenantID, Name) identifies the definition exactly — both are
-    # immutable, and Name is unique per tenant over ACTIVE rows.
     #
-    # That last word is load-bearing in the BODY: uniqueness is scoped to the active rows, so
-    # an archived definition can share the pair with the live one. Both queries must therefore
-    # join with `claims.deleted_at IS NULL` as well, or a retired definition's leftover edges
-    # would block a narrowing on the live row that replaced it.
+    # FILTERED BY THE ROW ID, which is what the edge column actually stores. The entry keeps
+    # claim_id and not the name — deliberately, so a retired-and-recreated definition needs an
+    # explicit re-set instead of silently inheriting a value written for the old one — so
+    # asking by id is asking the edge in its own terms rather than translating into somebody
+    # else's.
+    #
+    # It also makes the question ONE PREDICATE, and the shape it replaced is worth recording
+    # so nobody restores it. Filtering by (TenantID, Name) — which is what this spec said
+    # while `filters` refused the primary key, before omnicore-gen 0.52.0 — paid for the
+    # detour twice: a join to `claims` that existed only to translate name -> id, and a
+    # SECOND archive predicate on that join, because (tenant, name) is ambiguous between a
+    # live definition and an archived one that still shares the pair. An id is never
+    # ambiguous, so both are gone with it.
     - name: ClaimIsHeldByAUser
       kind: manual
       returns: bool
-      filters: [TenantID, Name]
+      filters: [ID]
       description: >-
-        Whether any ACTIVE user_claims row references the ACTIVE claim definition identified by
-        this tenant and name. Join user_claims to claims on claim_id and require
-        user_claims.deleted_at IS NULL AND claims.deleted_at IS NULL — archived edges do not
-        count, because a value somebody removed must not freeze the definition's shape, and the
-        archived-definition half is what keeps a retired row's leftovers out of the answer.
+        Whether any ACTIVE user_claims row references this claim definition. Read user_claims
+        alone, by claim_id, requiring user_claims.deleted_at IS NULL — archived edges do not
+        count, because a value somebody removed must not freeze the definition's shape.
 
     - name: ClaimIsHeldByAClient
       kind: manual
       returns: bool
-      filters: [TenantID, Name]
+      filters: [ID]
       description: >-
-        Whether any ACTIVE client_claims row references the ACTIVE claim definition identified
-        by this tenant and name. Same join and the same two archive predicates as its user
-        twin.
+        Whether any ACTIVE client_claims row references this claim definition. Same single-table
+        read and the same archive predicate as its user twin, on the other side of the chain.
 
     # The counting half of the two catalog-cap rules above. ONE GROUPED QUERY for the whole
     # catalog — a single COUNT(*) … GROUP BY applies_to — rather than one count per enum

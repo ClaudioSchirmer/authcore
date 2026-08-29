@@ -58,15 +58,26 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
 
-**`ClaimIsHeldByAUser(tenantID domain.ID, name string) bool`**
+**`ClaimIsHeldByAUser(id domain.ID) bool`**
 
-> Whether any ACTIVE user_claims row references the ACTIVE claim definition identified by this tenant and name. Join user_claims to claims on claim_id and require user_claims.deleted_at IS NULL AND claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape, and the archived-definition half is what keeps a retired row's leftovers out of the answer.
+> Whether any ACTIVE user_claims row references this claim definition. Read user_claims alone, by claim_id, requiring user_claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape.
 
-**`ClaimIsHeldByAClient(tenantID domain.ID, name string) bool`**
+**`ClaimIsHeldByAClient(id domain.ID) bool`**
 
-> Whether any ACTIVE client_claims row references the ACTIVE claim definition identified by this tenant and name. Same join and the same two archive predicates as its user twin.
+> Whether any ACTIVE client_claims row references this claim definition. Same single-table read and the same archive predicate as its user twin, on the other side of the chain.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+**Before writing one of these against another TABLE, check the door.** The facts beside this file run over this entity's own repository, so a question about another aggregate's child table, a control table or a lookup cannot be asked there. If the pinned framework documents a DIRECT schema — one table, no aggregate behind it — that table gets its own anchor and the body keeps the same existence probe and aggregate DSL, in every dialect, inside the caller's transaction. Hand-written SQL and a whole aggregate declared for a table that is only ever counted are both the wrong answer to that question.
+
+### `internal/infra/claim_service_manual.go` — bodies the spec no longer asks for
+
+This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
+
+- `func (s *ClaimServiceImpl) tenants(...)`
+- `func (s *ClaimServiceImpl) claimIsHeldBy(...)`
+
+⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
 ### The migration — already yours
 
@@ -197,14 +208,15 @@ Owned by other tools:
 - integration events (publish/subscribe) — `/omnicore:implement`
 - read models spanning more than this entity — `/omnicore:scaffold-view`
 - changing this entity once it exists — `/omnicore:evolve-entity`, which edits this spec and regenerates. The CODE comes back from the spec; the DATABASE never does — the migration a change needs is written by hand, and that skill's impact map is what carries it, along with the orphans a shrinking spec leaves and everything outside this generator's ownership
+- a table with NO aggregate behind it — a control table, a job queue, a lookup, an idempotency ledger. This generator writes aggregates and this spec language cannot say "not one"; that does not mean the framework has no answer. If the pinned version documents a DIRECT schema (one table, no entity), it is the door for those, and `/omnicore:implement` owns wiring it. Neither hand-written SQL nor an entity declared for a table that is only ever queried is the right shape
 
 Read controls this listing does NOT serve: `?search=`. That is a contract, not an omission — sending one is answered with a typed 400 rather than being ignored.
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.63.0)
+Verdict: **exact** (project pins v0.64.0)
 
-framework v0.63.0 meets the required v0.63.0
+framework v0.64.0 meets the required v0.64.0
 
 Verify what was generated:
 

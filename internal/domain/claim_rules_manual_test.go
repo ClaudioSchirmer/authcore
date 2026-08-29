@@ -44,6 +44,13 @@ type probingClaimService struct {
 	askedHeldByAUser   int
 	askedHeldByAClient int
 
+	// What the two probes were asked ABOUT. The kind of id is the whole point
+	// of the pair: the edge tables store claim_id, so a probe handed the
+	// tenant's id — or the definition's name — would read a different table's
+	// worth of rows and answer confidently about nothing.
+	askedHeldByAUserWith   []domain.ID
+	askedHeldByAClientWith []domain.ID
+
 	// The catalog cap reads the whole catalog in ONE grouped call. The map is
 	// per enum member because that is what a tenant's catalog looks like; the
 	// stub folds it into groups the way the store would. A nil map answers with
@@ -68,13 +75,15 @@ func (s *probingClaimService) TenantIsUnavailable(tenantID domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool {
+func (s *probingClaimService) ClaimIsHeldByAUser(id domain.ID) bool {
 	s.askedHeldByAUser++
+	s.askedHeldByAUserWith = append(s.askedHeldByAUserWith, id)
 	return s.heldByAUser
 }
 
-func (s *probingClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool {
+func (s *probingClaimService) ClaimIsHeldByAClient(id domain.ID) bool {
 	s.askedHeldByAClient++
+	s.askedHeldByAClientWith = append(s.askedHeldByAClientWith, id)
 	return s.heldByAClient
 }
 
@@ -437,6 +446,27 @@ func TestNarrowingIsAllowedWhenNobodyHoldsAValue(t *testing.T) {
 	// The USER side is not being dropped, so it must not be asked at all.
 	if svc.askedHeldByAUser != 0 {
 		t.Errorf("the user side was asked %d times for a narrowing that keeps users", svc.askedHeldByAUser)
+	}
+}
+
+// THE PROBE IS ASKED ABOUT THE DEFINITION'S OWN ROW, and this is the assertion
+// that keeps it that way. The two edge tables store claim_id, so the id of the
+// row being narrowed is the only value that reads them correctly — and the
+// mistakes available here are quiet ones: the tenant's id is also a domain.ID
+// and would compile, match rows belonging to other definitions, and refuse
+// narrowings that should pass. An outcome assertion cannot tell the two apart
+// under a stub that answers the same either way.
+func TestTheHeldValueProbeIsAskedAboutTheClaimRowNotItsTenant(t *testing.T) {
+	svc, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToUser, &probingClaimService{})
+	if err != nil {
+		t.Fatalf("a definition nobody holds a value for could not be narrowed: %v", err)
+	}
+
+	if len(svc.askedHeldByAClientWith) != 1 {
+		t.Fatalf("the client side was asked %d times, want exactly once", len(svc.askedHeldByAClientWith))
+	}
+	if got := svc.askedHeldByAClientWith[0].Value(); got != claimRowID {
+		t.Errorf("the probe was asked about %q, want the claim row %q", got, claimRowID)
 	}
 }
 

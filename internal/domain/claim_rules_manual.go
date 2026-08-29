@@ -340,18 +340,37 @@ func (e *Claim) refuseNarrowingAppliesToWithHeldValues(service ClaimService, r *
 	// different sentences.
 	dropsUsers := ClaimAdmitsUsers(old.AppliesTo) && !ClaimAdmitsUsers(e.AppliesTo)
 	dropsClients := ClaimAdmitsClients(old.AppliesTo) && !ClaimAdmitsClients(e.AppliesTo)
+	if !dropsUsers && !dropsClients {
+		return
+	}
+
+	// THE ROW ID, which is what the two edge collections store — one entry
+	// carries claim_id, never the name. Asking by it is asking the edge in its
+	// own terms, and it is why each probe reads ONE table with ONE predicate.
+	//
+	// Guarded rather than dereferenced blind: GetID returns a pointer and is nil
+	// before the id is minted. This gate is unreachable on an insert — it
+	// returned above when Old was nil — so a nil here is not a narrowing that
+	// slips through but a state no verb produces, and answering "nobody holds
+	// it" for it would be inventing the safe-looking half of an impossible case.
+	// Refusing is the fail-closed reading and matches how every probe in this
+	// entity treats an id it cannot use.
+	id := e.GetID()
+	if id == nil {
+		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+		return
+	}
 
 	// Ask ONLY about the kinds this change actually drops. A widening reaches
 	// neither branch and queries nothing at all, which is the property the
 	// tests assert on the stub's call count rather than on the outcome: a
 	// widening that queries two tables is a correctness bug no assertion about
 	// the answer would catch.
-	name := e.Name.Value()
-	if dropsUsers && service.ClaimIsHeldByAUser(e.TenantID, name) {
+	if dropsUsers && service.ClaimIsHeldByAUser(*id) {
 		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
 		return
 	}
-	if dropsClients && service.ClaimIsHeldByAClient(e.TenantID, name) {
+	if dropsClients && service.ClaimIsHeldByAClient(*id) {
 		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
 	}
 }

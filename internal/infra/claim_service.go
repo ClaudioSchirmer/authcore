@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:8a931d25b9cff549bf11021ce813bc80d69feaec4b774651ac20ab1a23a13073
+// checksum:   sha256:c08d41ab1ce5afa4256525a062b6131b95c98864a345d7424d4f0406a9ce5f87
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *ClaimServiceImpl) queryContext() context.Context {
 // already holds this name. Excludes the row being updated.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a
@@ -111,8 +111,8 @@ func (s *ClaimServiceImpl) ClaimNameTaken(tenantID domain.ID, name string, selfI
 // `both`, the client bucket is `client` + `both`.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — one GROUP BY answers every key at once, where
+// the same question asked per key is one query per bucket.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a
@@ -134,8 +134,7 @@ func (s *ClaimServiceImpl) ActiveClaimsByAppliesTo(tenantID domain.ID) []appdoma
 	}
 
 	// One entry per distinct key. An empty set yields NO groups at all, so
-	// there is no row of zeroes to tell apart from a real one — and where a
-	// group's own scalar can still be null, its Found says so.
+	// there is no row of zeroes to tell apart from a real one.
 	out := make([]appdomain.ClaimActiveClaimsByAppliesToGroup, 0, len(groups))
 	for _, g := range groups {
 		out = append(out, appdomain.ClaimActiveClaimsByAppliesToGroup{
