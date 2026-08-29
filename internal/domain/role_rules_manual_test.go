@@ -10,6 +10,8 @@
 package domain
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
@@ -32,8 +34,13 @@ type probingRoleService struct {
 	askedNotInCatalog []domain.ID
 	askedWildcard     []domain.ID
 	askedDoesNotHold  []domain.ID
-	keyTakenSelf      []domain.ID
-	askedTenant       int
+
+	// callsPerFact counts how many times each collection fact was ASKED, as
+	// opposed to how many entries it was asked about. `perEntry` promises ONE
+	// call per write whatever the size of the collection.
+	callsPerFact map[string]int
+	keyTakenSelf []domain.ID
+	askedTenant  int
 }
 
 func (s *probingRoleService) RoleKeyTaken(_ domain.ID, _ string, selfID domain.ID) bool {
@@ -47,22 +54,76 @@ func (s *probingRoleService) TenantIsUnavailable(_ domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingRoleService) PermissionIsNotInCatalog(id domain.ID) bool {
-	s.askedNotInCatalog = append(s.askedNotInCatalog, id)
-	return s.notInCatalog
+// The three collection facts, each asked ONCE for the whole set.
+//
+// The stub keeps recording ONE QUESTION PER ID — which ids reach a fact is a
+// property the batch did not change and several cases below still assert.
+// asked() counts the CALLS, the only thing that can catch a regression to one
+// call per entry: every assertion about the outcome would pass either way.
+func (s *probingRoleService) PermissionIsNotInCatalog(permissionIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("PermissionIsNotInCatalog")
+	out := make(map[domain.ID]bool, len(permissionIDSet))
+	for _, id := range permissionIDSet {
+		s.askedNotInCatalog = append(s.askedNotInCatalog, id)
+		out[id] = s.notInCatalog
+	}
+	return out
 }
 
-func (s *probingRoleService) PermissionIsWildcard(id domain.ID) bool {
-	s.askedWildcard = append(s.askedWildcard, id)
-	return s.isWildcard
+func (s *probingRoleService) PermissionIsWildcard(permissionIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("PermissionIsWildcard")
+	out := make(map[domain.ID]bool, len(permissionIDSet))
+	for _, id := range permissionIDSet {
+		s.askedWildcard = append(s.askedWildcard, id)
+		out[id] = s.isWildcard
+	}
+	return out
 }
 
-func (s *probingRoleService) CallerDoesNotHoldPermission(id domain.ID) bool {
-	s.askedDoesNotHold = append(s.askedDoesNotHold, id)
-	return s.doesNotHold
+func (s *probingRoleService) CallerDoesNotHoldPermission(permissionIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("CallerDoesNotHoldPermission")
+	out := make(map[domain.ID]bool, len(permissionIDSet))
+	for _, id := range permissionIDSet {
+		s.askedDoesNotHold = append(s.askedDoesNotHold, id)
+		out[id] = s.doesNotHold
+	}
+	return out
+}
+
+// roleNotificationKeysOf lists the notification TYPES a refusal carries, which
+// is what "one answer per entry" is asserted on: the blamed field is "Permissions"
+// for all three rules, so counting fields would count the same name three times.
+func roleNotificationKeysOf(err error) []string {
+	var carrier domain.NotificationCarrier
+	if !errors.As(err, &carrier) {
+		return nil
+	}
+	var out []string
+	for _, ctx := range carrier.NotificationContexts() {
+		for _, msg := range ctx.Messages() {
+			out = append(out, fmt.Sprintf("%T", msg.Notification))
+		}
+	}
+	return out
+}
+
+// asked records one CALL of a collection fact.
+func (s *probingRoleService) asked(fact string) {
+	if s.callsPerFact == nil {
+		s.callsPerFact = map[string]int{}
+	}
+	s.callsPerFact[fact]++
 }
 
 const grantedPermissionID = "9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3"
+
+// A second and a third, for the one case that needs a collection rather than a
+// single entry: a batch of one cannot tell "asked once" apart from "asked once
+// per entry".
+const (
+	secondPermissionID = "9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a4"
+	thirdPermissionID  = "9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a5"
+)
 
 // roleGranting returns a valid role that ADDS one grant — the shape all three
 // per-entry rules judge.
@@ -70,6 +131,35 @@ func roleGranting(grant aggregatevos.RolePermission) *Role {
 	e := validRole()
 	e.AddRolePermission(grant)
 	return e
+}
+
+// THE COST THE `perEntry` FACTS BUY, pinned where a regression would otherwise
+// be invisible: every collection fact is asked ONCE for the whole write,
+// however many grants it carries. Nothing about the OUTCOME changes if this
+// regresses to one call per entry, which is why the call count is asserted.
+func TestEveryRoleCollectionFactIsAskedOnceForTheWholeWrite(t *testing.T) {
+	e := validRole()
+	for _, id := range []string{grantedPermissionID, secondPermissionID, thirdPermissionID} {
+		e.AddRolePermission(aggregatevos.RolePermission{PermissionID: domain.NewID(id)})
+	}
+
+	svc := &probingRoleService{}
+	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err != nil {
+		t.Fatalf("a role granting three catalogued permissions was refused: %v", roleRejectedFields(err))
+	}
+
+	for _, fact := range []string{
+		"PermissionIsNotInCatalog", "PermissionIsWildcard", "CallerDoesNotHoldPermission",
+	} {
+		if got := svc.callsPerFact[fact]; got != 1 {
+			t.Errorf("%s was asked %d times for a write carrying three grants, want exactly 1", fact, got)
+		}
+	}
+
+	// And it was asked about EVERY entry: one call, three subjects.
+	if len(svc.askedNotInCatalog) != 3 {
+		t.Errorf("the single call carried %d grants, want all three", len(svc.askedNotInCatalog))
+	}
 }
 
 // ── tenant-must-exist ───────────────────────────────────────────────────────
@@ -145,20 +235,26 @@ func TestGrantingAPermissionOutsideTheCatalogIsRefused(t *testing.T) {
 	}
 }
 
-// An id that is not in the catalog stops the walk for THAT entry: nothing below
-// can say anything true about a permission that is not there, and the wildcard
-// probe answers "yes" for an unknown id anyway. Reporting all three for one bad
-// id would be noise.
-func TestAnUnknownPermissionIsNotAlsoJudgedByTheLaterRules(t *testing.T) {
-	svc := &probingRoleService{notInCatalog: true}
+// ONE PROBLEM PER ENTRY. An id that is not in the catalog is one refusal:
+// nothing below can say anything true about a permission that is not there, and
+// every later fact answers "the problem is present" for an unknown id, so
+// reporting all three would be noise the caller has to read past.
+//
+// The interlock is about the ANSWER rather than about the question — the three
+// facts are asked once each for the whole collection, so a bad entry's later
+// verdicts are computed and simply not read. The stub answers TRUE to all
+// three, which is what makes this assertion mean something.
+func TestAnUnknownPermissionIsReportedOnceAndNothingElse(t *testing.T) {
+	svc := &probingRoleService{notInCatalog: true, isWildcard: true, doesNotHold: true}
 	e := roleGranting(aggregatevos.RolePermission{PermissionID: domain.NewID(grantedPermissionID)})
 
-	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
+	_, err := domain.GetInsertable(e, svc, "GetInsertable")
+	if err == nil {
 		t.Fatal("expected a refusal")
 	}
-	if len(svc.askedWildcard) != 0 || len(svc.askedDoesNotHold) != 0 {
-		t.Errorf("an unknown permission still reached the later probes (wildcard: %d, escalation: %d)",
-			len(svc.askedWildcard), len(svc.askedDoesNotHold))
+	if got := len(roleNotificationKeysOf(err)); got != 1 {
+		t.Errorf("one unknown permission produced %d answers, want exactly 1: %v",
+			got, roleNotificationKeysOf(err))
 	}
 }
 
@@ -177,25 +273,31 @@ func TestGrantingAWildcardPermissionIsRefused(t *testing.T) {
 	}
 }
 
-// THE ORDERING TEST, and the reason the two rules are a pair rather than one.
+// THE ORDERING CASE, and where its load now sits.
 //
-// Identity.HasPermission PANICS on any argument containing '*'. The escalation
-// probe is what would hand it that string, so the wildcard refusal has to run
-// FIRST and short-circuit. If this ever regresses, the symptom in production is
-// not a 403 — it is a panicked 500, on exactly the request the rule exists to
-// refuse.
-func TestAWildcardGrantNeverReachesTheEscalationProbe(t *testing.T) {
-	svc := &probingRoleService{isWildcard: true}
+// Identity.HasPermission PANICS on any argument containing '*'. The rule can no
+// longer promise the escalation fact is not ASKED about a wildcard grant — it is
+// asked about every entry at once — so what keeps the panic away is the
+// guarantee the fact's own description carries and its body implements: it
+// GUARDS THE WILDCARD ITSELF and answers "does not hold" instead of calling
+// through (internal/infra/role_service_manual.go).
+//
+// What the domain still owns, and what this pins, is that a wildcard grant is
+// reported as a wildcard and as nothing else.
+func TestAWildcardGrantIsReportedAsWildcardAndNothingElse(t *testing.T) {
+	svc := &probingRoleService{isWildcard: true, doesNotHold: true}
 	e := roleGranting(aggregatevos.RolePermission{PermissionID: domain.NewID(grantedPermissionID)})
 
-	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
+	_, err := domain.GetInsertable(e, svc, "GetInsertable")
+	if err == nil {
 		t.Fatal("expected a refusal")
 	}
-	if len(svc.askedWildcard) == 0 {
-		t.Fatal("the wildcard probe never ran — the ordering this test pins does not exist")
+	keys := roleNotificationKeysOf(err)
+	if len(keys) != 1 {
+		t.Errorf("one wildcard grant produced %d answers, want exactly 1: %v", len(keys), keys)
 	}
-	if len(svc.askedDoesNotHold) != 0 {
-		t.Error("a wildcard permission reached CallerDoesNotHoldPermission, which is what panics on '*'")
+	if len(svc.askedWildcard) == 0 {
+		t.Fatal("the wildcard fact never ran — the rule this test pins does not exist")
 	}
 }
 

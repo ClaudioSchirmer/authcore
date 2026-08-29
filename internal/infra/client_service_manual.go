@@ -43,12 +43,12 @@
 package infra
 
 import (
+	"strconv"
 	"sync"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
-	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/criteria"
 )
@@ -91,60 +91,42 @@ func (s *ClientServiceImpl) companions() *clientCompanionRepos {
 	return c
 }
 
-// roleRow resolves one role and its conferred permission keys, memoised for the
-// request. Same contract and same shape as UserServiceImpl's, on this service's
-// context — see role_probe.go for what the type MEANS, which is the half both
-// callers must agree on.
-//
-// The memo lives on the AppContext, so it is per REQUEST and never shared
-// between two writes. Outside a request there is no context to memoise on and
-// every call is a fresh read, which is correct rather than merely acceptable: a
-// long-lived cache would answer with a role's bundle from an arbitrary point in
-// the past, and that bundle is what the escalation rule is judging.
-func (s *ClientServiceImpl) roleRow(roleID domain.ID) roleRow {
-	const memoPrefix = "authcore.client.role:"
+// The memo prefixes. One per row type, so the two resolvers never collide, and
+// named for THIS service: the memo hangs off the request's AppContext, which
+// every service of the request shares.
+const (
+	clientRoleMemoPrefix  = "authcore.client.role:"
+	clientClaimMemoPrefix = "authcore.client.claim:"
+)
 
-	if s.ctx != nil {
-		if cached, ok := s.ctx.Get(memoPrefix + roleID.String()); ok {
-			if row, ok := cached.(roleRow); ok {
-				return row
+// roleRows resolves every requested role and the permission keys it confers in
+// ONE read, memoised for the request. Same row type GroupServiceImpl and
+// UserServiceImpl use, on this service's context — and the same batch
+// arithmetic, which lives in row_resolution.go.
+func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
+	return resolveRows(s.ctx, clientRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]roleRow {
+		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
+		if err != nil {
+			// A failed probe PANICS rather than inventing an answer: every
+			// caller of this row is a security rule, and a plausible answer
+			// would skip the invariant it exists to enforce.
+			panic("Client: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write grants")
+		}
+
+		rows := make(map[string]roleRow, len(found))
+		for _, role := range found {
+			// The grants arrive with resource and action already filled — Role
+			// declares the traversal into the catalog. Nothing here queries it.
+			grants := domain.GetCurrentItemsOf[aggregatevos.RolePermission](role.GetAggregateRoot())
+			keys := make([]vos.PermissionKey, 0, len(grants))
+			for _, grant := range grants {
+				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
+			rows[canonicalIDOf(role.GetID())] = roleRow{found: true, tenantID: role.TenantID, keys: keys}
 		}
-	}
-
-	// DEFENCE IN DEPTH. The domain already refuses an entry id that is not a
-	// usable UUID before asking, but this is the seat that would pay for it: an
-	// unparseable value binds into a criterion against a UUID column, the driver
-	// rejects it, and the panic below turns a validation problem into a 500.
-	// Answering "not found" is both safe and true — no role row carries it.
-	if _, err := roleID.UUID(); err != nil {
-		return roleRow{found: false}
-	}
-
-	q := criteria.Where(criteria.Eq("ID", roleID))
-	found, err := s.companions().roles.Loader.FindOne(s.queryContext(), q)
-
-	var row roleRow
-	switch {
-	case err == nil:
-		// The grants arrive with resource and action already filled — Role
-		// declares the traversal into the catalog. Nothing here queries it.
-		grants := domain.GetCurrentItemsOf[aggregatevos.RolePermission](found.GetAggregateRoot())
-		keys := make([]vos.PermissionKey, 0, len(grants))
-		for _, grant := range grants {
-			keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
-		}
-		row = roleRow{found: true, tenantID: found.TenantID, keys: keys}
-	case isRecordNotFound(err):
-		row = roleRow{found: false}
-	default:
-		panic("Client: role probe failed for role " + roleID.String())
-	}
-
-	if s.ctx != nil {
-		s.ctx.Set(memoPrefix+roleID.String(), row)
-	}
-	return row
+		return rows
+	})
 }
 
 // HashSecret returns the SHA-256 of the secret, lowercase hex.
@@ -213,12 +195,14 @@ func (s *ClientServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
 // refused anything else — but a `*:*` super-admin crosses that scope, and when
 // they do, "this tenant" has to mean the client's or the rule would compare a
 // role against the operator's own tenant and refuse every legitimate grant.
-func (s *ClientServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool {
-	row := s.roleRow(roleID)
-	if !row.found {
-		return true
+func (s *ClientServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.roleRows(roleIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = !row.found || row.tenantID != tenantID
 	}
-	return row.tenantID != tenantID
+	return out
 }
 
 // RoleGrantsWildcard reports whether the role behind this id confers any
@@ -227,8 +211,14 @@ func (s *ClientServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleID
 // The keys it scans came out of the SAME read RoleIsUnavailableInTenant used —
 // filled by the traversal RoleRepository declares into the catalog, so this
 // costs no query of its own.
-func (s *ClientServiceImpl) RoleGrantsWildcard(roleID domain.ID) bool {
-	return s.roleRow(roleID).grantsWildcard()
+func (s *ClientServiceImpl) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.roleRows(roleIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = row.grantsWildcard()
+	}
+	return out
 }
 
 // CallerLacksAnyPermissionOfRole reports whether the requesting caller fails to
@@ -239,31 +229,26 @@ func (s *ClientServiceImpl) RoleGrantsWildcard(roleID domain.ID) bool {
 // longer carry the catalog row's archive stamp it is also the only reading
 // expressible without a second query. Strictly more restrictive, never more
 // permissive.
-func (s *ClientServiceImpl) CallerLacksAnyPermissionOfRole(roleID domain.ID) bool {
+func (s *ClientServiceImpl) CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool {
 	if s.ctx == nil {
-		return false
+		return nil
 	}
 	identity := s.ctx.Identity()
 	if identity == nil {
-		return false
+		// STANDS DOWN WITHOUT READING ANYTHING. An empty answer raises nothing
+		// — an absent key is this fact answering nothing for that entry — and
+		// there is no caller to compare the bundles against, so resolving them
+		// would be work for no verdict.
+		return nil
 	}
-	return s.callerLacksAnyPermissionOfRole(identity, roleID)
-}
 
-func (s *ClientServiceImpl) callerLacksAnyPermissionOfRole(identity *configuration.Identity, roleID domain.ID) bool {
-	row := s.roleRow(roleID)
-	if row.grantsWildcard() {
-		// Never handed to HasPermission — it panics on a wildcard, and this also
-		// covers the unresolvable role. The wildcard rule refuses this write on
-		// its own; this is the second lock.
-		return true
+	rows := s.roleRows(roleIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = callerLacksAnyPermissionOfRole(identity, row)
 	}
-	for _, key := range row.keys {
-		if !identity.HasPermission(key.String()) {
-			return true
-		}
-	}
-	return false
+	return out
 }
 
 var _ appdomain.ClientService = (*ClientServiceImpl)(nil)
@@ -276,104 +261,98 @@ var _ appdomain.ClientService = (*ClientServiceImpl)(nil)
 // admits, and what its values must parse as — so a probe per question would be
 // three reads of one row per entry of the collection.
 
-func (s *ClientServiceImpl) claimRow(claimID domain.ID) claimRow {
-	const memoPrefix = "authcore.client.claim:"
+// claimRows resolves every requested definition in ONE read, memoised for the
+// request — so the three facts below share it and the write pays for one query
+// however many claims it carries.
+func (s *ClientServiceImpl) claimRows(claimIDs []domain.ID) map[domain.ID]claimRow {
+	return resolveRows(s.ctx, clientClaimMemoPrefix, claimIDs, func(missing []domain.ID) map[string]claimRow {
+		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+		found, err := s.companions().claims.Loader.FindAll(s.queryContext(), q)
+		if err != nil {
+			panic("Client: claim probe failed for the " + strconv.Itoa(len(missing)) + " claim(s) this write holds")
+		}
 
-	if s.ctx != nil {
-		if cached, ok := s.ctx.Get(memoPrefix + claimID.String()); ok {
-			if row, ok := cached.(claimRow); ok {
-				return row
+		// ARCHIVED IS SIMPLY ABSENT, and that is the point rather than a
+		// coincidence: the loader filters the archived rows out, so a retired
+		// definition never comes back and lands as the zero row — exactly the
+		// answer the rules want for it.
+		rows := make(map[string]claimRow, len(found))
+		for _, claim := range found {
+			rows[canonicalIDOf(claim.GetID())] = claimRow{
+				found:     true,
+				tenantID:  claim.TenantID,
+				appliesTo: claim.AppliesTo,
+				valueType: claim.ValueType,
 			}
 		}
-	}
-
-	// DEFENCE IN DEPTH, the same seat roleRow guards. The domain already
-	// refuses an entry id that is not a usable UUID before asking, but an
-	// unparseable value binds into a criterion against a UUID column, the driver
-	// rejects it, and the panic below would turn a validation problem into a
-	// 500. Answering "not found" is both safe and true — no claim row carries
-	// it.
-	if _, err := claimID.UUID(); err != nil {
-		return claimRow{found: false}
-	}
-
-	q := criteria.Where(criteria.Eq("ID", claimID))
-	found, err := s.companions().claims.Loader.FindOne(s.queryContext(), q)
-
-	var row claimRow
-	switch {
-	case err == nil:
-		row = claimRow{
-			found:     true,
-			tenantID:  found.TenantID,
-			appliesTo: found.AppliesTo,
-			valueType: found.ValueType,
-		}
-	case isRecordNotFound(err):
-		// ARCHIVED LANDS HERE TOO, and that is the point rather than a
-		// coincidence: the loader filters the archived rows out, so a retired
-		// definition is not found — which is exactly the answer the rule wants
-		// for it. The same reading roleRow relies on.
-		row = claimRow{found: false}
-	default:
-		// A failed probe PANICS rather than inventing an answer, matching every
-		// other probe in this file: a plausible answer would skip the invariant
-		// it exists to enforce.
-		panic("Client: claim probe failed for claim " + claimID.String())
-	}
-
-	if s.ctx != nil {
-		s.ctx.Set(memoPrefix+claimID.String(), row)
-	}
-	return row
+		return rows
+	})
 }
 
 // ClaimIsUnavailableInTenant answers absent, archived and foreign-tenant as ONE
-// value.
+// value, for every entry of the collection.
 //
 // The caller-facing message must not distinguish them: a distinct "belongs to
 // another tenant" reply confirms to a caller in tenant A that a specific UUID is
 // a live definition in some other tenant — an existence oracle over a
-// competitor's claim vocabulary. Verbatim the shape RoleIsUnavailableInTenant
-// already ships.
-func (s *ClientServiceImpl) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
-	row := s.claimRow(claimID)
-	if !row.found {
-		return true
+// competitor's claim vocabulary.
+func (s *ClientServiceImpl) ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.claimRows(claimIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = !row.found || row.tenantID != tenantID
 	}
-	return row.tenantID != tenantID
+	return out
 }
 
-// ClaimDoesNotApplyToClient answers whether the definition excludes machine clients.
+// ClaimDoesNotApplyToClient answers whether the definition excludes machine
+// clients.
 //
 // TRUE for an unknown id, the direction every probe in this file takes: a fact
 // that cannot resolve its subject reports the problem as present, so an
 // unresolvable entry can never pass a check by accident. In practice the
-// availability rule refuses it first and this is never reached for that entry.
-func (s *ClientServiceImpl) ClaimDoesNotApplyToClient(claimID domain.ID) bool {
-	row := s.claimRow(claimID)
-	if !row.found {
-		return true
+// availability rule refuses it first and the rule never reads this entry's
+// answer — the answer is computed anyway, because it rode the same read.
+func (s *ClientServiceImpl) ClaimDoesNotApplyToClient(claimIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.claimRows(claimIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		// ClaimAppliesToClient and Both admit a client; User does not, and
+		// neither does the Unknown sentinel — a value outside the closed set is
+		// not a permission to hold anything.
+		out[id] = !row.found ||
+			(row.appliesTo != vos.ClaimAppliesToClient && row.appliesTo != vos.ClaimAppliesToBoth)
 	}
-	// ClaimAppliesToClient and Both admit a client; User does not, and
-	// neither does the Unknown sentinel — a value outside the closed set is not
-	// a permission to hold anything.
-	return row.appliesTo != vos.ClaimAppliesToClient && row.appliesTo != vos.ClaimAppliesToBoth
+	return out
 }
 
-// ClaimValueDoesNotMatchValueType answers whether the value fails to parse as
-// the type the definition declares.
+// ClaimValueDoesNotMatchValueType answers whether each entry's value fails to
+// parse as the type its definition declares.
 //
 // It calls appdomain.ClaimValueMatchesValueType — the SAME function the catalog
 // uses for its own default_value at level 2 — rather than repeating the switch
 // here. Two levels of one chain must not disagree about what a bool is, and a
 // second copy is a rule that can drift from the first.
 //
+// THE ENTRY CARRIES BOTH HALVES, in the generated carrier: the id says which
+// definition, the value is what has to parse. Two parallel slices would be the
+// same pair with one more way to go wrong.
+//
 // TRUE for an unknown id, like its neighbour above.
-func (s *ClientServiceImpl) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
-	row := s.claimRow(claimID)
-	if !row.found {
-		return true
+func (s *ClientServiceImpl) ClaimValueDoesNotMatchValueType(entries []appdomain.ClientClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool {
+	ids := make([]domain.ID, 0, len(entries))
+	for _, entry := range entries {
+		ids = append(ids, entry.ClaimID)
 	}
-	return !appdomain.ClaimValueMatchesValueType(row.valueType, value)
+	rows := s.claimRows(ids)
+
+	out := make(map[domain.ID]bool, len(entries))
+	for _, entry := range entries {
+		row := rows[entry.ClaimID]
+		out[entry.ClaimID] = !row.found ||
+			!appdomain.ClaimValueMatchesValueType(row.valueType, entry.Value)
+	}
+	return out
 }

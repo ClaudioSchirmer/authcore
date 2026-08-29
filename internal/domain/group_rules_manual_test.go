@@ -19,6 +19,8 @@
 package domain
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
@@ -43,6 +45,11 @@ type probingGroupService struct {
 	askedEscalation   []domain.ID
 	keyTakenSelf      []domain.ID
 	askedTenant       int
+
+	// callsPerFact counts how many times each collection fact was ASKED, as
+	// opposed to how many entries it was asked about. `perEntry` promises ONE
+	// call per write whatever the size of the collection.
+	callsPerFact map[string]int
 }
 
 // availabilityQuestion records BOTH arguments, because which tenant the rule
@@ -62,22 +69,59 @@ func (s *probingGroupService) TenantIsUnavailable(_ domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingGroupService) RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool {
-	s.askedAvailability = append(s.askedAvailability, availabilityQuestion{tenantID, roleID})
-	return s.roleUnavailable
+// The three collection facts, each asked ONCE for the whole set.
+//
+// The stub keeps recording ONE QUESTION PER ID — which ids, and for the
+// availability fact which TENANT, are properties the batch did not change and
+// several cases below still assert. asked() counts the CALLS, the only thing
+// that can catch a regression to one call per entry.
+func (s *probingGroupService) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedAvailability = append(s.askedAvailability, availabilityQuestion{tenantID, id})
+		out[id] = s.roleUnavailable
+	}
+	return out
 }
 
-func (s *probingGroupService) RoleGrantsWildcard(id domain.ID) bool {
-	s.askedWildcard = append(s.askedWildcard, id)
-	return s.roleGrantsWildcard
+func (s *probingGroupService) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleGrantsWildcard")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedWildcard = append(s.askedWildcard, id)
+		out[id] = s.roleGrantsWildcard
+	}
+	return out
 }
 
-func (s *probingGroupService) CallerLacksAnyPermissionOf(id domain.ID) bool {
-	s.askedEscalation = append(s.askedEscalation, id)
-	return s.callerLacksSomeGrant
+func (s *probingGroupService) CallerLacksAnyPermissionOf(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("CallerLacksAnyPermissionOf")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedEscalation = append(s.askedEscalation, id)
+		out[id] = s.callerLacksSomeGrant
+	}
+	return out
+}
+
+// asked records one CALL of a collection fact.
+func (s *probingGroupService) asked(fact string) {
+	if s.callsPerFact == nil {
+		s.callsPerFact = map[string]int{}
+	}
+	s.callsPerFact[fact]++
 }
 
 const attachedRoleID = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"
+
+// A second and a third, for the one case that needs a collection rather than a
+// single entry: a batch of one cannot tell "asked once" apart from "asked once
+// per entry".
+const (
+	secondAttachedRoleID = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f62"
+	thirdAttachedRoleID  = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f63"
+)
 
 // groupNotificationsOf reads what the aggregate itself recorded — the seat the
 // collection's own verbs report through, which is not the same place a refused
@@ -202,21 +246,31 @@ func TestTheAvailabilityProbeIsAskedWithTheGroupsOwnTenant(t *testing.T) {
 	}
 }
 
-// An unavailable role stops the walk for THAT entry: nothing below can say
-// anything true about a role that is not there, and the wildcard probe answers
-// "yes" for an unresolvable id anyway. Reporting all three for one bad id would
-// be noise — and the 403 the escalation rule raises would blame the caller for
-// a problem whose honest answer is a 422 saying the role is not there.
-func TestAnUnavailableRoleIsNotAlsoJudgedByTheLaterRules(t *testing.T) {
-	svc := &probingGroupService{roleUnavailable: true}
+// ONE PROBLEM PER ENTRY. An unavailable role is one refusal: nothing below can
+// say anything true about a role that is not there, every later fact answers
+// "the problem is present" for an unresolvable id, and the 403 the escalation
+// rule raises would blame the caller for a problem whose honest answer is a 422
+// saying the role is not there.
+//
+// The interlock is about the ANSWER rather than about the question — the three
+// facts are asked once each for the whole collection, so a bad entry's later
+// verdicts are computed and simply not read. The stub answers TRUE to all three,
+// which is what makes this assertion mean something.
+func TestAnUnavailableRoleIsReportedOnceAndNothingElse(t *testing.T) {
+	svc := &probingGroupService{
+		roleUnavailable:      true,
+		roleGrantsWildcard:   true,
+		callerLacksSomeGrant: true,
+	}
 	e := groupConferring(aggregatevos.GroupRole{RoleID: domain.NewID(attachedRoleID)})
 
-	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
+	_, err := domain.GetInsertable(e, svc, "GetInsertable")
+	if err == nil {
 		t.Fatal("expected a refusal")
 	}
-	if len(svc.askedWildcard) != 0 || len(svc.askedEscalation) != 0 {
-		t.Errorf("an unavailable role still reached the later probes (wildcard: %d, escalation: %d)",
-			len(svc.askedWildcard), len(svc.askedEscalation))
+	keys := groupNotificationKeysOf(err)
+	if len(keys) != 1 {
+		t.Errorf("one unavailable role produced %d answers, want exactly 1: %v", len(keys), keys)
 	}
 }
 
@@ -235,25 +289,77 @@ func TestAttachingAWildcardBearingRoleIsRefused(t *testing.T) {
 	}
 }
 
-// THE ORDERING TEST, and the reason the two rules are a pair rather than one.
+// THE ORDERING CASE, and where its load now sits.
 //
-// Identity.HasPermission PANICS on any argument containing '*'. The escalation
-// probe is what would hand it that string, so the wildcard refusal has to run
-// FIRST and short-circuit. If this ever regresses, the symptom in production is
-// not a 403 — it is a panicked 500, on exactly the request the rule exists to
-// refuse.
-func TestAWildcardBearingRoleNeverReachesTheEscalationProbe(t *testing.T) {
-	svc := &probingGroupService{roleGrantsWildcard: true}
+// Identity.HasPermission PANICS on any argument containing '*'. The rule can no
+// longer promise the escalation fact is not ASKED about a wildcard-bearing role
+// — it is asked about every entry at once — so what keeps the panic away is the
+// guarantee the fact's own description carries and its body implements: it
+// GUARDS THE WILDCARD ITSELF and answers "lacks" instead of calling through
+// (internal/infra/role_probe.go, callerLacksAnyPermissionOfRole).
+//
+// What the domain still owns, and what this pins, is that one entry produces one
+// answer: a wildcard-bearing role is reported as a wildcard and as nothing else.
+func TestAWildcardBearingRoleIsReportedAsWildcardAndNothingElse(t *testing.T) {
+	svc := &probingGroupService{roleGrantsWildcard: true, callerLacksSomeGrant: true}
 	e := groupConferring(aggregatevos.GroupRole{RoleID: domain.NewID(attachedRoleID)})
 
-	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
+	_, err := domain.GetInsertable(e, svc, "GetInsertable")
+	if err == nil {
 		t.Fatal("expected a refusal")
 	}
 	if len(svc.askedWildcard) == 0 {
-		t.Fatal("the wildcard probe never ran — the ordering this test pins does not exist")
+		t.Fatal("the wildcard fact never ran — the rule this test pins does not exist")
 	}
-	if len(svc.askedEscalation) != 0 {
-		t.Error("a wildcard-bearing role reached CallerLacksAnyPermissionOf, which is what panics on '*'")
+	keys := groupNotificationKeysOf(err)
+	if len(keys) != 1 {
+		t.Errorf("one wildcard-bearing role produced %d answers, want exactly 1: %v", len(keys), keys)
+	}
+}
+
+// groupNotificationKeysOf lists the notification TYPES a refusal carries, which
+// is what "one answer per entry" is asserted on: the blamed field is "Roles" for
+// all three rules, so counting fields would count the same name three times.
+func groupNotificationKeysOf(err error) []string {
+	var carrier domain.NotificationCarrier
+	if !errors.As(err, &carrier) {
+		return nil
+	}
+	var out []string
+	for _, ctx := range carrier.NotificationContexts() {
+		for _, msg := range ctx.Messages() {
+			out = append(out, fmt.Sprintf("%T", msg.Notification))
+		}
+	}
+	return out
+}
+
+// THE COST THE `perEntry` FACTS BUY, pinned where a regression would otherwise
+// be invisible: every collection fact is asked ONCE for the whole write,
+// however many roles it attaches. Nothing about the OUTCOME changes if this
+// regresses to one call per entry, which is why the call count is asserted.
+func TestEveryGroupCollectionFactIsAskedOnceForTheWholeWrite(t *testing.T) {
+	e := validGroup()
+	for _, id := range []string{attachedRoleID, secondAttachedRoleID, thirdAttachedRoleID} {
+		e.AddGroupRole(aggregatevos.GroupRole{RoleID: domain.NewID(id)})
+	}
+
+	svc := &probingGroupService{}
+	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err != nil {
+		t.Fatalf("a group conferring three available roles was refused: %v", groupRejectedFields(err))
+	}
+
+	for _, fact := range []string{
+		"RoleIsUnavailableInTenant", "RoleGrantsWildcard", "CallerLacksAnyPermissionOf",
+	} {
+		if got := svc.callsPerFact[fact]; got != 1 {
+			t.Errorf("%s was asked %d times for a write carrying three roles, want exactly 1", fact, got)
+		}
+	}
+
+	// And it was asked about EVERY entry: one call, three subjects.
+	if len(svc.askedAvailability) != 3 {
+		t.Errorf("the single call carried %d roles, want all three", len(svc.askedAvailability))
 	}
 }
 

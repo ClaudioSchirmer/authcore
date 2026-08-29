@@ -673,7 +673,7 @@ service:
     - name: PermissionIsNotInCatalog
       kind: manual
       returns: bool
-      filters: [Permissions.PermissionID]
+      perEntry: Permissions.PermissionID
       description: >-
         Whether this permission id is absent from the catalog or points at an archived
         permission.
@@ -681,7 +681,7 @@ service:
     - name: PermissionIsWildcard
       kind: manual
       returns: bool
-      filters: [Permissions.PermissionID]
+      perEntry: Permissions.PermissionID
       description: >-
         Whether the catalog row behind this id carries a wildcard in either part. Answers
         true when the id is unknown, so an unresolvable grant never reaches the escalation
@@ -690,7 +690,7 @@ service:
     - name: CallerDoesNotHoldPermission
       kind: manual
       returns: bool
-      filters: [Permissions.PermissionID]
+      perEntry: Permissions.PermissionID
       description: >-
         Whether the requesting caller lacks the permission behind this id. Reads
         ctx.Identity() through the request-scoped service. It GUARDS THE WILDCARD ITSELF and

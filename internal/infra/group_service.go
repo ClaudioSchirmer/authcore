@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:52269ca4f8aae78a2c29ce237658439c5778f9560ee322ad2f1115a4d7a53ed9
+// checksum:   sha256:b24cae79f587ba3a0a66c5703b19c2f98a93837d7c176ee497f23a31664757a3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *GroupServiceImpl) queryContext() context.Context {
 // already holds this key. Excludes the row being updated.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a

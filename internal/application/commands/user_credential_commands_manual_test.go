@@ -78,17 +78,33 @@ func (s *credentialService) HashPassword(p string) string      { return s.hasher
 func (s *credentialService) PasswordIsUnchanged(p, hash string) bool {
 	return hash != "" && s.hasher.Matches(p, hash)
 }
-func (s *credentialService) TenantIsUnavailable(domain.ID) bool                   { return false }
-func (s *credentialService) GroupIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
-func (s *credentialService) GroupGrantsWildcard(domain.ID) bool                   { return false }
-func (s *credentialService) CallerLacksAnyPermissionOfGroup(domain.ID) bool       { return false }
-func (s *credentialService) RoleIsUnavailableInTenant(domain.ID, domain.ID) bool  { return false }
-func (s *credentialService) RoleGrantsWildcard(domain.ID) bool                    { return false }
-func (s *credentialService) CallerLacksAnyPermissionOfRole(domain.ID) bool        { return false }
-func (s *credentialService) ClaimIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
-func (s *credentialService) ClaimDoesNotApplyToUser(domain.ID) bool               { return false }
-func (s *credentialService) ClaimValueDoesNotMatchValueType(domain.ID, string) bool {
-	return false
+func (s *credentialService) TenantIsUnavailable(domain.ID) bool { return false }
+
+// The collection facts answer NOTHING for every entry — an empty map, which
+// each rule reads as the zero value and raises nothing. Same "nothing found"
+// posture the generated stub takes, in the shape `perEntry` gives it.
+func (s *credentialService) GroupIsUnavailableInTenant(domain.ID, []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *credentialService) GroupGrantsWildcard([]domain.ID) map[domain.ID]bool { return nil }
+func (s *credentialService) CallerLacksAnyPermissionOfGroup([]domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *credentialService) RoleIsUnavailableInTenant(domain.ID, []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *credentialService) RoleGrantsWildcard([]domain.ID) map[domain.ID]bool { return nil }
+func (s *credentialService) CallerLacksAnyPermissionOfRole([]domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *credentialService) ClaimIsUnavailableInTenant(domain.ID, []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *credentialService) ClaimDoesNotApplyToUser([]domain.ID) map[domain.ID]bool { return nil }
+func (s *credentialService) ClaimValueDoesNotMatchValueType(
+	[]appdomain.UserClaimValueDoesNotMatchValueTypeEntry,
+) map[domain.ID]bool {
+	return nil
 }
 
 // ── fixtures ────────────────────────────────────────────────────────────────

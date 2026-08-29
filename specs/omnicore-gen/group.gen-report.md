@@ -52,19 +52,28 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
 
-**`RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool`**
+**`RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this role id is absent from the roles table, points at an archived role, or belongs to a tenant OTHER than the one passed. One answer for all three questions — the caller-facing message must not distinguish them, because a distinct "belongs to another tenant" reply is an existence oracle over a competitor's org chart.
 
-**`RoleGrantsWildcard(roleID domain.ID) bool`**
+**`RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the role behind this id grants any permission carrying a wildcard in either part. Resolve the role through RoleRepository.Loader, whose declared read join fills every grant's resource and action. Answers TRUE when the id is unknown, so an unresolvable attachment never reaches the escalation probe.
 
-**`CallerLacksAnyPermissionOf(roleID domain.ID) bool`**
+**`CallerLacksAnyPermissionOf(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the requesting caller fails to hold at least one of the permissions this role grants — the TRANSITIVE half of the escalation rule. Resolves the role through the same single read RoleGrantsWildcard uses, then asks the caller's claim for every key it found. Judges EVERY key the role grants, archived catalog rows included: that is the fail-closed direction, and since the grants no longer carry the catalog row's archive stamp it is also the only reading expressible without a second query. It GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through — defence in depth behind the wildcard rule, because a panic on a security rule is a 500. Reads ctx.Identity() through the request-scoped service.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+### `internal/infra/group_service_manual.go` — bodies the spec no longer asks for
+
+This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
+
+- `func (s *GroupServiceImpl) companions(...)`
+- `func (s *GroupServiceImpl) roleRow(...)`
+
+⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
 ### The migration — already yours
 
@@ -194,40 +203,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the groups feature (repository + view + mount) | `bootstrap/groups_feature.go` |
-| the archive command and result | `internal/application/commands/archive_group_command.go` |
-| the shapes for 1 child collection(s) | `internal/application/commands/group_child_results.go` |
-| tests for the command mappers | `internal/application/commands/group_commands_test.go` |
-| the per-entry commands for group_roles | `internal/application/commands/group_role_commands.go` |
-| the insert command and result | `internal/application/commands/insert_group_command.go` |
-| the patch command and result | `internal/application/commands/patch_group_command.go` |
-| tests for the 1 collection input mapper(s) | `internal/application/dtos/group_dtos_test.go` |
-| the GroupRole input DTO | `internal/application/dtos/group_role_input.go` |
-| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/group_queries_test.go` |
-| the read shapes for 1 child collection(s) | `internal/application/queries/group_row_results.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/group_translations_test.go` |
-| tests for the collection types | `internal/domain/aggregatevos/group_children_test.go` |
-| the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
-| the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
 | the Group service port (5 fact(s)) | `internal/domain/group_service.go` |
 | tests for Group's rules | `internal/domain/group_test.go` |
-| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
 | the Group service implementation | `internal/infra/group_service.go` |
-| the group_roles child schema | `internal/infra/schemas/group_role_schema.go` |
-| the groups schema (4 columns) | `internal/infra/schemas/group_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/group_schemas_test.go` |
-| the groups view (relational-backed) | `internal/infra/views/group_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/group_view_test.go` |
-| the 5 group endpoints | `internal/web/group_routes.go` |
-| the by-id request and response | `internal/web/requests/find_group_by_id.go` |
-| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
-| the wire types for 1 child collection(s) | `internal/web/requests/group_children.go` |
-| the request mapper tests | `internal/web/requests/group_requests_test.go` |
-| the per-entry wire types for group_roles | `internal/web/requests/group_role_requests.go` |
-| the insert request and response | `internal/web/requests/insert_group.go` |
-| the patch request and response | `internal/web/requests/patch_group.go` |
 
 **Left untouched** (yours, by design):
 
@@ -236,7 +214,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-1 file(s) were already up to date.
+32 file(s) were already up to date.
 
 ## What was NOT generated
 

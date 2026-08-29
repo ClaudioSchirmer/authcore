@@ -63,16 +63,28 @@ type clientSecretService struct {
 	hasher *infra.SHA256SecretHasher
 }
 
-func (s *clientSecretService) NameTaken(domain.ID, string, domain.ID) bool          { return false }
-func (s *clientSecretService) HashSecret(secret string) string                      { return s.hasher.Hash(secret) }
-func (s *clientSecretService) TenantIsUnavailable(domain.ID) bool                   { return false }
-func (s *clientSecretService) RoleIsUnavailableInTenant(domain.ID, domain.ID) bool  { return false }
-func (s *clientSecretService) RoleGrantsWildcard(domain.ID) bool                    { return false }
-func (s *clientSecretService) CallerLacksAnyPermissionOfRole(domain.ID) bool        { return false }
-func (s *clientSecretService) ClaimIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
-func (s *clientSecretService) ClaimDoesNotApplyToClient(domain.ID) bool             { return false }
-func (s *clientSecretService) ClaimValueDoesNotMatchValueType(domain.ID, string) bool {
-	return false
+func (s *clientSecretService) NameTaken(domain.ID, string, domain.ID) bool { return false }
+func (s *clientSecretService) HashSecret(secret string) string             { return s.hasher.Hash(secret) }
+func (s *clientSecretService) TenantIsUnavailable(domain.ID) bool          { return false }
+
+// The collection facts answer NOTHING for every entry — an empty map, which each
+// rule reads as the zero value and raises nothing. Same "nothing found" posture
+// the generated stub takes, in the shape `perEntry` gives it.
+func (s *clientSecretService) RoleIsUnavailableInTenant(domain.ID, []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *clientSecretService) RoleGrantsWildcard([]domain.ID) map[domain.ID]bool { return nil }
+func (s *clientSecretService) CallerLacksAnyPermissionOfRole([]domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *clientSecretService) ClaimIsUnavailableInTenant(domain.ID, []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (s *clientSecretService) ClaimDoesNotApplyToClient([]domain.ID) map[domain.ID]bool { return nil }
+func (s *clientSecretService) ClaimValueDoesNotMatchValueType(
+	[]appdomain.ClientClaimValueDoesNotMatchValueTypeEntry,
+) map[domain.ID]bool {
+	return nil
 }
 
 // ── fixtures ────────────────────────────────────────────────────────────────

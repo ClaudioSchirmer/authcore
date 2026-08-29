@@ -99,31 +99,42 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
 
-**`RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool`**
+**`RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this role id is absent from the roles table, points at an archived role, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
 
-**`RoleGrantsWildcard(roleID domain.ID) bool`**
+**`RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this role grants a permission carrying a wildcard in either part. Answers TRUE when the id is unknown, so an unresolvable grant never reaches the escalation probe — the framework's HasPermission panics on a wildcard argument.
 
-**`CallerLacksAnyPermissionOfRole(roleID domain.ID) bool`**
+**`CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the requesting caller fails to hold at least one permission this role confers — the escalation half. GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through, because a panic on a security rule is a 500. A *:* superadmin passes by construction.
 
-**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool`**
+**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this claim id is absent from the claims table, points at an archived definition, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
 
-**`ClaimDoesNotApplyToClient(claimID domain.ID) bool`**
+**`ClaimDoesNotApplyToClient(claimIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the definition behind this id declares appliesTo: user, so no machine client may hold a value for it. client and both answer false. Answers TRUE for an unknown id.
 
-**`ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool`**
+**`ClaimValueDoesNotMatchValueType(entries []ClientClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool`**
 
 > Whether the value fails to parse as the ValueType the definition declares: `number` wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants any non-empty value. The same three readings the catalog's own default-value check uses. Answers TRUE for an unknown id.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+### `internal/infra/client_service_manual.go` — bodies the spec no longer asks for
+
+This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
+
+- `func (s *ClientServiceImpl) companions(...)`
+- `func (s *ClientServiceImpl) roleRow(...)`
+- `func (s *ClientServiceImpl) callerLacksAnyPermissionOfRole(...)`
+- `func (s *ClientServiceImpl) claimRow(...)`
+
+⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
 ### Fields nothing generated fills
 
@@ -342,52 +353,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the clients feature (repository + view + mount) | `bootstrap/clients_feature.go` |
-| the archive command and result | `internal/application/commands/archive_client_command.go` |
-| the per-entry commands for client_allowed_cidrs | `internal/application/commands/client_allowed_cidr_commands.go` |
-| the shapes for 3 child collection(s) | `internal/application/commands/client_child_results.go` |
-| the per-entry commands for client_claims | `internal/application/commands/client_claim_commands.go` |
-| tests for the command mappers | `internal/application/commands/client_commands_test.go` |
-| the per-entry commands for client_roles | `internal/application/commands/client_role_commands.go` |
-| the insert command and result | `internal/application/commands/insert_client_command.go` |
-| the patch command and result | `internal/application/commands/patch_client_command.go` |
-| the ClientAllowedCIDR input DTO | `internal/application/dtos/client_allowed_cidr_input.go` |
-| the ClientClaim input DTO | `internal/application/dtos/client_claim_input.go` |
-| tests for the 3 collection input mapper(s) | `internal/application/dtos/client_dtos_test.go` |
-| the ClientRole input DTO | `internal/application/dtos/client_role_input.go` |
-| the read criteria tests | `internal/application/queries/client_queries_test.go` |
-| the read shapes for 3 child collection(s) | `internal/application/queries/client_row_results.go` |
-| the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
-| the ClientAllowedCIDR child value object | `internal/domain/aggregatevos/client_allowed_cidr.go` |
-| tests for the collection types | `internal/domain/aggregatevos/client_children_test.go` |
-| the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
-| the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
-| the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
 | the Client service port (9 fact(s)) | `internal/domain/client_service.go` |
 | tests for Client's rules | `internal/domain/client_test.go` |
-| the ClientStatus enumeration (2 members) | `internal/domain/vos/client_status.go` |
-| tests for 1 value object(s) | `internal/domain/vos/client_vos_test.go` |
-| the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
 | the Client service implementation | `internal/infra/client_service.go` |
-| the client_allowed_cidrs child schema | `internal/infra/schemas/client_allowed_cidr_schema.go` |
-| the client_claims child schema | `internal/infra/schemas/client_claim_schema.go` |
-| the client_roles child schema | `internal/infra/schemas/client_role_schema.go` |
-| the clients schema (8 columns) | `internal/infra/schemas/client_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/client_schemas_test.go` |
-| the clients view (relational-backed) | `internal/infra/views/client_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/client_view_test.go` |
-| the 5 client endpoints | `internal/web/client_routes.go` |
-| the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
-| the wire types for 3 child collection(s) | `internal/web/requests/client_children.go` |
-| the per-entry wire types for client_claims | `internal/web/requests/client_claim_requests.go` |
-| the request mapper tests | `internal/web/requests/client_requests_test.go` |
-| the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
-| the by-id request and response | `internal/web/requests/find_client_by_id.go` |
-| the listing request and response | `internal/web/requests/find_clients_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_client.go` |
-| the patch request and response | `internal/web/requests/patch_client.go` |
 
 **Left untouched** (yours, by design):
 
@@ -396,7 +364,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-1 file(s) were already up to date.
+44 file(s) were already up to date.
 
 ## What was NOT generated
 

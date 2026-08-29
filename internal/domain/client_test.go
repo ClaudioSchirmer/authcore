@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:5f27257d9c607817a032133cec67ec2fd42e4a399e3a8eaf2f1472d7063fc179
+// checksum:   sha256:01a1cf4ecb469d51045669ac3afb9e2776ca6fb3a29342760dd7244dbb68dc45
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,15 +83,21 @@ type stubClientService struct {
 	domain.ServiceBase
 }
 
-func (stubClientService) NameTaken(_ domain.ID, _ string, _ domain.ID) bool          { return false }
-func (stubClientService) HashSecret(_ string) string                                 { return "" }
-func (stubClientService) TenantIsUnavailable(_ domain.ID) bool                       { return false }
-func (stubClientService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool    { return false }
-func (stubClientService) RoleGrantsWildcard(_ domain.ID) bool                        { return false }
-func (stubClientService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool            { return false }
-func (stubClientService) ClaimIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
-func (stubClientService) ClaimDoesNotApplyToClient(_ domain.ID) bool                 { return false }
-func (stubClientService) ClaimValueDoesNotMatchValueType(_ domain.ID, _ string) bool { return false }
+func (stubClientService) NameTaken(_ domain.ID, _ string, _ domain.ID) bool { return false }
+func (stubClientService) HashSecret(_ string) string                        { return "" }
+func (stubClientService) TenantIsUnavailable(_ domain.ID) bool              { return false }
+func (stubClientService) RoleIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubClientService) RoleGrantsWildcard(_ []domain.ID) map[domain.ID]bool             { return nil }
+func (stubClientService) CallerLacksAnyPermissionOfRole(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubClientService) ClaimIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubClientService) ClaimDoesNotApplyToClient(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubClientService) ClaimValueDoesNotMatchValueType(_ []ClientClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool {
+	return nil
+}
 
 // validClient returns an aggregate that satisfies every declared rule.
 //

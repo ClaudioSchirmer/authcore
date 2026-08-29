@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:78d2134553c843d844953440f55c0d3d11852403f908639782cb740ff2bcd241
+// checksum:   sha256:a554b2a71594d85055bd7a4931049beb5475b20788de0a4affd941335a13d406
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,19 +83,27 @@ type stubUserService struct {
 	domain.ServiceBase
 }
 
-func (stubUserService) EmailTaken(_ string, _ domain.ID) bool                      { return false }
-func (stubUserService) HashPassword(_ string) string                               { return "" }
-func (stubUserService) PasswordIsUnchanged(_ string, _ string) bool                { return false }
-func (stubUserService) TenantIsUnavailable(_ domain.ID) bool                       { return false }
-func (stubUserService) GroupIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
-func (stubUserService) GroupGrantsWildcard(_ domain.ID) bool                       { return false }
-func (stubUserService) CallerLacksAnyPermissionOfGroup(_ domain.ID) bool           { return false }
-func (stubUserService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool    { return false }
-func (stubUserService) RoleGrantsWildcard(_ domain.ID) bool                        { return false }
-func (stubUserService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool            { return false }
-func (stubUserService) ClaimIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
-func (stubUserService) ClaimDoesNotApplyToUser(_ domain.ID) bool                   { return false }
-func (stubUserService) ClaimValueDoesNotMatchValueType(_ domain.ID, _ string) bool { return false }
+func (stubUserService) EmailTaken(_ string, _ domain.ID) bool       { return false }
+func (stubUserService) HashPassword(_ string) string                { return "" }
+func (stubUserService) PasswordIsUnchanged(_ string, _ string) bool { return false }
+func (stubUserService) TenantIsUnavailable(_ domain.ID) bool        { return false }
+func (stubUserService) GroupIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubUserService) GroupGrantsWildcard(_ []domain.ID) map[domain.ID]bool             { return nil }
+func (stubUserService) CallerLacksAnyPermissionOfGroup(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubUserService) RoleIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubUserService) RoleGrantsWildcard(_ []domain.ID) map[domain.ID]bool             { return nil }
+func (stubUserService) CallerLacksAnyPermissionOfRole(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubUserService) ClaimIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubUserService) ClaimDoesNotApplyToUser(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubUserService) ClaimValueDoesNotMatchValueType(_ []UserClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool {
+	return nil
+}
 
 // validUser returns an aggregate that satisfies every declared rule.
 //

@@ -690,7 +690,8 @@ service:
     - name: RoleIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Roles.RoleID]
+      perEntry: Roles.RoleID
+      filters: [TenantID]
       description: >-
         Whether this role id is absent from the roles table, points at an archived role, or
         belongs to a tenant OTHER than the one passed. One answer for all three questions —
@@ -701,7 +702,7 @@ service:
     - name: RoleGrantsWildcard
       kind: manual
       returns: bool
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
       description: >-
         Whether the role behind this id grants any permission carrying a wildcard in either
         part. Resolve the role through RoleRepository.Loader, whose declared read join fills
@@ -721,7 +722,7 @@ service:
         It GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through —
         defence in depth behind the wildcard rule, because a panic on a security rule is a
         500. Reads ctx.Identity() through the request-scoped service.
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
 
     # NOTE — CallerIsSuperAdmin is deliberately NOT declared. On Role the identical fact was
     # declared, implemented and tested, and NO rule ever called it: the generator answers the

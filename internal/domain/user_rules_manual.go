@@ -234,16 +234,48 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 	// the entity unusable on a bench that has no tokens.
 	identityGates := e.RequestingIdentityPresent
 
+	// USABLE IDS ONLY, and the filter runs BEFORE the questions rather than
+	// inside the loop. Every fact below hands these ids to a criterion against
+	// a UUID column, so a value uuid.Parse refuses makes the query error and
+	// the probe panic: a 500 on a request whose problem is plain validation. It
+	// raises nothing on purpose — the framework's own child validation reports
+	// the bad id.
+	judged := make([]aggregatevos.UserGroup, 0, len(added))
+	groupIDs := make([]domain.ID, 0, len(added))
 	for _, joined := range added {
-		// USABLE, not merely non-empty. Every probe below hands this id to a
-		// criterion against a UUID column, so a value uuid.Parse refuses makes
-		// the query error and the probe panic: a 500 on a request whose problem
-		// is plain validation. It raises nothing on purpose — the framework's
-		// own child validation reports the bad id.
 		if _, err := joined.GroupID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, joined)
+		groupIDs = append(groupIDs, joined.GroupID)
+	}
+	if len(judged) == 0 {
+		return
+	}
 
+	// THREE QUESTIONS, ASKED ONCE EACH FOR THE WHOLE COLLECTION. The facts are
+	// `perEntry`, so each answers a map keyed by the entry's id and the service
+	// resolves the set in one read — a user joining ten groups costs what one
+	// costs. The verdicts are still per entry: the loop below reads them.
+	//
+	// EVERY QUESTION IS ASKED OF EVERY ENTRY, including entries the first
+	// answer already refuses. The old shape skipped the later probes for a bad
+	// entry to save round trips; there are no round trips left to save, and the
+	// answers are identical — an unresolvable group reads TRUE from the
+	// wildcard fact either way. What did NOT change is what the caller is told:
+	// the interlock below still reports one problem per entry.
+	//
+	// The escalation fact is not asked at all when the request carried no
+	// identity: there is nobody to compare the bundles against.
+	unavailable := service.GroupIsUnavailableInTenant(e.TenantID, groupIDs)
+	grantsWildcard := service.GroupGrantsWildcard(groupIDs)
+
+	var escalates map[domain.ID]bool
+	if identityGates {
+		escalates = service.CallerLacksAnyPermissionOfGroup(groupIDs)
+	}
+
+	for _, joined := range judged {
 		// NEVER read joined.GroupKey / joined.GroupName here. They are
 		// read-join fields: filled on entries LOADED from the row, and blank on
 		// an entry this write just added — which is every entry in this loop.
@@ -261,7 +293,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// The tenant asked about is the ROW's, not the caller's. On the
 		// ordinary path they are the same value, but a *:* super-admin crosses
 		// that scope, and when they do "this tenant" must mean the user's.
-		if service.GroupIsUnavailableInTenant(e.TenantID, joined.GroupID) {
+		if unavailable[joined.GroupID] {
 			r.AddNotification("Groups", GroupNotAvailableInTenantNotification{}, joined.GroupID.String())
 			// Nothing below can say anything true about a group that is not
 			// there, and the wildcard probe already answers "yes" for an
@@ -278,7 +310,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// Consequence, accepted and consistent with the rest of the service:
 		// the platform's own superadmin user cannot be created through this
 		// API. It is seeded by migration beside the reserved platform tenant.
-		if service.GroupGrantsWildcard(joined.GroupID) {
+		if grantsWildcard[joined.GroupID] {
 			r.AddNotification("Groups", CannotJoinWildcardGroupNotification{}, joined.GroupID.String())
 			continue
 		}
@@ -288,7 +320,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// and the caller must hold every one of them. A set, not one key.
 		// A *:* superadmin passes by construction — HasPermission answers true
 		// for any concrete permission when the claim set contains it.
-		if identityGates && service.CallerLacksAnyPermissionOfGroup(joined.GroupID) {
+		if escalates[joined.GroupID] {
 			r.AddNotification("Groups", CannotJoinGroupWithUnheldPermissionsNotification{}, joined.GroupID.String())
 		}
 	}
@@ -308,25 +340,44 @@ func (e *User) refuseUngrantableRoles(service UserService, r *domain.Rules) {
 	added := domain.GetAddedItemsOf[aggregatevos.UserRole](&e.AggregateRoot)
 	identityGates := e.RequestingIdentityPresent
 
+	// The same batched shape the group half above documents: unusable ids
+	// filtered first, three questions asked once each, verdicts read per entry.
+	judged := make([]aggregatevos.UserRole, 0, len(added))
+	roleIDs := make([]domain.ID, 0, len(added))
 	for _, granted := range added {
 		if _, err := granted.RoleID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, granted)
+		roleIDs = append(roleIDs, granted.RoleID)
+	}
+	if len(judged) == 0 {
+		return
+	}
 
+	unavailable := service.RoleIsUnavailableInTenant(e.TenantID, roleIDs)
+	grantsWildcard := service.RoleGrantsWildcard(roleIDs)
+
+	var escalates map[domain.ID]bool
+	if identityGates {
+		escalates = service.CallerLacksAnyPermissionOfRole(roleIDs)
+	}
+
+	for _, granted := range judged {
 		// ── role-available-in-tenant ──
-		if service.RoleIsUnavailableInTenant(e.TenantID, granted.RoleID) {
+		if unavailable[granted.RoleID] {
 			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
 			continue
 		}
 
 		// ── role-wildcard-refused ──
-		if service.RoleGrantsWildcard(granted.RoleID) {
+		if grantsWildcard[granted.RoleID] {
 			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
 			continue
 		}
 
 		// ── role-no-escalation ──
-		if identityGates && service.CallerLacksAnyPermissionOfRole(granted.RoleID) {
+		if escalates[granted.RoleID] {
 			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
 		}
 	}
@@ -364,15 +415,40 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		domain.GetChangedItemsOf[aggregatevos.UserClaim](&e.AggregateRoot)...,
 	)
 
+	// USABLE IDS ONLY, filtered before anything is asked — every fact below
+	// hands these ids to a criterion against a UUID column, so a value
+	// uuid.Parse refuses would make the query error and the probe panic. It
+	// raises nothing: the framework's own child validation reports the bad id.
+	//
+	// THE ENTRIES TRAVEL WHOLE, not as two parallel slices: the value-type
+	// question needs the id AND the value of the SAME entry, and the generated
+	// carrier is what keeps that pair from being misaligned by a caller.
+	judged := make([]aggregatevos.UserClaim, 0, len(touched))
+	claimIDs := make([]domain.ID, 0, len(touched))
+	entries := make([]UserClaimValueDoesNotMatchValueTypeEntry, 0, len(touched))
 	for _, held := range touched {
-		// USABLE, not merely non-empty — every probe below hands this id to a
-		// criterion against a UUID column, so a value uuid.Parse refuses would
-		// make the query error and the probe panic. It raises nothing: the
-		// framework's own child validation reports the bad id.
 		if _, err := held.ClaimID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, held)
+		claimIDs = append(claimIDs, held.ClaimID)
+		entries = append(entries, UserClaimValueDoesNotMatchValueTypeEntry{
+			ClaimID: held.ClaimID,
+			Value:   held.Value.Value(),
+		})
+	}
+	if len(judged) == 0 {
+		return
+	}
 
+	// THREE QUESTIONS, ASKED ONCE EACH, exactly as the two collections above.
+	// One read of the catalog answers all three however many claims the write
+	// carries; the verdicts below are still per entry.
+	unavailable := service.ClaimIsUnavailableInTenant(e.TenantID, claimIDs)
+	notForUsers := service.ClaimDoesNotApplyToUser(claimIDs)
+	valueMismatched := service.ClaimValueDoesNotMatchValueType(entries)
+
+	for _, held := range judged {
 		// NEVER read held.ClaimName / held.ClaimValueType here. They are
 		// read-join fields — filled on entries LOADED from the row and blank on
 		// one this write just added — so the type check below asks the SERVICE
@@ -394,7 +470,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// The tenant asked about is the ROW's, not the caller's: on the
 		// ordinary path they are the same value, but a *:* super-admin crosses
 		// that scope, and when they do "this tenant" must mean the user's.
-		if service.ClaimIsUnavailableInTenant(e.TenantID, held.ClaimID) {
+		if unavailable[held.ClaimID] {
 			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
 			// Nothing below can say anything true about a definition that is
 			// not there, and both probes answer "the problem is present" for an
@@ -407,7 +483,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// The definition declares which identity kinds may hold a value:
 		// `user`, `client` or `both`. This is what finally makes that column
 		// mean something rather than merely state it.
-		if service.ClaimDoesNotApplyToUser(held.ClaimID) {
+		if notForUsers[held.ClaimID] {
 			r.AddNotification("Claims", ClaimDoesNotApplyToUserNotification{}, held.ClaimID.String())
 			continue
 		}
@@ -420,7 +496,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// The rejected value is echoed rather than the id: the caller knows
 		// which entry they sent, and what they need told back is the string
 		// that did not parse.
-		if service.ClaimValueDoesNotMatchValueType(held.ClaimID, held.Value.Value()) {
+		if valueMismatched[held.ClaimID] {
 			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
 		}
 	}

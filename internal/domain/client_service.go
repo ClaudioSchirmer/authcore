@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:e3ddaa478949ae779502b0dc64a070760e14a66e79120419d32f8ea4293c70b4
+// checksum:   sha256:c81b3cecba9f8150daa8e60d814d23a6753419cd2ee7e29005550332161d04e0
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,47 +59,100 @@ type ClientService interface {
 	// Whether this role id is absent from the roles table, points at an
 	// archived role, or belongs to a tenant OTHER than the one passed. One
 	// answer for all three — the caller-facing message must not distinguish
-	// them. Asked ONCE PER ENTRY of Roles, so the answer is about that entry
-	// and the cost of the body is multiplied by the size of the collection.
-	RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool
+	// them. Asked ONCE for the WHOLE of Roles and answered per entry, keyed by
+	// RoleID. A key MISSING from the answer is this fact answering NOTHING for
+	// that entry, and at the call site Go's zero value settles what that
+	// means: absent reads as false, which is the answer a fact named for the
+	// PROBLEM wants, so nothing is raised. Say "this entry IS the problem" by
+	// putting the answer in the map — never by leaving the key out, which is
+	// silence rather than a verdict. Where the source could not be reached at
+	// all, fail: the port returns no error precisely so that decision is made
+	// here.
+	RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether this role grants a permission carrying a wildcard in either
 	// part. Answers TRUE when the id is unknown, so an unresolvable grant
 	// never reaches the escalation probe — the framework's HasPermission
-	// panics on a wildcard argument. Asked ONCE PER ENTRY of Roles, so the
-	// answer is about that entry and the cost of the body is multiplied by the
-	// size of the collection.
-	RoleGrantsWildcard(roleID domain.ID) bool
+	// panics on a wildcard argument. Asked ONCE for the WHOLE of Roles and
+	// answered per entry, keyed by RoleID. A key MISSING from the answer is
+	// this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the requesting caller fails to hold at least one permission this
 	// role confers — the escalation half. GUARDS THE WILDCARD ITSELF and
 	// answers "lacks" rather than calling through, because a panic on a
 	// security rule is a 500. A *:* superadmin passes by construction. Asked
-	// ONCE PER ENTRY of Roles, so the answer is about that entry and the cost
-	// of the body is multiplied by the size of the collection.
-	CallerLacksAnyPermissionOfRole(roleID domain.ID) bool
+	// ONCE for the WHOLE of Roles and answered per entry, keyed by RoleID. A
+	// key MISSING from the answer is this fact answering NOTHING for that
+	// entry, and at the call site Go's zero value settles what that means:
+	// absent reads as false, which is the answer a fact named for the PROBLEM
+	// wants, so nothing is raised. Say "this entry IS the problem" by putting
+	// the answer in the map — never by leaving the key out, which is silence
+	// rather than a verdict. Where the source could not be reached at all,
+	// fail: the port returns no error precisely so that decision is made here.
+	CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether this claim id is absent from the claims table, points at an
 	// archived definition, or belongs to a tenant OTHER than the one passed.
 	// One answer for all three — the caller-facing message must not
-	// distinguish them. Asked ONCE PER ENTRY of Claims, so the answer is about
-	// that entry and the cost of the body is multiplied by the size of the
-	// collection.
-	ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool
+	// distinguish them. Asked ONCE for the WHOLE of Claims and answered per
+	// entry, keyed by ClaimID. A key MISSING from the answer is this fact
+	// answering NOTHING for that entry, and at the call site Go's zero value
+	// settles what that means: absent reads as false, which is the answer a
+	// fact named for the PROBLEM wants, so nothing is raised. Say "this entry
+	// IS the problem" by putting the answer in the map — never by leaving
+	// the key out, which is silence rather than a verdict. Where the source
+	// could not be reached at all, fail: the port returns no error precisely
+	// so that decision is made here.
+	ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the definition behind this id declares appliesTo: user, so no
 	// machine client may hold a value for it. client and both answer false.
-	// Answers TRUE for an unknown id. Asked ONCE PER ENTRY of Claims, so the
-	// answer is about that entry and the cost of the body is multiplied by the
-	// size of the collection.
-	ClaimDoesNotApplyToClient(claimID domain.ID) bool
+	// Answers TRUE for an unknown id. Asked ONCE for the WHOLE of Claims and
+	// answered per entry, keyed by ClaimID. A key MISSING from the answer is
+	// this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	ClaimDoesNotApplyToClient(claimIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the value fails to parse as the ValueType the definition
 	// declares: `number` wants a valid decimal number, `bool` wants exactly
 	// "true" or "false", `string` wants any non-empty value. The same three
 	// readings the catalog's own default-value check uses. Answers TRUE for an
-	// unknown id. Asked ONCE PER ENTRY of Claims, so the answer is about that
-	// entry and the cost of the body is multiplied by the size of the
-	// collection.
-	ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool
+	// unknown id. Asked ONCE for the WHOLE of Claims and answered per entry,
+	// keyed by ClaimID. An entry contributes more than its key, so the entries
+	// travel as ClientClaimValueDoesNotMatchValueTypeEntry rather than as
+	// parallel slices a caller could misalign. A key MISSING from the answer
+	// is this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	ClaimValueDoesNotMatchValueType(entries []ClientClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool
+}
+
+// ClientClaimValueDoesNotMatchValueTypeEntry is ONE entry of Claims, as
+// ClaimValueDoesNotMatchValueType is asked about it.
+//
+// The question needs ClaimID and Value of the same entry, and they travel
+// together for one reason: two parallel slices are two things a caller can put
+// out of step, and the answer would then be about a different entry than the
+// one whose values were sent.
+//
+// ClaimID is what the answer is keyed by.
+type ClientClaimValueDoesNotMatchValueTypeEntry struct {
+	ClaimID domain.ID
+	Value   string
 }

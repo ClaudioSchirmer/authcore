@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:595e87fc534a9bead9495f1d60a8969e8cda1f9481aaa3e1759960e970200a2c
+// checksum:   sha256:1a4d93e3b8f346fa7a5ceb477d638644ce7249f61f4dad8afc38155aeffdd94e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *RoleServiceImpl) queryContext() context.Context {
 // holds this key. Excludes the row being updated.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a

@@ -22,18 +22,27 @@ import (
 
 func TestAnUnusableClaimIDResolvesToNotFoundWithoutTouchingTheUserStore(t *testing.T) {
 	svc := &UserServiceImpl{}
-	for _, id := range []string{"", "tatu"} {
-		if row := svc.claimRow(domain.NewID(id)); row.found {
-			t.Errorf("%q resolved to a claim definition", id)
+
+	// ASKED AS A SET, which is what the batched resolver takes — and a set of
+	// nothing but unusable ids must still reach no store: the read closure runs
+	// only for ids that parse, so a nil repository is never dereferenced.
+	unusable := []domain.ID{domain.NewID(""), domain.NewID("tatu")}
+	rows := svc.claimRows(unusable)
+	for _, id := range unusable {
+		if rows[id].found {
+			t.Errorf("%q resolved to a claim definition", id.String())
 		}
 	}
 }
 
 func TestAnUnusableClaimIDResolvesToNotFoundWithoutTouchingTheClientStore(t *testing.T) {
 	svc := &ClientServiceImpl{}
-	for _, id := range []string{"", "tatu"} {
-		if row := svc.claimRow(domain.NewID(id)); row.found {
-			t.Errorf("%q resolved to a claim definition", id)
+
+	unusable := []domain.ID{domain.NewID(""), domain.NewID("tatu")}
+	rows := svc.claimRows(unusable)
+	for _, id := range unusable {
+		if rows[id].found {
+			t.Errorf("%q resolved to a claim definition", id.String())
 		}
 	}
 }
@@ -46,13 +55,16 @@ func TestTheThreeUserClaimFactsAllFailClosedOnAnUnusableID(t *testing.T) {
 	unusable := domain.NewID("tatu")
 	tenant := domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")
 
-	if !svc.ClaimIsUnavailableInTenant(tenant, unusable) {
+	set := []domain.ID{unusable}
+
+	if !svc.ClaimIsUnavailableInTenant(tenant, set)[unusable] {
 		t.Error("an unusable claim id was reported as available")
 	}
-	if !svc.ClaimDoesNotApplyToUser(unusable) {
+	if !svc.ClaimDoesNotApplyToUser(set)[unusable] {
 		t.Error("an unusable claim id was reported as applying to users")
 	}
-	if !svc.ClaimValueDoesNotMatchValueType(unusable, "1000") {
+	entries := []appdomain.UserClaimValueDoesNotMatchValueTypeEntry{{ClaimID: unusable, Value: "1000"}}
+	if !svc.ClaimValueDoesNotMatchValueType(entries)[unusable] {
 		t.Error("an unusable claim id was reported as type-matching")
 	}
 }
@@ -62,13 +74,16 @@ func TestTheThreeClientClaimFactsAllFailClosedOnAnUnusableID(t *testing.T) {
 	unusable := domain.NewID("tatu")
 	tenant := domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410")
 
-	if !svc.ClaimIsUnavailableInTenant(tenant, unusable) {
+	set := []domain.ID{unusable}
+
+	if !svc.ClaimIsUnavailableInTenant(tenant, set)[unusable] {
 		t.Error("an unusable claim id was reported as available")
 	}
-	if !svc.ClaimDoesNotApplyToClient(unusable) {
+	if !svc.ClaimDoesNotApplyToClient(set)[unusable] {
 		t.Error("an unusable claim id was reported as applying to clients")
 	}
-	if !svc.ClaimValueDoesNotMatchValueType(unusable, "sa-east-1") {
+	entries := []appdomain.ClientClaimValueDoesNotMatchValueTypeEntry{{ClaimID: unusable, Value: "sa-east-1"}}
+	if !svc.ClaimValueDoesNotMatchValueType(entries)[unusable] {
 		t.Error("an unusable claim id was reported as type-matching")
 	}
 }

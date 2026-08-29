@@ -1513,18 +1513,27 @@ service:
         the tenants table by its primary key. A trial tenant is a live customer and is
         available.
 
-    # Six per-entry facts, three per collection. A fact about a collection is asked ONCE PER
-    # ENTRY, the entry's field arriving as an argument, and all six are asked only about the
-    # entries a write ADDS.
+    # Six per-entry facts, three per collection, and all six are asked only about the entries
+    # a write ADDS.
     #
-    # The group pair is the expensive one and it is still cheap: GroupRepository declares the
-    # traversal into roles and RoleRepository declares the one into permissions, so a group
-    # carrying N roles resolves in 1 + N reads with every grant's resource and action already
-    # filled. Memoise per request so the wildcard probe and the escalation probe share it.
+    # `perEntry` IS THE COST DECISION, said in the spec instead of left to the rule. Without
+    # it the loop lives in the rule and a write joining twenty groups pays twenty round
+    # trips; with it the fact is asked ONCE for the whole collection and answers a map keyed
+    # by the entry's id. The rule still judges entry by entry — it reads the map — so every
+    # notification still names the membership that failed.
+    #
+    # THE GROUP PAIR IS TWO ROUNDS, not one, and that is the shape of the question rather
+    # than a shortcoming: a group's roles are not known until the groups are read.
+    # GroupRepository declares the traversal into roles and RoleRepository the one into
+    # permissions, so N groups conferring M distinct roles resolve in TWO reads with every
+    # grant's resource and action already filled. Memoise per request, keyed by id, so the
+    # wildcard probe and the escalation probe share the resolution and a role reached both
+    # directly and through a group is read once.
     - name: GroupIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Groups.GroupID]
+      perEntry: Groups.GroupID
+      filters: [TenantID]
       description: >-
         Whether this group id is absent from the groups table, points at an archived group,
         or belongs to a tenant OTHER than the one passed. One answer for all three — the
@@ -1533,7 +1542,7 @@ service:
     - name: GroupGrantsWildcard
       kind: manual
       returns: bool
-      filters: [Groups.GroupID]
+      perEntry: Groups.GroupID
       description: >-
         Whether any role this group confers grants a permission carrying a wildcard in
         either part. Answers TRUE when the id is unknown, so an unresolvable membership
@@ -1542,7 +1551,7 @@ service:
     - name: CallerLacksAnyPermissionOfGroup
       kind: manual
       returns: bool
-      filters: [Groups.GroupID]
+      perEntry: Groups.GroupID
       description: >-
         Whether the requesting caller fails to hold at least one permission conferred by any
         role in this group — the transitive, three-hop half of the escalation rule. Shares
@@ -1553,7 +1562,8 @@ service:
     - name: RoleIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Roles.RoleID]
+      perEntry: Roles.RoleID
+      filters: [TenantID]
       description: >-
         Whether this role id is absent from the roles table, points at an archived role, or
         belongs to a tenant OTHER than the one passed. One answer for all three.
@@ -1561,7 +1571,7 @@ service:
     - name: RoleGrantsWildcard
       kind: manual
       returns: bool
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
       description: >-
         Whether the role behind this id grants any permission carrying a wildcard. Resolve it
         through RoleRepository.Loader, whose declared read join fills every grant's resource
@@ -1570,14 +1580,15 @@ service:
     - name: CallerLacksAnyPermissionOfRole
       kind: manual
       returns: bool
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
       description: >-
         Whether the requesting caller fails to hold at least one of the permissions this role
         grants. Shares RoleGrantsWildcard's single read, and guards the wildcard itself.
 
-    # Three per-entry facts for the claims collection, asked once per entry, only about the
-    # entries a write adds or changes. ONE read of claims by primary key answers all three —
-    # memoise per request, the same note the group pair above carries.
+    # Three per-entry facts for the claims collection, asked once for the WHOLE collection
+    # and answered per entry, only about the entries a write adds or changes. ONE read of
+    # claims by their ids answers all three — memoise per request, the same note the group
+    # pair above carries.
     #
     # All three answer TRUE — "the problem is present" — for an id they cannot resolve, and
     # all three are NAMED FOR THE PROBLEM so the generated suite's stub, which answers
@@ -1586,7 +1597,8 @@ service:
     - name: ClaimIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Claims.ClaimID]
+      perEntry: Claims.ClaimID
+      filters: [TenantID]
       description: >-
         Whether this claim id is absent from the claims table, points at an archived
         definition, or belongs to a tenant OTHER than the one passed. One answer for all
@@ -1595,7 +1607,7 @@ service:
     - name: ClaimDoesNotApplyToUser
       kind: manual
       returns: bool
-      filters: [Claims.ClaimID]
+      perEntry: Claims.ClaimID
       description: >-
         Whether the definition behind this id declares appliesTo: client, so no user may hold
         a value for it. user and both answer false. Answers TRUE for an unknown id.
@@ -1603,7 +1615,8 @@ service:
     - name: ClaimValueDoesNotMatchValueType
       kind: manual
       returns: bool
-      filters: [Claims.ClaimID, Claims.Value]
+      perEntry: Claims.ClaimID
+      filters: [Claims.Value]
       description: >-
         Whether the value fails to parse as the ValueType the definition declares: `number`
         wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants

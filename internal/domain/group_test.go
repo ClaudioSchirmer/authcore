@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:72306ce497547417c74cafa473bc9a67f93e243614e6909bb1ba6a43215f5e45
+// checksum:   sha256:19dd8611c5c9e1a0536b61e1c958a0b246267f06d176d0f2c9a531cfe390dfb6
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,11 +83,13 @@ type stubGroupService struct {
 	domain.ServiceBase
 }
 
-func (stubGroupService) GroupKeyTaken(_ domain.ID, _ string, _ domain.ID) bool   { return false }
-func (stubGroupService) TenantIsUnavailable(_ domain.ID) bool                    { return false }
-func (stubGroupService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool { return false }
-func (stubGroupService) RoleGrantsWildcard(_ domain.ID) bool                     { return false }
-func (stubGroupService) CallerLacksAnyPermissionOf(_ domain.ID) bool             { return false }
+func (stubGroupService) GroupKeyTaken(_ domain.ID, _ string, _ domain.ID) bool { return false }
+func (stubGroupService) TenantIsUnavailable(_ domain.ID) bool                  { return false }
+func (stubGroupService) RoleIsUnavailableInTenant(_ domain.ID, _ []domain.ID) map[domain.ID]bool {
+	return nil
+}
+func (stubGroupService) RoleGrantsWildcard(_ []domain.ID) map[domain.ID]bool         { return nil }
+func (stubGroupService) CallerLacksAnyPermissionOf(_ []domain.ID) map[domain.ID]bool { return nil }
 
 // validGroup returns an aggregate that satisfies every declared rule.
 //

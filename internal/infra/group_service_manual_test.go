@@ -92,13 +92,19 @@ func TestAnUnusableTenantIsAnsweredWithoutTouchingTheGroupStore(t *testing.T) {
 
 func TestAnUnusableRoleIDResolvesToNotFoundWithoutTouchingTheStore(t *testing.T) {
 	svc := &GroupServiceImpl{}
-	for _, id := range []string{"", "tatu"} {
-		row := svc.roleRow(domain.NewID(id))
+
+	// ASKED AS A SET, which is what the batched resolver takes — and a set of
+	// nothing but unusable ids must still reach no store: the read closure runs
+	// only for ids that parse, so a nil repository is never dereferenced.
+	unusable := []domain.ID{domain.NewID(""), domain.NewID("tatu")}
+	rows := svc.roleRows(unusable)
+	for _, id := range unusable {
+		row := rows[id]
 		if row.found {
-			t.Errorf("%q resolved to a role", id)
+			t.Errorf("%q resolved to a role", id.String())
 		}
 		if !row.grantsWildcard() {
-			t.Errorf("%q did not fail closed on the wildcard question", id)
+			t.Errorf("%q did not fail closed on the wildcard question", id.String())
 		}
 	}
 }
@@ -108,11 +114,12 @@ func TestAnUnusableRoleIDResolvesToNotFoundWithoutTouchingTheStore(t *testing.T)
 func TestTheThreePerEntryFactsAllShortCircuitAnUnusableRole(t *testing.T) {
 	svc := &GroupServiceImpl{}
 	unusable := domain.NewID("tatu")
+	set := []domain.ID{unusable}
 
-	if !svc.RoleIsUnavailableInTenant(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"), unusable) {
+	if !svc.RoleIsUnavailableInTenant(domain.NewID("0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"), set)[unusable] {
 		t.Error("an unusable role reference was reported as available")
 	}
-	if !svc.RoleGrantsWildcard(unusable) {
+	if !svc.RoleGrantsWildcard(set)[unusable] {
 		t.Error("an unusable role reference did not fail closed on the wildcard question")
 	}
 }
@@ -124,15 +131,21 @@ func TestTheThreePerEntryFactsAllShortCircuitAnUnusableRole(t *testing.T) {
 // permission refuses. Collapsing the two makes the entity unusable on a bench
 // that issues no tokens.
 func TestCallerLacksAnyPermissionOfStandsDownWithoutAnIdentity(t *testing.T) {
+	attached := []domain.ID{domain.NewID(probedRoleID)}
+
+	// An empty answer, not a map of falses: an absent key is the fact answering
+	// NOTHING for that entry, which the rule reads as the zero value and does
+	// not raise.
+	//
 	// No bound context at all — outside a request entirely.
-	if (&GroupServiceImpl{}).CallerLacksAnyPermissionOf(domain.NewID(probedRoleID)) {
-		t.Error("the escalation probe refused a call made outside any request")
+	if len((&GroupServiceImpl{}).CallerLacksAnyPermissionOf(attached)) != 0 {
+		t.Error("the escalation probe answered a call made outside any request")
 	}
 
 	// A bound context that carries no identity: auth.mode disabled.
 	ctx := configuration.NewAppContextWithRandomID(configuration.LangENG)
-	if (&GroupServiceImpl{ctx: ctx}).CallerLacksAnyPermissionOf(domain.NewID(probedRoleID)) {
-		t.Error("the escalation probe refused a request whose context carries no identity")
+	if len((&GroupServiceImpl{ctx: ctx}).CallerLacksAnyPermissionOf(attached)) != 0 {
+		t.Error("the escalation probe answered a request whose context carries no identity")
 	}
 }
 
@@ -148,12 +161,12 @@ func TestASuperAdminLacksNothingInAConcreteBundle(t *testing.T) {
 
 	// Prime the request memo so the fact answers from it and never queries.
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set("authcore.group.role:"+roleID.String(), roleRow{
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), roleRow{
 		found: true,
 		keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
 
-	if svc.CallerLacksAnyPermissionOf(roleID) {
+	if svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
 		t.Error("a *:* super-admin was refused a role granting only concrete permissions")
 	}
 }
@@ -169,18 +182,18 @@ func TestACallerMissingOneKeyOfTheBundleIsRefused(t *testing.T) {
 
 	roleID := domain.NewID(probedRoleID)
 	held := roleRow{found: true, keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})}
-	ctx.Set("authcore.group.role:"+roleID.String(), held)
-	if svc.CallerLacksAnyPermissionOf(roleID) {
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), held)
+	if svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
 		t.Fatal("a caller holding every key of the bundle was refused")
 	}
 
 	// One more key, which the caller does not hold. Nothing else changes.
 	other := domain.NewID("0198f400-1111-7000-8000-aaaaaaaaaaaa")
-	ctx.Set("authcore.group.role:"+other.String(), roleRow{
+	ctx.Set(groupRoleMemoPrefix+other.String(), roleRow{
 		found: true,
 		keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
-	if !svc.CallerLacksAnyPermissionOf(other) {
+	if !svc.CallerLacksAnyPermissionOf([]domain.ID{other})[other] {
 		t.Error("a caller was allowed to confer a role granting a permission they do not hold")
 	}
 }
@@ -197,13 +210,13 @@ func TestAWildcardBearingBundleIsRefusedWithoutAskingTheIdentity(t *testing.T) {
 	svc := &GroupServiceImpl{ctx: ctx}
 
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set("authcore.group.role:"+roleID.String(), roleRow{
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), roleRow{
 		found: true,
 		keys:  concreteKeys([2]string{vos.PermissionWildcard, vos.PermissionWildcard}),
 	})
 
 	// Even for a super-admin: the answer comes from the guard, not the claim.
-	if !svc.CallerLacksAnyPermissionOf(roleID) {
+	if !svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
 		t.Error("a wildcard-bearing bundle reached the identity instead of the guard")
 	}
 }
@@ -215,13 +228,13 @@ func TestTheRoleMemoIsScopedToOneRequest(t *testing.T) {
 	roleID := domain.NewID(probedRoleID)
 
 	first := configuration.NewAppContextWithRandomID(configuration.LangENG)
-	first.Set("authcore.group.role:"+roleID.String(), roleRow{found: true})
+	first.Set(groupRoleMemoPrefix+roleID.String(), roleRow{found: true})
 
-	if _, ok := first.Get("authcore.group.role:" + roleID.String()); !ok {
+	if _, ok := first.Get(groupRoleMemoPrefix + roleID.String()); !ok {
 		t.Fatal("the memo did not store the row on its own context")
 	}
 	second := configuration.NewAppContextWithRandomID(configuration.LangENG)
-	if _, ok := second.Get("authcore.group.role:" + roleID.String()); ok {
+	if _, ok := second.Get(groupRoleMemoPrefix + roleID.String()); ok {
 		t.Error("a second request saw the first request's memoised role")
 	}
 }

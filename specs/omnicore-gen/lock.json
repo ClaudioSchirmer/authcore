@@ -377,7 +377,7 @@
     },
     "Client": {
       "spec": "specs/omnicore-gen/client.omnicore.yaml",
-      "specHash": "8c027e88decc4363f2914452901af5d0cf48477cc123d10cac8f4dc3096ae40e",
+      "specHash": "119d35aaa13acb9b7e439ca662cacc3b0bb653e285aead44257ac52ae9f95e44",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/clients_feature.go": {
@@ -478,11 +478,11 @@
         },
         "internal/domain/client_service.go": {
           "class": "owned",
-          "hash": "73ed587bb0121c14b1b668efa99716cff45dc93d04d59f6224d5ef9fcf7c03e7"
+          "hash": "5642e4f617c0421c5fe6cc8bdf9f5edc39c13df60aff4a2dc726d6ec3a743cfe"
         },
         "internal/domain/client_test.go": {
           "class": "owned",
-          "hash": "eaacb0bdb350b3f7f77f8a21a9327f3fc570249972a60f1d65d16a0ea47e2c73"
+          "hash": "a96d9622943be734277b21d53151907b1c71d1894af78ed00d76c539cb5b1c6e"
         },
         "internal/domain/vos/client_status.go": {
           "class": "owned",
@@ -502,7 +502,7 @@
         },
         "internal/infra/client_service.go": {
           "class": "owned",
-          "hash": "2516bac076606459f3881a996af6922f9bb34ff95ee7fdfe03cec47342433c0c"
+          "hash": "ad533ebc43c74047244912eaa18318db7f78810eb8a9ceacdefd90c6e5b3907d"
         },
         "internal/infra/client_service_manual.go": {
           "class": "hook",
@@ -992,7 +992,7 @@
     },
     "Group": {
       "spec": "specs/omnicore-gen/group.omnicore.yaml",
-      "specHash": "cc2dc0778e6673c9bf3d2383eca70e2a5508d82deecd666907e9298bb202290b",
+      "specHash": "651351ea4a6ef7f24376b2d233bd24a02cbcca08fec19f9e4ae9b8873f641da6",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/groups_feature.go": {
@@ -1069,11 +1069,11 @@
         },
         "internal/domain/group_service.go": {
           "class": "owned",
-          "hash": "fe839cdbe6aa038841eac5380fb51dc1388f46f2cafa65191e22bd133bf4589f"
+          "hash": "e7fbfd9307ffa89a96f39ab2fd1005d7b12be5c9edf29fec4dfb1dd4dff0c574"
         },
         "internal/domain/group_test.go": {
           "class": "owned",
-          "hash": "fa7fde4150383e20f85c912a908b7f29d56bd08aa17508e2ece9fea5aeb6aefc"
+          "hash": "577ad914fd092cc12a1a3d25eb7483f354259a206a0a80315874b851f066bd5a"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",
@@ -1085,7 +1085,7 @@
         },
         "internal/infra/group_service.go": {
           "class": "owned",
-          "hash": "339e7a596ef967c6ceeffa136155b4e1398ec05f5bca4adceb1b72a8c3457cb8"
+          "hash": "54c7009bae380e266a720e7af93351318206b5593ef7601106768f8138dc1189"
         },
         "internal/infra/group_service_manual.go": {
           "class": "hook",
@@ -1578,7 +1578,7 @@
     },
     "Role": {
       "spec": "specs/omnicore-gen/role.omnicore.yaml",
-      "specHash": "d872a8344414091d13d43d08f4078309af4d88cea037fd04f9c446d8705c212e",
+      "specHash": "5084e00f0fb4c4dc84d7e46a8c6478a51911e2339e1cb7e8c59d2f3ac8b36009",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/roles_feature.go": {
@@ -1659,11 +1659,11 @@
         },
         "internal/domain/role_service.go": {
           "class": "owned",
-          "hash": "5315aebce02ce4f354062b3cf3cc4d20b2908a336298dd63a1fc70fb5c2d975a"
+          "hash": "0437dc8dbd92aaee0eb4d248b8aa28e666b3bfed7f626cdf40f39c0e2b9449ee"
         },
         "internal/domain/role_test.go": {
           "class": "owned",
-          "hash": "3f682c374658a31bb6a38a3661d77383e43559acce3e28fc3e31c70f1fca4e44"
+          "hash": "a2409901d62585db17953dfb66dddc3c818549645b5e7d027fd5c55fde982158"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",
@@ -1675,7 +1675,7 @@
         },
         "internal/infra/role_service.go": {
           "class": "owned",
-          "hash": "f0765a975cd94a0e280c82a588152774e4cbcdacea5f0205b48bb396f8e8bb57"
+          "hash": "1f5b115e1469cb612d8c74722289cdf8f73a90db5638ca22f03035c9fed38982"
         },
         "internal/infra/role_service_manual.go": {
           "class": "hook",
@@ -2221,7 +2221,7 @@
     },
     "User": {
       "spec": "specs/omnicore-gen/user.omnicore.yaml",
-      "specHash": "31c26883fd87fc81ffee76889af811175eb61ee9ab008b4b99b0c2a1a3ac4a51",
+      "specHash": "9ebf0cba45409894041154c8eaa41f091cc9988dedcc414c4027a3072c0083fb",
       "framework": "v0.63.0",
       "files": {
         "bootstrap/users_feature.go": {
@@ -2326,11 +2326,11 @@
         },
         "internal/domain/user_service.go": {
           "class": "owned",
-          "hash": "41321cbfefeb75e606134cdd260f2788f9e50e8f251d5ed56f81e8732b39ef7a"
+          "hash": "2df809601ae902aa5a5e1ab74a35433b5f9f452017544b82b0b9be19b43c121f"
         },
         "internal/domain/user_test.go": {
           "class": "owned",
-          "hash": "2cd2d054e3e074cf8aeb57fe34f90b93ae5c8f0252bead4e24546953016e4067"
+          "hash": "d729f60086ae1e379870495402d8a39b0263b571963f2bcb3d6b98bed59c7771"
         },
         "internal/domain/vos/claim_value.go": {
           "class": "owned",
@@ -2378,7 +2378,7 @@
         },
         "internal/infra/user_service.go": {
           "class": "owned",
-          "hash": "8d6d030f1ed2621398ed440360a28e0e0d045d605e041d4aa7deeb76c2e0e8e8"
+          "hash": "f5026105f8430e4534881974271b053c2318390b6cbf4af5f4161bf3dd0c02d8"
         },
         "internal/infra/user_service_manual.go": {
           "class": "hook",

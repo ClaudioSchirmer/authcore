@@ -17,6 +17,7 @@ package infra
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
+	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
 
@@ -51,6 +52,35 @@ func (r roleRow) grantsWildcard() bool {
 	}
 	for _, key := range r.keys {
 		if key.Resource == vos.PermissionWildcard || key.Action == vos.PermissionWildcard {
+			return true
+		}
+	}
+	return false
+}
+
+// callerLacksAnyPermissionOfRole is the shared body of every escalation fact in
+// this package — User's two (direct and through a group) and Client's.
+//
+// It lives beside the row it judges for the reason this whole file exists: one
+// definition of "holds every key", one wildcard guard, one treatment of an
+// unresolvable role. Copies would be one rule that can disagree with itself
+// about the case that matters most, and it is a SECURITY rule.
+//
+// It judges EVERY key the role confers, including one whose catalog row has
+// since been retired. That is the fail-closed direction — a role whose bundle
+// contains a retired `tenant:export` is refused to a caller who does not hold
+// `tenant:export` — and since the grants no longer carry the catalog row's
+// archive stamp it is also the only reading expressible without a second query.
+// Strictly more restrictive, never more permissive.
+func callerLacksAnyPermissionOfRole(identity *configuration.Identity, row roleRow) bool {
+	if row.grantsWildcard() {
+		// Never handed to HasPermission — it panics on a wildcard, and this
+		// also covers the unresolvable role. The wildcard rule refuses this
+		// write on its own; this is the second lock.
+		return true
+	}
+	for _, key := range row.keys {
+		if !identity.HasPermission(key.String()) {
 			return true
 		}
 	}

@@ -23,11 +23,17 @@ import (
 )
 
 const (
-	clientRoleID      = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b904"
-	clientOwnTenant   = "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"
-	clientOtherTenant = "0198f4aa-1111-7c9e-9f2a-6d3b1e77a410"
-	clientRowID       = "7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"
-	someOtherClientID = "1f6e6ac6-2a1e-4c22-9c0a-2b7a9c5f21d4"
+	clientRoleID = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b904"
+
+	// A second and a third, for the one case that needs a collection rather
+	// than a single entry: a batch of one cannot tell "asked once" apart from
+	// "asked once per entry".
+	secondClientRoleID = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b905"
+	thirdClientRoleID  = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b906"
+	clientOwnTenant    = "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"
+	clientOtherTenant  = "0198f4aa-1111-7c9e-9f2a-6d3b1e77a410"
+	clientRowID        = "7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"
+	someOtherClientID  = "1f6e6ac6-2a1e-4c22-9c0a-2b7a9c5f21d4"
 )
 
 // probingClientService records every question and answers "nothing wrong" by
@@ -53,6 +59,11 @@ type probingClientService struct {
 	askedClaimAvail   []clientScopedQuestion
 	askedClaimApplies []domain.ID
 	askedClaimType    []clientClaimTypeQuestion
+
+	// callsPerFact counts how many times each collection fact was ASKED, as
+	// opposed to how many entries it was asked about. `perEntry` promises ONE
+	// call per write whatever the size of the collection.
+	callsPerFact map[string]int
 }
 
 // clientClaimTypeQuestion records BOTH arguments of the value-type probe: which
@@ -82,19 +93,49 @@ func (s *probingClientService) TenantIsUnavailable(domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingClientService) RoleIsUnavailableInTenant(tenantID, roleID domain.ID) bool {
-	s.askedRoleAvail = append(s.askedRoleAvail, clientScopedQuestion{tenantID, roleID})
-	return s.roleUnavailable
+// The collection facts, each asked ONCE for the whole set.
+//
+// The stub keeps recording ONE QUESTION PER ID — which ids, and for the
+// availability facts which TENANT, are properties the batch did not change and
+// several cases below still assert. asked() counts the CALLS, which is the only
+// thing that can catch a regression to one call per entry: every assertion about
+// the outcome would pass either way.
+func (s *probingClientService) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleAvail = append(s.askedRoleAvail, clientScopedQuestion{tenantID, id})
+		out[id] = s.roleUnavailable
+	}
+	return out
 }
 
-func (s *probingClientService) RoleGrantsWildcard(id domain.ID) bool {
-	s.askedRoleWildcard = append(s.askedRoleWildcard, id)
-	return s.roleWildcard
+func (s *probingClientService) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleGrantsWildcard")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleWildcard = append(s.askedRoleWildcard, id)
+		out[id] = s.roleWildcard
+	}
+	return out
 }
 
-func (s *probingClientService) CallerLacksAnyPermissionOfRole(id domain.ID) bool {
-	s.askedRoleEscalate = append(s.askedRoleEscalate, id)
-	return s.lacksRolePerm
+func (s *probingClientService) CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("CallerLacksAnyPermissionOfRole")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleEscalate = append(s.askedRoleEscalate, id)
+		out[id] = s.lacksRolePerm
+	}
+	return out
+}
+
+// asked records one CALL of a collection fact.
+func (s *probingClientService) asked(fact string) {
+	if s.callsPerFact == nil {
+		s.callsPerFact = map[string]int{}
+	}
+	s.callsPerFact[fact]++
 }
 
 // clientNotificationKeys reads what the aggregate itself recorded — the seat the
@@ -147,6 +188,40 @@ func clientGranting(roleID string) *Client {
 	e := validClient()
 	e.AddClientRole(aggregatevos.ClientRole{RoleID: domain.NewID(roleID)})
 	return e
+}
+
+// THE COST THE `perEntry` FACTS BUY, pinned where a regression would otherwise
+// be invisible: every collection fact is asked ONCE for the whole write,
+// however many entries it carries. Nothing about the OUTCOME changes if this
+// regresses to one call per entry, which is why the call count is asserted.
+func TestEveryClientCollectionFactIsAskedOnceForTheWholeWrite(t *testing.T) {
+	e := validClient()
+	for _, id := range []string{clientRoleID, secondClientRoleID, thirdClientRoleID} {
+		e.AddClientRole(aggregatevos.ClientRole{RoleID: domain.NewID(id)})
+	}
+	for _, id := range []string{someClientClaimID, someOtherClientClaimID} {
+		e.AddClientClaim(aggregatevos.ClientClaim{
+			ClaimID: domain.NewID(id),
+			Value:   vos.ClaimValue("sa-east-1"),
+		})
+	}
+
+	svc := insertClient(t, e, &probingClientService{})
+
+	for _, fact := range []string{
+		"RoleIsUnavailableInTenant", "RoleGrantsWildcard", "CallerLacksAnyPermissionOfRole",
+		"ClaimIsUnavailableInTenant", "ClaimDoesNotApplyToClient", "ClaimValueDoesNotMatchValueType",
+	} {
+		if got := svc.callsPerFact[fact]; got != 1 {
+			t.Errorf("%s was asked %d times for a write carrying several entries, want exactly 1", fact, got)
+		}
+	}
+
+	// And it was asked about EVERY entry: one call, every subject.
+	if len(svc.askedRoleAvail) != 3 || len(svc.askedClaimAvail) != 2 {
+		t.Errorf("the single call did not carry every entry: roles=%d claims=%d",
+			len(svc.askedRoleAvail), len(svc.askedClaimAvail))
+	}
 }
 
 // ── credential-minting ──────────────────────────────────────────────────────
@@ -252,17 +327,21 @@ func TestTheRoleIsJudgedAgainstTheCLIENTsTenant(t *testing.T) {
 
 // TestAWildcardRoleNeverReachesTheEscalationProbe is the ordering rule, and it
 // is load-bearing rather than tidy: Identity.HasPermission PANICS on a wildcard,
-// so reaching the probe would turn a refusal into a 500 on exactly the case the
-// escalation rule exists to stop.
-func TestAWildcardRoleNeverReachesTheEscalationProbe(t *testing.T) {
+// so the escalation fact GUARDS THE WILDCARD ITSELF rather than calling through
+// (internal/infra/role_probe.go, callerLacksAnyPermissionOfRole) — the rule can
+// no longer promise the fact is not ASKED about a wildcard role, because it is
+// asked about every entry of the collection at once. What the rule still owns,
+// and what this case pins, is that one entry produces one answer.
+func TestAWildcardRoleIsReportedAsWildcardAndNothingElse(t *testing.T) {
 	e := clientGranting(clientRoleID)
-	svc := insertClient(t, e, &probingClientService{roleWildcard: true})
+	insertClient(t, e, &probingClientService{roleWildcard: true, lacksRolePerm: true})
 
-	if !clientHasKey(clientNotificationKeys(e), "CannotGrantWildcardRoleNotification") {
-		t.Fatalf("a wildcard role was granted to a machine; got %v", clientNotificationKeys(e))
+	keys := clientNotificationKeys(e)
+	if !clientHasKey(keys, "CannotGrantWildcardRoleNotification") {
+		t.Fatalf("a wildcard role was granted to a machine; got %v", keys)
 	}
-	if len(svc.askedRoleEscalate) != 0 {
-		t.Fatal("the escalation probe was asked about a wildcard role; that call panics in production")
+	if clientHasKey(keys, "CannotGrantRoleWithUnheldPermissionsNotification") {
+		t.Fatalf("the wildcard role was also reported as an escalation: %v", keys)
 	}
 }
 
@@ -467,19 +546,41 @@ func TestAClientSubjectCallerMayArchiveAnotherRow(t *testing.T) {
 // They are why this file lands near 91% rather than at the repository's 95%, and
 // the same two shapes put user_rules_manual.go at 91.5%.
 
-func (s *probingClientService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
-	s.askedClaimAvail = append(s.askedClaimAvail, clientScopedQuestion{tenantID: tenantID, targetID: claimID})
-	return s.claimUnavailable
+func (s *probingClientService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("ClaimIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(claimIDSet))
+	for _, id := range claimIDSet {
+		s.askedClaimAvail = append(s.askedClaimAvail, clientScopedQuestion{tenantID: tenantID, targetID: id})
+		out[id] = s.claimUnavailable
+	}
+	return out
 }
 
-func (s *probingClientService) ClaimDoesNotApplyToClient(claimID domain.ID) bool {
-	s.askedClaimApplies = append(s.askedClaimApplies, claimID)
-	return s.claimAppliesElse
+func (s *probingClientService) ClaimDoesNotApplyToClient(claimIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("ClaimDoesNotApplyToClient")
+	out := make(map[domain.ID]bool, len(claimIDSet))
+	for _, id := range claimIDSet {
+		s.askedClaimApplies = append(s.askedClaimApplies, id)
+		out[id] = s.claimAppliesElse
+	}
+	return out
 }
 
-func (s *probingClientService) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
-	s.askedClaimType = append(s.askedClaimType, clientClaimTypeQuestion{claimID: claimID, value: value})
-	return s.claimValueBadType
+// The entries arrive whole, so the recorded question keeps carrying BOTH halves
+// — which is what proves a CHANGED entry reaches the fact with its NEW value.
+func (s *probingClientService) ClaimValueDoesNotMatchValueType(
+	entries []ClientClaimValueDoesNotMatchValueTypeEntry,
+) map[domain.ID]bool {
+	s.asked("ClaimValueDoesNotMatchValueType")
+	out := make(map[domain.ID]bool, len(entries))
+	for _, entry := range entries {
+		s.askedClaimType = append(s.askedClaimType, clientClaimTypeQuestion{
+			claimID: entry.ClaimID,
+			value:   entry.Value,
+		})
+		out[entry.ClaimID] = s.claimValueBadType
+	}
+	return out
 }
 
 // ── the claims collection: the three per-entry rules ────────────────────────
@@ -521,13 +622,24 @@ func TestClientClaimValueIsRefusedWhenTheDefinitionIsNotAvailableInTheTenant(t *
 	}
 }
 
-func TestClientNothingBelowIsAskedAboutADefinitionThatIsNotThere(t *testing.T) {
-	svc := insertClient(t, clientHolding(someClientClaimID, "sa-east-1"),
-		&probingClientService{claimUnavailable: true})
+// ONE PROBLEM PER ENTRY. An unresolvable definition is one refusal, however many
+// facts would answer TRUE about it — the later verdicts are computed, because
+// they rode the same read, and simply not read.
+func TestClientNothingBelowIsReportedAboutADefinitionThatIsNotThere(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	insertClient(t, e, &probingClientService{
+		claimUnavailable:  true,
+		claimAppliesElse:  true,
+		claimValueBadType: true,
+	})
 
-	if len(svc.askedClaimApplies) != 0 || len(svc.askedClaimType) != 0 {
-		t.Fatalf("the later probes ran on an unresolvable definition: applies=%d type=%d",
-			len(svc.askedClaimApplies), len(svc.askedClaimType))
+	keys := clientNotificationKeys(e)
+	if !clientHasKey(keys, "ClaimNotAvailableInTenantNotification") {
+		t.Fatalf("an unavailable definition was accepted (raised %v)", keys)
+	}
+	if clientHasKey(keys, "ClaimDoesNotApplyToClientNotification") ||
+		clientHasKey(keys, "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("one unresolvable definition produced more than one answer: %v", keys)
 	}
 }
 
