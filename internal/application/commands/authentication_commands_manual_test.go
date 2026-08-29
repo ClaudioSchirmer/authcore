@@ -45,6 +45,12 @@ type fakeAuthStore struct {
 	matches     bool
 	burned      int
 	askedEmail  string
+	catalog     []*appdomain.Claim
+	catalogErr  error
+	// Counted, so the rotation test can assert the catalog is RE-READ rather
+	// than replayed from the token being redeemed.
+	catalogReads int
+	askedTenant  domain.ID
 }
 
 func (s *fakeAuthStore) FindUserByEmail(_ *configuration.AppContext, email string) (*appdomain.User, error) {
@@ -69,6 +75,12 @@ func (s *fakeAuthStore) FindUserByID(_ *configuration.AppContext, _ domain.ID) (
 
 func (s *fakeAuthStore) ResolveGrants(context.Context, domain.ID) ([]string, []vos.PermissionKey, error) {
 	return s.roleKeys, s.permissions, s.grantsErr
+}
+
+func (s *fakeAuthStore) ClaimDefinitionsOfTenant(_ *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error) {
+	s.catalogReads++
+	s.askedTenant = tenantID
+	return s.catalog, s.catalogErr
 }
 
 func (s *fakeAuthStore) PasswordMatches(string, string) bool { return s.matches }
@@ -690,7 +702,7 @@ func TestBuildProfile_RolesComeFromTheResolvedGrants(t *testing.T) {
 	// through a group (never loaded here, so it has none).
 	roleKeys := []string{"billing-admin", "inherited-viewer"}
 
-	profile := buildProfile(user, roleKeys, nil)
+	profile := buildProfile(user, roleKeys, nil, nil)
 	if len(profile.Roles) != 2 {
 		t.Fatalf("roles = %+v, want both the direct and the inherited one", profile.Roles)
 	}
@@ -1326,5 +1338,212 @@ func TestIdentityKinds_AreTheTwoTheRestOfTheServiceUses(t *testing.T) {
 	if identityKindUser != "user" || identityKindClient != "client" {
 		t.Errorf("kinds = %q/%q, want user/client — authentication_attempts.identity_kind stores these",
 			identityKindUser, identityKindClient)
+	}
+}
+
+// ── the tenant claims on the two token paths ────────────────────────────────
+//
+// The chain itself is proven in authentication_claims_manual_test.go. What these
+// assert is the WIRING around it: that the catalog is read on both paths, that
+// its failure is not dressed up as a refusal, that a definition can never take
+// over a platform name, and that the body and the token cannot disagree.
+
+// A catalog failure is NOT a credential refusal, for the same reason a grants
+// failure is not: the caller proved who they are and this service failed them.
+func TestIssueToken_CatalogFailureIsNotACredentialRefusal(t *testing.T) {
+	boom := errors.New("claims query exploded")
+	store := &fakeAuthStore{user: usableUser(), matches: true, catalogErr: boom}
+	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: &fakeIssuer{}}
+
+	_, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want the underlying failure to escape as an exception", err)
+	}
+	var carrier domain.NotificationCarrier
+	if errors.As(err, &carrier) {
+		t.Error("a catalog failure must not be dressed up as a credential refusal")
+	}
+}
+
+func TestIssueToken_MintsTheTenantClaimsBesideTheFixedSet(t *testing.T) {
+	user := usableUser()
+	holds(user, claimID(1), "9000")
+
+	store := &fakeAuthStore{
+		user:    user,
+		matches: true,
+		catalog: []*appdomain.Claim{
+			definition(claimID(1), "x_cost_center", vos.ClaimValueTypeNumber, stringValue("1000")),
+			definition(claimID(2), "x_region", vos.ClaimValueTypeString, stringValue("emea")),
+		},
+	}
+	issuer := &fakeIssuer{}
+	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: issuer}
+
+	result, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "right"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The catalog is read for THIS user's tenant. Reading it for another one
+	// would hand a token the vocabulary of a tenant the caller is not in.
+	if store.askedTenant != user.TenantID {
+		t.Errorf("catalog read for tenant %v, want the user's own %v", store.askedTenant, user.TenantID)
+	}
+	// Level 1 beat level 2, and level 2 filled the claim level 1 said nothing
+	// about — both, on one token.
+	if got := issuer.claims["x_cost_center"]; got != float64(9000) {
+		t.Errorf("x_cost_center = %#v, want the user's own value", got)
+	}
+	if got := issuer.claims["x_region"]; got != "emea" {
+		t.Errorf("x_region = %#v, want the tenant default", got)
+	}
+	// BESIDE, not instead of. The fixed set is what every service in the mesh
+	// reads, and a merge that displaced any of it would be the worst outcome
+	// this feature could have.
+	if issuer.claims[claimTenantWorkspace] != "acme" || issuer.claims[claimEmail] != "ada@acme.test" {
+		t.Errorf("the fixed claim set did not survive the merge: %#v", issuer.claims)
+	}
+	if result.User.Claims["x_region"] != "emea" {
+		t.Errorf("the body did not carry the resolved claims: %#v", result.User.Claims)
+	}
+}
+
+// The merge order, tested where it can actually be reached: resolveCustomClaims
+// already refuses a platform name, so this drives buildClaims directly.
+//
+// The two guards fail in OPPOSITE directions, which is the whole reason both
+// exist. If the first is ever wrong — a name added to the platform's vocabulary
+// that an operator had already seeded — the consequence must be a tenant claim
+// that quietly does not appear, never `permissions` replaced by a value the
+// tenant chose.
+func TestBuildClaims_TheFixedSetIsNeverDisplacedByACustomClaim(t *testing.T) {
+	user := usableUser()
+	hostile := map[string]any{
+		claimPermissions: []string{"*:*"},
+		claimTenantID:    "99999999-9999-9999-9999-999999999999",
+		"x_region":       "emea",
+	}
+
+	claims := buildClaims(user, []string{"viewer"}, []vos.PermissionKey{{Resource: "user", Action: "read"}}, hostile)
+
+	if got := claims[claimTenantID]; got != user.TenantID.Value() {
+		t.Errorf("tenant_id = %#v, want the loaded row's own tenant", got)
+	}
+	permissions, ok := claims[claimPermissions].([]string)
+	if !ok || len(permissions) != 1 || permissions[0] != "user:read" {
+		t.Errorf("permissions = %#v, want the resolved bundle and not the injected one", claims[claimPermissions])
+	}
+	// And the harmless one still rode along.
+	if claims["x_region"] != "emea" {
+		t.Errorf("a legitimate custom claim was lost: %#v", claims)
+	}
+}
+
+// The anti-drift test, mirroring the one that already compares the body's
+// permissions against the token's. A body advertising claims the token does not
+// carry would have a client offering actions every request then refuses.
+func TestIssueToken_BodyClaimsMirrorTheToken(t *testing.T) {
+	user := usableUser()
+	holds(user, claimID(1), "true")
+
+	store := &fakeAuthStore{
+		user:    user,
+		matches: true,
+		catalog: []*appdomain.Claim{
+			definition(claimID(1), "x_beta_enabled", vos.ClaimValueTypeBool, nil),
+			definition(claimID(2), "x_region", vos.ClaimValueTypeString, stringValue("emea")),
+		},
+	}
+	issuer := &fakeIssuer{}
+	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: issuer}
+
+	result, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "right"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.User.Claims) != 2 {
+		t.Fatalf("body claims = %#v, want both resolved claims", result.User.Claims)
+	}
+	for name, value := range result.User.Claims {
+		if issuer.claims[name] != value {
+			t.Errorf("body claim %s = %#v, token has %#v — the two must not disagree",
+				name, value, issuer.claims[name])
+		}
+	}
+}
+
+// The case where body and token are MOST likely to disagree, because the
+// restriction applies to one of them for a reason the other does not share.
+func TestIssueToken_BodyAndTokenAgreeOnARestrictedSession(t *testing.T) {
+	user := usableUser()
+	user.MustChangePassword = true
+	holds(user, claimID(1), "emea")
+
+	store := &fakeAuthStore{
+		user:    user,
+		matches: true,
+		catalog: []*appdomain.Claim{
+			definition(claimID(1), "x_region", vos.ClaimValueTypeString, nil),
+		},
+	}
+	issuer := &fakeIssuer{}
+	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: issuer}
+
+	result, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "right"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, present := issuer.claims["x_region"]; present {
+		t.Errorf("a restricted token carried a tenant claim: %#v", issuer.claims)
+	}
+	if len(result.User.Claims) != 0 {
+		t.Errorf("the body advertised claims the token does not carry: %#v", result.User.Claims)
+	}
+}
+
+// A corrected value has to propagate at the next rotation, which it only can if
+// the catalog is RE-READ rather than replayed from the token being redeemed.
+func TestRefreshToken_RebuildsTheTenantClaims(t *testing.T) {
+	user := usableUser()
+	holds(user, claimID(1), "9000")
+
+	store := &fakeAuthStore{
+		byID:    user,
+		catalog: []*appdomain.Claim{definition(claimID(1), "x_cost_center", vos.ClaimValueTypeNumber, nil)},
+	}
+	lookup := &fakeLookup{subject: "11111111-1111-1111-1111-111111111111"}
+	issuer := &fakeIssuer{}
+	h := &RefreshTokenHandler{Store: store, Lookup: lookup, Issuer: issuer}
+
+	result, err := h.Handle(authCtx(), &RefreshTokenCommand{RefreshToken: "opaque-value"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if store.catalogReads != 1 {
+		t.Errorf("catalog reads = %d, want exactly one per rotation", store.catalogReads)
+	}
+	if got := issuer.claims["x_cost_center"]; got != float64(9000) {
+		t.Errorf("x_cost_center = %#v, want it rebuilt from the database", got)
+	}
+	if result.User.Claims["x_cost_center"] != float64(9000) {
+		t.Errorf("the rotation's body lost the claims: %#v", result.User.Claims)
+	}
+}
+
+// A rotation that refuses must not have paid for the catalog either.
+func TestRefreshToken_CatalogFailureIsNotACredentialRefusal(t *testing.T) {
+	boom := errors.New("claims query exploded")
+	store := &fakeAuthStore{byID: usableUser(), catalogErr: boom}
+	lookup := &fakeLookup{subject: "11111111-1111-1111-1111-111111111111"}
+	h := &RefreshTokenHandler{Store: store, Lookup: lookup, Issuer: &fakeIssuer{}}
+
+	_, err := h.Handle(authCtx(), &RefreshTokenCommand{RefreshToken: "opaque-value"})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want the underlying failure to escape as an exception", err)
+	}
+	var carrier domain.NotificationCarrier
+	if errors.As(err, &carrier) {
+		t.Error("a catalog failure must not be dressed up as a credential refusal")
 	}
 }

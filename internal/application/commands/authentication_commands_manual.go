@@ -23,6 +23,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -114,6 +115,17 @@ type AuthenticationStore interface {
 	// for why a named type here would have been one invented to work around a
 	// layer boundary rather than to model anything.
 	ResolveGrants(ctx context.Context, userID domain.ID) (roleKeys []string, permissions []vos.PermissionKey, err error)
+	// ClaimDefinitionsOfTenant returns the ACTIVE claim definitions of this
+	// tenant that a user may hold a value for — level 2 of the two-level chain,
+	// and the vocabulary level 1 is resolved against.
+	//
+	// It returns the aggregate and NOT a result type of its own, for the reason
+	// ResolveGrants states one method up: a struct with a name, a type and a
+	// default would have no identity, no rule and no validation, and would
+	// exist only to give this port something to name. *appdomain.Claim already
+	// is that shape, and FindUserByEmail already hands the application an
+	// aggregate across this same seam.
+	ClaimDefinitionsOfTenant(ctx *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error)
 	// PasswordMatches verifies a plaintext against a stored hash.
 	PasswordMatches(plaintext, encoded string) bool
 	// BurnPasswordVerification spends one verification and discards it, so a
@@ -183,6 +195,14 @@ type AuthenticatedUserResult struct {
 	Groups             []NamedGrantResult
 	Roles              []NamedGrantResult
 	Permissions        []string
+	// The tenant-defined claims this token carries, resolved down the two-level
+	// chain and typed per each definition's declared value type.
+	//
+	// IT MIRRORS THE TOKEN EXACTLY, restriction included — the same reason
+	// Permissions above is filled from effectivePermissions rather than from the
+	// raw bundle. Both come from ONE resolution per request; neither re-derives
+	// the other's answer.
+	Claims map[string]any
 }
 
 // NamedGrantResult is one group or role, with the display name the token
@@ -346,9 +366,27 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		return TokenResult{}, err
 	}
 
+	// LEVEL 2 of the claim chain. Level 1 came along with the aggregate — the
+	// repository's read join fills every entry — so this is the one extra read
+	// the custom claims cost, and it is an indexed one.
+	//
+	// It fails the way ResolveGrants above fails, and for the same two reasons:
+	// the caller proved who they are and this service failed them, so it is
+	// neither a credential refusal nor an attempt worth counting — counting it
+	// would let a database problem lock out the very users it is already
+	// failing. Minting a token silently missing claims a consumer branches on
+	// is the alternative, and a wrong answer is worse than no answer.
+	catalog, err := h.Store.ClaimDefinitionsOfTenant(ctx, user.TenantID)
+	if err != nil {
+		return TokenResult{}, err
+	}
+	// ONE resolution, two readers. The token below and the profile at the
+	// bottom of this function both receive this exact map.
+	customClaims := resolveCustomClaims(user, catalog)
+
 	access, refresh, err := h.Issuer.IssueWithRefresh(ctx, authcore.TokenRequest{
 		Subject: idOf(user).Value(),
-		Claims:  buildClaims(user, roleKeys, permissions),
+		Claims:  buildClaims(user, roleKeys, permissions, customClaims),
 	})
 	if err != nil {
 		return TokenResult{}, err
@@ -367,7 +405,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, roleKeys, permissions),
+		User:             buildProfile(user, roleKeys, permissions, customClaims),
 	}, nil
 }
 
@@ -439,7 +477,18 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		return TokenResult{}, err
 	}
 
-	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(user, roleKeys, permissions))
+	// RE-READ ON EVERY ROTATION, never replayed from the token being redeemed —
+	// the same discipline the grants above already follow, and the reason the
+	// framework takes claims fresh at redemption time. A claim value corrected
+	// while a session is live therefore reaches the mesh at the next rotation
+	// rather than at the next full sign-in, with no invalidation step anywhere.
+	catalog, err := h.Store.ClaimDefinitionsOfTenant(ctx, user.TenantID)
+	if err != nil {
+		return TokenResult{}, err
+	}
+	customClaims := resolveCustomClaims(user, catalog)
+
+	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(user, roleKeys, permissions, customClaims))
 	switch {
 	case err == nil:
 	case errors.Is(err, authcore.ErrRefreshTokenNotFound),
@@ -462,7 +511,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, roleKeys, permissions),
+		User:             buildProfile(user, roleKeys, permissions, customClaims),
 	}, nil
 }
 
@@ -569,18 +618,28 @@ func accountIsUsable(user *appdomain.User) bool {
 // claim is an EMPTY list and the account is a dead end until a helpdesk reset —
 // which is the honest fail-closed reading, because inventing the permission would
 // hand out a grant nobody issued.
-func buildClaims(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey) map[string]any {
-	return map[string]any{
-		claimIdentityKind:       identityKindUser,
-		claimTenantID:           user.TenantID.Value(),
-		claimTenantWorkspace:    user.TenantWorkspace,
-		claimEmail:              user.Email.Value(),
-		claimName:               user.Name.FullName(),
-		claimPermissions:        effectivePermissions(user, permissions),
-		claimGroups:             groupKeysOf(user),
-		claimRoles:              roleKeys,
-		claimMustChangePassword: user.MustChangePassword,
-	}
+// THE TENANT-DEFINED CLAIMS ARE MERGED UNDER THE FIXED SET, never over it. The
+// resolution already refuses a definition carrying a platform name, so the
+// order changes nothing today; it is written this way because the two guards
+// fail in opposite directions. Assigning the fixed set last means that if the
+// first guard is ever wrong — a name added to the platform's vocabulary that an
+// operator had already seeded, a row written straight into the table — the
+// consequence is a tenant claim that quietly does not appear, rather than
+// `permissions` or `tenant_id` being replaced by a value the tenant chose.
+// Those two are read by the framework across the whole mesh.
+func buildClaims(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) map[string]any {
+	claims := make(map[string]any, len(custom)+9)
+	maps.Copy(claims, custom)
+	claims[claimIdentityKind] = identityKindUser
+	claims[claimTenantID] = user.TenantID.Value()
+	claims[claimTenantWorkspace] = user.TenantWorkspace
+	claims[claimEmail] = user.Email.Value()
+	claims[claimName] = user.Name.FullName()
+	claims[claimPermissions] = effectivePermissions(user, permissions)
+	claims[claimGroups] = groupKeysOf(user)
+	claims[claimRoles] = roleKeys
+	claims[claimMustChangePassword] = user.MustChangePassword
+	return claims
 }
 
 // effectivePermissions is the ONE decision about what this user may attempt, and
@@ -656,7 +715,13 @@ func groupKeysOf(user *appdomain.User) []string {
 // roles" has to see the ones inherited through a group too. That is also why the
 // role entries have no display name: a role reached through a group was never
 // loaded as a row here.
-func buildProfile(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey) AuthenticatedUserResult {
+// The custom map is PASSED IN rather than resolved here, and that is the whole
+// anti-drift argument effectivePermissions makes one function up, applied to the
+// second thing this body and that token now both carry. One resolution runs per
+// request and both readers consume it, so the body cannot advertise a claim the
+// token omits — including the case that makes the two most likely to disagree,
+// where a must-change-password session carries none at all.
+func buildProfile(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) AuthenticatedUserResult {
 	groupEntries := domain.GetCurrentItemsOf[aggregatevos.UserGroup](user.GetAggregateRoot())
 	groups := make([]NamedGrantResult, 0, len(groupEntries))
 	for _, entry := range groupEntries {
@@ -687,6 +752,7 @@ func buildProfile(user *appdomain.User, roleKeys []string, permissions []vos.Per
 		Groups:             groups,
 		Roles:              roles,
 		Permissions:        effectivePermissions(user, permissions),
+		Claims:             custom,
 	}
 }
 

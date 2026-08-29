@@ -95,6 +95,22 @@ type AuthenticatedUserResponse struct {
 	// mustChangePassword is true — so a client never has to decode the token to
 	// know what it may attempt.
 	Permissions []string `json:"permissions"`
+	// The tenant-defined claims this token carries, by the name a consuming
+	// service reads them under — the reserved `x_` namespace, always. Each value
+	// is rendered in the JSON type its definition declares, so a `number` claim
+	// is a number here and in the token alike.
+	//
+	// It mirrors the token's custom claims exactly, restriction included: when
+	// mustChangePassword is true this is `{}`, because that token carries none
+	// either. That is the one place where a body re-deriving its own answer
+	// would advertise facts the token does not carry.
+	//
+	// UNLIKE Groups and Roles, this carries no display name and no description.
+	// The catalog's `description` is written for the operator filling a value
+	// in, not for the consumer branching on it, and a body read once at sign-in
+	// is not where a client should learn the tenant's vocabulary — the claim
+	// listing endpoint is.
+	Claims map[string]any `json:"claims"`
 }
 
 // NamedGrantResponse is one group or role.
@@ -125,8 +141,20 @@ func (TokenResponse) FromResult(result commands.TokenResult) TokenResponse {
 			Groups:             namedGrants(result.User.Groups),
 			Roles:              namedGrants(result.User.Roles),
 			Permissions:        nonNilStrings(result.User.Permissions),
+			Claims:             nonNilClaims(result.User.Claims),
 		},
 	}
+}
+
+// nonNilClaims guarantees `{}` over `null`, for the reason nonNilStrings below
+// guarantees `[]`: a client reading a key out of this object should not have to
+// guard first, and "this user carries no custom claims" is an empty object, not
+// a missing one.
+func nonNilClaims(claims map[string]any) map[string]any {
+	if claims == nil {
+		return map[string]any{}
+	}
+	return claims
 }
 
 // namedGrants maps the application shape onto the wire one.

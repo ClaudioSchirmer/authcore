@@ -49,6 +49,7 @@ import (
 // statement no aggregate load can express).
 type AuthenticationReader struct {
 	users  *UserRepository
+	claims *ClaimRepository
 	engine core.RelationalEngine
 
 	// Assembled once, at construction. See the file header: a schema that no
@@ -66,6 +67,7 @@ type AuthenticationReader struct {
 func NewAuthenticationReader(engine core.RelationalEngine) *AuthenticationReader {
 	r := &AuthenticationReader{
 		users:  NewUserRepository(engine),
+		claims: NewClaimRepository(engine),
 		engine: engine,
 	}
 	r.permissionsStmt = buildEffectivePermissionsStatement(engine.Dialect())
@@ -114,6 +116,40 @@ func (r *AuthenticationReader) FindUserByEmail(ctx *configuration.AppContext, em
 // bundle on every refresh — never replaying what the previous token carried.
 func (r *AuthenticationReader) FindUserByID(ctx *configuration.AppContext, id domain.ID) (*appdomain.User, error) {
 	return r.users.Loader.FindOne(ctx, criteria.ByID(id))
+}
+
+// ClaimDefinitionsOfTenant returns the claim definitions a user of this tenant
+// may carry a value for — LEVEL 2 of the two-level chain, and the vocabulary
+// level 1 is read against.
+//
+// THE ACTIVE-ONLY SCOPE IS THE POINT OF READING THE CATALOG AT ALL, not a
+// detail inherited from the loader's default. The emission could have been
+// driven off the user's own entries instead: `UserClaim` already carries
+// ClaimName and ClaimValueType from the read join this repository declares, so
+// level 1 needs no query. But a read join is deliberately NOT archive-gated on
+// its target — the scope governs which ROOTS come back, never which rows a
+// traversal reaches into — so an entry whose definition was retired still
+// arrives with a name and a type, and minting from it would put a claim in a
+// token for a definition the tenant took out of service. Driving from the
+// catalog drops it, and drops the default with it. Fail-closed in both halves.
+//
+// FindAll and not the neutral seam ResolveGrants uses one function over: this
+// is rows to walk, on the same criteria surface, one hop and no aggregation —
+// exactly what the list primitive is for. The tenant predicate is served by the
+// leading column of claims_tenant_id_name_key, so the extra round trip a token
+// operation pays here is one indexed read.
+//
+// The `both` member is included because it means "either identity kind may hold
+// this", NOT "only a principal that is both" — there is no such principal. The
+// client half of the same set is what POST /auth/client/token will read when it
+// exists; nothing here anticipates it.
+func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error) {
+	return r.claims.Loader.FindAll(ctx, criteria.Where(criteria.And(
+		criteria.Eq("TenantID", tenantID),
+		criteria.In("AppliesTo",
+			vos.ClaimAppliesToUser.Value(),
+			vos.ClaimAppliesToBoth.Value()),
+	)))
 }
 
 // ResolveGrants returns the roles this user holds by ANY path and the permissions
