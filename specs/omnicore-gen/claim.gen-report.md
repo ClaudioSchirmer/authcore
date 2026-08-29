@@ -130,6 +130,23 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 
 ## What to check
 
+### Read what was generated — it is a first draft, not a verdict
+
+This tree is ordinary Go in your repository. **`// Code generated … DO NOT EDIT.` is the Go convention that tells linters to skip a file — it is not a rule that the code may not change.** Review it the way you would review a colleague's: for logic, and for the QUESTION each query asks.
+
+Measure it against what the FRAMEWORK offers, not against what the spec language can say — the language is a subset of the framework and always will be, so "the generator does not emit that" is a fact about the generator and never a reason for the service to do the worse thing. If something here should be a single pass over the table instead of several, or a primitive the framework ships and this spec cannot name, that is worth changing.
+
+Two ways to change it, and the only reason to prefer the first is cost:
+
+1. **Change the spec and regenerate** — survives every later run and every upgrade, and leaves nothing to maintain. Check `omnicore-gen explain keys` before assuming the language cannot say it.
+2. **Edit the file, then adopt it** — normal and expected when the framework can do it and the spec cannot say it:
+
+   ```
+   omnicore-gen adopt <path> -why '<what the spec could not express>'
+   ```
+
+   Adopting re-hashes the file as it stands, so regeneration KEEPS the edit; without it the next run stops rather than overwriting your work. The cost is real and worth saying out loud: an adopted file is PINNED — it stops tracking the spec, so a later framework version's improvements to it never arrive. Every later `generate` prints the file as adopted and `doctor` lists it, which is how it stays visible.
+
 These are the decisions the spec made that are expensive to change later. Read them against what you actually meant.
 
 | Decision | Value | Why it matters |
@@ -159,18 +176,33 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the claims feature (repository + view + mount) | `bootstrap/claims_feature.go` |
+| the archive command and result | `internal/application/commands/archive_claim_command.go` |
+| tests for the command mappers | `internal/application/commands/claim_commands_test.go` |
+| the insert command and result | `internal/application/commands/insert_claim_command.go` |
+| the patch command and result | `internal/application/commands/patch_claim_command.go` |
+| the read criteria tests | `internal/application/queries/claim_queries_test.go` |
+| the by-id query and its result | `internal/application/queries/find_claim_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_claims_by_params_query.go` |
 | the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/claim_translations_test.go` |
-| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the Claim aggregate root, its modes and its rules | `internal/domain/claim.go` |
 | the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
 | tests for Claim's rules | `internal/domain/claim_test.go` |
-| 10 notification declaration(s) | `internal/domain/notifications.go` |
+| the ClaimAppliesTo enumeration (3 members) | `internal/domain/vos/claim_applies_to.go` |
+| the ClaimValueType enumeration (3 members) | `internal/domain/vos/claim_value_type.go` |
+| tests for 2 value object(s) | `internal/domain/vos/claim_vos_test.go` |
+| the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
 | the Claim service implementation | `internal/infra/claim_service.go` |
+| the claims schema (6 columns) | `internal/infra/schemas/claim_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/claim_schemas_test.go` |
+| the claims view (relational-backed) | `internal/infra/views/claim_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/claim_view_test.go` |
+| the 5 claim endpoints | `internal/web/claim_routes.go` |
+| the request mapper tests | `internal/web/requests/claim_requests_test.go` |
+| the by-id request and response | `internal/web/requests/find_claim_by_id.go` |
+| the listing request and response | `internal/web/requests/find_claims_by_params.go` |
+| the insert request and response | `internal/web/requests/insert_claim.go` |
+| the patch request and response | `internal/web/requests/patch_claim.go` |
 
 **Left untouched** (yours, by design):
 
@@ -179,7 +211,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-24 file(s) were already up to date.
+1 file(s) were already up to date.
 
 ## What was NOT generated
 

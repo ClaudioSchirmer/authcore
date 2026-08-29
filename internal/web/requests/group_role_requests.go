@@ -5,21 +5,33 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-28
-// checksum:   sha256:373889a48b4280cde239798f94455a218a85fef32e7f7426e491424d6edfbf4c
+// generated:  2026-08-29
+// checksum:   sha256:35d1a7004872242447c0b3ac61874112842106bf9a14a065dd32c61da4f87090
 //
-// The checksum covers this file with the checksum line itself blanked. The
-// generator recomputes it before every write: if it does not match, the file
-// was changed by hand and the run REFUSES it — your change is neither
-// overwritten nor updated. Change the spec and regenerate instead; to keep a
-// deliberate edit, run omnicore-gen adopt on this path.
+// The line above is the Go convention that tells linters to skip this file.
+// It is NOT a rule that the code may not change: this file is yours, in your
+// repository, and improving it is ordinary work. What the generator asks is
+// only that it be told.
+//
+// Changing the SPEC and regenerating is the cheaper of the two edits — it
+// survives every later run. When the spec cannot say what you need and the
+// framework can, edit this file: ask whoever owns the service first, and
+// then run `omnicore-gen adopt <this path> -why '<what the spec could not
+// express>'`. Adopting re-hashes the file as it now stands, so regeneration
+// KEEPS your edit — and every later run prints the file as adopted, so it
+// stays visible instead of becoming a surprise.
+//
+// Without that adopt, the next run notices the checksum no longer matches
+// and REFUSES rather than overwriting — your work is never lost, but the
+// run stops for whoever meets it.
 
 package requests
 
 import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 )

@@ -5,14 +5,25 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:2dd80a97ae37fb2733b51171931bff504c6864f59f0b6720091d674e7f82693d
+// generated:  2026-08-29
+// checksum:   sha256:2f8bf50af5654c84f159126fa0af66b61a84f3cf2151557c75f225cefd40b4b0
 //
-// The checksum covers this file with the checksum line itself blanked. The
-// generator recomputes it before every write: if it does not match, the file
-// was changed by hand and the run REFUSES it — your change is neither
-// overwritten nor updated. Change the spec and regenerate instead; to keep a
-// deliberate edit, run omnicore-gen adopt on this path.
+// The line above is the Go convention that tells linters to skip this file.
+// It is NOT a rule that the code may not change: this file is yours, in your
+// repository, and improving it is ordinary work. What the generator asks is
+// only that it be told.
+//
+// Changing the SPEC and regenerating is the cheaper of the two edits — it
+// survives every later run. When the spec cannot say what you need and the
+// framework can, edit this file: ask whoever owns the service first, and
+// then run `omnicore-gen adopt <this path> -why '<what the spec could not
+// express>'`. Adopting re-hashes the file as it now stands, so regeneration
+// KEEPS your edit — and every later run prints the file as adopted, so it
+// stays visible instead of becoming a surprise.
+//
+// Without that adopt, the next run notices the checksum no longer matches
+// and REFUSES rather than overwriting — your work is never lost, but the
+// run stops for whoever meets it.
 
 package main
 

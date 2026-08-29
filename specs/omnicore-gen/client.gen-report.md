@@ -284,6 +284,23 @@ The verbs that address ONE entry — add, change, remove — have generated test
 
 ## What to check
 
+### Read what was generated — it is a first draft, not a verdict
+
+This tree is ordinary Go in your repository. **`// Code generated … DO NOT EDIT.` is the Go convention that tells linters to skip a file — it is not a rule that the code may not change.** Review it the way you would review a colleague's: for logic, and for the QUESTION each query asks.
+
+Measure it against what the FRAMEWORK offers, not against what the spec language can say — the language is a subset of the framework and always will be, so "the generator does not emit that" is a fact about the generator and never a reason for the service to do the worse thing. If something here should be a single pass over the table instead of several, or a primitive the framework ships and this spec cannot name, that is worth changing.
+
+Two ways to change it, and the only reason to prefer the first is cost:
+
+1. **Change the spec and regenerate** — survives every later run and every upgrade, and leaves nothing to maintain. Check `omnicore-gen explain keys` before assuming the language cannot say it.
+2. **Edit the file, then adopt it** — normal and expected when the framework can do it and the spec cannot say it:
+
+   ```
+   omnicore-gen adopt <path> -why '<what the spec could not express>'
+   ```
+
+   Adopting re-hashes the file as it stands, so regeneration KEEPS the edit; without it the next run stops rather than overwriting your work. The cost is real and worth saying out loud: an adopted file is PINNED — it stops tracking the spec, so a later framework version's improvements to it never arrive. Every later `generate` prints the file as adopted and `doctor` lists it, which is how it stays visible.
+
 These are the decisions the spec made that are expensive to change later. Read them against what you actually meant.
 
 | Decision | Value | Why it matters |
@@ -325,16 +342,52 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the clients feature (repository + view + mount) | `bootstrap/clients_feature.go` |
+| the archive command and result | `internal/application/commands/archive_client_command.go` |
 | the per-entry commands for client_allowed_cidrs | `internal/application/commands/client_allowed_cidr_commands.go` |
+| the shapes for 3 child collection(s) | `internal/application/commands/client_child_results.go` |
 | the per-entry commands for client_claims | `internal/application/commands/client_claim_commands.go` |
 | tests for the command mappers | `internal/application/commands/client_commands_test.go` |
 | the per-entry commands for client_roles | `internal/application/commands/client_role_commands.go` |
+| the insert command and result | `internal/application/commands/insert_client_command.go` |
+| the patch command and result | `internal/application/commands/patch_client_command.go` |
+| the ClientAllowedCIDR input DTO | `internal/application/dtos/client_allowed_cidr_input.go` |
+| the ClientClaim input DTO | `internal/application/dtos/client_claim_input.go` |
+| tests for the 3 collection input mapper(s) | `internal/application/dtos/client_dtos_test.go` |
+| the ClientRole input DTO | `internal/application/dtos/client_role_input.go` |
+| the read criteria tests | `internal/application/queries/client_queries_test.go` |
+| the read shapes for 3 child collection(s) | `internal/application/queries/client_row_results.go` |
+| the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/client_translations_test.go` |
+| the ClientAllowedCIDR child value object | `internal/domain/aggregatevos/client_allowed_cidr.go` |
+| tests for the collection types | `internal/domain/aggregatevos/client_children_test.go` |
+| the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
+| the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
 | the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
+| the Client service port (9 fact(s)) | `internal/domain/client_service.go` |
+| tests for Client's rules | `internal/domain/client_test.go` |
+| the ClientStatus enumeration (2 members) | `internal/domain/vos/client_status.go` |
+| tests for 1 value object(s) | `internal/domain/vos/client_vos_test.go` |
+| the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
+| the Client service implementation | `internal/infra/client_service.go` |
+| the client_allowed_cidrs child schema | `internal/infra/schemas/client_allowed_cidr_schema.go` |
+| the client_claims child schema | `internal/infra/schemas/client_claim_schema.go` |
+| the client_roles child schema | `internal/infra/schemas/client_role_schema.go` |
+| the clients schema (8 columns) | `internal/infra/schemas/client_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/client_schemas_test.go` |
+| the clients view (relational-backed) | `internal/infra/views/client_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/client_view_test.go` |
 | the 5 client endpoints | `internal/web/client_routes.go` |
 | the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
+| the wire types for 3 child collection(s) | `internal/web/requests/client_children.go` |
 | the per-entry wire types for client_claims | `internal/web/requests/client_claim_requests.go` |
 | the request mapper tests | `internal/web/requests/client_requests_test.go` |
 | the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
+| the by-id request and response | `internal/web/requests/find_client_by_id.go` |
+| the listing request and response | `internal/web/requests/find_clients_by_params.go` |
+| the insert request and response | `internal/web/requests/insert_client.go` |
+| the patch request and response | `internal/web/requests/patch_client.go` |
 
 **Left untouched** (yours, by design):
 
@@ -343,7 +396,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-37 file(s) were already up to date.
+1 file(s) were already up to date.
 
 ## What was NOT generated
 

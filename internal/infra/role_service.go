@@ -5,19 +5,31 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-24
-// checksum:   sha256:4d7eee9ca97144a841ca1cc45096f9fe0f61398e01629f385d56cf3301211fba
+// generated:  2026-08-29
+// checksum:   sha256:595e87fc534a9bead9495f1d60a8969e8cda1f9481aaa3e1759960e970200a2c
 //
-// The checksum covers this file with the checksum line itself blanked. The
-// generator recomputes it before every write: if it does not match, the file
-// was changed by hand and the run REFUSES it — your change is neither
-// overwritten nor updated. Change the spec and regenerate instead; to keep a
-// deliberate edit, run omnicore-gen adopt on this path.
+// The line above is the Go convention that tells linters to skip this file.
+// It is NOT a rule that the code may not change: this file is yours, in your
+// repository, and improving it is ordinary work. What the generator asks is
+// only that it be told.
+//
+// Changing the SPEC and regenerating is the cheaper of the two edits — it
+// survives every later run. When the spec cannot say what you need and the
+// framework can, edit this file: ask whoever owns the service first, and
+// then run `omnicore-gen adopt <this path> -why '<what the spec could not
+// express>'`. Adopting re-hashes the file as it now stands, so regeneration
+// KEEPS your edit — and every later run prints the file as adopted, so it
+// stays visible instead of becoming a surprise.
+//
+// Without that adopt, the next run notices the checksum no longer matches
+// and REFUSES rather than overwriting — your work is never lost, but the
+// run stops for whoever meets it.
 
 package infra
 
 import (
 	"context"
+
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/domain"
