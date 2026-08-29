@@ -41,6 +41,7 @@ Honest scope, so nobody reads intent as delivery:
 | User ↔ tenant association | **built** — `users.tenant_id` NOT NULL, FK to `tenants.id`, filled from the caller's `tenant_id` claim and nameable in the body only by a `*:*` operator crossing the scope |
 | Self-service password change | **built** — `PATCH /users/{id}/password`, gated on `user:change-password`: token required, the id on the path must be the caller's own, and the current password is proved before the new one is accepted. *(This row read "not started" until 2026-08-26; it was stale the same day the route landed.)* What is still missing is a FORGOT-password flow for the caller who has no password to prove — e-mail, an expiring link — and that has not been started |
 | User ↔ group / User → role membership | **built** — two owned collections with per-entry join/leave and grant/revoke, both gated on `user:grant` and both refusing an escalation the caller does not already hold |
+| Claim VALUES on a principal | **built** (2026-08-28) — level 1 of the claim chain: a `claims` collection on **both** `User` and `Client`, each holding one row per definition with the value that principal carries. Per-entry add/correct/remove gated on `user:set-claim` / `client:set-claim`. **The correction is a PATCH carrying only `value`** — the definition an entry belongs to is read off the stored row and is absent from the body, so an entry can never become the value of a different claim. Every write is judged against the definition it points at — same tenant, an `appliesTo` that admits this identity kind, and a value that parses as the declared `valueType`. Plans in `specs/evolve-entity/{user,client}/spec.md`. **It changes no token yet, by decision**: `buildClaims` is untouched, so the values can be set, read and audited with nothing issued behaving differently. Emission is its own run |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
@@ -54,7 +55,7 @@ Honest scope, so nobody reads intent as delivery:
 | Refresh-token storage | **built** — `authentication_refresh_tokens` (migration `0006`), hash-only: the raw value never reaches the table. Single-use with rotation on every redemption; replaying a redeemed value revokes the entire session family. The table sweeps its own expired rows on every write, so there is no scheduled job to forget to deploy |
 | Contract QA suite (`/omnicore:qa`) | not generated |
 | Generated code | **All seven aggregates.** `internal/` holds Tenant, Permission, Role, Group, User, Client and Claim end to end — domain, application, web, infra, migrations `0001` to `0005`, `0008` and `0009`, wiring and the seven catalogs. What is NOT generated, and could not be, is the credential and token path: the password hasher, the two credential operations, the two token routes, the permission resolver, the refresh store and migration `0006` are hand-written. `specs/omnicore-gen/user.gen-report.md` lists the credential pieces; `specs/implement/authentication-token/plan.md` lists the token ones |
-| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` · `:grant` now gate the built role routes too, the two child ops riding `role:grant` since 2026-08-28, when the collection verbs of every entity were aligned on a verb of their own; `group:*` (**five** verbs) and `user:*` (**seven** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password`) gate their built routes too; so do `client:*` (**seven** — the five plus `rotate-secret` and `manage-network`) and `claim:*` (**four** — `read` · `insert` · `update` · `archive`, and there is no fifth because the catalog owns no collection). **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `role:grant`, `group:grant`, `user:grant`, `user:reset-password` and `user:change-password` are the five nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
+| Permission enforcement in production | `tenant:read` · `:insert` · `:update` · `:archive` and `permission:read` · `:insert` · `:update` · `:archive` now gate the built routes for real, on REST and GraphQL alike; `role:read` · `:insert` · `:update` · `:archive` · `:grant` now gate the built role routes too, the two child ops riding `role:grant` since 2026-08-28, when the collection verbs of every entity were aligned on a verb of their own; `group:*` (**five** verbs) and `user:*` (**eight** — `read` · `insert` · `update` · `archive` · `grant` · `reset-password` · `change-password` · `set-claim`) gate their built routes too; so do `client:*` (**eight** — the five plus `rotate-secret`, `manage-network` and `set-claim`) and `claim:*` (**four** — `read` · `insert` · `update` · `archive`, and there is no fifth because the catalog owns no collection: the verb that sets a VALUE lives on the two parents that hold one). **`auth.mode` is now `jwt` in BOTH profiles, with `auth.authorization.enabled: true` and a required tenant claim.** The dev bench was closed on 2026-08-26: a bench that answers without a token proves nothing about a service whose whole job is deciding who may do what — every row-scope guard stands down when no identity is present, so the tests that mattered most were the ones not running. Dev now signs with a key `start.sh` generates on first run and validates through its own JWKS. The literals have **no catalog row until an operator inserts one** — see the seeding note below, and note that `role:grant`, `group:grant`, `user:grant`, `user:reset-password`, `user:change-password`, `user:set-claim` and `client:set-claim` are the seven nobody will guess from the pattern — and that `user:change-password` is the one that must reach EVERY user, since without it a caller cannot set their own password at all. **Every route in the service declares a permission** — the framework refuses to boot otherwise once `auth.authorization` is on |
 
 ## Architecture posture
 
@@ -695,6 +696,7 @@ row, which is the same work as provisioning a new client anyway.
 | `previousSecretExpiresAt` | timestamp? | when the retiring secret stops working. Absent when no rotation is in flight |
 | `roles[]` | collection | direct role grants, id-only, with the key and name read across the foreign key |
 | `allowedCIDRs[]` | collection | the network ranges this client may authenticate from |
+| `claims[]` | collection | the claim values this client carries — one row per definition, with the claim's name and declared type read across the foreign key |
 
 The hash columns are in **no response, no filter, no sort and no `?fields=` vocabulary**, and
 they are redacted on both axes — the outbox payload and the audit event — the same four
@@ -735,9 +737,11 @@ rotation call. That gap and its three ways out are in
 
 Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
 `client:grant` (the two role verbs) · **`client:rotate-secret`** · **`client:manage-network`**
-(the two allow-list verbs). The last two are their own for the reason `user:reset-password`
-is — whoever may fix a typo in a description is not automatically whoever may hand out a
-production credential, nor whoever may decide where that credential works from.
+(the two allow-list verbs) · **`client:set-claim`** (the three claim-value verbs). The last
+three are their own for the reason `user:reset-password` is — whoever may fix a typo in a
+description is not automatically whoever may hand out a production credential, nor whoever may
+decide where that credential works from, nor whoever may write a value that some downstream
+service reads to decide what this machine may do.
 
 `client:manage-network` was `client:update` until 2026-08-28. The first reading called the
 allow-list configuration rather than privilege — it grants the client nothing it does not
@@ -803,10 +807,18 @@ nothing.
   the claim does not enter the token at all
 ```
 
-Level 1 is two owned collections on `User` and on `Client`, and **neither exists yet**. So the
-catalog can be filled, read and audited today with **no observable change to any token**:
-nothing here touches `buildClaims`. That is the first step, not half a feature — and it is why
-`appliesTo` currently states as data something the code does not yet enforce.
+Level 1 is two owned collections on `User` and on `Client`, and **both were built on
+2026-08-28** — `POST /users/{id}/claims` and `POST /clients/{id}/claims`, gated on
+`user:set-claim` and `client:set-claim`. **Still no observable change to any token**, and that
+remains a decision rather than an unfinished edge: `buildClaims` is untouched, so both levels
+can be filled, read and audited with nothing issued behaving differently. Resolving the chain
+and merging it into the token is its own run.
+
+What the edges DID change is that `appliesTo` finally means something. It used to state as
+data what nothing enforced; now a `user` definition refuses a value on a client and a `client`
+one refuses a value on a user — and, because narrowing it out from under stored values would
+strand them silently, `appliesTo` may be widened freely but is refused when narrowing away
+from a kind that still holds one.
 
 **Why the registry is called `Claim` and not `Attribute`.** The industry distinction is real
 — AD FS keeps the data in an *attribute store* and a *Claim Description* names what leaves in
@@ -981,6 +993,9 @@ POST   /users/{id}/groups                          join a group        — user:
 PATCH  /users/{id}/groups/{entryId}/archive        leave one           — user:grant
 POST   /users/{id}/roles                           grant a role        — user:grant
 PATCH  /users/{id}/roles/{entryId}/archive         revoke one          — user:grant
+POST   /users/{id}/claims                          set a claim value   — user:set-claim
+PATCH  /users/{id}/claims/{entryId}                correct the value   — user:set-claim
+PATCH  /users/{id}/claims/{entryId}/archive        remove one          — user:set-claim
 
 PATCH  /users/{id}/password                        change own — user:change-password
 PATCH  /users/{id}/password-reset                  reset another — user:reset-password (or *:*)

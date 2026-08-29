@@ -11,6 +11,7 @@
 package domain
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -43,6 +44,9 @@ type probingUserService struct {
 	roleWildcard      bool
 	lacksRolePerm     bool
 	passwordUnchanged bool
+	claimUnavailable  bool
+	claimAppliesElse  bool
+	claimValueBadType bool
 
 	askedTenant        int
 	askedGroupAvail    []scopedQuestion
@@ -53,6 +57,18 @@ type probingUserService struct {
 	askedRoleEscalate  []domain.ID
 	hashedPlaintexts   []string
 	askedUnchanged     []string
+	askedClaimAvail    []scopedQuestion
+	askedClaimApplies  []domain.ID
+	askedClaimType     []claimTypeQuestion
+}
+
+// claimTypeQuestion records BOTH arguments of the value-type probe: which
+// definition was asked about AND the value that was judged. The second is what
+// proves a CHANGED entry reaches the rule with its NEW value rather than the
+// stored one.
+type claimTypeQuestion struct {
+	claimID domain.ID
+	value   string
 }
 
 // scopedQuestion records BOTH arguments, because which tenant the rule passes is
@@ -447,5 +463,211 @@ func TestArchivingForcesSuspended(t *testing.T) {
 
 	if e.Status.Value() != "suspended" {
 		t.Fatalf("archiving left the status %q — archived+active is meant to be unrepresentable", e.Status.Value())
+	}
+}
+
+func (s *probingUserService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
+	s.askedClaimAvail = append(s.askedClaimAvail, scopedQuestion{tenantID: tenantID, targetID: claimID})
+	return s.claimUnavailable
+}
+
+func (s *probingUserService) ClaimDoesNotApplyToUser(claimID domain.ID) bool {
+	s.askedClaimApplies = append(s.askedClaimApplies, claimID)
+	return s.claimAppliesElse
+}
+
+func (s *probingUserService) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
+	s.askedClaimType = append(s.askedClaimType, claimTypeQuestion{claimID: claimID, value: value})
+	return s.claimValueBadType
+}
+
+// ── the claims collection: the three per-entry rules ────────────────────────
+//
+// Every case below judges what the write CARRIES, which for this collection is
+// two sets rather than one: the entries it adds and the entries it changes.
+// That second set is what makes this collection different from groups and
+// roles, whose entries have nothing to change.
+
+const (
+	someClaimID      = "0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"
+	someOtherClaimID = "0198f3e0-8c42-7d13-9b66-2a0e3f7c5d28"
+)
+
+// userHolding returns a valid user that SETS one claim value — the shape all
+// three per-entry claim rules judge on an insert.
+func userHolding(claimID, value string) *User {
+	e := validUser()
+	e.AddUserClaim(aggregatevos.UserClaim{
+		ClaimID: domain.NewID(claimID),
+		Value:   vos.ClaimValue(value),
+	})
+	return e
+}
+
+func TestClaimValueIsRefusedWhenTheDefinitionIsNotAvailableInTheTenant(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	svc := insertUser(t, e, &probingUserService{claimUnavailable: true})
+
+	if !hasKey(userNotificationKeys(e), "ClaimNotAvailableInTenantNotification") {
+		t.Fatalf("a value was set against an absent, archived or foreign definition; answers were %v",
+			userNotificationKeys(e))
+	}
+	if len(svc.askedClaimAvail) != 1 {
+		t.Fatalf("the availability probe was asked %d times, want once per added entry", len(svc.askedClaimAvail))
+	}
+	// THE ROW's tenant, not the caller's. On the ordinary path they are the same
+	// value, but a *:* super-admin crosses that scope — and when they do, "this
+	// tenant" has to mean the user's or the rule stops isolating anything.
+	if svc.askedClaimAvail[0].tenantID != e.TenantID {
+		t.Errorf("the probe was scoped by %v, want the row's tenant %v",
+			svc.askedClaimAvail[0].tenantID, e.TenantID)
+	}
+}
+
+// The three conditions must be INDISTINGUISHABLE to the caller. A separate
+// "belongs to another tenant" answer would confirm that a specific UUID is a
+// live definition in some other tenant — an existence oracle over a
+// competitor's claim vocabulary. The fact collapses them, and this asserts the
+// rule does not un-collapse them by reporting something extra.
+func TestAnUnavailableDefinitionIsNotDistinguishedFromAForeignOne(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	insertUser(t, e, &probingUserService{claimUnavailable: true})
+
+	keys := userNotificationKeys(e)
+	if hasKey(keys, "ClaimDoesNotApplyToUserNotification") ||
+		hasKey(keys, "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("one bad definition produced more than one answer: %v", keys)
+	}
+}
+
+func TestNothingBelowIsAskedAboutADefinitionThatIsNotThere(t *testing.T) {
+	svc := insertUser(t, userHolding(someClaimID, "1000"), &probingUserService{claimUnavailable: true})
+
+	if len(svc.askedClaimApplies) != 0 || len(svc.askedClaimType) != 0 {
+		t.Fatalf("the later probes ran on an unresolvable definition: applies=%d type=%d",
+			len(svc.askedClaimApplies), len(svc.askedClaimType))
+	}
+}
+
+// appliesTo finally means something. Until this rule existed, the column stated
+// as data what nothing enforced — the README said so in as many words.
+func TestClaimValueIsRefusedWhenTheDefinitionDoesNotApplyToUsers(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	insertUser(t, e, &probingUserService{claimAppliesElse: true})
+
+	if !hasKey(userNotificationKeys(e), "ClaimDoesNotApplyToUserNotification") {
+		t.Fatalf("a user holds a value for a client-only definition; answers were %v",
+			userNotificationKeys(e))
+	}
+}
+
+func TestClaimValueIsRefusedWhenItDoesNotParseAsTheDeclaredType(t *testing.T) {
+	e := userHolding(someClaimID, "abc")
+	svc := insertUser(t, e, &probingUserService{claimValueBadType: true})
+
+	if !hasKey(userNotificationKeys(e), "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("a value of the wrong type was stored; answers were %v", userNotificationKeys(e))
+	}
+	// The VALUE reaches the probe, not just the id: the whole question is
+	// whether THIS string parses, and a rule that passed only the id would ask
+	// something unanswerable.
+	if len(svc.askedClaimType) != 1 || svc.askedClaimType[0].value != "abc" {
+		t.Fatalf("the value handed to the type probe was %v", svc.askedClaimType)
+	}
+}
+
+// The happy path. Without it every case above could pass because the fixture is
+// broken rather than because the rule fired.
+func TestAValidClaimValueIsAccepted(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	if _, err := domain.GetInsertable(e, &probingUserService{}, "Insert"); err != nil {
+		t.Fatalf("a valid claim value was refused: %v", err)
+	}
+}
+
+// A CHANGED entry is judged like an added one — the PATCH path.
+// PATCH /users/{id}/claims/{entryId} carries only `value`; the definition is
+// read off the stored entry. So a correction arrives with a string nothing has
+// judged, and judging only the additions would let it write anything at all.
+func TestACorrectedValueIsJudgedLikeANewOne(t *testing.T) {
+	e := validUser()
+	original := aggregatevos.UserClaim{ClaimID: domain.NewID(someClaimID), Value: vos.ClaimValue("1000")}
+	e.AddUserClaim(original)
+	// Add-then-change moves the entry from ADDED to CHANGED, which is the state
+	// a correction arrives in.
+	domain.ChangeAggregateChild(e, original, aggregatevos.UserClaim{
+		ClaimID: domain.NewID(someClaimID),
+		Value:   vos.ClaimValue("not-a-number"),
+	})
+
+	svc := insertUser(t, e, &probingUserService{claimValueBadType: true})
+
+	if !hasKey(userNotificationKeys(e), "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("a corrected value skipped the type check; answers were %v", userNotificationKeys(e))
+	}
+	if len(svc.askedClaimType) != 1 || svc.askedClaimType[0].value != "not-a-number" {
+		t.Fatalf("the probe was handed %v, want the NEW value", svc.askedClaimType)
+	}
+}
+
+// A second entry for the same definition is the collision the whole two-level
+// chain exists to make impossible: one principal holds at most one value per
+// definition, so precedence never becomes a question along this chain.
+func TestASecondValueForTheSameDefinitionIsRefused(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	e.AddUserClaim(aggregatevos.UserClaim{
+		ClaimID: domain.NewID(someClaimID),
+		Value:   vos.ClaimValue("2000"),
+	})
+
+	if !hasKey(userNotificationKeys(e), "UserAlreadyHoldsClaimNotification") {
+		t.Fatalf("one user holds two values for one definition; answers were %v", userNotificationKeys(e))
+	}
+}
+
+// Two DIFFERENT definitions are the ordinary case and must not collide — the
+// duplicate guard is over the definition, not over the collection.
+func TestTwoDifferentDefinitionsCoexist(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	e.AddUserClaim(aggregatevos.UserClaim{
+		ClaimID: domain.NewID(someOtherClaimID),
+		Value:   vos.ClaimValue("sa-east-1"),
+	})
+
+	if hasKey(userNotificationKeys(e), "UserAlreadyHoldsClaimNotification") {
+		t.Fatalf("two distinct definitions were treated as a duplicate: %v", userNotificationKeys(e))
+	}
+}
+
+// The cap is a HEADER BUDGET before it is a count: 20 values of up to 256 runes
+// is ~5 KB riding on every request to every service, on top of permissions,
+// groups and roles.
+func TestAUserMayNotHoldMoreThanTwentyClaimValues(t *testing.T) {
+	e := validUser()
+	for i := 0; i < 21; i++ {
+		e.AddUserClaim(aggregatevos.UserClaim{
+			ClaimID: domain.NewID(fmt.Sprintf("0198f3e0-7b31-7c02-8a55-1f9d2e6b%04d", i)),
+			Value:   vos.ClaimValue("v"),
+		})
+	}
+	insertUser(t, e, &probingUserService{})
+
+	if !hasKey(userNotificationKeys(e), "TooManyClaimsForUserNotification") {
+		t.Fatalf("21 claim values were accepted; answers were %v", userNotificationKeys(e))
+	}
+}
+
+func TestTwentyClaimValuesAreAccepted(t *testing.T) {
+	e := validUser()
+	for i := 0; i < 20; i++ {
+		e.AddUserClaim(aggregatevos.UserClaim{
+			ClaimID: domain.NewID(fmt.Sprintf("0198f3e0-7b31-7c02-8a55-1f9d2e6b%04d", i)),
+			Value:   vos.ClaimValue("v"),
+		})
+	}
+	insertUser(t, e, &probingUserService{})
+
+	if hasKey(userNotificationKeys(e), "TooManyClaimsForUserNotification") {
+		t.Fatal("the cap fired at exactly 20, which is the number the spec allows")
 	}
 }

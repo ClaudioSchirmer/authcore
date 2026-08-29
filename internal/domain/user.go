@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:3f0054ab0b5b119aa2301e93f58d15faa0fc141dd197936ce330900d7939f5c3
+// generated:  2026-08-28
+// checksum:   sha256:ce76580a0c637e956995c971897c70dc2e4d06461d376bb4b9ea5feb2e09d86f
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -119,7 +119,7 @@ func (e *User) GetAggregateRoot() *domain.AggregateRoot {
 // The framework matches this set against the schema's child declarations and
 // refuses to bind them when they disagree.
 func (e *User) AggregateChildren() []domain.AggregateValueObject {
-	return []domain.AggregateValueObject{aggregatevos.UserGroup{}, aggregatevos.UserRole{}}
+	return []domain.AggregateValueObject{aggregatevos.UserGroup{}, aggregatevos.UserRole{}, aggregatevos.UserClaim{}}
 }
 
 // RequiresService opts in to the domain service.
@@ -198,6 +198,14 @@ func (e *User) BuildRules(actionName string, service domain.Service, r *domain.R
 			items := domain.GetCurrentItemsOf[aggregatevos.UserRole](e.GetAggregateRoot())
 			if len(items) > 50 {
 				r.AddNotification("Roles", TooManyRolesForUserNotification{Max: "50"}, len(items))
+			}
+		}
+		// at most 20 claim values on one user, counted over the whole
+		// collection.
+		{
+			items := domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot())
+			if len(items) > 20 {
+				r.AddNotification("Claims", TooManyClaimsForUserNotification{Max: "20"}, len(items))
 			}
 		}
 		// The database unique index is the backstop for the race between this
@@ -350,4 +358,55 @@ func (e *User) RemoveUserRoleByID(id string) {
 		}
 	}
 	e.AddNotification("UserRole", domain.RecordNotFoundNotification{}, id)
+}
+
+// AddUserClaim adds one entry to the claims collection.
+//
+// A duplicate is rejected by business identity, not by comparing every field,
+// so re-sending an entry with a cosmetic change updates it in place instead of
+// creating a second one.
+func (e *User) AddUserClaim(item aggregatevos.UserClaim) {
+	// Adding ONE entry can collide with what is already there, and the
+	// caller asked for this entry rather than for a whole collection — so
+	// the collision is an answer, not a silent merge.
+	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot()) {
+		if existing.IsSameBusinessIdentity(item) {
+			e.AddNotification("Claims", UserAlreadyHoldsClaimNotification{}, item.ClaimID)
+			return
+		}
+	}
+	domain.AddAggregateChild(e, item)
+}
+
+// ChangeUserClaimByID replaces ONE entry, keeping its id.
+//
+// Keeping the id is the whole point: the row is updated rather than removed
+// and re-added, so whatever references it still does, and the audit trail
+// reads as a change instead of as a deletion plus a creation.
+//
+// An id that is not in the collection is NOT silently ignored — it answers
+// not-found, because the caller addressed a specific entry.
+func (e *User) ChangeUserClaimByID(id string, replacement aggregatevos.UserClaim) {
+	for _, current := range domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot()) {
+		if current.GetID().Value() == id {
+			replacement.SetID(domain.NewID(id))
+			domain.ChangeAggregateChild(e, current, replacement)
+			return
+		}
+	}
+	e.AddNotification("UserClaim", domain.RecordNotFoundNotification{}, id)
+}
+
+// RemoveUserClaimByID takes ONE entry out of the collection.
+//
+// Same not-found posture as the change: the caller named an entry, so a
+// missing one is an answer rather than a no-op.
+func (e *User) RemoveUserClaimByID(id string) {
+	for _, current := range domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot()) {
+		if current.GetID().Value() == id {
+			domain.RemoveAggregateChild(e, current)
+			return
+		}
+	}
+	e.AddNotification("UserClaim", domain.RecordNotFoundNotification{}, id)
 }

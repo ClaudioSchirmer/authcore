@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:250e7e45614e2139de40949c16fcf9994f5071c6d3f3281df4b87075751be682
+// generated:  2026-08-28
+// checksum:   sha256:7a86a2e44380df2c9a01f70925f1f1f1373584cfc7d098f3f690db7eb33fb443
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -72,16 +72,19 @@ type stubUserService struct {
 	domain.ServiceBase
 }
 
-func (stubUserService) EmailTaken(_ string, _ domain.ID) bool                    { return false }
-func (stubUserService) HashPassword(_ string) string                             { return "" }
-func (stubUserService) PasswordIsUnchanged(_ string, _ string) bool              { return false }
-func (stubUserService) TenantIsUnavailable(_ domain.ID) bool                     { return false }
-func (stubUserService) GroupIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool { return false }
-func (stubUserService) GroupGrantsWildcard(_ domain.ID) bool                     { return false }
-func (stubUserService) CallerLacksAnyPermissionOfGroup(_ domain.ID) bool         { return false }
-func (stubUserService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool  { return false }
-func (stubUserService) RoleGrantsWildcard(_ domain.ID) bool                      { return false }
-func (stubUserService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool          { return false }
+func (stubUserService) EmailTaken(_ string, _ domain.ID) bool                      { return false }
+func (stubUserService) HashPassword(_ string) string                               { return "" }
+func (stubUserService) PasswordIsUnchanged(_ string, _ string) bool                { return false }
+func (stubUserService) TenantIsUnavailable(_ domain.ID) bool                       { return false }
+func (stubUserService) GroupIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
+func (stubUserService) GroupGrantsWildcard(_ domain.ID) bool                       { return false }
+func (stubUserService) CallerLacksAnyPermissionOfGroup(_ domain.ID) bool           { return false }
+func (stubUserService) RoleIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool    { return false }
+func (stubUserService) RoleGrantsWildcard(_ domain.ID) bool                        { return false }
+func (stubUserService) CallerLacksAnyPermissionOfRole(_ domain.ID) bool            { return false }
+func (stubUserService) ClaimIsUnavailableInTenant(_ domain.ID, _ domain.ID) bool   { return false }
+func (stubUserService) ClaimDoesNotApplyToUser(_ domain.ID) bool                   { return false }
+func (stubUserService) ClaimValueDoesNotMatchValueType(_ domain.ID, _ string) bool { return false }
 
 // validUser returns an aggregate that satisfies every declared rule.
 //
@@ -124,7 +127,7 @@ func TestValidUserIsAccepted(t *testing.T) {
 // that quietly saves nothing.
 func TestUserDeclaresItsAggregateContract(t *testing.T) {
 	e := validUser()
-	if got, want := len(e.AggregateChildren()), 2; got != want {
+	if got, want := len(e.AggregateChildren()), 3; got != want {
 		t.Errorf("the aggregate declares %d child collection(s), want %d — the schema binding compares this set", got, want)
 	}
 	e.AddUserGroup(aggregatevos.UserGroup{})
@@ -134,6 +137,10 @@ func TestUserDeclaresItsAggregateContract(t *testing.T) {
 	e.AddUserRole(aggregatevos.UserRole{})
 	if got := len(domain.GetCurrentItemsOf[aggregatevos.UserRole](&e.AggregateRoot)); got != 1 {
 		t.Errorf("AddUserRole left the collection at %d entries — the write would save a root with no children", got)
+	}
+	e.AddUserClaim(aggregatevos.UserClaim{})
+	if got := len(domain.GetCurrentItemsOf[aggregatevos.UserClaim](&e.AggregateRoot)); got != 1 {
+		t.Errorf("AddUserClaim left the collection at %d entries — the write would save a root with no children", got)
 	}
 	if !e.RequiresService() {
 		t.Error("the entity stopped requiring the domain service, and the rules that ask it would be handed a nil")
@@ -273,6 +280,12 @@ func TestUserNotificationSemantics(t *testing.T) {
 		{"RoleNotAvailableInTenantNotification", RoleNotAvailableInTenantNotification{}.Semantic(), domain.SemanticValidation},
 		{"CannotGrantRoleWithUnheldPermissionsNotification", CannotGrantRoleWithUnheldPermissionsNotification{}.Semantic(), domain.SemanticForbidden},
 		{"CannotGrantWildcardRoleNotification", CannotGrantWildcardRoleNotification{}.Semantic(), domain.SemanticForbidden},
+		{"InvalidClaimValueNotification", vos.InvalidClaimValueNotification{}.Semantic(), domain.SemanticValidation},
+		{"UserAlreadyHoldsClaimNotification", UserAlreadyHoldsClaimNotification{}.Semantic(), domain.SemanticConflict},
+		{"TooManyClaimsForUserNotification", TooManyClaimsForUserNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimNotAvailableInTenantNotification", ClaimNotAvailableInTenantNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimDoesNotApplyToUserNotification", ClaimDoesNotApplyToUserNotification{}.Semantic(), domain.SemanticValidation},
+		{"ClaimValueDoesNotMatchValueTypeNotification", ClaimValueDoesNotMatchValueTypeNotification{}.Semantic(), domain.SemanticValidation},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s answers %v, the spec says %v", tc.name, tc.got, tc.want)

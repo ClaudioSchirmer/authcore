@@ -63,12 +63,17 @@ type clientSecretService struct {
 	hasher *infra.SHA256SecretHasher
 }
 
-func (s *clientSecretService) NameTaken(domain.ID, string, domain.ID) bool         { return false }
-func (s *clientSecretService) HashSecret(secret string) string                     { return s.hasher.Hash(secret) }
-func (s *clientSecretService) TenantIsUnavailable(domain.ID) bool                  { return false }
-func (s *clientSecretService) RoleIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
-func (s *clientSecretService) RoleGrantsWildcard(domain.ID) bool                   { return false }
-func (s *clientSecretService) CallerLacksAnyPermissionOfRole(domain.ID) bool       { return false }
+func (s *clientSecretService) NameTaken(domain.ID, string, domain.ID) bool          { return false }
+func (s *clientSecretService) HashSecret(secret string) string                      { return s.hasher.Hash(secret) }
+func (s *clientSecretService) TenantIsUnavailable(domain.ID) bool                   { return false }
+func (s *clientSecretService) RoleIsUnavailableInTenant(domain.ID, domain.ID) bool  { return false }
+func (s *clientSecretService) RoleGrantsWildcard(domain.ID) bool                    { return false }
+func (s *clientSecretService) CallerLacksAnyPermissionOfRole(domain.ID) bool        { return false }
+func (s *clientSecretService) ClaimIsUnavailableInTenant(domain.ID, domain.ID) bool { return false }
+func (s *clientSecretService) ClaimDoesNotApplyToClient(domain.ID) bool             { return false }
+func (s *clientSecretService) ClaimValueDoesNotMatchValueType(domain.ID, string) bool {
+	return false
+}
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 

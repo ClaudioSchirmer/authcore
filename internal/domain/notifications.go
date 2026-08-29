@@ -511,3 +511,68 @@ type DefaultValueTooLongNotification struct {
 	domain.DomainNotificationBase
 	Max string `tvar:"max"`
 }
+
+// UserAlreadyHoldsClaimNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type UserAlreadyHoldsClaimNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (UserAlreadyHoldsClaimNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// TooManyClaimsForUserNotification reaches the caller as 422. The struct NAME
+// is the translation key, so renaming it here without renaming it in the seven
+// catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type TooManyClaimsForUserNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// ClaimNotAvailableInTenantNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimNotAvailableInTenantNotification struct{ domain.DomainNotificationBase }
+
+// ClaimDoesNotApplyToUserNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimDoesNotApplyToUserNotification struct{ domain.DomainNotificationBase }
+
+// ClaimValueDoesNotMatchValueTypeNotification reaches the caller as 422. The
+// struct NAME is the translation key, so renaming it here without renaming it
+// in the seven catalogs leaves the message untranslated.
+type ClaimValueDoesNotMatchValueTypeNotification struct{ domain.DomainNotificationBase }
+
+// ClaimAppliesToCannotExcludeHeldValuesNotification reaches the caller as 422.
+// The struct NAME is the translation key, so renaming it here without renaming
+// it in the seven catalogs leaves the message untranslated.
+type ClaimAppliesToCannotExcludeHeldValuesNotification struct{ domain.DomainNotificationBase }
+
+// ClientAlreadyHoldsClaimNotification reaches the caller as 409 (already
+// exists). The struct NAME is the translation key, so renaming it here without
+// renaming it in the seven catalogs leaves the message untranslated.
+type ClientAlreadyHoldsClaimNotification struct {
+	domain.DomainNotificationBase
+}
+
+func (ClientAlreadyHoldsClaimNotification) Semantic() domain.NotificationSemantic {
+	return domain.SemanticConflict
+}
+
+// TooManyClaimsForClientNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated. It interpolates max into the
+// message.
+type TooManyClaimsForClientNotification struct {
+	domain.DomainNotificationBase
+	Max string `tvar:"max"`
+}
+
+// ClaimDoesNotApplyToClientNotification reaches the caller as 422. The struct
+// NAME is the translation key, so renaming it here without renaming it in the
+// seven catalogs leaves the message untranslated.
+type ClaimDoesNotApplyToClientNotification struct{ domain.DomainNotificationBase }

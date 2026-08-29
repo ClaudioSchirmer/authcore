@@ -57,6 +57,7 @@ import (
 type clientCompanionRepos struct {
 	tenants *TenantRepository
 	roles   *RoleRepository
+	claims  *ClaimRepository
 }
 
 var (
@@ -72,7 +73,7 @@ var (
 // to key it by. Exactly how userHasher is held, one file over.
 var clientHasher = NewSHA256SecretHasher()
 
-// companions returns the two repositories this service reads across, building
+// companions returns the three repositories this service reads across, building
 // them once per owning ClientRepository.
 func (s *ClientServiceImpl) companions() *clientCompanionRepos {
 	clientCompanionsMu.Lock()
@@ -84,6 +85,7 @@ func (s *ClientServiceImpl) companions() *clientCompanionRepos {
 	c := &clientCompanionRepos{
 		tenants: NewTenantRepository(s.repo.Engine),
 		roles:   NewRoleRepository(s.repo.Engine),
+		claims:  NewClaimRepository(s.repo.Engine),
 	}
 	clientCompanionsByRepo[s.repo] = c
 	return c
@@ -265,3 +267,113 @@ func (s *ClientServiceImpl) callerLacksAnyPermissionOfRole(identity *configurati
 }
 
 var _ appdomain.ClientService = (*ClientServiceImpl)(nil)
+
+// ── the claims collection: one row, three questions ─────────────────────────
+//
+// claimRow is what a single load of a claim definition answers, memoised per
+// request. The three facts below each need a different part of the SAME row —
+// whether it exists at all, which tenant owns it, which identity kinds it
+// admits, and what its values must parse as — so a probe per question would be
+// three reads of one row per entry of the collection.
+
+func (s *ClientServiceImpl) claimRow(claimID domain.ID) claimRow {
+	const memoPrefix = "authcore.client.claim:"
+
+	if s.ctx != nil {
+		if cached, ok := s.ctx.Get(memoPrefix + claimID.String()); ok {
+			if row, ok := cached.(claimRow); ok {
+				return row
+			}
+		}
+	}
+
+	// DEFENCE IN DEPTH, the same seat roleRow guards. The domain already
+	// refuses an entry id that is not a usable UUID before asking, but an
+	// unparseable value binds into a criterion against a UUID column, the driver
+	// rejects it, and the panic below would turn a validation problem into a
+	// 500. Answering "not found" is both safe and true — no claim row carries
+	// it.
+	if _, err := claimID.UUID(); err != nil {
+		return claimRow{found: false}
+	}
+
+	q := criteria.Where(criteria.Eq("ID", claimID))
+	found, err := s.companions().claims.Loader.FindOne(s.queryContext(), q)
+
+	var row claimRow
+	switch {
+	case err == nil:
+		row = claimRow{
+			found:     true,
+			tenantID:  found.TenantID,
+			appliesTo: found.AppliesTo,
+			valueType: found.ValueType,
+		}
+	case isRecordNotFound(err):
+		// ARCHIVED LANDS HERE TOO, and that is the point rather than a
+		// coincidence: the loader filters the archived rows out, so a retired
+		// definition is not found — which is exactly the answer the rule wants
+		// for it. The same reading roleRow relies on.
+		row = claimRow{found: false}
+	default:
+		// A failed probe PANICS rather than inventing an answer, matching every
+		// other probe in this file: a plausible answer would skip the invariant
+		// it exists to enforce.
+		panic("Client: claim probe failed for claim " + claimID.String())
+	}
+
+	if s.ctx != nil {
+		s.ctx.Set(memoPrefix+claimID.String(), row)
+	}
+	return row
+}
+
+// ClaimIsUnavailableInTenant answers absent, archived and foreign-tenant as ONE
+// value.
+//
+// The caller-facing message must not distinguish them: a distinct "belongs to
+// another tenant" reply confirms to a caller in tenant A that a specific UUID is
+// a live definition in some other tenant — an existence oracle over a
+// competitor's claim vocabulary. Verbatim the shape RoleIsUnavailableInTenant
+// already ships.
+func (s *ClientServiceImpl) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
+	row := s.claimRow(claimID)
+	if !row.found {
+		return true
+	}
+	return row.tenantID != tenantID
+}
+
+// ClaimDoesNotApplyToClient answers whether the definition excludes machine clients.
+//
+// TRUE for an unknown id, the direction every probe in this file takes: a fact
+// that cannot resolve its subject reports the problem as present, so an
+// unresolvable entry can never pass a check by accident. In practice the
+// availability rule refuses it first and this is never reached for that entry.
+func (s *ClientServiceImpl) ClaimDoesNotApplyToClient(claimID domain.ID) bool {
+	row := s.claimRow(claimID)
+	if !row.found {
+		return true
+	}
+	// ClaimAppliesToClient and Both admit a client; User does not, and
+	// neither does the Unknown sentinel — a value outside the closed set is not
+	// a permission to hold anything.
+	return row.appliesTo != vos.ClaimAppliesToClient && row.appliesTo != vos.ClaimAppliesToBoth
+}
+
+// ClaimValueDoesNotMatchValueType answers whether the value fails to parse as
+// the type the definition declares.
+//
+// It calls appdomain.ClaimValueMatchesValueType — the SAME function the catalog
+// uses for its own default_value at level 2 — rather than repeating the switch
+// here. Two levels of one chain must not disagree about what a bool is, and a
+// second copy is a rule that can drift from the first.
+//
+// TRUE for an unknown id, like its neighbour above.
+func (s *ClientServiceImpl) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
+	row := s.claimRow(claimID)
+	if !row.found {
+		return true
+	}
+	return !appdomain.ClaimValueMatchesValueType(row.valueType, value)
+}

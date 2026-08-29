@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:a9e796069373e5f043b44e3d2a7b146be640c107c4ed0b74e63c2c034bbaa5ad
+// checksum:   sha256:7a3f832e67044bf9b8264cac083b017085c1534c0cb36397ab9cb7bd3f27571b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -37,6 +37,7 @@ type InsertClientCommand struct {
 	TenantID     *domain.ID
 	Roles        []dtos.ClientRoleInput
 	AllowedCIDRs []dtos.ClientAllowedCIDRInput
+	Claims       []dtos.ClientClaimInput
 }
 
 // ToEntity builds the aggregate the framework will validate and persist.
@@ -50,6 +51,9 @@ func (c *InsertClientCommand) ToEntity(ctx *configuration.AppContext) (*appdomai
 	}
 	for _, item := range c.AllowedCIDRs {
 		e.AddClientAllowedCIDR(item.ToClientAllowedCIDR())
+	}
+	for _, item := range c.Claims {
+		e.AddClientClaim(item.ToClientClaim())
 	}
 
 	// Filled from the caller's identity, never from the request: these fields
@@ -105,6 +109,7 @@ type InsertClientResult struct {
 	Secret       string
 	Roles        []ClientRoleResult
 	AllowedCIDRs []ClientAllowedCIDRResult
+	Claims       []ClientClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -130,5 +135,6 @@ func (c *InsertClientCommand) FromEntity(_ *configuration.AppContext, e *appdoma
 		Secret:                  e.Secret,
 		Roles:                   projectClientRoles(e),
 		AllowedCIDRs:            projectClientAllowedCIDRs(e),
+		Claims:                  projectClientClaims(e),
 	}, nil
 }

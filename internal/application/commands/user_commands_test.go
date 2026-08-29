@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:400d673e86f2884f1d36d0f7d9677b1ac8d2e72b1d884c8b9f7927168ac0b2d0
+// checksum:   sha256:840e5af5d27980c579aeb263ccf6fc1cdd47497105b2e4dfd497bfb63d8577a3
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -55,6 +55,10 @@ func TestInsertUserMapsEveryField(t *testing.T) {
 		}},
 		Roles: []dtos.UserRoleInput{{
 			RoleID: domain.NewID("0198f3e0-1a44-7bb2-9c31-77c0d5e1b904"),
+		}},
+		Claims: []dtos.UserClaimInput{{
+			ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+			Value:   "1000",
 		}},
 	}
 	e, err := c.ToEntity(ctx)
@@ -118,6 +122,10 @@ func TestInsertUserCommandResultCarriesWhatWasWritten(t *testing.T) {
 		Roles: []dtos.UserRoleInput{{
 			RoleID: domain.NewID("0198f3e0-1a44-7bb2-9c31-77c0d5e1b904"),
 		}},
+		Claims: []dtos.UserClaimInput{{
+			ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+			Value:   "1000",
+		}},
 	}
 	e, err := c.ToEntity(ctx)
 	if err != nil {
@@ -148,6 +156,9 @@ func TestInsertUserCommandResultCarriesWhatWasWritten(t *testing.T) {
 	}
 	if len(res.Roles) != 1 {
 		t.Errorf("the Roles collection reached the result with %d entries, want 1", len(res.Roles))
+	}
+	if len(res.Claims) != 1 {
+		t.Errorf("the Claims collection reached the result with %d entries, want 1", len(res.Claims))
 	}
 }
 
@@ -435,6 +446,202 @@ func TestRemoveUserRoleCommand_TakesTheEntryOut(t *testing.T) {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	for _, item := range domain.GetCurrentItemsOf[aggregatevos.UserRole](e.GetAggregateRoot()) {
+		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
+			t.Error("the entry the command named is still in the collection")
+		}
+	}
+	if _, err := cmd.FromEntity(ctx, e); err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+}
+
+// AddUserClaimCommand appends the entry and projects it back with the id the
+// server minted for it — the id the caller addresses it by afterwards.
+func TestAddUserClaimCommand_AppliesAndProjects(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	// A request has a caller. With no identity the mappers' identity feed is
+	// skipped entirely, and what a scoped write is checked against is exactly
+	// what the feed carries.
+	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Claims: map[string]any{
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		},
+	})
+	e := &appdomain.User{}
+	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
+	cmd := &AddUserClaimCommand{ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"), Value: "1000"}
+	if err := cmd.ApplyTo(ctx, e); err != nil {
+		t.Fatalf("ApplyTo: %v", err)
+	}
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
+	}
+	out, err := cmd.FromEntity(ctx, e)
+	if err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+	if out.UserID.Value() != "019ffd00-0000-7000-8000-000000000000" {
+		t.Error("the result does not carry the owner id")
+	}
+	if out.UserClaim.ClaimID != domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17") {
+		t.Errorf("the projected entry lost ClaimID")
+	}
+	if out.UserClaim.Value != "1000" {
+		t.Errorf("the projected entry lost Value")
+	}
+}
+
+// PatchUserClaimCommand leaves everything the caller did not send exactly as
+// the entry holds it.
+//
+// This is the whole contract of the verb, and the identity fields are the part
+// that matters: they are not on the wire at all, so what survives here is the
+// only thing that decides which entry this still is.
+func TestPatchUserClaimCommand_KeepsWhatWasNotSent(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	// A request has a caller. With no identity the mappers' identity feed is
+	// skipped entirely, and what a scoped write is checked against is exactly
+	// what the feed carries.
+	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Claims: map[string]any{
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		},
+	})
+	e := &appdomain.User{}
+	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
+	seeded := domain.WithID(
+		dtos.UserClaimInput{ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"), Value: "1000"}.ToUserClaim(),
+		domain.NewID("019ffd00-0000-7000-8000-0000000000a1"),
+	)
+	e.AggregateConstructor([]domain.AggregateValueObject{seeded})
+
+	// An empty body: the id and nothing else.
+	cmd := &PatchUserClaimCommand{UserClaimID: "019ffd00-0000-7000-8000-0000000000a1"}
+	if err := cmd.ApplyPartiallyTo(ctx, e); err != nil {
+		t.Fatalf("ApplyPartiallyTo: %v", err)
+	}
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
+	}
+	out, err := cmd.FromEntity(ctx, e)
+	if err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+	if out.UserClaim.ID.Value() != "019ffd00-0000-7000-8000-0000000000a1" {
+		t.Error("the entry lost its id across the patch")
+	}
+	if out.UserClaim.ClaimID != domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17") {
+		t.Errorf("ClaimID was not sent and did not survive the patch: %v", out.UserClaim.ClaimID)
+	}
+	if out.UserClaim.Value != "1000" {
+		t.Errorf("Value was not sent and did not survive the patch: %v", out.UserClaim.Value)
+	}
+}
+
+// What the caller DID send reaches the entry. PatchUserClaim starts from an
+// empty entry so that a value arriving is the only thing that could have put
+// it there.
+func TestPatchUserClaimCommand_AppliesWhatWasSent(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	e := &appdomain.User{}
+	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
+	seeded := domain.WithID(
+		dtos.UserClaimInput{}.ToUserClaim(),
+		domain.NewID("019ffd00-0000-7000-8000-0000000000a1"),
+	)
+	e.AggregateConstructor([]domain.AggregateValueObject{seeded})
+
+	cmd := &PatchUserClaimCommand{
+		UserClaimID: "019ffd00-0000-7000-8000-0000000000a1",
+		Value:       func() *string { v := string("1000"); return &v }(),
+	}
+	if err := cmd.ApplyPartiallyTo(ctx, e); err != nil {
+		t.Fatalf("ApplyPartiallyTo: %v", err)
+	}
+	out, err := cmd.FromEntity(ctx, e)
+	if err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+	if out.UserClaim.Value != "1000" {
+		t.Errorf("Value was sent and did not reach the entry: %v", out.UserClaim.Value)
+	}
+}
+
+// An id the collection does not hold changes nothing. PatchUserClaim reaches
+// the aggregate with an empty replacement in that case, so what is proved here
+// is that the empty one never lands: the collection is left as it was, and the
+// projection invents no entry to fill the gap.
+func TestPatchUserClaimCommand_UnknownIDChangesNothing(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	e := &appdomain.User{}
+	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
+	seeded := domain.WithID(
+		dtos.UserClaimInput{ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"), Value: "1000"}.ToUserClaim(),
+		domain.NewID("019ffd00-0000-7000-8000-0000000000a1"),
+	)
+	e.AggregateConstructor([]domain.AggregateValueObject{seeded})
+
+	cmd := &PatchUserClaimCommand{UserClaimID: "019ffd00-0000-7000-8000-0000000000ff"}
+	if err := cmd.ApplyPartiallyTo(ctx, e); err != nil {
+		t.Fatalf("ApplyPartiallyTo: %v", err)
+	}
+	items := domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot())
+	if len(items) != 1 {
+		t.Errorf("a patch addressed at an unknown id changed the collection: %d entries", len(items))
+	}
+	out, err := cmd.FromEntity(ctx, e)
+	if err != nil {
+		t.Fatalf("FromEntity: %v", err)
+	}
+	if !out.UserClaim.ID.IsEmpty() {
+		t.Errorf("an unknown id projected an entry: %+v", out.UserClaim)
+	}
+}
+
+// RemoveUserClaimCommand takes the named entry out of the collection.
+//
+// It projects NOTHING — the endpoint answers 204 — so the only thing worth
+// asserting is the effect: the entry the caller addressed is no longer among
+// the current items. A command that silently matched nothing would still
+// answer 204, and this is what tells the two apart.
+func TestRemoveUserClaimCommand_TakesTheEntryOut(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	// A request has a caller. With no identity the mappers' identity feed is
+	// skipped entirely, and what a scoped write is checked against is exactly
+	// what the feed carries.
+	ctx.SetIdentity(&configuration.Identity{
+		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Claims: map[string]any{
+			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		},
+	})
+	e := &appdomain.User{}
+	e.SetID(domain.NewID("019ffd00-0000-7000-8000-000000000000"))
+	seeded := domain.WithID(
+		dtos.UserClaimInput{ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"), Value: "1000"}.ToUserClaim(),
+		domain.NewID("019ffd00-0000-7000-8000-0000000000a1"),
+	)
+	e.AggregateConstructor([]domain.AggregateValueObject{seeded})
+
+	cmd := &RemoveUserClaimCommand{UserClaimID: "019ffd00-0000-7000-8000-0000000000a1"}
+	if err := cmd.ApplyTo(ctx, e); err != nil {
+		t.Fatalf("ApplyTo: %v", err)
+	}
+	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+	}
+	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
+	}
+	for _, item := range domain.GetCurrentItemsOf[aggregatevos.UserClaim](e.GetAggregateRoot()) {
 		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
 			t.Error("the entry the command named is still in the collection")
 		}

@@ -80,6 +80,24 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantRoleWithUnheldPermissionsNotification{}` · attach it to `Roles`
 
+**`claim-available-in-tenant`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the claim id is absent from the claims table, points at an archived definition, or belongs to a tenant other than this user's. ONE answer for all three — a distinct "belongs to another tenant" reply is an existence oracle over a competitor's claim vocabulary. Asks ClaimIsUnavailableInTenant, and judges domain.GetAddedItemsOf and the changed entries rather than the stored set.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimNotAvailableInTenantNotification{}` · attach it to `Claims`
+
+**`claim-applies-to-user`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the definition declares appliesTo: client. user and both pass. This rule and its twin on Client are what make appliesTo mean something — the README notes today that it states as data something the code does not yet enforce. Asks ClaimDoesNotApplyToUser, which answers true for an id it cannot resolve.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimDoesNotApplyToUserNotification{}` · attach it to `Claims`
+
+**`claim-value-matches-value-type`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the value does not parse as the ValueType the definition declares. `number` accepts a valid decimal number, `bool` accepts exactly "true" or "false", `string` accepts any non-empty value — deliberately the SAME three readings the catalog's own default-value-matches-value-type uses, because two levels of one chain must not disagree about what a bool is. Read the enum member off the definition rather than its raw string. Asks ClaimValueDoesNotMatchValueType.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimValueDoesNotMatchValueTypeNotification{}` · attach it to `Claims`
+
 **`archive-forces-suspended`**
 
 > Archiving forces Status to suspended. Set the field and raise nothing. Verbatim the shape Tenant already ships.
@@ -127,6 +145,18 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 **`CallerLacksAnyPermissionOfRole(roleID domain.ID) bool`**
 
 > Whether the requesting caller fails to hold at least one of the permissions this role grants. Shares RoleGrantsWildcard's single read, and guards the wildcard itself.
+
+**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool`**
+
+> Whether this claim id is absent from the claims table, points at an archived definition, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
+
+**`ClaimDoesNotApplyToUser(claimID domain.ID) bool`**
+
+> Whether the definition behind this id declares appliesTo: client, so no user may hold a value for it. user and both answer false. Answers TRUE for an unknown id.
+
+**`ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool`**
+
+> Whether the value fails to parse as the ValueType the definition declares: `number` wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants any non-empty value. The same three readings the catalog's own default-value check uses. Answers TRUE for an unknown id.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
 
@@ -199,6 +229,7 @@ Indexes it expects:
 - `users_email_key` — UNIQUE on (email), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as UserEmailAlreadyExistsNotification
 - `user_groups_user_id_group_id_key` — UNIQUE on (user_id, group_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as UserAlreadyInGroupNotification
 - `user_roles_user_id_role_id_key` — UNIQUE on (user_id, role_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as UserAlreadyGrantsRoleNotification
+- `user_claims_user_id_claim_id_key` — UNIQUE on (user_id, claim_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as UserAlreadyHoldsClaimNotification
 
 
 **`user_groups`** — the groups collection (1:N)
@@ -219,6 +250,18 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `user_id` | id | no | foreign key to users |
 | `role_id` | id | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+**`user_claims`** — the claims collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `user_id` | id | no | foreign key to users |
+| `claim_id` | id | no |  |
+| `value` | string(256) | no |  |
 | `deleted_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
@@ -288,13 +331,13 @@ The claim NAMES behind these are the framework's to resolve, not this code's: th
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/user_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, change, remove — have generated tests in `internal/application/commands/user_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
 ## What to check
 
-- **Is the set of Email really open?** They are declared as shapes (`kind: raw`), so anything matching the pattern is accepted. If the valid values are FINITE and known — a state code, a status, a category — it is an `enum` instead: the caller gets the list in OpenAPI, the code gets named constants, and an out-of-set value converges to Unknown rather than being stored.
+- **Is the set of Email, ClaimValue really open?** They are declared as shapes (`kind: raw`), so anything matching the pattern is accepted. If the valid values are FINITE and known — a state code, a status, a category — it is an `enum` instead: the caller gets the list in OpenAPI, the code gets named constants, and an out-of-set value converges to Unknown rather than being stored.
 
 - **Are `givenName`, `familyName` the names you want on the wire?** They are the parts of the composite value object `PersonName`, and they are the ONLY names the outside world ever sees — the filter, `?fields=`, `orderBy`, the JSON field, the export column and the projected document key — because nothing above the schema learns a composite exists. Renaming one later is a wire break, not a refactor. The value object is mandatory — it is always there, and each part follows its own type.
 
@@ -306,6 +349,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Collection `Groups` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/groups`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Collection `Roles` | `add` → `user:grant` (declared); `remove` → `user:grant` (declared) | These routes hang off `/users/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `Claims` | `add` → `user:set-claim` (declared); `change` → `user:set-claim` (declared); `remove` → `user:set-claim` (declared) | These routes hang off `/users/:id/claims`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Changing ONE entry is PARTIAL (`PATCH`): what the body leaves out is read off the STORED entry, and what `change.patchExcludes` names — `ClaimID` — never reaches the wire, so it cannot move. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Email` — across the whole table, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `UserEmailAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
@@ -314,6 +358,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 | Read join → Group | `InnerJoin` on `group_id`, from UserGroup | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 | Read join → Role | `InnerJoin` on `role_id`, from UserRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
+| Read join → Claim | `InnerJoin` on `claim_id`, from UserClaim | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 
 ### Where each endpoint answers
 
@@ -330,11 +375,20 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 | Take out one `UserGroup` | `PATCH /users/:id/groups/:userGroupId/archive` | `removeUserGroup` |
 | Add one `UserRole` | `POST /users/:id/roles` | `addUserRole` |
 | Take out one `UserRole` | `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` |
+| Add one `UserClaim` | `POST /users/:id/claims` | `addUserClaim` |
+| Update one `UserClaim` | `PATCH /users/:id/claims/:userClaimId` | `patchUserClaim` |
+| Take out one `UserClaim` | `PATCH /users/:id/claims/:userClaimId/archive` | `removeUserClaim` |
 
 ## What was generated
 
 | What | File |
 |---|---|
+| the per-entry commands for user_claims | `internal/application/commands/user_claim_commands.go` |
+| tests for the command mappers | `internal/application/commands/user_commands_test.go` |
+| the per-entry commands for user_groups | `internal/application/commands/user_group_commands.go` |
+| the per-entry commands for user_roles | `internal/application/commands/user_role_commands.go` |
+| the User aggregate root, its modes and its rules | `internal/domain/user.go` |
+| the per-entry wire types for user_claims | `internal/web/requests/user_claim_requests.go` |
 | the per-entry wire types for user_groups | `internal/web/requests/user_group_requests.go` |
 | the request mapper tests | `internal/web/requests/user_requests_test.go` |
 | the per-entry wire types for user_roles | `internal/web/requests/user_role_requests.go` |
@@ -363,9 +417,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.62.0)
+Verdict: **exact** (project pins v0.63.0)
 
-framework v0.62.0 meets the required v0.62.0
+framework v0.63.0 meets the required v0.63.0
 
 Verify what was generated:
 

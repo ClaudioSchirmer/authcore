@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:353b836d6bc65d952751a54792e98e65df909914b84d7c88e11b27328f8d4e4b
+// checksum:   sha256:2feba0378d3b53aff6519460da486327e774999f10a45d53df365db8b125547b
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,9 +17,10 @@
 package requests
 
 import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
-	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 )

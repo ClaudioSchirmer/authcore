@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:77c37cd3377822b730dbc5f0a74d7a0ccd34d37df5bd7e33b844da58629c9adc
+// generated:  2026-08-28
+// checksum:   sha256:28a12319cf18ff3a2f4c251e65623d43e434471b3193e5ba6af714bba86b04c4
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -39,6 +39,7 @@ func (h *clientRuleHost) AggregateChildren() []domain.AggregateValueObject {
 	return []domain.AggregateValueObject{
 		ClientRole{},
 		ClientAllowedCIDR{},
+		ClientClaim{},
 	}
 }
 
@@ -167,5 +168,69 @@ func TestClientClientAllowedCIDR_ValidPasses(t *testing.T) {
 	ctx := rulesForClientClientAllowedCIDR(validClientClientAllowedCIDR())
 	if msgs := ctx.Messages(); len(msgs) > 0 {
 		t.Errorf("a valid ClientAllowedCIDR was refused: %v", msgs)
+	}
+}
+
+// rulesForClientClaim runs one entry through the framework's own seat.
+//
+// Not %s.BuildRules directly. A rule may end the validation pass — the
+// `guard: true` barrier — and the framework unwinds that from inside the
+// seat that invoked the rules; a body called by hand would let the unwind
+// escape as a panic, and every test below would fail on a rule doing exactly
+// what it was declared to do.
+//
+// The seat also validates the entry's value objects, which is what a write
+// does, so what these tests see is what the service sees.
+func rulesForClientClientClaim(v ClientClaim) *domain.NotificationContext {
+	host := &clientRuleHost{}
+	domain.ValidateAggregateChild(host, v, domain.ModeInsert, "insert", nil)
+	return host.GetAggregateRoot().NotificationContext()
+}
+
+// validClientClaim is one entry every rule accepts.
+func validClientClientClaim() ClientClaim {
+	return ClientClaim{
+		ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+		Value:   vos.ClaimValue("sa-east-1"),
+	}
+}
+
+// ClientClaim's collection name is a PERSISTED key, so it is pinned here.
+//
+// It is the segment the projection nests the collection under and the field a
+// read DTO carries. Changing it is a data migration wearing a rename's
+// clothes: the old documents keep the old key and nothing reads them back.
+func TestClientClientClaim_CollectionNameIsTheDocumentKey(t *testing.T) {
+	if got := (ClientClaim{}).CollectionName(); got != "Claims" {
+		t.Errorf("the collection is written under %q, and the documents already say %q", got, "Claims")
+	}
+}
+
+// Two ClientClaim entries are the same one when their business identity
+// matches.
+//
+// Sameness is the business identity, never the id: the same entry typed twice
+// in one request carries two ids and is still one entry, and the aggregate
+// refuses the duplicate on exactly this answer.
+func TestClientClientClaim_SamenessIsTheBusinessIdentity(t *testing.T) {
+	a := validClientClientClaim()
+	b := validClientClientClaim()
+	if !a.IsSameBusinessIdentity(b) {
+		t.Error("two entries with the same business identity were seen as different")
+	}
+	b.ClaimID = domain.NewID("00000000-0000-0000-0000-000000000002")
+	if a.IsSameBusinessIdentity(b) {
+		t.Errorf("changing ClaimID did not change the identity")
+	}
+}
+
+// A well-formed ClientClaim passes its own rules.
+//
+// The negative cases below are only meaningful if the positive one holds: a
+// builder that never validates would make every rejection vacuous.
+func TestClientClientClaim_ValidPasses(t *testing.T) {
+	ctx := rulesForClientClientClaim(validClientClientClaim())
+	if msgs := ctx.Messages(); len(msgs) > 0 {
+		t.Errorf("a valid ClientClaim was refused: %v", msgs)
 	}
 }

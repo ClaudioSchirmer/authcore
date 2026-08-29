@@ -55,6 +55,24 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantRoleWithUnheldPermissionsNotification{}` · attach it to `Roles`
 
+**`claim-available-in-tenant`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the claim id is absent from the claims table, points at an archived definition, or belongs to a tenant other than this client's. ONE answer for all three — a distinct "belongs to another tenant" reply is an existence oracle over a competitor's claim vocabulary. Asks ClaimIsUnavailableInTenant, and judges the ADDED and CHANGED entries only.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimNotAvailableInTenantNotification{}` · attach it to `Claims`
+
+**`claim-applies-to-client`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the definition declares appliesTo: user. client and both pass. This rule and its twin on User are what make appliesTo mean something — the README notes today that it states as data something the code does not yet enforce. Asks ClaimDoesNotApplyToClient, which answers true for an id it cannot resolve.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimDoesNotApplyToClientNotification{}` · attach it to `Claims`
+
+**`claim-value-matches-value-type`**
+
+> For every claim value this write ADDS or CHANGES: refuse when the value does not parse as the ValueType the definition declares. `number` accepts a valid decimal number, `bool` accepts exactly "true" or "false", `string` accepts any non-empty value — deliberately the SAME three readings the catalog's own default-value-matches-value-type uses, because two levels of one chain must not disagree about what a bool is. Read the enum member off the definition rather than its raw string. Asks ClaimValueDoesNotMatchValueType.
+
+- fires under `IfInsertOrUpdate` · raise `ClaimValueDoesNotMatchValueTypeNotification{}` · attach it to `Claims`
+
 **`archive-forces-suspended`**
 
 > Archiving a client sets Status to suspended. Mirrors Tenant rule 13 and User's U15: a row that is gone must not read as active anywhere it is still listed. There is no Unarchive on this entity, so this is a one-way door by construction.
@@ -92,6 +110,18 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 **`CallerLacksAnyPermissionOfRole(roleID domain.ID) bool`**
 
 > Whether the requesting caller fails to hold at least one permission this role confers — the escalation half. GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through, because a panic on a security rule is a 500. A *:* superadmin passes by construction.
+
+**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool`**
+
+> Whether this claim id is absent from the claims table, points at an archived definition, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
+
+**`ClaimDoesNotApplyToClient(claimID domain.ID) bool`**
+
+> Whether the definition behind this id declares appliesTo: user, so no machine client may hold a value for it. client and both answer false. Answers TRUE for an unknown id.
+
+**`ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool`**
+
+> Whether the value fails to parse as the ValueType the definition declares: `number` wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants any non-empty value. The same three readings the catalog's own default-value check uses. Answers TRUE for an unknown id.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
 
@@ -155,6 +185,7 @@ Indexes it expects:
 - `clients_tenant_id_name_key` — UNIQUE on (tenant_id, name), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientNameAlreadyExistsNotification
 - `client_roles_client_id_role_id_key` — UNIQUE on (client_id, role_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientAlreadyGrantsRoleNotification
 - `client_allowed_cidrs_client_id_cidr_key` — UNIQUE on (client_id, cidr), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientAlreadyAllowsCIDRNotification
+- `client_claims_client_id_claim_id_key` — UNIQUE on (client_id, claim_id), over the ACTIVE rows only — an archived one frees the value; a duplicate is reported as ClientAlreadyHoldsClaimNotification
 
 
 **`client_roles`** — the roles collection (1:N)
@@ -176,6 +207,18 @@ Indexes it expects:
 | `client_id` | id | no | foreign key to clients |
 | `cidr` | string(43) | no |  |
 | `label` | string(120) | no |  |
+| `deleted_at` | time | yes | archive stamp |
+| `created_at` | time | no |  |
+| `updated_at` | time | no |  |
+
+**`client_claims`** — the claims collection (1:N)
+
+| Column | Type | Null | Note |
+|---|---|---|---|
+| `id` | id | no | primary key |
+| `client_id` | id | no | foreign key to clients |
+| `claim_id` | id | no |  |
+| `value` | string(256) | no |  |
 | `deleted_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
@@ -235,7 +278,7 @@ The claim NAMES behind these are the framework's to resolve, not this code's: th
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/client_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, change, remove — have generated tests in `internal/application/commands/client_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -249,6 +292,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Operations | `insert`, `patch`, `archive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Collection `Roles` | `add` → `client:grant` (declared); `remove` → `client:grant` (declared) | These routes hang off `/clients/:id/roles`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Collection `AllowedCIDRs` | `add` → `client:manage-network` (declared); `remove` → `client:manage-network` (declared) | These routes hang off `/clients/:id/allowedCIDRs`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
+| Collection `Claims` | `add` → `client:set-claim` (declared); `change` → `client:set-claim` (declared); `remove` → `client:set-claim` (declared) | These routes hang off `/clients/:id/claims`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Changing ONE entry is PARTIAL (`PATCH`): what the body leaves out is read off the STORED entry, and what `change.patchExcludes` names — `ClaimID` — never reaches the wire, so it cannot move. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
 | Data access | tenant | Callers are restricted to their tenant's rows. |
@@ -256,6 +300,7 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. On the entity and OFF the wire: TenantStatus — read by the rules, in no response body and in no export. |
 | Read join → Role | `InnerJoin` on `role_id`, from ClientRole | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
+| Read join → Claim | `InnerJoin` on `claim_id`, from ClientClaim | An entry with no counterpart is NOT returned — a silent hole in the collection, not a missing aggregate. Prefer left wherever the relationship is genuinely optional. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. |
 
 ### Where each endpoint answers
 
@@ -272,13 +317,24 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 | Take out one `ClientRole` | `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` |
 | Add one `ClientAllowedCIDR` | `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` |
 | Take out one `ClientAllowedCIDR` | `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` |
+| Add one `ClientClaim` | `POST /clients/:id/claims` | `addClientClaim` |
+| Update one `ClientClaim` | `PATCH /clients/:id/claims/:clientClaimId` | `patchClientClaim` |
+| Take out one `ClientClaim` | `PATCH /clients/:id/claims/:clientClaimId/archive` | `removeClientClaim` |
 
 ## What was generated
 
 | What | File |
 |---|---|
-| the insert command and result | `internal/application/commands/insert_client_command.go` |
-| the insert request and response | `internal/web/requests/insert_client.go` |
+| the per-entry commands for client_allowed_cidrs | `internal/application/commands/client_allowed_cidr_commands.go` |
+| the per-entry commands for client_claims | `internal/application/commands/client_claim_commands.go` |
+| tests for the command mappers | `internal/application/commands/client_commands_test.go` |
+| the per-entry commands for client_roles | `internal/application/commands/client_role_commands.go` |
+| the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
+| the 5 client endpoints | `internal/web/client_routes.go` |
+| the per-entry wire types for client_allowed_cidrs | `internal/web/requests/client_allowed_cidr_requests.go` |
+| the per-entry wire types for client_claims | `internal/web/requests/client_claim_requests.go` |
+| the request mapper tests | `internal/web/requests/client_requests_test.go` |
+| the per-entry wire types for client_roles | `internal/web/requests/client_role_requests.go` |
 
 **Left untouched** (yours, by design):
 
@@ -287,7 +343,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-40 file(s) were already up to date.
+37 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -302,9 +358,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.62.0)
+Verdict: **exact** (project pins v0.63.0)
 
-framework v0.62.0 meets the required v0.62.0
+framework v0.63.0 meets the required v0.63.0
 
 Verify what was generated:
 

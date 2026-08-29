@@ -53,6 +53,7 @@ func (e *User) customRules(actionName string, service domain.Service, r *domain.
 	r.IfInsertOrUpdate(func() {
 		e.refuseUnjoinableGroups(svc, r)
 		e.refuseUngrantableRoles(svc, r)
+		e.refuseUnsettableClaims(svc, r)
 	})
 
 	r.IfUpdate(func() {
@@ -327,6 +328,100 @@ func (e *User) refuseUngrantableRoles(service UserService, r *domain.Rules) {
 		// ── role-no-escalation ──
 		if identityGates && service.CallerLacksAnyPermissionOfRole(granted.RoleID) {
 			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
+		}
+	}
+}
+
+// refuseUnsettableClaims judges every claim value this write ADDS or CHANGES.
+//
+// The three checks are the same shape the two collections above use, one hop
+// each, and in the same deliberate order. What is different is the SET being
+// judged: this is the only collection in the service that mounts a `change`
+// verb, so an entry whose value was corrected has to be judged too. An added
+// entry and a changed one are equally unvalidated — the value is new either
+// way — and judging only the additions would let "correct this cost center"
+// write anything at all.
+//
+// WHAT IS NOT HERE, and it is a decision rather than an omission: no wildcard
+// probe and no escalation probe. The two collections above carry them because
+// they confer PERMISSIONS, and the caller must already hold what they hand
+// over. A claim confers nothing inside this service — it is in no BuildRules,
+// it gates no route, and there is no permission set to compare a caller
+// against, so a probe here would gate nothing. What answers that worry is the
+// verb the routes declare: user:set-claim, its own, rather than user:grant.
+func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
+	if service == nil {
+		return
+	}
+
+	// ADDED **and** CHANGED. The change verb is a PATCH carrying only `value`
+	// (`change.shape: patch`, `patchExcludes: [ClaimID]`), so a correction
+	// arrives with the definition read off the stored entry and a value nothing
+	// has judged yet — exactly as unjudged as a new one. Judging only the
+	// additions would let a correction write anything at all.
+	touched := append(
+		domain.GetAddedItemsOf[aggregatevos.UserClaim](&e.AggregateRoot),
+		domain.GetChangedItemsOf[aggregatevos.UserClaim](&e.AggregateRoot)...,
+	)
+
+	for _, held := range touched {
+		// USABLE, not merely non-empty — every probe below hands this id to a
+		// criterion against a UUID column, so a value uuid.Parse refuses would
+		// make the query error and the probe panic. It raises nothing: the
+		// framework's own child validation reports the bad id.
+		if _, err := held.ClaimID.UUID(); err != nil {
+			continue
+		}
+
+		// NEVER read held.ClaimName / held.ClaimValueType here. They are
+		// read-join fields — filled on entries LOADED from the row and blank on
+		// one this write just added — so the type check below asks the SERVICE
+		// for the definition's value type instead of reading the field sitting
+		// right there. On an added entry that field is "", which no member
+		// matches, and every value would be refused for the wrong reason.
+		//
+		// This is also why the check is not a value object: "parse as whatever
+		// the definition says" reads a field of another aggregate, which no
+		// value object can see.
+
+		// ── claim-available-in-tenant ──
+		// In the table, still active, AND owned by THIS USER's tenant. One
+		// notification for all three: a distinct "belongs to another tenant"
+		// reply confirms to a caller in tenant A that a specific UUID is a live
+		// definition in some other tenant — an existence oracle over a
+		// competitor's claim vocabulary.
+		//
+		// The tenant asked about is the ROW's, not the caller's: on the
+		// ordinary path they are the same value, but a *:* super-admin crosses
+		// that scope, and when they do "this tenant" must mean the user's.
+		if service.ClaimIsUnavailableInTenant(e.TenantID, held.ClaimID) {
+			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
+			// Nothing below can say anything true about a definition that is
+			// not there, and both probes answer "the problem is present" for an
+			// unknown id — reporting all three for one bad id would be noise.
+			// Same interlock the group and role loops use.
+			continue
+		}
+
+		// ── claim-applies-to-user ──
+		// The definition declares which identity kinds may hold a value:
+		// `user`, `client` or `both`. This is what finally makes that column
+		// mean something rather than merely state it.
+		if service.ClaimDoesNotApplyToUser(held.ClaimID) {
+			r.AddNotification("Claims", ClaimDoesNotApplyToUserNotification{}, held.ClaimID.String())
+			continue
+		}
+
+		// ── claim-value-matches-value-type ──
+		// The value must parse as the type the definition declares, using the
+		// SAME three readings the catalog's own default-value check uses — two
+		// levels of one chain must not disagree about what a bool is.
+		//
+		// The rejected value is echoed rather than the id: the caller knows
+		// which entry they sent, and what they need told back is the string
+		// that did not parse.
+		if service.ClaimValueDoesNotMatchValueType(held.ClaimID, held.Value.Value()) {
+			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
 		}
 	}
 }

@@ -138,7 +138,7 @@ Membership is not here: `user_groups` is a collection of **User**, gated on `use
 
 ## User
 
-Tenant-scoped: `users.tenant_id`. Two collections (`groups`, `roles`) and the two hand-written credential routes — the only endpoints in the service where the caller's own identity decides the row.
+Tenant-scoped: `users.tenant_id`. Three collections (`groups`, `roles`, `claims`) and the two hand-written credential routes — the only endpoints in the service where the caller's own identity decides the row.
 
 | Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached | Must change password |
 |---|---|---|---|---|---|---|---|---|
@@ -149,6 +149,9 @@ Tenant-scoped: `users.tenant_id`. Two collections (`groups`, `roles`) and the tw
 | `PATCH /users/:id/groups/:userGroupId/archive` | `removeUserGroup` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `POST /users/:id/roles` | `addUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `PATCH /users/:id/roles/:userRoleId/archive` | `removeUserRole` | `user:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /users/:id/claims` | `addUserClaim` | `user:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /users/:id/claims/:userClaimId` | `patchUserClaim` | `user:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /users/:id/claims/:userClaimId/archive` | `removeUserClaim` | `user:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `GET /users` | `users` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 | `GET /users/:id` | `user` | `user:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 | `PATCH /users/:id/password` | `changeUserPassword` | `user:change-password` | JWT + claim | guard foreign-tenant | `sub → self` | yes | **own row** | — |
@@ -192,7 +195,7 @@ Cap of 50 per collection, counted over the whole collection. The escalation gate
 
 ## Client
 
-Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`roles`, `allowedCIDRs`) and a hand-written secret rotation. The only entity whose rules ask what KIND of caller is on the token.
+Tenant-scoped: `clients.tenant_id`. The machine identity: three collections (`roles`, `allowedCIDRs`, `claims`) and a hand-written secret rotation. The only entity whose rules ask what KIND of caller is on the token.
 
 | Endpoint | GraphQL | Permission | Admission | Tenant scope | Self | `*:*` crosses | Rows reached | Secret |
 |---|---|---|---|---|---|---|---|---|
@@ -203,19 +206,23 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: two collections (`role
 | `PATCH /clients/:id/roles/:clientRoleId/archive` | `removeClientRole` | `client:grant` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `POST /clients/:id/allowedCIDRs` | `addClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `PATCH /clients/:id/allowedCIDRs/:clientAllowedCIDRId/archive` | `removeClientAllowedCIDR` | `client:manage-network` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `POST /clients/:id/claims` | `addClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /clients/:id/claims/:clientClaimId` | `patchClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
+| `PATCH /clients/:id/claims/:clientClaimId/archive` | `removeClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` (dormant) | yes | own tenant | **generated** |
 | `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 | `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 
 **One row rule, and it is about MACHINES rather than ownership.** A user token of the tenant meets it on no route at all: it holds the permission, the row is in its tenant, and it writes — so an operator with `client:rotate-secret` rotates the secret of any client in their tenant, the mirror of User's reset. What it bounds is a CLIENT-subject caller, and only on the rotation.
 
-**Everything else a client-subject caller may do, it may do to a sibling**: create, edit, archive, grant a role, edit the allow-list — ordinary tenant-scoped writes, gated by the permission the caller carries and nothing more. Until 2026-08-28 the rule covered every update and the archive, and a companion rule refused a client-subject insert outright; both were narrowed away as closed past the point of usefulness. Rotation is the exception because it is not editing a row: it mints a credential AND starts retiring the one in use, so a machine able to rotate another machine's secret could lock it out and take its place in one call.
+**Everything else a client-subject caller may do, it may do to a sibling**: create, edit, archive, grant a role, edit the allow-list, set a claim value — ordinary tenant-scoped writes, gated by the permission the caller carries and nothing more. Until 2026-08-28 the rule covered every update and the archive, and a companion rule refused a client-subject insert outright; both were narrowed away as closed past the point of usefulness. Rotation is the exception because it is not editing a row: it mints a credential AND starts retiring the one in use, so a machine able to rotate another machine's secret could lock it out and take its place in one call.
 
 **`dormant` means nothing reaches it yet**: it reads `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Until it does the field reads `""`, the rule stands down, and that cell behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
 
 - **Secret**: the endpoint mints a credential AND renders the plaintext in its own answer — the create issues the first one, the rotation every one after it. Nowhere else, ever: no read, no listing, no export, no `?fields=`. Shown once, because nothing stores it. See *The secret* below.
 - `client:rotate-secret` is a **sixth verb**, for the reason `user:reset-password` is its own: handing out a production credential is not editing a label.
-- **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.
+- **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential), `client:set-claim` (claims — see below). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.
+- **`client:set-claim` is its own verb even though a claim gates nothing here.** That is the point rather than a contradiction: a claim value is read by services authcore does not control, and one of them may well authorize on it — so setting a value is potentially conferring privilege in a way THIS service cannot audit. Folding it into `client:grant` would hand everyone who manages roles a reach nothing here can see. Same call `client:manage-network` made three days earlier, one turn further out.
 - **An empty `allowedCIDRs` means ANY address** — `0.0.0.0/0` and `::/0` are refused so there is exactly one spelling of "no restriction". So archiving the last entry opens the credential to the whole internet, which is why the pair left `client:update` on 2026-08-28. Nothing enforces the list yet: it is read by no code until `POST /auth/client/token` exists.
 - **Insert**: `tenantID` optional, absent means the claim's. `name` unique per tenant. **Patch** carries `name`, `description`, `status` (`active` ⇄ `suspended`); `tenantID` is immutable.
 - **Archive** forces `status = suspended`. No unarchive, on the root or per entry.
@@ -256,9 +263,15 @@ Tenant-scoped: `claims.tenant_id`. The catalog of claim definitions a tenant's t
 | `GET /claims` | `claims` | `claim:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 | `GET /claims/:id` | `claim` | `claim:read` | JWT + claim | filter TenantID | — | yes | own tenant |
 
-**Four verbs, not five, and it is not an oversight.** `Role`, `Group` and `User` each carry a `:grant` because each owns a collection whose contents change what a principal can DO — "may rename it" and "may change what it confers" are separately grantable across this whole service. This entity owns no collection and confers nothing, so a fifth verb would gate nothing. The verb that eventually sets a claim VALUE on a principal is a real question, and it belongs to the two collections that will live on `User` and `Client`, not here.
+**Four verbs, not five, and it is not an oversight.** `Role`, `Group` and `User` each carry a `:grant` because each owns a collection whose contents change what a principal can DO — "may rename it" and "may change what it confers" are separately grantable across this whole service. This entity owns no collection and confers nothing, so a fifth verb would gate nothing.
 
-**There is no "What a claim may be granted" sub-section below this table**, and the absence is meaningful: no in-catalog check, no wildcard refusal, no escalation rule, because nothing is granted. A claim definition is vocabulary.
+**The verb that sets a VALUE on a principal now exists, and it is not here.** `user:set-claim` and `client:set-claim` gate the two collections built on 2026-08-28, which live on `User` and on `Client` — the catalog names the vocabulary, the parents hold the values. Reading the two tables together is what answers "who may write what": `claim:insert` decides who invents a claim name, `user:set-claim` decides who puts a value against it on a person.
+
+**There is no "What a claim may be granted" sub-section below this table**, and the absence is meaningful: no in-catalog check, no wildcard refusal, no escalation rule, because nothing is granted. A claim definition is vocabulary. The same absence repeats one level out: setting a VALUE on a principal consults the caller's permissions nowhere either, and for the same reason.
+
+**Correcting a value is a PATCH carrying only `value`.** `PATCH /users/:id/claims/:entryId` and its client twin take a partial body; the claim definition an entry belongs to is read off the stored row and is excluded from the body entirely (`change.patchExcludes`), so there is no field in which to send a different one. That is a stronger answer than a rule refusing it — nothing can be sent wrong. The framework's own guard sits under it: since v0.63.0 a child change colliding with another ACTIVE entry's business identity answers 409.
+
+**`appliesTo` is mutable but no longer freely.** Widening (`user`/`client` → `both`) is the ordinary operational move and passes untouched. NARROWING is refused when an active `user_claims` or `client_claims` row still holds a value for the kind being dropped — all four narrowing transitions, the cross pair (`user` → `client`) included. Without it a definition could be narrowed out from under stored values, which stay in the table, stay readable, and would be refused if anyone tried to write them, with nothing anywhere complaining. `valueType` answers the same family of question by being immutable outright; `appliesTo` cannot, because widening has to keep working.
 
 **PATCH carries only what it can change.** `tenantID`, `name` and `valueType` are absent from the request shape entirely, so the domain's three immutability rules guard the values without the API ever offering them. `Claim` is the first tenant-owned registry here built that way from the start; `Role` and `Group` were brought level for `tenantID` on 2026-08-28 and still advertise `key`, which is a separate open decision.
 

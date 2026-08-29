@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:fa100116816661ec2e0325f61ea6b2e6e09b713060292e03c8abfa2279e2f7b3
+// generated:  2026-08-28
+// checksum:   sha256:6ad323aa79446bda60228a6f723ccb3fcfe936d0c63c802d4a023c76425291ed
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -51,6 +51,7 @@ func NewUserRepository(engine core.RelationalEngine) *UserRepository {
 		"users_email_key":                  {Notification: appdomain.UserEmailAlreadyExistsNotification{}, Field: "email"},
 		"user_groups_user_id_group_id_key": {Notification: appdomain.UserAlreadyInGroupNotification{}, Field: "groups"},
 		"user_roles_user_id_role_id_key":   {Notification: appdomain.UserAlreadyGrantsRoleNotification{}, Field: "roles"},
+		"user_claims_user_id_claim_id_key": {Notification: appdomain.UserAlreadyHoldsClaimNotification{}, Field: "claims"},
 	}
 
 	r.WithSchema(schemas.UserSchema())
@@ -78,6 +79,12 @@ func NewUserRepository(engine core.RelationalEngine) *UserRepository {
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name"),
+		// UserClaim → Claim, on every loaded entry. No counterpart drops the
+		// ENTRY, not the root — a hole in the collection.
+		read.InnerJoinInChild(schemas.UserClaimSchema()).To(schemas.ClaimSchema()).
+			On("claim_id").
+			Field("ClaimName", "name").
+			Field("ClaimValueType", "value_type"),
 	)
 	return r
 }

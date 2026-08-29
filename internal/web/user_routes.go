@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:069f4eac3d643d30f57dd586fce5bd17be52bb32994fa3ed4fdcc5d45a040c45
+// checksum:   sha256:69197c8e154be4e6eb3735b25580f7443d66f02bee7948a3853df0cb226c5838
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -183,6 +183,51 @@ func MountUsers(
 		},
 		fwopenapi.RequirePermission("user:grant"))
 
+	hAddUserClaim, sAddUserClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.AddUserClaimRequest{},
+		requests.AddUserClaimResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.AddUserClaimCommand, commands.AddUserClaimResult]{
+			Repo: repo, Service: svc,
+		}, fiber.StatusCreated)
+	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/:id/claims",
+		hAddUserClaim, sAddUserClaim,
+		fwopenapi.Doc{
+			Summary:     "Add one UserClaim to a User",
+			Description: "Adds ONE entry to the claims collection of an existing User, in the owner's transaction. 404 when the owner is not there. The response carries the entry AS STORED, including the id the server minted for it — that id is how the caller addresses it afterwards.",
+			Tags:        []string{"Users"},
+		},
+		fwopenapi.RequirePermission("user:set-claim"))
+
+	hPatchUserClaim, sPatchUserClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.PatchUserClaimRequest{},
+		requests.PatchUserClaimResponse{}.FromResult,
+		&handlers.PartialUpdateCommandHandler[*appdomain.User, *commands.PatchUserClaimCommand, commands.PatchUserClaimResult]{
+			Repo: repo, Service: svc,
+		}, fiber.StatusOK)
+	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/claims/:userClaimId",
+		hPatchUserClaim, sPatchUserClaim,
+		fwopenapi.Doc{
+			Summary:     "Update one UserClaim of a User (partial)",
+			Description: "Partial change of ONE entry, keeping its id. Only the fields present in the body change; the rest keep what the entry already holds, which is why the business identity is not among them — it comes from the stored entry and cannot be moved here. Because an absent field and an explicit null cannot be told apart, this verb cannot set a value back to null. 404 when the owner is not there, and 404 when the owner exists but holds no entry with that id.",
+			Tags:        []string{"Users"},
+		},
+		fwopenapi.RequirePermission("user:set-claim"))
+
+	hRemoveUserClaim, sRemoveUserClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.RemoveUserClaimRequest{},
+		fwresponses.NoBody,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserClaimCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		}, fiber.StatusNoContent)
+	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/claims/:userClaimId/archive",
+		hRemoveUserClaim, sRemoveUserClaim,
+		fwopenapi.Doc{
+			Summary:     "Archive one UserClaim of a User",
+			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
+			Tags:        []string{"Users"},
+		},
+		fwopenapi.RequirePermission("user:set-claim"))
+
 }
 
 // MountUsersGraphQL exposes user on the GraphQL surface.
@@ -277,5 +322,37 @@ func MountUsersGraphQL(
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("user:grant")))
+
+	// The entry is the whole input; the owner is the id. The REST route's
+	// own Request travels unchanged — it carries no path segment to lose.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.AddUserClaimRequest](
+		"addUserClaim", requests.AddUserClaimResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.AddUserClaimCommand, commands.AddUserClaimResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:set-claim")))
+
+	// The partial shape of the same operation, under its own field — the
+	// schema has no verb to carry the difference, so the name does, exactly
+	// as the root's patch<Entity> stands beside its update<Entity>. The
+	// handler is the partial one: the full-body wrapper would demand every
+	// field of a command whose whole point is that they are optional.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.PatchUserClaimGraphQLRequest](
+		"patchUserClaim", requests.PatchUserClaimResponse{}.FromResult,
+		&handlers.PartialUpdateCommandHandler[*appdomain.User, *commands.PatchUserClaimCommand, commands.PatchUserClaimResult]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:set-claim")))
+
+	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
+	// so the payload is the acknowledgement and nothing more. Whether the
+	// row is archived or deleted follows the child's own declaration, the
+	// same way it does on the REST verb.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserClaimGraphQLRequest](
+		"removeUserClaim", requests.RemoveUserClaimGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserClaimCommand, fwresults.None]{
+			Repo: repo, Service: svc,
+		},
+		fwgraphql.RequirePermission("user:set-claim")))
 
 }

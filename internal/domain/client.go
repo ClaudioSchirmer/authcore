@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:0b80dfbd3114db1b6741526bd7453712473cb6958f1b42171c73505e0d5665c3
+// generated:  2026-08-28
+// checksum:   sha256:60c2b4776460dfd13682e65ab1456f8ce0d16fc0b3348d666a7ff9886977c531
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -110,7 +110,7 @@ func (e *Client) GetAggregateRoot() *domain.AggregateRoot {
 // The framework matches this set against the schema's child declarations and
 // refuses to bind them when they disagree.
 func (e *Client) AggregateChildren() []domain.AggregateValueObject {
-	return []domain.AggregateValueObject{aggregatevos.ClientRole{}, aggregatevos.ClientAllowedCIDR{}}
+	return []domain.AggregateValueObject{aggregatevos.ClientRole{}, aggregatevos.ClientAllowedCIDR{}, aggregatevos.ClientClaim{}}
 }
 
 // RequiresService opts in to the domain service.
@@ -170,6 +170,14 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 			items := domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](e.GetAggregateRoot())
 			if len(items) > 20 {
 				r.AddNotification("AllowedCIDRs", TooManyAllowedCIDRsForClientNotification{Max: "20"}, len(items))
+			}
+		}
+		// at most 20 claim values on one client, counted over the whole
+		// collection.
+		{
+			items := domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot())
+			if len(items) > 20 {
+				r.AddNotification("Claims", TooManyClaimsForClientNotification{Max: "20"}, len(items))
 			}
 		}
 		// The database unique index is the backstop for the race between this
@@ -325,4 +333,55 @@ func (e *Client) RemoveClientAllowedCIDRByID(id string) {
 		}
 	}
 	e.AddNotification("ClientAllowedCIDR", domain.RecordNotFoundNotification{}, id)
+}
+
+// AddClientClaim adds one entry to the claims collection.
+//
+// A duplicate is rejected by business identity, not by comparing every field,
+// so re-sending an entry with a cosmetic change updates it in place instead of
+// creating a second one.
+func (e *Client) AddClientClaim(item aggregatevos.ClientClaim) {
+	// Adding ONE entry can collide with what is already there, and the
+	// caller asked for this entry rather than for a whole collection — so
+	// the collision is an answer, not a silent merge.
+	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
+		if existing.IsSameBusinessIdentity(item) {
+			e.AddNotification("Claims", ClientAlreadyHoldsClaimNotification{}, item.ClaimID)
+			return
+		}
+	}
+	domain.AddAggregateChild(e, item)
+}
+
+// ChangeClientClaimByID replaces ONE entry, keeping its id.
+//
+// Keeping the id is the whole point: the row is updated rather than removed
+// and re-added, so whatever references it still does, and the audit trail
+// reads as a change instead of as a deletion plus a creation.
+//
+// An id that is not in the collection is NOT silently ignored — it answers
+// not-found, because the caller addressed a specific entry.
+func (e *Client) ChangeClientClaimByID(id string, replacement aggregatevos.ClientClaim) {
+	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
+		if current.GetID().Value() == id {
+			replacement.SetID(domain.NewID(id))
+			domain.ChangeAggregateChild(e, current, replacement)
+			return
+		}
+	}
+	e.AddNotification("ClientClaim", domain.RecordNotFoundNotification{}, id)
+}
+
+// RemoveClientClaimByID takes ONE entry out of the collection.
+//
+// Same not-found posture as the change: the caller named an entry, so a
+// missing one is an answer rather than a no-op.
+func (e *Client) RemoveClientClaimByID(id string) {
+	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
+		if current.GetID().Value() == id {
+			domain.RemoveAggregateChild(e, current)
+			return
+		}
+	}
+	e.AddNotification("ClientClaim", domain.RecordNotFoundNotification{}, id)
 }

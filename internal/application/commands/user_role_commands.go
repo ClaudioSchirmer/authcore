@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:a126d5c10d082a6981886bdaa6e5515af622832f8f75fff8b13ef1bd35bdbf03
+// checksum:   sha256:0b9beb8e244385e0c666bf48e7a114f927ac8847b323aa3cd4bbeedcbf3f7ba7
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,13 +17,14 @@
 package commands
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 )
 
 // AddUserRoleCommand adds ONE entry to User's roles.

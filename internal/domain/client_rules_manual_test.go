@@ -11,6 +11,7 @@
 package domain
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,12 +41,26 @@ type probingClientService struct {
 	roleUnavailable   bool
 	roleWildcard      bool
 	lacksRolePerm     bool
+	claimUnavailable  bool
+	claimAppliesElse  bool
+	claimValueBadType bool
 
 	askedTenant       int
 	askedRoleAvail    []clientScopedQuestion
 	askedRoleWildcard []domain.ID
 	askedRoleEscalate []domain.ID
 	hashedSecrets     []string
+	askedClaimAvail   []clientScopedQuestion
+	askedClaimApplies []domain.ID
+	askedClaimType    []clientClaimTypeQuestion
+}
+
+// clientClaimTypeQuestion records BOTH arguments of the value-type probe: which
+// definition was asked about AND the value that was judged. The second is what
+// proves a CHANGED entry reaches the rule with its NEW value.
+type clientClaimTypeQuestion struct {
+	claimID domain.ID
+	value   string
 }
 
 // clientScopedQuestion records BOTH arguments, because WHICH tenant the rule
@@ -451,3 +466,181 @@ func TestAClientSubjectCallerMayArchiveAnotherRow(t *testing.T) {
 //
 // They are why this file lands near 91% rather than at the repository's 95%, and
 // the same two shapes put user_rules_manual.go at 91.5%.
+
+func (s *probingClientService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
+	s.askedClaimAvail = append(s.askedClaimAvail, clientScopedQuestion{tenantID: tenantID, targetID: claimID})
+	return s.claimUnavailable
+}
+
+func (s *probingClientService) ClaimDoesNotApplyToClient(claimID domain.ID) bool {
+	s.askedClaimApplies = append(s.askedClaimApplies, claimID)
+	return s.claimAppliesElse
+}
+
+func (s *probingClientService) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
+	s.askedClaimType = append(s.askedClaimType, clientClaimTypeQuestion{claimID: claimID, value: value})
+	return s.claimValueBadType
+}
+
+// ── the claims collection: the three per-entry rules ────────────────────────
+//
+// The twin of User's block. It is written out rather than shared, for the same
+// reason the two rules are separate methods: the two parents ask DIFFERENT
+// facts, and a shared table-driven case would hide which side a refusal came
+// from.
+
+const (
+	someClientClaimID      = "0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"
+	someOtherClientClaimID = "0198f3e0-8c42-7d13-9b66-2a0e3f7c5d28"
+)
+
+// clientHolding returns a valid client that SETS one claim value.
+func clientHolding(claimID, value string) *Client {
+	e := validClient()
+	e.AddClientClaim(aggregatevos.ClientClaim{
+		ClaimID: domain.NewID(claimID),
+		Value:   vos.ClaimValue(value),
+	})
+	return e
+}
+
+func TestClientClaimValueIsRefusedWhenTheDefinitionIsNotAvailableInTheTenant(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	svc := insertClient(t, e, &probingClientService{claimUnavailable: true})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClaimNotAvailableInTenantNotification") {
+		t.Fatalf("a value was set against an absent, archived or foreign definition; answers were %v",
+			clientNotificationKeys(e))
+	}
+	if len(svc.askedClaimAvail) != 1 {
+		t.Fatalf("the availability probe was asked %d times, want once per added entry", len(svc.askedClaimAvail))
+	}
+	if svc.askedClaimAvail[0].tenantID != e.TenantID {
+		t.Errorf("the probe was scoped by %v, want the row's tenant %v",
+			svc.askedClaimAvail[0].tenantID, e.TenantID)
+	}
+}
+
+func TestClientNothingBelowIsAskedAboutADefinitionThatIsNotThere(t *testing.T) {
+	svc := insertClient(t, clientHolding(someClientClaimID, "sa-east-1"),
+		&probingClientService{claimUnavailable: true})
+
+	if len(svc.askedClaimApplies) != 0 || len(svc.askedClaimType) != 0 {
+		t.Fatalf("the later probes ran on an unresolvable definition: applies=%d type=%d",
+			len(svc.askedClaimApplies), len(svc.askedClaimType))
+	}
+}
+
+// The other half of the pair that makes appliesTo mean something: a definition
+// declaring `user` is refused here, and its twin on User refuses `client`.
+func TestClientClaimValueIsRefusedWhenTheDefinitionDoesNotApplyToClients(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	insertClient(t, e, &probingClientService{claimAppliesElse: true})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClaimDoesNotApplyToClientNotification") {
+		t.Fatalf("a client holds a value for a user-only definition; answers were %v",
+			clientNotificationKeys(e))
+	}
+}
+
+func TestClientClaimValueIsRefusedWhenItDoesNotParseAsTheDeclaredType(t *testing.T) {
+	e := clientHolding(someClientClaimID, "maybe")
+	svc := insertClient(t, e, &probingClientService{claimValueBadType: true})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("a value of the wrong type was stored; answers were %v", clientNotificationKeys(e))
+	}
+	if len(svc.askedClaimType) != 1 || svc.askedClaimType[0].value != "maybe" {
+		t.Fatalf("the value handed to the type probe was %v", svc.askedClaimType)
+	}
+}
+
+func TestAValidClientClaimValueIsAccepted(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	if _, err := domain.GetInsertable(e, &probingClientService{}, "Insert"); err != nil {
+		t.Fatalf("a valid claim value was refused: %v", err)
+	}
+}
+
+// A CHANGED entry is judged like an added one — the PATCH path. See the User
+// twin for the full reasoning.
+func TestACorrectedClientValueIsJudgedLikeANewOne(t *testing.T) {
+	e := validClient()
+	original := aggregatevos.ClientClaim{
+		ClaimID: domain.NewID(someClientClaimID),
+		Value:   vos.ClaimValue("sa-east-1"),
+	}
+	e.AddClientClaim(original)
+	domain.ChangeAggregateChild(e, original, aggregatevos.ClientClaim{
+		ClaimID: domain.NewID(someClientClaimID),
+		Value:   vos.ClaimValue("not-a-region"),
+	})
+
+	svc := insertClient(t, e, &probingClientService{claimValueBadType: true})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("a corrected value skipped the type check; answers were %v", clientNotificationKeys(e))
+	}
+	if len(svc.askedClaimType) != 1 || svc.askedClaimType[0].value != "not-a-region" {
+		t.Fatalf("the probe was handed %v, want the NEW value", svc.askedClaimType)
+	}
+}
+
+func TestASecondValueForTheSameDefinitionIsRefusedOnAClient(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	e.AddClientClaim(aggregatevos.ClientClaim{
+		ClaimID: domain.NewID(someClientClaimID),
+		Value:   vos.ClaimValue("us-east-1"),
+	})
+
+	if !clientHasKey(clientNotificationKeys(e), "ClientAlreadyHoldsClaimNotification") {
+		t.Fatalf("one client holds two values for one definition; answers were %v",
+			clientNotificationKeys(e))
+	}
+}
+
+func TestTwoDifferentDefinitionsCoexistOnAClient(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	e.AddClientClaim(aggregatevos.ClientClaim{
+		ClaimID: domain.NewID(someOtherClientClaimID),
+		Value:   vos.ClaimValue("1000"),
+	})
+
+	if clientHasKey(clientNotificationKeys(e), "ClientAlreadyHoldsClaimNotification") {
+		t.Fatalf("two distinct definitions were treated as a duplicate: %v", clientNotificationKeys(e))
+	}
+}
+
+func TestAClientMayNotHoldMoreThanTwentyClaimValues(t *testing.T) {
+	e := validClient()
+	for i := 0; i < 21; i++ {
+		e.AddClientClaim(aggregatevos.ClientClaim{
+			ClaimID: domain.NewID(fmt.Sprintf("0198f3e0-7b31-7c02-8a55-1f9d2e6b%04d", i)),
+			Value:   vos.ClaimValue("v"),
+		})
+	}
+	insertClient(t, e, &probingClientService{})
+
+	if !clientHasKey(clientNotificationKeys(e), "TooManyClaimsForClientNotification") {
+		t.Fatalf("21 claim values were accepted; answers were %v", clientNotificationKeys(e))
+	}
+}
+
+// NO ESCALATION PROBE, and this is the assertion for it. The roles collection
+// beside this one refuses a grant the caller does not already hold; a claim
+// confers nothing inside this service, so setting one must not consult the
+// caller's permissions at all. If somebody later "fixes" the asymmetry by
+// wiring the role probes into the claims loop, this fails.
+func TestSettingAClaimValueDoesNotConsultTheCallersPermissions(t *testing.T) {
+	e := clientHolding(someClientClaimID, "sa-east-1")
+	svc := insertClient(t, e, &probingClientService{lacksRolePerm: true, roleWildcard: true})
+
+	if len(svc.askedRoleEscalate) != 0 || len(svc.askedRoleWildcard) != 0 {
+		t.Fatalf("a claim value was judged against the caller's privileges: escalate=%d wildcard=%d",
+			len(svc.askedRoleEscalate), len(svc.askedRoleWildcard))
+	}
+	if _, err := domain.GetInsertable(clientHolding(someClientClaimID, "sa-east-1"),
+		&probingClientService{lacksRolePerm: true, roleWildcard: true}, "Insert"); err != nil {
+		t.Fatalf("a claim value was refused for a privilege reason: %v", err)
+	}
+}

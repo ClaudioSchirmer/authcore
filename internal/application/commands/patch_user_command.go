@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:082c4152148a5e866f856d263bc0ef78602cfdcdf0e936bdb540062682038b6c
+// generated:  2026-08-28
+// checksum:   sha256:e27ec097f6c405b07b2a518d64c28289d980fa5964bcfc494d5a0b18b289a9b5
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -87,6 +87,7 @@ type PatchUserResult struct {
 	FullName string
 	Groups   []UserGroupResult
 	Roles    []UserRoleResult
+	Claims   []UserClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -110,6 +111,7 @@ func (c *PatchUserCommand) FromEntity(ctx *configuration.AppContext, e *appdomai
 		Status:             e.Status.Value(),
 		Groups:             projectUserGroups(e),
 		Roles:              projectUserRoles(e),
+		Claims:             projectUserClaims(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family

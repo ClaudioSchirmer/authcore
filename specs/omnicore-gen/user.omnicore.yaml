@@ -448,6 +448,36 @@ valueObjects:
         value: suspended
         text: {ptbr: Suspenso, eng: Suspended, esp: Suspendido, fra: Suspendu, deu: Gesperrt, ita: Sospeso, nld: Opgeschort}
 
+  # Level 1 of the claim chain, the value side. A raw shape and not a manual one: the two
+  # invariants it owns are a length floor and a length ceiling, which is exactly what raw
+  # says.
+  #
+  # It owns ONLY what does not depend on the definition being pointed at — that the value is
+  # present, and that it fits the CLAIM-SIZE BUDGET. The 256 is the same number
+  # claims.default_value carries, because they are two levels of one chain feeding one
+  # header on every request to every service.
+  #
+  # Everything type-dependent stays in claim-value-matches-value-type: "parse as whatever
+  # ValueType says" reads a field of ANOTHER aggregate, which no value object can see. That
+  # is also why the catalog's own DefaultValue is plain — but there level 2 may legitimately
+  # be null and its budget rides a `length` rule with skipWhen. On a collection entry
+  # rules.list does not reach the field at all, so the value object is the only declarative
+  # seat left, and every child field in this project already takes it (ClientAllowedCIDR's
+  # CIDR and Label both do).
+  #
+  # Declared identically in client.omnicore.yaml — the same verbatim redeclaration this
+  # project already uses for RoleNotAvailableInTenantNotification across three specs.
+  - name: ClaimValue
+    kind: raw
+    backing: string
+    minLength: 1
+    maxLength: 256
+    notification: InvalidClaimValueNotification
+    description: >-
+      A claim's value as a token would carry it: 1-256 runes, never empty. It carries no
+      type rule of its own — what the value must PARSE as is declared on the claim
+      definition, in another aggregate, and is enforced by a rule that can read it.
+
 notifications:
   - name: UserEmailAlreadyExistsNotification
     semantic: conflict
@@ -706,6 +736,97 @@ notifications:
       ita: Un ruolo che concede un permesso jolly non può essere conferito da un gruppo.
       nld: Een rol die een jokerrecht verleent, kan niet door een groep worden verleend.
 
+  - name: InvalidClaimValueNotification
+    package: vos
+    semantic: validation
+    description: >-
+      A claim value that is empty or longer than the claim-size budget allows. The type
+      check is a separate answer, raised by a rule that can read the definition.
+    text:
+      ptbr: O valor do claim não é válido.
+      eng: The claim value is not valid.
+      esp: El valor del claim no es válido.
+      fra: La valeur du claim n'est pas valide.
+      deu: Der Claim-Wert ist ungültig.
+      ita: Il valore del claim non è valido.
+      nld: De claimwaarde is ongeldig.
+
+  - name: UserAlreadyHoldsClaimNotification
+    semantic: conflict
+    description: >-
+      The user already holds a value for this claim definition. One principal holds at most
+      one value per definition — that constraint IS the anti-collision argument of the whole
+      two-level chain, not a hygiene detail.
+    text:
+      ptbr: Este usuário já possui um valor para este claim.
+      eng: This user already holds a value for this claim.
+      esp: Este usuario ya tiene un valor para este claim.
+      fra: Cet utilisateur possède déjà une valeur pour ce claim.
+      deu: Dieser Benutzer hat bereits einen Wert für diesen Claim.
+      ita: Questo utente ha già un valore per questo claim.
+      nld: Deze gebruiker heeft al een waarde voor deze claim.
+
+  - name: TooManyClaimsForUserNotification
+    semantic: validation
+    tvars: [max]
+    description: >-
+      More claim values than one token can carry. The cap is a header budget before it is a
+      count: every value here rides on every request to every service.
+    text:
+      ptbr: Um usuário pode ter no máximo {max} valores de claim.
+      eng: A user may hold at most {max} claim values.
+      esp: Un usuario puede tener como máximo {max} valores de claim.
+      fra: Un utilisateur peut détenir au maximum {max} valeurs de claim.
+      deu: Ein Benutzer darf höchstens {max} Claim-Werte haben.
+      ita: Un utente può avere al massimo {max} valori di claim.
+      nld: Een gebruiker mag maximaal {max} claimwaarden hebben.
+
+  - name: ClaimNotAvailableInTenantNotification
+    semantic: validation
+    description: >-
+      The claim definition is absent, archived, or belongs to another tenant. ONE answer for
+      all three — a distinct "belongs to another tenant" reply is an existence oracle over a
+      competitor's claim vocabulary.
+    text:
+      ptbr: O claim não existe, está arquivado ou não pertence a este inquilino.
+      eng: The claim does not exist, is archived or does not belong to this tenant.
+      esp: El claim no existe, está archivado o no pertenece a este inquilino.
+      fra: Le claim n'existe pas, est archivé ou n'appartient pas à ce locataire.
+      deu: Der Claim existiert nicht, ist archiviert oder gehört nicht zu diesem Mandanten.
+      ita: Il claim non esiste, è archiviato o non appartiene a questo tenant.
+      nld: De claim bestaat niet, is gearchiveerd of hoort niet bij deze tenant.
+
+  - name: ClaimDoesNotApplyToUserNotification
+    semantic: validation
+    description: >-
+      The claim definition declares appliesTo: client, so no user may hold a value for it.
+      This is what finally makes appliesTo mean something instead of merely stating it.
+    text:
+      ptbr: Este claim não se aplica a usuários.
+      eng: This claim does not apply to users.
+      esp: Este claim no se aplica a usuarios.
+      fra: Ce claim ne s'applique pas aux utilisateurs.
+      deu: Dieser Claim gilt nicht für Benutzer.
+      ita: Questo claim non si applica agli utenti.
+      nld: Deze claim geldt niet voor gebruikers.
+
+  - name: ClaimValueDoesNotMatchValueTypeNotification
+    semantic: validation
+    description: >-
+      The value does not parse as the type the claim definition declares: a number that is
+      not a number, or a boolean that is neither true nor false. Deliberately a DISTINCT
+      type from the catalog's DefaultValueDoesNotMatchValueTypeNotification — same question,
+      two different subjects, and collapsing them would attach a level-1 refusal to a
+      level-2 field name.
+    text:
+      ptbr: O valor não corresponde ao tipo declarado no claim.
+      eng: The value does not match the type declared on the claim.
+      esp: El valor no corresponde al tipo declarado en el claim.
+      fra: La valeur ne correspond pas au type déclaré sur le claim.
+      deu: Der Wert entspricht nicht dem im Claim angegebenen Typ.
+      ita: Il valore non corrisponde al tipo dichiarato nel claim.
+      nld: De waarde komt niet overeen met het type dat op de claim is opgegeven.
+
 modes: [display, insert, update, archive]
 
 update:
@@ -791,6 +912,21 @@ rules:
       cap: 50
       notification: TooManyRolesForUserNotification
       description: at most 50 direct role grants on one user, counted over the whole collection.
+
+    # Twenty, not the fifty its two neighbours carry, and the difference is arithmetic
+    # rather than taste. A claim VALUE caps at 256 runes, so 20 entries is ~5 KB of level-1
+    # values alone — before the claim names, and before permissions, groups and roles which
+    # are already in the token. That fits the 8 KB header buffer nginx and most proxies
+    # default to; 50 would be ~12.8 KB and would stop being a cap in any real sense. It is
+    # also the cap ClientAllowedCIDR already uses, for the same reason: some collections
+    # ride in a header and some do not.
+    - id: claims-cap
+      kind: groupCap
+      scope: [insertOrUpdate]
+      fields: [Claims]
+      cap: 20
+      notification: TooManyClaimsForUserNotification
+      description: at most 20 claim values on one user, counted over the whole collection.
 
   manual:
     # The derivation the generator cannot write, and it covers FIVE server-assigned fields
@@ -892,6 +1028,56 @@ rules:
       scope: [insertOrUpdate]
       notification: CannotGrantRoleWithUnheldPermissionsNotification
       attachTo: Roles
+
+    # THE THREE CLAIM CHECKS. Each judges only the entries this write ADDS or CHANGES,
+    # never the ones already stored, and each mirrors role-available-in-tenant's shape.
+    #
+    # Availability is written first, as in the group and role triples. All three still run
+    # in one pass, so an unresolvable claim_id raises all three notifications rather than
+    # one — every fact answers "the problem is present" for an id it cannot resolve, which
+    # is the safe direction. That is the existing behaviour of the two triples above, not a
+    # new wart, and no guard is added here: a barrier would suppress the honest 422 the
+    # caller most needs.
+    #
+    # There is deliberately NO wildcard rule and NO escalation rule. Group and Role carry
+    # them because they confer permissions; a claim confers nothing inside this service —
+    # it is not in BuildRules, it gates no route, and there is no permission set to compare
+    # a caller against. What answers that worry is the verb: user:set-claim, its own.
+    - id: claim-available-in-tenant
+      description: >-
+        For every claim value this write ADDS or CHANGES: refuse when the claim id is absent
+        from the claims table, points at an archived definition, or belongs to a tenant other
+        than this user's. ONE answer for all three — a distinct "belongs to another tenant"
+        reply is an existence oracle over a competitor's claim vocabulary. Asks
+        ClaimIsUnavailableInTenant, and judges domain.GetAddedItemsOf and the changed entries
+        rather than the stored set.
+      scope: [insertOrUpdate]
+      notification: ClaimNotAvailableInTenantNotification
+      attachTo: Claims
+
+    - id: claim-applies-to-user
+      description: >-
+        For every claim value this write ADDS or CHANGES: refuse when the definition declares
+        appliesTo: client. user and both pass. This rule and its twin on Client are what make
+        appliesTo mean something — the README notes today that it states as data something
+        the code does not yet enforce. Asks ClaimDoesNotApplyToUser, which answers true for an
+        id it cannot resolve.
+      scope: [insertOrUpdate]
+      notification: ClaimDoesNotApplyToUserNotification
+      attachTo: Claims
+
+    - id: claim-value-matches-value-type
+      description: >-
+        For every claim value this write ADDS or CHANGES: refuse when the value does not parse
+        as the ValueType the definition declares. `number` accepts a valid decimal number,
+        `bool` accepts exactly "true" or "false", `string` accepts any non-empty value —
+        deliberately the SAME three readings the catalog's own
+        default-value-matches-value-type uses, because two levels of one chain must not
+        disagree about what a bool is. Read the enum member off the definition rather than its
+        raw string. Asks ClaimValueDoesNotMatchValueType.
+      scope: [insertOrUpdate]
+      notification: ClaimValueDoesNotMatchValueTypeNotification
+      attachTo: Claims
 
     # A MUTATION, not a validation: set the field and raise nothing. An archived user is
     # never active, so archived+active becomes unrepresentable rather than refused. It
@@ -996,6 +1182,119 @@ children:
           deu: Rolle
           ita: Ruolo
           nld: Rol
+
+  # LEVEL 1 of the claim chain: the specialised value, per principal. The catalog (Claim)
+  # is level 2 — the tenant-wide default — and this collection is what a resolution reads
+  # first. It changes NO token in this run by decision: buildClaims is untouched, so this
+  # can be filled, read and audited with no observable effect on anything issued.
+  #
+  # THE ONLY COLLECTION IN THIS SERVICE THAT MOUNTS `change`, and the reason is the entry's
+  # shape. On user_roles, user_groups, client_roles and role_permissions the single stored
+  # column IS the business identity, so a change would turn grant A into grant B while
+  # keeping A's row id — which an audit trail reads as one grant BECOMING another. Here the
+  # identity is the ClaimID and Value is a separate mutable column, so "correct this cost
+  # center" is genuinely one entry changing rather than a remove and an add.
+  - name: UserClaim
+    plural: Claims
+    table: user_claims
+    parentColumn: user_id
+    ownedBy: root
+    editStrategy: per-child
+    # THE CHANGE VERB IS A PATCH CARRYING ONLY `value`, and both halves of that
+    # are load-bearing.
+    #
+    # shape: patch — not `put`, not `both`. A PUT is a full replacement whose
+    # body is the entry's whole shape, so it would make the caller re-send the
+    # definition id on every correction, and it would let a correction move the
+    # entry to a DIFFERENT definition. Nothing here needs a full replacement:
+    # the entry has exactly one mutable field.
+    #
+    # patchExcludes: [ClaimID] — the definition an entry belongs to is fixed
+    # when the value is set. Excluding it means there is no field to send wrong
+    # rather than a rule refusing it when it is, which is the same reasoning
+    # this project already applies to Claim's own name and valueType.
+    #
+    # The framework's v0.63.0 guard is the floor under this, not a substitute
+    # for it: it refuses a replacement that would COLLIDE with another active
+    # entry's identity, and deliberately still lets a replacement reshape
+    # identity fields (a natural-key aggregate edits exactly those). So "one
+    # principal, at most one value per definition" is now the framework's to
+    # keep; "this entry never changes which definition it is for" is this
+    # exclusion's.
+    operations: [add, change, remove]
+    change:
+      shape: patch
+      patchExcludes: [ClaimID]
+    softRemove: true
+    archivedAt: deleted_at
+    # Over ClaimID ALONE, explicitly, for the reason UserGroup spells out: the entry also
+    # carries read-only join fields that are BLANK on a freshly added entry, so comparing
+    # everything would answer "different" for an addition that duplicates a stored one —
+    # the duplicate guard failing open. Value is excluded for a second reason of its own:
+    # two entries for the same definition with different values is exactly the collision
+    # the whole two-level chain exists to make impossible.
+    businessIdentity: [ClaimID]
+    duplicateNotification: UserAlreadyHoldsClaimNotification
+    # A VERB OF ITS OWN, not user:grant. The precedent is this service's own, opened on
+    # 2026-08-28: ClientAllowedCIDR refused client:grant and took client:manage-network,
+    # because folding a security control into the role verb hands everyone who manages
+    # roles a different blast radius. The same argument applies with one turn more —
+    # authcore cannot see what a consumer does with x_cost_center, so setting a value is
+    # potentially conferring privilege in a way THIS service cannot audit, and "may hand
+    # out roles" and "may set any claim on anybody" are not obviously the same job.
+    #
+    # ONE verb for all three operations, as on every other collection here. Splitting them
+    # would make this the only collection whose verbs disagree, and would leave the operator
+    # who set a wrong value unable to take it back.
+    permissions:
+      add: user:set-claim
+      change: user:set-claim
+      remove: user:set-claim
+    description: >-
+      The claim values set on this user directly — level 1 of the two-level chain, read
+      before the definition's tenant-wide default. One row per definition, holding the
+      definition's id and the value.
+    fields:
+      - name: ClaimID
+        type: id
+        column: claim_id
+        unique:
+          enforce: constraint-only
+          notification: UserAlreadyHoldsClaimNotification
+          scope: active-only
+        example: 0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17
+        description: >-
+          The claim definition this value belongs to — the id and not the name, so a
+          retired-and-recreated definition needs an explicit re-set rather than silently
+          inheriting a value written for the old one.
+        labelKey: UserClaimClaimIDField
+        text:
+          eng: Claim
+          ptbr: Claim
+          esp: Claim
+          fra: Claim
+          deu: Claim
+          ita: Claim
+          nld: Claim
+      - name: Value
+        type: string
+        column: value
+        length: 256
+        vo: {kind: raw, ref: ClaimValue}
+        example: "1000"
+        description: >-
+          The value this user carries for the definition above. Validated against the
+          definition's declared ValueType by a rule, since no value object can read another
+          aggregate's field.
+        labelKey: UserClaimValueField
+        text:
+          eng: Value
+          ptbr: Valor
+          esp: Valor
+          fra: Valeur
+          deu: Wert
+          ita: Valore
+          nld: Waarde
 
 joins:
   # The traversal into the OWNER, mirroring Role and Group. A ROOT join's fields ARE
@@ -1111,6 +1410,56 @@ joins:
           ita: Nome del ruolo
           nld: Rolnaam
 
+  # The forward walk into the CATALOG, so GET /users/:id names the claims a person holds
+  # with no second call. Same shape as the two above.
+  #
+  # inner is safe ONLY because claim_id is NOT NULL and FK-backed — inside a collection an
+  # inner join drops the ENTRY, which is a silent hole in the array rather than a missing
+  # user. LOAD-ONLY: a filter over these is a typed 400, the 1:N boundary and not the
+  # backing.
+  #
+  # ClaimName is the point — it is the string a consuming service greps for. ClaimValueType
+  # rides along because a stored "true" means nothing without knowing whether the definition
+  # is a bool or a string. AppliesTo, DefaultValue and the definition's deleted_at are NOT
+  # traversed: the first two belong to the catalog's own read, and republishing an owning
+  # aggregate's archive stamp through a neighbour is a back door to a decision already made
+  # the other way — the line UserGroup and UserRole both hold.
+  - kind: inner
+    to: Claim
+    inChild: Claims
+    on: claim_id
+    fields:
+      - name: ClaimName
+        column: name
+        example: x_cost_center
+        description: >-
+          The claim's exact name as a token would carry it, prefix included. Read-only,
+          filled on load.
+        labelKey: UserClaimClaimNameField
+        text:
+          eng: Claim name
+          ptbr: Nome do claim
+          esp: Nombre del claim
+          fra: Nom du claim
+          deu: Claim-Name
+          ita: Nome del claim
+          nld: Claimnaam
+      - name: ClaimValueType
+        column: value_type
+        example: string
+        description: >-
+          What the value beside it must parse as, per the definition. Read-only, filled on
+          load — a stored "true" is unreadable without it.
+        labelKey: UserClaimClaimValueTypeField
+        text:
+          eng: Value type
+          ptbr: Tipo do valor
+          esp: Tipo de valor
+          fra: Type de valeur
+          deu: Werttyp
+          ita: Tipo di valore
+          nld: Waardetype
+
 service:
   required: true
   facts:
@@ -1225,6 +1574,41 @@ service:
       description: >-
         Whether the requesting caller fails to hold at least one of the permissions this role
         grants. Shares RoleGrantsWildcard's single read, and guards the wildcard itself.
+
+    # Three per-entry facts for the claims collection, asked once per entry, only about the
+    # entries a write adds or changes. ONE read of claims by primary key answers all three —
+    # memoise per request, the same note the group pair above carries.
+    #
+    # All three answer TRUE — "the problem is present" — for an id they cannot resolve, and
+    # all three are NAMED FOR THE PROBLEM so the generated suite's stub, which answers
+    # "nothing found", reads them as "nothing wrong" and the happy path passes on the day it
+    # is written.
+    - name: ClaimIsUnavailableInTenant
+      kind: manual
+      returns: bool
+      filters: [TenantID, Claims.ClaimID]
+      description: >-
+        Whether this claim id is absent from the claims table, points at an archived
+        definition, or belongs to a tenant OTHER than the one passed. One answer for all
+        three — the caller-facing message must not distinguish them.
+
+    - name: ClaimDoesNotApplyToUser
+      kind: manual
+      returns: bool
+      filters: [Claims.ClaimID]
+      description: >-
+        Whether the definition behind this id declares appliesTo: client, so no user may hold
+        a value for it. user and both answer false. Answers TRUE for an unknown id.
+
+    - name: ClaimValueDoesNotMatchValueType
+      kind: manual
+      returns: bool
+      filters: [Claims.ClaimID, Claims.Value]
+      description: >-
+        Whether the value fails to parse as the ValueType the definition declares: `number`
+        wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants
+        any non-empty value. The same three readings the catalog's own default-value check
+        uses. Answers TRUE for an unknown id.
 
 read:
   backing: relational

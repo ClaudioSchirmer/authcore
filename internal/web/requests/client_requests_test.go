@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:8693c466a9304142aa733186191ca4bdd85742aa6f3985ea69a9bd49246a1910
+// checksum:   sha256:555563616be1afd82c8b0967d52dc235ddacee9f139e17764b7e31fdff608965
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -44,6 +44,10 @@ func TestInsertClientRequest_CarriesEveryField(t *testing.T) {
 		CIDR:  "203.0.113.0/24",
 		Label: "NAT gateway, sa-east-1",
 	}}
+	r.Claims = []ClientClaimRequest{{
+		ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+		Value:   "sa-east-1",
+	}}
 	cmd := r.ToCommand()
 	if cmd == nil {
 		t.Fatal("the mapper produced no command")
@@ -53,6 +57,9 @@ func TestInsertClientRequest_CarriesEveryField(t *testing.T) {
 	}
 	if len(cmd.AllowedCIDRs) != 1 {
 		t.Errorf("the ClientAllowedCIDR collection did not reach the command")
+	}
+	if len(cmd.Claims) != 1 {
+		t.Errorf("the ClientClaim collection did not reach the command")
 	}
 	if cmd.Name != r.Name {
 		t.Errorf("Name did not reach the command")
@@ -293,6 +300,144 @@ func TestRemoveClientAllowedCIDRGraphQLRequest_NamesTheEntry(t *testing.T) {
 // which is exactly why it is asserted rather than assumed.
 func TestRemoveClientAllowedCIDRGraphQLResponse_Acknowledges(t *testing.T) {
 	if !(RemoveClientAllowedCIDRGraphQLResponse{}).FromResult(fwresults.None{}).Success {
+		t.Error("a successful removal answered success: false")
+	}
+}
+
+// AddClientClaimRequest carries the entry into its command.
+//
+// The body is the same entry shape the root's own body carries, so a field
+// forgotten here is saved as missing on a request that answered 201.
+func TestAddClientClaimRequest_CarriesEveryField(t *testing.T) {
+	r := AddClientClaimRequest{ClientClaimRequest: ClientClaimRequest{
+		ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+		Value:   "sa-east-1",
+	}}
+	cmd := r.ToCommand()
+	if cmd.ClaimID != domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17") {
+		t.Errorf("ClaimID did not reach the command")
+	}
+	if cmd.Value != "sa-east-1" {
+		t.Errorf("Value did not reach the command")
+	}
+}
+
+// PatchClientClaimRequest names the entry AND carries what may change.
+//
+// The id comes from the path and the body is partial, so an id that does not
+// reach the command patches the wrong entry, or none.
+func TestPatchClientClaimRequest_CarriesTheEntryAndItsID(t *testing.T) {
+	r := PatchClientClaimRequest{ClientClaimID: "01890000-0000-7000-8000-000000000000",
+		Value: func() *string { v := string("sa-east-1"); return &v }(),
+	}
+	cmd := r.ToCommand()
+	if cmd.ClientClaimID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be patched")
+	}
+	if cmd.Value == nil || *cmd.Value != "sa-east-1" {
+		t.Errorf("Value did not reach the command")
+	}
+}
+
+// The ClientClaim responses carry the stored entry back to the caller.
+//
+// The entry comes back with the id the SERVER minted, which is how the caller
+// addresses it afterwards — a response mapper that drops it answers 201 with
+// nothing to act on.
+func TestAddClientClaimResponse_CarriesTheStoredEntry(t *testing.T) {
+	ownerID := domain.NewRandomID()
+	entryID := domain.NewRandomID()
+	res := AddClientClaimResponse{}.FromResult(commands.AddClientClaimResult{
+		ClientID: ownerID,
+		ClientClaim: commands.ClientClaimResult{ID: entryID,
+			ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+			Value:   "sa-east-1",
+		},
+	})
+	if res.ClientID != ownerID {
+		t.Error("the owner id did not reach the response")
+	}
+	if res.ClientClaim.ID != entryID {
+		t.Error("the entry id the server minted did not reach the response")
+	}
+	if res.ClientClaim.ClaimID != domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17") {
+		t.Errorf("ClaimID did not reach the response")
+	}
+	if res.ClientClaim.Value != "sa-east-1" {
+		t.Errorf("Value did not reach the response")
+	}
+}
+
+// The PatchClientClaim response carries the entry back WHOLE, with the id it
+// keeps.
+//
+// A partial change answers with the entry as stored, which is how the caller
+// sees what the fields they did not send actually hold.
+func TestPatchClientClaimResponse_CarriesTheStoredEntry(t *testing.T) {
+	ownerID := domain.NewRandomID()
+	entryID := domain.NewRandomID()
+	res := PatchClientClaimResponse{}.FromResult(commands.PatchClientClaimResult{
+		ClientID: ownerID,
+		ClientClaim: commands.ClientClaimResult{ID: entryID,
+			ClaimID: domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"),
+			Value:   "sa-east-1",
+		},
+	})
+	if res.ClientID != ownerID {
+		t.Error("the owner id did not reach the response")
+	}
+	if res.ClientClaim.ID != entryID {
+		t.Error("the entry kept its id and the response did not carry it")
+	}
+	if res.ClientClaim.ClaimID != domain.NewID("0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17") {
+		t.Errorf("ClaimID did not reach the response")
+	}
+	if res.ClientClaim.Value != "sa-east-1" {
+		t.Errorf("Value did not reach the response")
+	}
+}
+
+// RemoveClientClaimRequest carries the addressed entry into its command.
+func TestRemoveClientClaimRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveClientClaimRequest{ClientClaimID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().ClientClaimID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// PatchClientClaimGraphQLRequest carries the entry id from the INPUT.
+//
+// Same command as its REST twin; the difference is where the id comes from,
+// and that difference is the reason this type exists at all.
+func TestPatchClientClaimGraphQLRequest_CarriesTheEntryAndItsID(t *testing.T) {
+	r := PatchClientClaimGraphQLRequest{ClientClaimID: "01890000-0000-7000-8000-000000000000",
+		Value: func() *string { v := string("sa-east-1"); return &v }(),
+	}
+	cmd := r.ToCommand()
+	if cmd.ClientClaimID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be patched")
+	}
+	if cmd.Value == nil || *cmd.Value != "sa-east-1" {
+		t.Errorf("Value did not reach the command")
+	}
+}
+
+// RemoveClientClaimGraphQLRequest names the entry through its input.
+func TestRemoveClientClaimGraphQLRequest_NamesTheEntry(t *testing.T) {
+	r := RemoveClientClaimGraphQLRequest{ClientClaimID: "01890000-0000-7000-8000-000000000000"}
+	if r.ToCommand().ClientClaimID != "01890000-0000-7000-8000-000000000000" {
+		t.Error("the entry id did not reach the command, so the wrong entry would be removed")
+	}
+}
+
+// RemoveClientClaimGraphQLResponse acknowledges, since a mutation must answer
+// something.
+//
+// Its REST twin answers 204 with no body at all. This one is the only
+// projection in the collection's wire types that is not the generic mapper,
+// which is exactly why it is asserted rather than assumed.
+func TestRemoveClientClaimGraphQLResponse_Acknowledges(t *testing.T) {
+	if !(RemoveClientClaimGraphQLResponse{}).FromResult(fwresults.None{}).Success {
 		t.Error("a successful removal answered success: false")
 	}
 }

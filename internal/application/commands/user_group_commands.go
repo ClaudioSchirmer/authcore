@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:e6d3208ef34380a9439a957f5fb85477e73c217438b6831e42db4666918e8149
+// checksum:   sha256:c80e7d3a742cc51cfd14f091836556c96b68c4c550ab7f0bb3bd48c3452b4a10
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,13 +17,14 @@
 package commands
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 )
 
 // AddUserGroupCommand adds ONE entry to User's groups.

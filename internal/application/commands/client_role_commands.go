@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-28
-// checksum:   sha256:da36e2ce69c2e8d83b191db6f9965c4e0fa60b58bd23af53bdb8d276bdd20beb
+// checksum:   sha256:eb3c4f870bfad6aff55f6cd5e7649fec1f8edd1e475c87342709f80b04caf2fa
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -17,13 +17,14 @@
 package commands
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 	fwresults "github.com/ClaudioSchirmer/omnicore/application/results"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 )
 
 // AddClientRoleCommand adds ONE entry to Client's roles.

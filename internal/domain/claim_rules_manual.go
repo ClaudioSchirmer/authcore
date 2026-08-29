@@ -57,6 +57,10 @@ func (e *Claim) customRules(actionName string, service domain.Service, r *domain
 		}
 	})
 
+	r.IfUpdate(func() {
+		e.refuseNarrowingAppliesToWithHeldValues(service.(ClaimService), r)
+	})
+
 	r.IfInsertOrUpdate(func() {
 		// ── default-value-matches-value-type ──
 		// The default must parse as the declared ValueType. A NULL default is
@@ -66,14 +70,27 @@ func (e *Claim) customRules(actionName string, service domain.Service, r *domain
 		if e.DefaultValue == nil {
 			return
 		}
-		if !defaultValueMatchesValueType(e.ValueType, *e.DefaultValue) {
+		if !ClaimValueMatchesValueType(e.ValueType, *e.DefaultValue) {
 			r.AddNotification("DefaultValue", DefaultValueDoesNotMatchValueTypeNotification{}, *e.DefaultValue)
 		}
 	})
 }
 
-// defaultValueMatchesValueType reports whether a default parses as the type the
+// ClaimValueMatchesValueType reports whether a value parses as the type a claim
 // definition declares.
+//
+// EXPORTED, and it serves BOTH LEVELS OF THE CHAIN. Level 2 is the caller right
+// above — claims.default_value, judged by this entity's own rule. Level 1 is
+// user_claims.value and client_claims.value, judged out in internal/infra by
+// the ClaimValueDoesNotMatchValueType fact each parent's service adapter
+// implements, which calls this same function after reading the definition's
+// value_type.
+//
+// One function rather than two identical switches, deliberately: "the same
+// three readings at both levels" is a promise the chain depends on — two levels
+// disagreeing about what a bool is would mean a value the catalog accepted as a
+// default is refused as a specialised value, or the reverse — and a second copy
+// is a rule that can drift from the first.
 //
 // It switches on the ENUM MEMBER rather than on the raw string, which is what
 // makes the last branch correct instead of merely permissive: a ValueType
@@ -84,11 +101,14 @@ func (e *Claim) customRules(actionName string, service domain.Service, r *domain
 //
 // NOTHING IS TRIMMED, matching the rest of this entity: " 1000" is not a
 // number, and repairing it here would store a value the caller did not send.
-func defaultValueMatchesValueType(valueType vos.ClaimValueType, value string) bool {
+func ClaimValueMatchesValueType(valueType vos.ClaimValueType, value string) bool {
 	switch valueType {
 	case vos.ClaimValueTypeString:
-		// Non-empty, because an empty default is not "no default" — that is
-		// what NULL is for, and the two reach a consumer differently.
+		// Non-empty. At level 2 that is because an empty default is not "no
+		// default" — NULL is what says that, and the two reach a consumer
+		// differently. At level 1 the ClaimValue value object already refuses
+		// an empty value before this is asked, so the branch is agreement
+		// rather than a second gate.
 		return value != ""
 
 	case vos.ClaimValueTypeNumber:
@@ -113,4 +133,98 @@ func defaultValueMatchesValueType(valueType vos.ClaimValueType, value string) bo
 		// doc comment above.
 		return true
 	}
+}
+
+// refuseNarrowingAppliesToWithHeldValues is the other half of
+// value-type-immutable: the second way an edit to this row can retro-invalidate
+// values already stored on the two edge collections.
+//
+// AppliesTo is mutable, and deliberately so — widening is the ordinary
+// operational move, a definition that started `user` becoming `both` the day
+// the machine side of an integration arrives. But the field is mutable in BOTH
+// directions, and narrowing is not symmetric with widening: narrowing `both` to
+// `user` while client_claims rows hold values for this definition STRANDS them.
+// They stay in the table, they stay readable on GET /clients/:id, and they would
+// be refused by claim-applies-to-client if anybody tried to write them. Nothing
+// complains, and without this rule nothing ever would.
+//
+// SIX transitions are possible and FOUR of them narrow — both->user and
+// both->client drop one kind each, and user->client and client->user drop one
+// each as well. The cross pair is the one a rule written as "did it lose Both?"
+// would miss, which is why this asks what the NEW value admits rather than what
+// the old one was.
+//
+// A definition nobody holds a value for narrows freely, and that has to keep
+// working: refusing every narrowing would make the field effectively immutable,
+// which the model gate decided the other way.
+//
+// ARCHIVE is deliberately not covered. Archiving a definition while principals
+// hold values is an ALREADY-ACCEPTED state: archive is one-way here, a retired
+// definition comes back as a NEW row with a NEW id precisely so an edge holding
+// the old id cannot silently re-attach, and writes against an archived
+// definition are already refused by claim-available-in-tenant on both parents.
+// Narrowing is different because it leaves the definition LIVE and the values
+// INVISIBLE — the row is neither refused nor retired, it just quietly stops
+// meaning anything.
+func (e *Claim) refuseNarrowingAppliesToWithHeldValues(service ClaimService, r *domain.Rules) {
+	if service == nil {
+		return
+	}
+
+	// domain.Old is the pre-write snapshot, and the same accessor the three
+	// generated immutability rules above read. It is nil on an insert, which
+	// this gate never sees, and on an update the framework could not load —
+	// there is nothing to compare against either way.
+	old := domain.Old(e)
+	if old == nil {
+		return
+	}
+
+	// Staying put asks nothing. Neither does a widening — and the two are the
+	// same test, because "still admits everything it used to" covers both.
+	if old.AppliesTo == e.AppliesTo {
+		return
+	}
+
+	// The ENUM MEMBER, not the raw string: a value outside the closed set
+	// converges to the Unknown sentinel, which the framework's automatic
+	// value-object pass already answers with UnknownClaimAppliesToNotification.
+	// Reading the raw string here would refuse the same bad field twice, in two
+	// different sentences.
+	dropsUsers := ClaimAdmitsUsers(old.AppliesTo) && !ClaimAdmitsUsers(e.AppliesTo)
+	dropsClients := ClaimAdmitsClients(old.AppliesTo) && !ClaimAdmitsClients(e.AppliesTo)
+
+	// Ask ONLY about the kinds this change actually drops. A widening reaches
+	// neither branch and queries nothing at all, which is the property the
+	// tests assert on the stub's call count rather than on the outcome: a
+	// widening that queries two tables is a correctness bug no assertion about
+	// the answer would catch.
+	name := e.Name.Value()
+	if dropsUsers && service.ClaimIsHeldByAUser(e.TenantID, name) {
+		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+		return
+	}
+	if dropsClients && service.ClaimIsHeldByAClient(e.TenantID, name) {
+		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+	}
+}
+
+// ClaimAdmitsUsers and ClaimAdmitsClients read one enum member as the two
+// questions the chain actually asks of it.
+//
+// EXPORTED, and shared by three callers rather than inlined at each: the
+// narrowing guard above compares old against new for each kind, and each
+// parent's ClaimDoesNotApplyTo… fact in internal/infra asks the same question of
+// the definition an entry points at. Written out five times it is a comparison
+// that can be written wrong once — and the failure would be silent in the worst
+// direction, letting a client hold a user-only claim.
+//
+// The Unknown sentinel admits NOBODY, by falling through both: a value outside
+// the closed set is not a permission to hold anything.
+func ClaimAdmitsUsers(v vos.ClaimAppliesTo) bool {
+	return v == vos.ClaimAppliesToUser || v == vos.ClaimAppliesToBoth
+}
+
+func ClaimAdmitsClients(v vos.ClaimAppliesTo) bool {
+	return v == vos.ClaimAppliesToClient || v == vos.ClaimAppliesToBoth
 }

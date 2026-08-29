@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-26
-// checksum:   sha256:751b7db8fa3ea08ebcd1993b2c6c94b83abcfa88100fdd851a0a5f70ff38043f
+// generated:  2026-08-28
+// checksum:   sha256:3c156c8a51c4b19e6fcbf7ca345e177e41ef80a1c800bf5d0136f771c0260dde
 //
 // The checksum covers this file with the checksum line itself blanked. The
 // generator recomputes it before every write: if it does not match, the file
@@ -70,6 +70,7 @@ type FindClientByIDResponse struct {
 	TenantWorkspace         string                 `json:"tenantWorkspace" exportLabelKey:"ClientTenantWorkspaceField" example:"acme-comercio"`
 	Roles                   []ClientRoleRow        `json:"roles"`
 	AllowedCIDRs            []ClientAllowedCIDRRow `json:"allowedCIDRs"`
+	Claims                  []ClientClaimRow       `json:"claims"`
 }
 
 // FromResult projects the application Result onto FindClientByIDResponse.
