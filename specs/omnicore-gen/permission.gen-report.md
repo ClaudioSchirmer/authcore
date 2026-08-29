@@ -87,6 +87,23 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 
 ## What to check
 
+### Read what was generated — it is a first draft, not a verdict
+
+This tree is ordinary Go in your repository. **`// Code generated … DO NOT EDIT.` is the Go convention that tells linters to skip a file — it is not a rule that the code may not change.** Review it the way you would review a colleague's: for logic, and for the QUESTION each query asks.
+
+Measure it against what the FRAMEWORK offers, not against what the spec language can say — the language is a subset of the framework and always will be, so "the generator does not emit that" is a fact about the generator and never a reason for the service to do the worse thing. If something here should be a single pass over the table instead of several, or a primitive the framework ships and this spec cannot name, that is worth changing.
+
+Two ways to change it, and the only reason to prefer the first is cost:
+
+1. **Change the spec and regenerate** — survives every later run and every upgrade, and leaves nothing to maintain. Check `omnicore-gen explain keys` before assuming the language cannot say it.
+2. **Edit the file, then adopt it** — normal and expected when the framework can do it and the spec cannot say it:
+
+   ```
+   omnicore-gen adopt <path> -why '<what the spec could not express>'
+   ```
+
+   Adopting re-hashes the file as it stands, so regeneration KEEPS the edit; without it the next run stops rather than overwriting your work. The cost is real and worth saying out loud: an adopted file is PINNED — it stops tracking the spec, so a later framework version's improvements to it never arrive. Every later `generate` prints the file as adopted and `doctor` lists it, which is how it stays visible.
+
 - **Are `resource`, `action` the names you want on the wire?** They are the parts of the composite value object `PermissionKey`, and they are the ONLY names the outside world ever sees — the filter, `?fields=`, `orderBy`, the JSON field, the export column and the projected document key — because nothing above the schema learns a composite exists. Renaming one later is a wire break, not a refactor. The value object is mandatory — it is always there, and each part follows its own type.
 
 These are the decisions the spec made that are expensive to change later. Read them against what you actually meant.
@@ -116,6 +133,29 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the permissions feature (repository + view + mount) | `bootstrap/permissions_feature.go` |
+| the archive command and result | `internal/application/commands/archive_permission_command.go` |
+| the insert command and result | `internal/application/commands/insert_permission_command.go` |
+| the patch command and result | `internal/application/commands/patch_permission_command.go` |
+| tests for the command mappers | `internal/application/commands/permission_commands_test.go` |
+| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
+| the read criteria tests | `internal/application/queries/permission_queries_test.go` |
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/permission_translations_test.go` |
+| the Permission aggregate root, its modes and its rules | `internal/domain/permission.go` |
+| the Permission service port (1 fact(s)) | `internal/domain/permission_service.go` |
+| tests for Permission's rules | `internal/domain/permission_test.go` |
+| the Permission repository and its constraint bindings | `internal/infra/permission_repository.go` |
+| the Permission service implementation | `internal/infra/permission_service.go` |
+| the permissions schema (3 columns) | `internal/infra/schemas/permission_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/permission_schemas_test.go` |
+| the permissions view (relational-backed) | `internal/infra/views/permission_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/permission_view_test.go` |
+| the 5 permission endpoints | `internal/web/permission_routes.go` |
+| the by-id request and response | `internal/web/requests/find_permission_by_id.go` |
+| the listing request and response | `internal/web/requests/find_permissions_by_params.go` |
+| the insert request and response | `internal/web/requests/insert_permission.go` |
+| the patch request and response | `internal/web/requests/patch_permission.go` |
 | the request mapper tests | `internal/web/requests/permission_requests_test.go` |
 
 **Left untouched** (yours, by design):
@@ -125,7 +165,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-24 file(s) were already up to date.
+1 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -140,9 +180,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.62.0)
+Verdict: **exact** (project pins v0.63.0)
 
-framework v0.62.0 meets the required v0.62.0
+framework v0.63.0 meets the required v0.63.0
 
 Verify what was generated:
 

@@ -144,6 +144,23 @@ The verbs that address ONE entry — add, remove — have generated tests in `in
 
 ## What to check
 
+### Read what was generated — it is a first draft, not a verdict
+
+This tree is ordinary Go in your repository. **`// Code generated … DO NOT EDIT.` is the Go convention that tells linters to skip a file — it is not a rule that the code may not change.** Review it the way you would review a colleague's: for logic, and for the QUESTION each query asks.
+
+Measure it against what the FRAMEWORK offers, not against what the spec language can say — the language is a subset of the framework and always will be, so "the generator does not emit that" is a fact about the generator and never a reason for the service to do the worse thing. If something here should be a single pass over the table instead of several, or a primitive the framework ships and this spec cannot name, that is worth changing.
+
+Two ways to change it, and the only reason to prefer the first is cost:
+
+1. **Change the spec and regenerate** — survives every later run and every upgrade, and leaves nothing to maintain. Check `omnicore-gen explain keys` before assuming the language cannot say it.
+2. **Edit the file, then adopt it** — normal and expected when the framework can do it and the spec cannot say it:
+
+   ```
+   omnicore-gen adopt <path> -why '<what the spec could not express>'
+   ```
+
+   Adopting re-hashes the file as it stands, so regeneration KEEPS the edit; without it the next run stops rather than overwriting your work. The cost is real and worth saying out loud: an adopted file is PINNED — it stops tracking the spec, so a later framework version's improvements to it never arrive. Every later `generate` prints the file as adopted and `doctor` lists it, which is how it stays visible.
+
 These are the decisions the spec made that are expensive to change later. Read them against what you actually meant.
 
 | Decision | Value | Why it matters |
@@ -177,10 +194,38 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the groups feature (repository + view + mount) | `bootstrap/groups_feature.go` |
+| the archive command and result | `internal/application/commands/archive_group_command.go` |
+| the shapes for 1 child collection(s) | `internal/application/commands/group_child_results.go` |
 | tests for the command mappers | `internal/application/commands/group_commands_test.go` |
+| the per-entry commands for group_roles | `internal/application/commands/group_role_commands.go` |
 | the insert command and result | `internal/application/commands/insert_group_command.go` |
 | the patch command and result | `internal/application/commands/patch_group_command.go` |
+| tests for the 1 collection input mapper(s) | `internal/application/dtos/group_dtos_test.go` |
+| the GroupRole input DTO | `internal/application/dtos/group_role_input.go` |
+| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
+| the read criteria tests | `internal/application/queries/group_queries_test.go` |
+| the read shapes for 1 child collection(s) | `internal/application/queries/group_row_results.go` |
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/group_translations_test.go` |
+| tests for the collection types | `internal/domain/aggregatevos/group_children_test.go` |
+| the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
+| the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
+| the Group service port (5 fact(s)) | `internal/domain/group_service.go` |
+| tests for Group's rules | `internal/domain/group_test.go` |
+| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
+| the Group service implementation | `internal/infra/group_service.go` |
+| the group_roles child schema | `internal/infra/schemas/group_role_schema.go` |
+| the groups schema (4 columns) | `internal/infra/schemas/group_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/group_schemas_test.go` |
+| the groups view (relational-backed) | `internal/infra/views/group_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/group_view_test.go` |
+| the 5 group endpoints | `internal/web/group_routes.go` |
+| the by-id request and response | `internal/web/requests/find_group_by_id.go` |
+| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
+| the wire types for 1 child collection(s) | `internal/web/requests/group_children.go` |
 | the request mapper tests | `internal/web/requests/group_requests_test.go` |
+| the per-entry wire types for group_roles | `internal/web/requests/group_role_requests.go` |
 | the insert request and response | `internal/web/requests/insert_group.go` |
 | the patch request and response | `internal/web/requests/patch_group.go` |
 
@@ -191,7 +236,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-29 file(s) were already up to date.
+1 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -206,9 +251,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.62.0)
+Verdict: **exact** (project pins v0.63.0)
 
-framework v0.62.0 meets the required v0.62.0
+framework v0.63.0 meets the required v0.63.0
 
 Verify what was generated:
 

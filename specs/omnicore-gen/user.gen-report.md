@@ -337,6 +337,23 @@ The verbs that address ONE entry — add, change, remove — have generated test
 
 ## What to check
 
+### Read what was generated — it is a first draft, not a verdict
+
+This tree is ordinary Go in your repository. **`// Code generated … DO NOT EDIT.` is the Go convention that tells linters to skip a file — it is not a rule that the code may not change.** Review it the way you would review a colleague's: for logic, and for the QUESTION each query asks.
+
+Measure it against what the FRAMEWORK offers, not against what the spec language can say — the language is a subset of the framework and always will be, so "the generator does not emit that" is a fact about the generator and never a reason for the service to do the worse thing. If something here should be a single pass over the table instead of several, or a primitive the framework ships and this spec cannot name, that is worth changing.
+
+Two ways to change it, and the only reason to prefer the first is cost:
+
+1. **Change the spec and regenerate** — survives every later run and every upgrade, and leaves nothing to maintain. Check `omnicore-gen explain keys` before assuming the language cannot say it.
+2. **Edit the file, then adopt it** — normal and expected when the framework can do it and the spec cannot say it:
+
+   ```
+   omnicore-gen adopt <path> -why '<what the spec could not express>'
+   ```
+
+   Adopting re-hashes the file as it stands, so regeneration KEEPS the edit; without it the next run stops rather than overwriting your work. The cost is real and worth saying out loud: an adopted file is PINNED — it stops tracking the spec, so a later framework version's improvements to it never arrive. Every later `generate` prints the file as adopted and `doctor` lists it, which is how it stays visible.
+
 - **Is the set of Email, ClaimValue really open?** They are declared as shapes (`kind: raw`), so anything matching the pattern is accepted. If the valid values are FINITE and known — a state code, a status, a category — it is an `enum` instead: the caller gets the list in OpenAPI, the code gets named constants, and an out-of-set value converges to Unknown rather than being stored.
 
 - **Are `givenName`, `familyName` the names you want on the wire?** They are the parts of the composite value object `PersonName`, and they are the ONLY names the outside world ever sees — the filter, `?fields=`, `orderBy`, the JSON field, the export column and the projected document key — because nothing above the schema learns a composite exists. Renaming one later is a wire break, not a refactor. The value object is mandatory — it is always there, and each part follows its own type.
@@ -383,11 +400,49 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the users feature (repository + view + mount) | `bootstrap/users_feature.go` |
+| the archive command and result | `internal/application/commands/archive_user_command.go` |
+| the insert command and result | `internal/application/commands/insert_user_command.go` |
+| the patch command and result | `internal/application/commands/patch_user_command.go` |
+| the shapes for 3 child collection(s) | `internal/application/commands/user_child_results.go` |
 | the per-entry commands for user_claims | `internal/application/commands/user_claim_commands.go` |
 | tests for the command mappers | `internal/application/commands/user_commands_test.go` |
 | the per-entry commands for user_groups | `internal/application/commands/user_group_commands.go` |
 | the per-entry commands for user_roles | `internal/application/commands/user_role_commands.go` |
+| the UserClaim input DTO | `internal/application/dtos/user_claim_input.go` |
+| tests for the 3 collection input mapper(s) | `internal/application/dtos/user_dtos_test.go` |
+| the UserGroup input DTO | `internal/application/dtos/user_group_input.go` |
+| the UserRole input DTO | `internal/application/dtos/user_role_input.go` |
+| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
+| the read criteria tests | `internal/application/queries/user_queries_test.go` |
+| the read shapes for 3 child collection(s) | `internal/application/queries/user_row_results.go` |
+| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/user_translations_test.go` |
+| tests for the collection types | `internal/domain/aggregatevos/user_children_test.go` |
+| the UserClaim child value object | `internal/domain/aggregatevos/user_claim.go` |
+| the UserGroup child value object | `internal/domain/aggregatevos/user_group.go` |
+| the UserRole child value object | `internal/domain/aggregatevos/user_role.go` |
 | the User aggregate root, its modes and its rules | `internal/domain/user.go` |
+| the User service port (13 fact(s)) | `internal/domain/user_service.go` |
+| tests for User's rules | `internal/domain/user_test.go` |
+| the ClaimValue value object | `internal/domain/vos/claim_value.go` |
+| the Email value object | `internal/domain/vos/email.go` |
+| the UserStatus enumeration (2 members) | `internal/domain/vos/user_status.go` |
+| tests for 3 value object(s) | `internal/domain/vos/user_vos_test.go` |
+| the user_claims child schema | `internal/infra/schemas/user_claim_schema.go` |
+| the user_groups child schema | `internal/infra/schemas/user_group_schema.go` |
+| the user_roles child schema | `internal/infra/schemas/user_role_schema.go` |
+| the users schema (9 columns) | `internal/infra/schemas/user_schema.go` |
+| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/user_schemas_test.go` |
+| the User repository and its constraint bindings | `internal/infra/user_repository.go` |
+| the User service implementation | `internal/infra/user_service.go` |
+| the users view (relational-backed) | `internal/infra/views/user_view.go` |
+| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/user_view_test.go` |
+| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
+| the listing request and response | `internal/web/requests/find_users_by_params.go` |
+| the insert request and response | `internal/web/requests/insert_user.go` |
+| the patch request and response | `internal/web/requests/patch_user.go` |
+| the wire types for 3 child collection(s) | `internal/web/requests/user_children.go` |
 | the per-entry wire types for user_claims | `internal/web/requests/user_claim_requests.go` |
 | the per-entry wire types for user_groups | `internal/web/requests/user_group_requests.go` |
 | the request mapper tests | `internal/web/requests/user_requests_test.go` |
@@ -402,7 +457,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-39 file(s) were already up to date.
+1 file(s) were already up to date.
 
 ## What was NOT generated
 
