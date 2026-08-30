@@ -86,11 +86,30 @@ const (
 	LockoutWindow    = 15 * time.Minute
 )
 
+// SQLSeam is the sliver of the relational engine this store uses: the neutral
+// read surface and the dialect that renders the engine-specific bits.
+//
+// core.RelationalEngine satisfies it, so nothing at the call site changes. What
+// it buys is that the engine's typed write verbs, the audit wiring and the rebuild
+// lock stay out of reach of a component that has no aggregate to write and no view
+// to rebuild — and that a test fakes two methods instead of eleven.
+//
+// IT LIVES HERE BECAUSE THIS IS NOW ITS ONLY USER. The refresh token store shared
+// it until it moved onto a DirectRepository, which reaches the engine through the
+// framework's own vocabulary and needs the whole of it to open a transaction. This
+// store cannot follow: its writes are upserts with arithmetic in the conflict
+// branch, and the Direct write verbs take values, not expressions, and offer no
+// upsert at all. Until they do, this seam is what keeps the reach honest.
+type SQLSeam interface {
+	Querier() core.Querier
+	Dialect() core.Dialect
+}
+
 // AuthenticationAttemptStore keeps the counters and answers the lockout question.
 //
-// It takes the same narrow SQLSeam the refresh store does: two methods, no typed
-// write verbs, no rebuild lock. A component whose entire job is one upsert and
-// one point lookup has no business holding the engine's write surface.
+// It takes the narrow SQLSeam above: two methods, no typed write verbs, no
+// rebuild lock. A component whose entire job is one upsert and one point lookup
+// has no business holding the engine's write surface.
 //
 // EVERY STATEMENT IS RENDERED THROUGH THE DIALECT, none is written by hand for a
 // particular engine — including the upserts, which go through Dialect.BuildUpsert
