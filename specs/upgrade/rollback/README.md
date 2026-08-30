@@ -1,3 +1,4 @@
-previous omnicore pin: v0.62.0
-target: v0.63.0
+previous omnicore pin: v0.63.0
+target: v0.64.0
+snapshot taken before bump
 restore: cp specs/upgrade/rollback/go.mod go.mod && cp specs/upgrade/rollback/go.sum go.sum && go build -tags postgres ./...

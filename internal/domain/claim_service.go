@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:a57e75436a8756dcf1fc4bff79d66a450b6d5546284fed20f31aa36a031f2747
+// checksum:   sha256:54694b5c4fbfa9061b3a90b9aa0cc1314d998a1a2378d824595d5fe3e15ddf4e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -47,23 +47,30 @@ type ClaimService interface {
 	// is a live customer and is available.
 	TenantIsUnavailable(tenantID domain.ID) bool
 
-	// Whether any ACTIVE user_claims row references the ACTIVE claim
-	// definition identified by this tenant and name. Join user_claims to
-	// claims on claim_id and require user_claims.deleted_at IS NULL AND
-	// claims.deleted_at IS NULL — archived edges do not count, because a
-	// value somebody removed must not freeze the definition's shape, and the
-	// archived-definition half is what keeps a retired row's leftovers out of
-	// the answer.
-	ClaimIsHeldByAUser(tenantID domain.ID, name string) bool
+	// Whether any ACTIVE user_claims row references this claim definition.
+	// Read user_claims alone, by claim_id, requiring user_claims.deleted_at IS
+	// NULL — archived edges do not count, because a value somebody removed
+	// must not freeze the definition's shape.
+	ClaimIsHeldByAUser(id domain.ID) bool
 
-	// Whether any ACTIVE client_claims row references the ACTIVE claim
-	// definition identified by this tenant and name. Same join and the same
-	// two archive predicates as its user twin.
-	ClaimIsHeldByAClient(tenantID domain.ID, name string) bool
+	// Whether any ACTIVE client_claims row references this claim definition.
+	// Same single-table read and the same archive predicate as its user twin,
+	// on the other side of the chain.
+	ClaimIsHeldByAClient(id domain.ID) bool
 
-	// How many ACTIVE claim definitions of this tenant declare EXACTLY this
-	// AppliesTo member. The two catalog-cap rules add two of these answers to
-	// get a bucket: the user bucket is `user` + `both`, the client bucket is
-	// `client` + `both`.
-	ActiveClaimsWithAppliesTo(tenantID domain.ID, appliesTo string) int64
+	// How many ACTIVE claim definitions this tenant holds, per AppliesTo
+	// member, in ONE grouped query. The two catalog-cap rules fold the groups
+	// into their overlapping buckets: the user bucket is `user` + `both`, the
+	// client bucket is `client` + `both`.
+	ActiveClaimsByAppliesTo(tenantID domain.ID) []ClaimActiveClaimsByAppliesToGroup
+}
+
+// ClaimActiveClaimsByAppliesToGroup is one group of ActiveClaimsByAppliesTo:
+// the key, and this group's value.
+//
+// A group exists BECAUSE at least one row matched, so an empty set yields no
+// groups at all rather than a row of zeroes. The key is AppliesTo.
+type ClaimActiveClaimsByAppliesToGroup struct {
+	AppliesTo string
+	Value     int64
 }

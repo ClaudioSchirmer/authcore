@@ -344,15 +344,44 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 	// entity unusable on a bench that has no tokens.
 	identityGates := e.RequestingIdentityPresent
 
+	// USABLE IDS ONLY, and the filter runs BEFORE the questions rather than
+	// inside the loop. Every fact below hands these ids to a criterion against a
+	// UUID column, so a value uuid.Parse refuses makes the query error and the
+	// probe panic: a 500 on a request whose problem is plain validation. It
+	// raises nothing on purpose — the framework's own child validation reports
+	// the bad id.
+	judged := make([]aggregatevos.ClientRole, 0, len(added))
+	roleIDs := make([]domain.ID, 0, len(added))
 	for _, granted := range added {
-		// USABLE, not merely non-empty. Every probe below hands this id to a
-		// criterion against a UUID column, so a value uuid.Parse refuses makes
-		// the query error and the probe panic: a 500 on a request whose problem
-		// is plain validation. It raises nothing on purpose — the framework's
-		// own child validation reports the bad id.
 		if _, err := granted.RoleID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, granted)
+		roleIDs = append(roleIDs, granted.RoleID)
+	}
+	if len(judged) == 0 {
+		return
+	}
+
+	// THREE QUESTIONS, ASKED ONCE EACH FOR THE WHOLE COLLECTION. The facts are
+	// `perEntry`, so each answers a map keyed by the entry's id and the service
+	// resolves the set in one read — a client granted ten roles costs what one
+	// costs. The verdicts are still per entry: the loop below reads them.
+	//
+	// EVERY QUESTION IS ASKED OF EVERY ENTRY, including entries the first answer
+	// already refuses. There are no round trips left to save by skipping them,
+	// and the answers are identical — an unresolvable role reads TRUE from the
+	// wildcard fact either way. What did NOT change is what the caller is told:
+	// the interlock below still reports one problem per entry.
+	unavailable := service.RoleIsUnavailableInTenant(e.TenantID, roleIDs)
+	grantsWildcard := service.RoleGrantsWildcard(roleIDs)
+
+	var escalates map[domain.ID]bool
+	if identityGates {
+		escalates = service.CallerLacksAnyPermissionOfRole(roleIDs)
+	}
+
+	for _, granted := range judged {
 
 		// NEVER read granted.RoleKey / granted.RoleName here. They are read-join
 		// fields: filled on entries LOADED from the row, and blank on an entry
@@ -367,7 +396,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// The tenant asked about is the ROW's, not the caller's — a `*:*`
 		// super-admin crosses that scope, and when they do "this tenant" must
 		// mean the client's.
-		if service.RoleIsUnavailableInTenant(e.TenantID, granted.RoleID) {
+		if unavailable[granted.RoleID] {
 			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
 			continue
 		}
@@ -381,7 +410,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// A machine credential carrying *:* is the single worst thing this
 		// entity could mint: it never expires, nobody is watching it, and it
 		// outlives the person who created it.
-		if service.RoleGrantsWildcard(granted.RoleID) {
+		if grantsWildcard[granted.RoleID] {
 			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
 			continue
 		}
@@ -391,7 +420,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// one of them. A *:* superadmin passes by construction — HasPermission
 		// answers true for any concrete permission when the claim set contains
 		// the wildcard.
-		if identityGates && service.CallerLacksAnyPermissionOfRole(granted.RoleID) {
+		if escalates[granted.RoleID] {
 			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
 		}
 	}
@@ -449,13 +478,38 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		domain.GetChangedItemsOf[aggregatevos.ClientClaim](&e.AggregateRoot)...,
 	)
 
+	// USABLE IDS ONLY, filtered before anything is asked — every fact below
+	// hands these ids to a criterion against a UUID column. It raises nothing:
+	// the framework's own child validation reports the bad id.
+	//
+	// THE ENTRIES TRAVEL WHOLE, not as two parallel slices: the value-type
+	// question needs the id AND the value of the SAME entry, and the generated
+	// carrier is what keeps that pair from being misaligned by a caller.
+	judged := make([]aggregatevos.ClientClaim, 0, len(touched))
+	claimIDs := make([]domain.ID, 0, len(touched))
+	entries := make([]ClientClaimValueDoesNotMatchValueTypeEntry, 0, len(touched))
 	for _, held := range touched {
-		// USABLE, not merely non-empty — every probe below hands this id to a
-		// criterion against a UUID column. It raises nothing: the framework's
-		// own child validation reports the bad id.
 		if _, err := held.ClaimID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, held)
+		claimIDs = append(claimIDs, held.ClaimID)
+		entries = append(entries, ClientClaimValueDoesNotMatchValueTypeEntry{
+			ClaimID: held.ClaimID,
+			Value:   held.Value.Value(),
+		})
+	}
+	if len(judged) == 0 {
+		return
+	}
+
+	// THREE QUESTIONS, ASKED ONCE EACH, exactly as the role half above. One read
+	// of the catalog answers all three however many claims the write carries.
+	unavailable := service.ClaimIsUnavailableInTenant(e.TenantID, claimIDs)
+	notForClients := service.ClaimDoesNotApplyToClient(claimIDs)
+	valueMismatched := service.ClaimValueDoesNotMatchValueType(entries)
+
+	for _, held := range judged {
 
 		// NEVER read held.ClaimName / held.ClaimValueType here — read-join
 		// fields, blank on an entry this write just added. The type check asks
@@ -467,7 +521,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// Present, active, and owned by THIS CLIENT's tenant. One notification
 		// for all three: a distinct "belongs to another tenant" reply is an
 		// existence oracle over a competitor's claim vocabulary.
-		if service.ClaimIsUnavailableInTenant(e.TenantID, held.ClaimID) {
+		if unavailable[held.ClaimID] {
 			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
 			continue
 		}
@@ -476,7 +530,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// A definition declaring appliesTo: user is refused here, and its twin
 		// on User refuses appliesTo: client. The pair is what makes that column
 		// mean something instead of merely stating it.
-		if service.ClaimDoesNotApplyToClient(held.ClaimID) {
+		if notForClients[held.ClaimID] {
 			r.AddNotification("Claims", ClaimDoesNotApplyToClientNotification{}, held.ClaimID.String())
 			continue
 		}
@@ -486,7 +540,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// The rejected VALUE is echoed rather than the id: the caller knows
 		// which entry they sent, and what they need told back is the string
 		// that did not parse.
-		if service.ClaimValueDoesNotMatchValueType(held.ClaimID, held.Value.Value()) {
+		if valueMismatched[held.ClaimID] {
 			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
 		}
 	}

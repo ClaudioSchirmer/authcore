@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:aea1a3ec541ffc33e2d6895dc564bb6d23fdeaea1a7680d9c01a5930f9932b17
+// checksum:   sha256:38e57eeed7bf40e100380f0843d1e7185aba2bb560e403f2487213eb98431e46
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,12 +83,12 @@ type stubRoleService struct {
 	domain.ServiceBase
 }
 
-func (stubRoleService) RoleKeyTaken(_ domain.ID, _ string, _ domain.ID) bool { return false }
-func (stubRoleService) TenantIsUnavailable(_ domain.ID) bool                 { return false }
-func (stubRoleService) PermissionIsNotInCatalog(_ domain.ID) bool            { return false }
-func (stubRoleService) PermissionIsWildcard(_ domain.ID) bool                { return false }
-func (stubRoleService) CallerDoesNotHoldPermission(_ domain.ID) bool         { return false }
-func (stubRoleService) CallerIsSuperAdmin() bool                             { return false }
+func (stubRoleService) RoleKeyTaken(_ domain.ID, _ string, _ domain.ID) bool         { return false }
+func (stubRoleService) TenantIsUnavailable(_ domain.ID) bool                         { return false }
+func (stubRoleService) PermissionIsNotInCatalog(_ []domain.ID) map[domain.ID]bool    { return nil }
+func (stubRoleService) PermissionIsWildcard(_ []domain.ID) map[domain.ID]bool        { return nil }
+func (stubRoleService) CallerDoesNotHoldPermission(_ []domain.ID) map[domain.ID]bool { return nil }
+func (stubRoleService) CallerIsSuperAdmin() bool                                     { return false }
 
 // validRole returns an aggregate that satisfies every declared rule.
 //

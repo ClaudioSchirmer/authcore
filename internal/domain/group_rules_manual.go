@@ -108,23 +108,52 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 	// make the entity unusable on a bench that has no tokens.
 	identityGates := e.RequestingIdentityPresent
 
+	// USABLE IDS ONLY, and the filter runs BEFORE the questions rather than
+	// inside the loop. Every fact below hands these ids to a criterion against a
+	// UUID column, so a value uuid.Parse refuses — "" and "tatu" alike — makes
+	// the query error and the probe panic: a 500 on a request whose problem is
+	// plain validation.
+	//
+	// Testing IsEmpty alone was the bug on Role, and it is the same bug the
+	// ROOT's owner had: the empty case is the one you think of, the
+	// malformed one is the one that reaches production. The root is covered
+	// by its `valueObject` barrier; a child id is not, because the framework
+	// validates children AFTER the rules and this loop runs inside them.
+	//
+	// It raises nothing on purpose: the framework's own child validation
+	// reports the bad id, so complaining here would say it twice.
+	judged := make([]aggregatevos.GroupRole, 0, len(added))
+	roleIDs := make([]domain.ID, 0, len(added))
 	for _, attached := range added {
-		// USABLE, not merely non-empty. Every probe below hands this id to a
-		// criterion against a UUID column, so a value uuid.Parse refuses — ""
-		// and "tatu" alike — makes the query error and the probe panic: a 500
-		// on a request whose problem is plain validation.
-		//
-		// Testing IsEmpty alone was the bug on Role, and it is the same bug the
-		// ROOT's owner had: the empty case is the one you think of, the
-		// malformed one is the one that reaches production. The root is covered
-		// by its `valueObject` barrier; a child id is not, because the framework
-		// validates children AFTER the rules and this loop runs inside them.
-		//
-		// It raises nothing on purpose: the framework's own child validation
-		// reports the bad id, so complaining here would say it twice.
 		if _, err := attached.RoleID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, attached)
+		roleIDs = append(roleIDs, attached.RoleID)
+	}
+	if len(judged) == 0 {
+		return
+	}
+
+	// THREE QUESTIONS, ASKED ONCE EACH FOR THE WHOLE COLLECTION. The facts are
+	// `perEntry`, so each answers a map keyed by the entry's id and the service
+	// resolves the set in one read — a group attaching ten roles costs what one
+	// costs. The verdicts are still per entry: the loop below reads them.
+	//
+	// EVERY QUESTION IS ASKED OF EVERY ENTRY, including entries the first answer
+	// already refuses. There are no round trips left to save by skipping them,
+	// and the answers are identical — an unresolvable role reads TRUE from the
+	// wildcard fact either way. What did NOT change is what the caller is told:
+	// the interlock below still reports one problem per entry.
+	unavailable := service.RoleIsUnavailableInTenant(e.TenantID, roleIDs)
+	grantsWildcard := service.RoleGrantsWildcard(roleIDs)
+
+	var escalates map[domain.ID]bool
+	if identityGates {
+		escalates = service.CallerLacksAnyPermissionOf(roleIDs)
+	}
+
+	for _, attached := range judged {
 
 		// NEVER read attached.RoleKey / attached.RoleName here. They are
 		// read-join fields: filled on entries LOADED from the row, and blank on
@@ -153,7 +182,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// ordinary path they are the same value — refuseForeignTenant already
 		// refused anything else — but a *:* super-admin crosses that scope, and
 		// when they do, "this tenant" must mean the group's.
-		if service.RoleIsUnavailableInTenant(e.TenantID, attached.RoleID) {
+		if unavailable[attached.RoleID] {
 			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, attached.RoleID.String())
 			// Nothing below can say anything true about a role that is not
 			// there, and the wildcard probe already answers "yes" for an
@@ -180,7 +209,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// What it costs, stated plainly: the platform's own superadmin group —
 		// the one carrying the *:* role — cannot be created through this API,
 		// and is seeded by migration beside the reserved platform tenant.
-		if service.RoleGrantsWildcard(attached.RoleID) {
+		if grantsWildcard[attached.RoleID] {
 			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, attached.RoleID.String())
 			continue
 		}
@@ -198,7 +227,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// HasPermission returns true for ANY concrete permission when the claim
 		// set contains *:*, so "you may only confer what you hold, unless you
 		// are a superadmin" is one question and not two.
-		if identityGates && service.CallerLacksAnyPermissionOf(attached.RoleID) {
+		if escalates[attached.RoleID] {
 			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, attached.RoleID.String())
 		}
 	}

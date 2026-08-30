@@ -1178,7 +1178,8 @@ service:
     - name: RoleIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Roles.RoleID]
+      perEntry: Roles.RoleID
+      filters: [TenantID]
       description: >-
         Whether this role id is absent from the roles table, points at an archived role, or
         belongs to a tenant OTHER than the one passed. One answer for all three — the
@@ -1187,7 +1188,7 @@ service:
     - name: RoleGrantsWildcard
       kind: manual
       returns: bool
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
       description: >-
         Whether this role grants a permission carrying a wildcard in either part. Answers
         TRUE when the id is unknown, so an unresolvable grant never reaches the escalation
@@ -1196,16 +1197,17 @@ service:
     - name: CallerLacksAnyPermissionOfRole
       kind: manual
       returns: bool
-      filters: [Roles.RoleID]
+      perEntry: Roles.RoleID
       description: >-
         Whether the requesting caller fails to hold at least one permission this role
         confers — the escalation half. GUARDS THE WILDCARD ITSELF and answers "lacks" rather
         than calling through, because a panic on a security rule is a 500. A *:* superadmin
         passes by construction.
 
-    # Three per-entry facts for the claims collection, asked once per entry, only about the
-    # entries a write adds or changes. ONE read of claims by primary key answers all three —
-    # memoise per request.
+    # Three per-entry facts for the claims collection, asked ONCE for the whole collection
+    # and answered per entry, only about the entries a write adds or changes. ONE read of
+    # claims by their ids answers all three — memoise per request, keyed by the row's
+    # canonical id, the same shape User's three carry.
     #
     # All three answer TRUE — "the problem is present" — for an id they cannot resolve, and
     # all three are NAMED FOR THE PROBLEM so the generated suite's stub, which answers
@@ -1214,7 +1216,8 @@ service:
     - name: ClaimIsUnavailableInTenant
       kind: manual
       returns: bool
-      filters: [TenantID, Claims.ClaimID]
+      perEntry: Claims.ClaimID
+      filters: [TenantID]
       description: >-
         Whether this claim id is absent from the claims table, points at an archived
         definition, or belongs to a tenant OTHER than the one passed. One answer for all
@@ -1223,7 +1226,7 @@ service:
     - name: ClaimDoesNotApplyToClient
       kind: manual
       returns: bool
-      filters: [Claims.ClaimID]
+      perEntry: Claims.ClaimID
       description: >-
         Whether the definition behind this id declares appliesTo: user, so no machine client
         may hold a value for it. client and both answer false. Answers TRUE for an unknown id.
@@ -1231,7 +1234,8 @@ service:
     - name: ClaimValueDoesNotMatchValueType
       kind: manual
       returns: bool
-      filters: [Claims.ClaimID, Claims.Value]
+      perEntry: Claims.ClaimID
+      filters: [Claims.Value]
       description: >-
         Whether the value fails to parse as the ValueType the definition declares: `number`
         wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants

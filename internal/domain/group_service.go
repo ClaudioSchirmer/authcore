@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:538deb15ca18ab5b9a8a1a840f429e234b3ddafe3d0eb8a008af1f68cd00d7e0
+// checksum:   sha256:ef92220d9b73d9ba680f2655be691e9d0e5c8aaa473f4cc6720c91d79e8f26b3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -51,19 +51,31 @@ type GroupService interface {
 	// archived role, or belongs to a tenant OTHER than the one passed. One
 	// answer for all three questions — the caller-facing message must not
 	// distinguish them, because a distinct "belongs to another tenant" reply
-	// is an existence oracle over a competitor's org chart. Asked ONCE PER
-	// ENTRY of Roles, so the answer is about that entry and the cost of the
-	// body is multiplied by the size of the collection.
-	RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool
+	// is an existence oracle over a competitor's org chart. Asked ONCE for the
+	// WHOLE of Roles and answered per entry, keyed by RoleID. A key MISSING
+	// from the answer is this fact answering NOTHING for that entry, and at
+	// the call site Go's zero value settles what that means: absent reads as
+	// false, which is the answer a fact named for the PROBLEM wants, so
+	// nothing is raised. Say "this entry IS the problem" by putting the answer
+	// in the map — never by leaving the key out, which is silence rather
+	// than a verdict. Where the source could not be reached at all, fail: the
+	// port returns no error precisely so that decision is made here.
+	RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the role behind this id grants any permission carrying a
 	// wildcard in either part. Resolve the role through RoleRepository.Loader,
 	// whose declared read join fills every grant's resource and action.
 	// Answers TRUE when the id is unknown, so an unresolvable attachment never
-	// reaches the escalation probe. Asked ONCE PER ENTRY of Roles, so the
-	// answer is about that entry and the cost of the body is multiplied by the
-	// size of the collection.
-	RoleGrantsWildcard(roleID domain.ID) bool
+	// reaches the escalation probe. Asked ONCE for the WHOLE of Roles and
+	// answered per entry, keyed by RoleID. A key MISSING from the answer is
+	// this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the requesting caller fails to hold at least one of the
 	// permissions this role grants — the TRANSITIVE half of the escalation
@@ -75,8 +87,14 @@ type GroupService interface {
 	// second query. It GUARDS THE WILDCARD ITSELF and answers "lacks" rather
 	// than calling through — defence in depth behind the wildcard rule,
 	// because a panic on a security rule is a 500. Reads ctx.Identity()
-	// through the request-scoped service. Asked ONCE PER ENTRY of Roles, so
-	// the answer is about that entry and the cost of the body is multiplied by
-	// the size of the collection.
-	CallerLacksAnyPermissionOf(roleID domain.ID) bool
+	// through the request-scoped service. Asked ONCE for the WHOLE of Roles
+	// and answered per entry, keyed by RoleID. A key MISSING from the answer
+	// is this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	CallerLacksAnyPermissionOf(roleIDSet []domain.ID) map[domain.ID]bool
 }

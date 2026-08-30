@@ -12,11 +12,23 @@
 // surface. Every one of those is wrong here: a refresh token has no invariants to
 // validate, no caller edits it, "archived" is meaningless for a credential that is
 // simply dead, and a REST surface over this table would be a credential
-// exfiltration endpoint whatever permission guarded it. So this reaches the
-// neutral read seam directly and accepts, knowingly, that these writes sit
-// outside the framework's write guarantees — which for an append-and-mark table
-// with no invariants is the right trade, and is recorded as such in
-// specs/implement/authentication-token/plan.md.
+// exfiltration endpoint whatever permission guarded it.
+//
+// NOT BEING AN ENTITY IS NO LONGER A REASON TO WRITE SQL. It was until omnicore
+// v0.64.0: the only door into the relational engine was a repository bound to a
+// domain.Entity, so this file rendered its own statements — placeholders, quoting
+// and argument encoding re-derived per dialect, and a table's column names typed
+// out in Go. DirectSchema anchors a schema on a TABLE instead, and DirectRepository
+// reads and writes it with the loader's own vocabulary, so every statement below is
+// now a criteria and not a string.
+//
+// WHAT UNBLOCKED THAT WAS THE PRIMARY KEY. An earlier shape of the 0006 migration
+// made `hash` the primary key, on the grounds that lookup is by hash on every
+// redemption. That single choice put the table outside the engine entirely —
+// DirectWriter.Insert mints the identity and refuses a caller-supplied one, and the
+// ID slot always binds in the dialect's canonical identity form, which a CHAR(64)
+// hex digest is not. The table now carries a UUID id like every other in this
+// service, with the hash as a UNIQUE index that serves the same single-row lookup.
 //
 // THE RAW TOKEN NEVER ARRIVES HERE. Only the SHA-256 hash crosses the port. That
 // is what makes a dump of this table survivable.
@@ -31,31 +43,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
+	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/command/read"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/command/write"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/criteria"
 	"github.com/ClaudioSchirmer/omnicore/web/authcore"
-)
-
-// The physical names, from migrations/postgres/0006_refresh_tokens_manual.up.sql.
-//
-// They are string constants rather than a TableSchema because this table is NOT
-// an entity: there is no Go struct for the framework to map, so there is no
-// schema to ask. That makes this the one place in the service where a column name
-// is written by hand, and the reason it is safe is that one migration and one
-// file are the only things that know these names — refresh_token_store_test.go
-// asserts the SELECT still matches the shipped DDL.
-const (
-	refreshTokenTable = "authentication_refresh_tokens"
-
-	refreshColHash      = "hash"
-	refreshColFamilyID  = "family_id"
-	refreshColSubject   = "subject"
-	refreshColAudience  = "audience"
-	refreshColExpiresAt = "expires_at"
-	refreshColUsed      = "used"
-	refreshColRevoked   = "revoked"
 )
 
 // sweepGrace holds a just-expired row back from the self-cleaning DELETE.
@@ -77,27 +72,20 @@ const sweepGrace = time.Hour
 // ordinary traffic.
 const sweepBatch = 500
 
-// SQLSeam is the sliver of the relational engine this store uses: the neutral
-// read surface and the dialect that renders the engine-specific bits.
-//
-// core.RelationalEngine satisfies it, so nothing at the call site changes. What
-// changes is what this file can DO: the engine's typed write verbs, the audit
-// wiring and the rebuild lock are all out of reach, which is the honest shape for
-// a component that has no aggregate to write and no view to rebuild. It also
-// means a test fakes two methods instead of eleven.
-type SQLSeam interface {
-	Querier() core.Querier
-	Dialect() core.Dialect
-}
-
 // RefreshTokenStore persists refresh-token rotation state for the framework's
 // Issuer.
 //
-// It holds the seam rather than a repository: there is no aggregate to load. Both
-// come from the service's one engine, so these statements run on the same
-// connection pool, and render in the same dialect, as every other read here.
+// It holds a DIRECT repository — one table, no aggregate — built over the
+// service's own engine, so these statements run on the same connection pool and
+// render in the same dialect as every other read here.
+//
+// It no longer holds the narrow two-method seam it used to. That seam existed to
+// keep a SQL-writing component away from the engine's typed verbs; with the
+// statements gone there is nothing to keep it away from — the repository IS the
+// bound, and wrapping it in a smaller interface would only be a second contract
+// to maintain beside the one the framework already publishes.
 type RefreshTokenStore struct {
-	engine SQLSeam
+	repo   *read.DirectRepository[schemas.RefreshToken]
 	logger *slog.Logger
 }
 
@@ -106,11 +94,14 @@ type RefreshTokenStore struct {
 // A nil logger falls back to slog.Default() rather than panicking: the only thing
 // this store logs is a swept-rows line and a swallowed sweep failure, and neither
 // is worth refusing to start over.
-func NewRefreshTokenStore(engine SQLSeam, logger *slog.Logger) *RefreshTokenStore {
+func NewRefreshTokenStore(engine core.RelationalEngine, logger *slog.Logger) *RefreshTokenStore {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &RefreshTokenStore{engine: engine, logger: logger}
+	return &RefreshTokenStore{
+		repo:   read.NewDirectRepository[schemas.RefreshToken](engine, schemas.RefreshTokenSchema()),
+		logger: logger,
+	}
 }
 
 // Compile-time proof that this satisfies the port. Without it a signature drift
@@ -125,37 +116,27 @@ var _ authcore.RefreshTokenStore = (*RefreshTokenStore)(nil)
 // off it rather than off a redemption-only seat: every event that adds a row also
 // gets a chance to remove the dead ones, so the table cannot grow without also
 // draining.
+//
+// THE ID IS NOT WRITTEN HERE, and cannot be: Insert mints it and refuses an `ID`
+// key in Values. Nothing in this store addresses a row by it — every read and
+// write below is keyed on the hash or on the family — so the value it returns is
+// discarded. The id exists so the table lives inside the engine, not so this file
+// has something to hold.
 func (s *RefreshTokenStore) Save(ctx context.Context, rec authcore.RefreshTokenRecord) error {
-	d := s.engine.Dialect()
-
 	audience, err := json.Marshal(rec.Audience)
 	if err != nil {
 		return fmt.Errorf("refresh token store: encode audience: %w", err)
 	}
 
-	stmt := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColHash),
-		d.QuoteIdent(refreshColFamilyID),
-		d.QuoteIdent(refreshColSubject),
-		d.QuoteIdent(refreshColAudience),
-		d.QuoteIdent(refreshColExpiresAt),
-		d.QuoteIdent(refreshColUsed),
-		d.QuoteIdent(refreshColRevoked),
-		d.Placeholder(1), d.Placeholder(2), d.Placeholder(3),
-		d.Placeholder(4), d.Placeholder(5), d.Placeholder(6), d.Placeholder(7),
-	)
-
-	if err := core.Exec(s.engine.Querier(), ctx, stmt,
-		d.EncodeArg(rec.Hash),
-		d.EncodeArg(rec.FamilyID),
-		d.EncodeArg(rec.Subject),
-		d.EncodeArg(string(audience)),
-		d.EncodeArg(rec.ExpiresAt),
-		d.EncodeArg(rec.Used),
-		d.EncodeArg(rec.Revoked),
-	); err != nil {
+	if _, err := s.repo.Insert(ctx, write.Values{
+		"Hash":      rec.Hash,
+		"FamilyID":  rec.FamilyID,
+		"Subject":   rec.Subject,
+		"Audience":  string(audience),
+		"ExpiresAt": rec.ExpiresAt,
+		"Used":      rec.Used,
+		"Revoked":   rec.Revoked,
+	}); err != nil {
 		return fmt.Errorf("refresh token store: save: %w", err)
 	}
 
@@ -171,48 +152,41 @@ func (s *RefreshTokenStore) Save(ctx context.Context, rec authcore.RefreshTokenR
 // contract and is matched with errors.Is by the Issuer. It deliberately does NOT
 // distinguish "never existed" from "swept after expiry": both mean the value in
 // the caller's hand redeems nothing, and the Issuer treats them identically.
+//
+// BY THE HASH, which is a UNIQUE index and therefore a single-row lookup — the
+// same one the old primary key gave. FindOne is the right verb for exactly that
+// reason: it refuses a criteria that matched more than one row instead of picking
+// one, so a duplicate hash would surface as an error rather than as an arbitrary
+// session.
 func (s *RefreshTokenStore) Lookup(ctx context.Context, hash string) (authcore.RefreshTokenRecord, error) {
-	d := s.engine.Dialect()
-
-	stmt := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = %s",
-		d.QuoteIdent(refreshColHash),
-		d.QuoteIdent(refreshColFamilyID),
-		d.QuoteIdent(refreshColSubject),
-		d.QuoteIdent(refreshColAudience),
-		d.QuoteIdent(refreshColExpiresAt),
-		d.QuoteIdent(refreshColUsed),
-		d.QuoteIdent(refreshColRevoked),
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColHash),
-		d.Placeholder(1),
-	)
-
-	var (
-		rec         authcore.RefreshTokenRecord
-		rawAudience string
-	)
-	row := s.engine.Querier().QueryRow(ctx, stmt, d.EncodeArg(hash))
-	err := row.Scan(&rec.Hash, &rec.FamilyID, &rec.Subject, &rawAudience,
-		&rec.ExpiresAt, &rec.Used, &rec.Revoked)
+	row, err := s.repo.FindOne(ctx, criteria.Where(criteria.Eq("Hash", hash)))
 	switch {
 	case err == nil:
-		// Empty rather than an error on a malformed audience: the column is
-		// written only by Save above, so a value that will not decode means the
-		// row was tampered with or predates a format change — and refusing the
-		// whole redemption over the AUDIENCE list would lock a user out over
-		// something the Issuer would have defaulted anyway.
-		if uerr := json.Unmarshal([]byte(rawAudience), &rec.Audience); uerr != nil {
-			s.logger.WarnContext(ctx, "refresh token store: unreadable audience column, treating as empty",
-				slog.String("familyId", rec.FamilyID), slog.String("error", uerr.Error()))
-			rec.Audience = nil
-		}
-		return rec, nil
-	case isNoRows(err):
+	case isRecordNotFound(err):
 		return authcore.RefreshTokenRecord{}, authcore.ErrRefreshTokenNotFound
 	default:
 		return authcore.RefreshTokenRecord{}, fmt.Errorf("refresh token store: lookup: %w", err)
 	}
+
+	rec := authcore.RefreshTokenRecord{
+		Hash:      row.Hash,
+		FamilyID:  row.FamilyID,
+		Subject:   row.Subject,
+		ExpiresAt: row.ExpiresAt,
+		Used:      row.Used,
+		Revoked:   row.Revoked,
+	}
+	// Empty rather than an error on a malformed audience: the column is written
+	// only by Save above, so a value that will not decode means the row was
+	// tampered with or predates a format change — and refusing the whole
+	// redemption over the AUDIENCE list would lock a user out over something the
+	// Issuer would have defaulted anyway.
+	if uerr := json.Unmarshal([]byte(row.Audience), &rec.Audience); uerr != nil {
+		s.logger.WarnContext(ctx, "refresh token store: unreadable audience column, treating as empty",
+			slog.String("familyId", rec.FamilyID), slog.String("error", uerr.Error()))
+		rec.Audience = nil
+	}
+	return rec, nil
 }
 
 // MarkUsed burns one token.
@@ -222,17 +196,17 @@ func (s *RefreshTokenStore) Lookup(ctx context.Context, hash string) (authcore.R
 // than leaving a token that can be redeemed twice. That ordering is the
 // framework's and this method must not soften it: no upsert, no "only if not
 // already used", nothing that could turn a second redemption into a success.
+//
+// Update and not UpdateOne, deliberately. UpdateOne fails when the predicate
+// matched nothing, and burning a hash that is no longer there is not a failure
+// this store should raise: the row may have been swept between the lookup and
+// here, and the redemption is refused by the Issuer either way. The count is
+// discarded for the same reason.
 func (s *RefreshTokenStore) MarkUsed(ctx context.Context, hash string) error {
-	d := s.engine.Dialect()
-
-	stmt := fmt.Sprintf("UPDATE %s SET %s = %s WHERE %s = %s",
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColUsed), d.Placeholder(1),
-		d.QuoteIdent(refreshColHash), d.Placeholder(2),
-	)
-
-	if err := core.Exec(s.engine.Querier(), ctx, stmt,
-		d.EncodeArg(true), d.EncodeArg(hash)); err != nil {
+	if _, err := s.repo.Update(ctx,
+		write.Values{"Used": true},
+		criteria.Where(criteria.Eq("Hash", hash)),
+	); err != nil {
 		return fmt.Errorf("refresh token store: mark used: %w", err)
 	}
 	return nil
@@ -246,16 +220,10 @@ func (s *RefreshTokenStore) MarkUsed(ctx context.Context, hash string) error {
 // both hold descendants of the same login, and there is no way to tell which is
 // which, so the only safe answer is that neither continues.
 func (s *RefreshTokenStore) RevokeFamily(ctx context.Context, familyID string) error {
-	d := s.engine.Dialect()
-
-	stmt := fmt.Sprintf("UPDATE %s SET %s = %s WHERE %s = %s",
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColRevoked), d.Placeholder(1),
-		d.QuoteIdent(refreshColFamilyID), d.Placeholder(2),
-	)
-
-	if err := core.Exec(s.engine.Querier(), ctx, stmt,
-		d.EncodeArg(true), d.EncodeArg(familyID)); err != nil {
+	if _, err := s.repo.Update(ctx,
+		write.Values{"Revoked": true},
+		criteria.Where(criteria.Eq("FamilyID", familyID)),
+	); err != nil {
 		return fmt.Errorf("refresh token store: revoke family: %w", err)
 	}
 	s.logger.WarnContext(ctx, "refresh token reuse detected: session family revoked",
@@ -312,49 +280,45 @@ func (s *RefreshTokenStore) SubjectForRefreshToken(ctx context.Context, value st
 // forgotten, misconfigured, or silently not running, and a table nobody writes to
 // is also a table that is not growing.
 //
+// TWO STATEMENTS, AND THE BOUND IS WHY. Delete takes a predicate, not a window —
+// there is no verb for "delete at most N matching rows" — so the batch is found
+// first, under the criteria's own Limit, and removed by the ids that came back.
+// Dropping to a single unbounded DELETE would have been shorter and wrong: the
+// first run against a table nobody has ever cleaned would delete an unbounded
+// number of rows while a user waits for a token. Bounded, that backlog drains
+// across several refreshes, and the steady state — a handful of rows per pass —
+// is reached within minutes of ordinary traffic.
+//
+// AN EMPTY BATCH ISSUES NO DELETE, which is not merely an optimisation: a Direct
+// write refuses an empty predicate outright, and `In` over no values is exactly
+// that. On the steady-state path — nothing expired — this costs one indexed read
+// and nothing else.
+//
 // ITS ERROR IS SWALLOWED ON PURPOSE. The caller has already been granted a token;
 // failing their request because housekeeping did not work would trade a real
 // outcome for a bookkeeping detail. It is logged instead, which is the same
 // posture the framework takes for post-commit domain-event publishing.
 func (s *RefreshTokenStore) sweepExpired(ctx context.Context) {
-	d := s.engine.Dialect()
-
-	// Bounded through a subquery rather than a bare `DELETE ... LIMIT`: only some
-	// dialects accept a limit on DELETE, and ApplyLimit is the framework's own
-	// renderer for capping a complete SELECT in whichever position the engine
-	// wants it.
-	inner := fmt.Sprintf("SELECT %s FROM %s WHERE %s < %s",
-		d.QuoteIdent(refreshColHash),
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColExpiresAt),
-		d.Placeholder(1),
-	)
-	stmt := fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)",
-		d.QuoteIdent(refreshTokenTable),
-		d.QuoteIdent(refreshColHash),
-		d.ApplyLimit(inner, sweepBatch),
-	)
-
 	cutoff := time.Now().UTC().Add(-sweepGrace)
-	if err := core.Exec(s.engine.Querier(), ctx, stmt, d.EncodeArg(cutoff)); err != nil {
+
+	dead, err := s.repo.FindAll(ctx, criteria.
+		Where(criteria.Lt("ExpiresAt", cutoff)).
+		Limit(sweepBatch))
+	if err != nil {
+		s.logger.WarnContext(ctx, "refresh token store: expired-row sweep failed (ignored)",
+			slog.String("error", err.Error()))
+		return
+	}
+	if len(dead) == 0 {
+		return
+	}
+
+	ids := make([]any, 0, len(dead))
+	for _, row := range dead {
+		ids = append(ids, row.ID)
+	}
+	if _, err := s.repo.Delete(ctx, criteria.Where(criteria.In("ID", ids...))); err != nil {
 		s.logger.WarnContext(ctx, "refresh token store: expired-row sweep failed (ignored)",
 			slog.String("error", err.Error()))
 	}
-}
-
-// isNoRows reports whether a scan error means "that row does not exist".
-//
-// It is NOT isRecordNotFound from role_service_manual.go: that one recognises the
-// *domain.DomainError the aggregate LOADER raises, and nothing here goes through
-// a loader — this store scans a raw Row.
-//
-// Every engine reports an empty result differently (database/sql answers
-// sql.ErrNoRows, pgx answers pgx.ErrNoRows), and this file must not import either
-// driver: doing so would pin the store to one dialect while the rest of the
-// service is deliberately free of any. Matching the message is the honest price
-// of that neutrality — both drivers spell it "no rows in result set", and the
-// store's test pins that assumption so a driver that stops spelling it that way
-// fails here rather than turning every unknown token into a 500.
-func isNoRows(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "no rows in result set")
 }

@@ -86,14 +86,19 @@ func TestIsRecordNotFoundSeparatesAbsenceFromFailure(t *testing.T) {
 // stands down instead of refusing, or the entity is unusable on a bench that
 // issues no tokens.
 func TestCallerDoesNotHoldPermissionStandsDownWithoutAnIdentity(t *testing.T) {
+	granted := []domain.ID{domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")}
+
+	// An empty answer, not a map of falses: an absent key is the fact answering
+	// NOTHING for that entry, which the rule reads as the zero value and does
+	// not raise. It also reaches no store, which the nil repository proves.
 	unbound := &RoleServiceImpl{}
-	if unbound.CallerDoesNotHoldPermission(domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")) {
-		t.Error("the escalation probe refused a request that carries no request context")
+	if len(unbound.CallerDoesNotHoldPermission(granted)) != 0 {
+		t.Error("the escalation probe answered for a request that carries no request context")
 	}
 
 	bound := &RoleServiceImpl{ctx: &configuration.AppContext{}}
-	if bound.CallerDoesNotHoldPermission(domain.NewID("9f14b0a2-6d38-4c5e-b7a1-2e0c5d81f4a3")) {
-		t.Error("the escalation probe refused a request whose context carries no identity")
+	if len(bound.CallerDoesNotHoldPermission(granted)) != 0 {
+		t.Error("the escalation probe answered for a request whose context carries no identity")
 	}
 }
 
@@ -150,16 +155,22 @@ func TestAnUnusableTenantIsAnsweredWithoutTouchingTheStore(t *testing.T) {
 
 func TestAnUnusableGrantIDResolvesToNotFoundWithoutTouchingTheStore(t *testing.T) {
 	svc := &RoleServiceImpl{}
-	for _, id := range []string{"", "tatu"} {
-		row := svc.catalogRow(domain.NewID(id))
+
+	// ASKED AS A SET, which is what the batched resolver takes — and a set of
+	// nothing but unusable ids must still reach no store: the read closure runs
+	// only for ids that parse, so a nil repository is never dereferenced.
+	unusable := []domain.ID{domain.NewID(""), domain.NewID("tatu")}
+	rows := svc.catalogRows(unusable)
+	for _, id := range unusable {
+		row := rows[id]
 		if row.found {
-			t.Errorf("%q resolved to a catalog row", id)
+			t.Errorf("%q resolved to a catalog row", id.String())
 		}
 		if !row.isWildcard() {
-			t.Errorf("%q did not fail closed on the wildcard question", id)
+			t.Errorf("%q did not fail closed on the wildcard question", id.String())
 		}
 		if row.active() {
-			t.Errorf("%q was reported as an active permission", id)
+			t.Errorf("%q was reported as an active permission", id.String())
 		}
 	}
 }

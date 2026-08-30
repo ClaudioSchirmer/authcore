@@ -100,24 +100,54 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 	// make the entity unusable on a bench that has no tokens.
 	identityGates := e.RequestingIdentityPresent
 
+	// USABLE IDS ONLY, and the filter runs BEFORE the questions rather than
+	// inside the loop. Every fact below hands these ids to a criterion against a
+	// UUID column, so a value uuid.Parse refuses — "" and "tatu" alike — makes
+	// the query error and the probe panic: a 500 on a request whose problem is
+	// plain validation.
+	//
+	// Testing IsEmpty alone was the bug, and it is the same bug the ROOT's
+	// owner had: the empty case is the one you think of, the malformed one
+	// is the one that reaches production. The root is covered by its
+	// `valueObject` barrier; a child id is not, because the framework
+	// validates children AFTER the rules and this loop runs inside them.
+	//
+	// It raises nothing on purpose: the framework's own child validation
+	// reports the bad id, so complaining here would say it twice.
+	judged := make([]aggregatevos.RolePermission, 0, len(added))
+	permissionIDs := make([]domain.ID, 0, len(added))
 	for _, grant := range added {
-		// USABLE, not merely non-empty. Every probe below hands this id to a
-		// criterion against a UUID column, so a value uuid.Parse refuses — ""
-		// and "tatu" alike — makes the query error and the probe panic: a 500
-		// on a request whose problem is plain validation.
-		//
-		// Testing IsEmpty alone was the bug, and it is the same bug the ROOT's
-		// owner had: the empty case is the one you think of, the malformed one
-		// is the one that reaches production. The root is covered by its
-		// `valueObject` barrier; a child id is not, because the framework
-		// validates children AFTER the rules and this loop runs inside them.
-		//
-		// It raises nothing on purpose: the framework's own child validation
-		// reports the bad id, so complaining here would say it twice.
 		if _, err := grant.PermissionID.UUID(); err != nil {
 			continue
 		}
+		judged = append(judged, grant)
+		permissionIDs = append(permissionIDs, grant.PermissionID)
+	}
+	if len(judged) == 0 {
+		return
+	}
 
+	// THREE QUESTIONS, ASKED ONCE EACH FOR THE WHOLE COLLECTION. The facts are
+	// `perEntry`, so each answers a map keyed by the entry's id and the service
+	// resolves the set in one read of the catalog — a role granting ten
+	// permissions costs what one costs. The verdicts are still per entry: the
+	// loop below reads them.
+	//
+	// EVERY QUESTION IS ASKED OF EVERY ENTRY, including entries the first answer
+	// already refuses. There are no round trips left to save by skipping them,
+	// and the answers are identical — a permission that is not in the catalog
+	// reads TRUE from the wildcard fact either way. What did NOT change is what
+	// the caller is told: the interlock below still reports one problem per
+	// entry.
+	notInCatalog := service.PermissionIsNotInCatalog(permissionIDs)
+	isWildcard := service.PermissionIsWildcard(permissionIDs)
+
+	var callerLacks map[domain.ID]bool
+	if identityGates {
+		callerLacks = service.CallerDoesNotHoldPermission(permissionIDs)
+	}
+
+	for _, grant := range judged {
 		// NEVER read grant.Resource / grant.Action / grant.ArchivedAt here.
 		// They are read-join fields: filled on entries LOADED from the row, and
 		// blank on an entry this write just added — which is every entry in this
@@ -130,7 +160,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// Every permission this write adds must exist in the catalog and still
 		// be active. A retired permission comes back as a NEW row with a NEW id,
 		// so re-granting the old id is refused rather than silently honoured.
-		if service.PermissionIsNotInCatalog(grant.PermissionID) {
+		if notInCatalog[grant.PermissionID] {
 			r.AddNotification("Permissions", PermissionNotInCatalogNotification{}, grant.PermissionID.String())
 			// Nothing below can say anything true about a permission that is
 			// not there, and the wildcard probe already answers "yes" for an
@@ -147,7 +177,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// rule is what removes the input that would crash the request into a
 		// 500 — on exactly the case the escalation rule exists to stop. The
 		// service guards the wildcard a second time for the same reason.
-		if service.PermissionIsWildcard(grant.PermissionID) {
+		if isWildcard[grant.PermissionID] {
 			r.AddNotification("Permissions", CannotGrantWildcardPermissionNotification{}, grant.PermissionID.String())
 			continue
 		}
@@ -161,7 +191,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// HasPermission returns true for ANY concrete permission when the claim
 		// set contains *:*, so "you may only grant what you hold, unless you are
 		// a superadmin" is one question and not two.
-		if identityGates && service.CallerDoesNotHoldPermission(grant.PermissionID) {
+		if callerLacks[grant.PermissionID] {
 			r.AddNotification("Permissions", CannotGrantUnheldPermissionNotification{}, grant.PermissionID.String())
 		}
 	}

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:d9652d660c65a87983e72636dfcbdf6d88f2b72b06142bee9251145ac3d49941
+// checksum:   sha256:84decdf84cd2aa22d72cfa0b397acc7ab40701b28ec0d968b573ec16d2cec1f2
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *UserServiceImpl) queryContext() context.Context {
 // already holds this e-mail address. Excludes the row being updated.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a

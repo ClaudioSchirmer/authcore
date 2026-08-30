@@ -44,12 +44,25 @@ type probingClaimService struct {
 	askedHeldByAUser   int
 	askedHeldByAClient int
 
-	// The catalog cap counts ONE enum member per call and adds two answers to
-	// get a bucket. A member absent from the map answers 0 — the same empty
-	// catalog the generated stub reports — so every case written before this
-	// rule existed still passes the cap untouched.
+	// What the two probes were asked ABOUT. The kind of id is the whole point
+	// of the pair: the edge tables store claim_id, so a probe handed the
+	// tenant's id — or the definition's name — would read a different table's
+	// worth of rows and answer confidently about nothing.
+	askedHeldByAUserWith   []domain.ID
+	askedHeldByAClientWith []domain.ID
+
+	// The catalog cap reads the whole catalog in ONE grouped call. The map is
+	// per enum member because that is what a tenant's catalog looks like; the
+	// stub folds it into groups the way the store would. A nil map answers with
+	// no groups at all — the same empty catalog the generated stub reports — so
+	// every case written before this rule existed still passes the cap
+	// untouched.
+	//
+	// askedCatalog is the round-trip count, and it is asserted rather than
+	// merely available: "one query, or none" is half of what this rule promises
+	// and no assertion on the OUTCOME would notice it breaking.
 	activeByAppliesTo map[string]int64
-	askedActiveWith   []string
+	askedCatalog      int
 }
 
 func (s *probingClaimService) ClaimNameTaken(_ domain.ID, _ string, _ domain.ID) bool {
@@ -62,19 +75,34 @@ func (s *probingClaimService) TenantIsUnavailable(tenantID domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingClaimService) ClaimIsHeldByAUser(_ domain.ID, _ string) bool {
+func (s *probingClaimService) ClaimIsHeldByAUser(id domain.ID) bool {
 	s.askedHeldByAUser++
+	s.askedHeldByAUserWith = append(s.askedHeldByAUserWith, id)
 	return s.heldByAUser
 }
 
-func (s *probingClaimService) ClaimIsHeldByAClient(_ domain.ID, _ string) bool {
+func (s *probingClaimService) ClaimIsHeldByAClient(id domain.ID) bool {
 	s.askedHeldByAClient++
+	s.askedHeldByAClientWith = append(s.askedHeldByAClientWith, id)
 	return s.heldByAClient
 }
 
-func (s *probingClaimService) ActiveClaimsWithAppliesTo(_ domain.ID, appliesTo string) int64 {
-	s.askedActiveWith = append(s.askedActiveWith, appliesTo)
-	return s.activeByAppliesTo[appliesTo]
+// A member nobody carries is ABSENT from the answer, the way the store's own
+// GROUP BY leaves it out — never present carrying a zero. The rule's fold must
+// work off that shape, not off a padded one.
+func (s *probingClaimService) ActiveClaimsByAppliesTo(_ domain.ID) []ClaimActiveClaimsByAppliesToGroup {
+	s.askedCatalog++
+
+	groups := make([]ClaimActiveClaimsByAppliesToGroup, 0, len(s.activeByAppliesTo))
+	for _, member := range vos.ClaimAppliesToUnknown.Values() {
+		if held := s.activeByAppliesTo[member.Value()]; held > 0 {
+			groups = append(groups, ClaimActiveClaimsByAppliesToGroup{
+				AppliesTo: member.Value(),
+				Value:     held,
+			})
+		}
+	}
+	return groups
 }
 
 // claimWithDefault returns a valid claim whose declared type and default are
@@ -421,6 +449,27 @@ func TestNarrowingIsAllowedWhenNobodyHoldsAValue(t *testing.T) {
 	}
 }
 
+// THE PROBE IS ASKED ABOUT THE DEFINITION'S OWN ROW, and this is the assertion
+// that keeps it that way. The two edge tables store claim_id, so the id of the
+// row being narrowed is the only value that reads them correctly — and the
+// mistakes available here are quiet ones: the tenant's id is also a domain.ID
+// and would compile, match rows belonging to other definitions, and refuse
+// narrowings that should pass. An outcome assertion cannot tell the two apart
+// under a stub that answers the same either way.
+func TestTheHeldValueProbeIsAskedAboutTheClaimRowNotItsTenant(t *testing.T) {
+	svc, err := narrowTo(vos.ClaimAppliesToBoth, vos.ClaimAppliesToUser, &probingClaimService{})
+	if err != nil {
+		t.Fatalf("a definition nobody holds a value for could not be narrowed: %v", err)
+	}
+
+	if len(svc.askedHeldByAClientWith) != 1 {
+		t.Fatalf("the client side was asked %d times, want exactly once", len(svc.askedHeldByAClientWith))
+	}
+	if got := svc.askedHeldByAClientWith[0].Value(); got != claimRowID {
+		t.Errorf("the probe was asked about %q, want the claim row %q", got, claimRowID)
+	}
+}
+
 // A WIDENING ASKS NOTHING, and the assertion is on the CALL COUNT rather than
 // on the outcome. Both probes would answer "nobody holds it" under this stub,
 // so an implementation that queried two tables on every widening would pass an
@@ -561,11 +610,9 @@ func TestAFullUserBucketDoesNotBlockAClientOnlyClaim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a client-only definition was refused because the USER bucket is full: %v", err)
 	}
-	// The user member is never counted for a write that admits no user.
-	for _, asked := range svc.askedActiveWith {
-		if asked == vos.ClaimAppliesToUser.Value() {
-			t.Errorf("the user member was counted for a client-only insert: %v", svc.askedActiveWith)
-		}
+	// And it costs the one grouped read, never one per bucket.
+	if svc.askedCatalog != 1 {
+		t.Errorf("a client-only insert asked the catalog %d times, want exactly 1", svc.askedCatalog)
 	}
 }
 
@@ -599,25 +646,18 @@ func TestInsertingBothIntoTwoFullBucketsReportsBothSides(t *testing.T) {
 	}
 }
 
-// A `both` insert asks each member exactly ONCE. The `both` count belongs to
-// both buckets, so a body that read it per side would pay for four queries
-// where three do — invisible to every assertion about the outcome.
-func TestInsertingBothAsksEachMemberOnce(t *testing.T) {
+// THE WHOLE CATALOG IN ONE QUERY, pinned on the widest write there is: an
+// insert of `both` consumes a slot on each side and is the case a per-bucket or
+// per-member body would charge two or three round trips for. Every assertion
+// about the OUTCOME passes either way, which is exactly why the round trip is
+// counted here.
+func TestInsertingBothAsksTheCatalogOnce(t *testing.T) {
 	svc, err := insertWithAppliesTo(vos.ClaimAppliesToBoth, catalogOf(0, 0, 0))
 	if err != nil {
 		t.Fatalf("a valid `both` definition was refused: %v", err)
 	}
-	seen := map[string]int{}
-	for _, asked := range svc.askedActiveWith {
-		seen[asked]++
-	}
-	for member, count := range seen {
-		if count != 1 {
-			t.Errorf("the %q member was counted %d times, want once: %v", member, count, svc.askedActiveWith)
-		}
-	}
-	if len(svc.askedActiveWith) != 3 {
-		t.Errorf("a `both` insert asked %d counts, want 3: %v", len(svc.askedActiveWith), svc.askedActiveWith)
+	if svc.askedCatalog != 1 {
+		t.Errorf("a `both` insert asked the catalog %d times, want exactly 1", svc.askedCatalog)
 	}
 }
 
@@ -654,8 +694,8 @@ func TestNarrowingAsksTheCatalogNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a narrowing was refused by the catalog cap: %v", err)
 	}
-	if len(svc.askedActiveWith) != 0 {
-		t.Fatalf("a narrowing counted the catalog: %v", svc.askedActiveWith)
+	if svc.askedCatalog != 0 {
+		t.Fatalf("a narrowing counted the catalog %d times", svc.askedCatalog)
 	}
 }
 
@@ -675,8 +715,8 @@ func TestAnEditThatConsumesNoSlotIsAcceptedInAnOverBudgetTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an ordinary edit was refused in a tenant that is over the cap: %v", err)
 	}
-	if len(svc.askedActiveWith) != 0 {
-		t.Fatalf("an edit that left AppliesTo alone counted the catalog: %v", svc.askedActiveWith)
+	if svc.askedCatalog != 0 {
+		t.Fatalf("an edit that left AppliesTo alone counted the catalog %d times", svc.askedCatalog)
 	}
 }
 
@@ -694,7 +734,7 @@ func TestTheCatalogCapIsNeverAskedWithAnUnusableTenant(t *testing.T) {
 	if _, err := domain.GetInsertable(e, svc, "GetInsertable"); err == nil {
 		t.Fatal("a claim was created under an unparseable tenant id")
 	}
-	if len(svc.askedActiveWith) != 0 {
-		t.Fatalf("the catalog was counted under an unparseable tenant id: %v", svc.askedActiveWith)
+	if svc.askedCatalog != 0 {
+		t.Fatalf("the catalog was counted %d times under an unparseable tenant id", svc.askedCatalog)
 	}
 }

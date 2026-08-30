@@ -36,6 +36,7 @@ package infra
 
 import (
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
@@ -84,6 +85,10 @@ func (s *RoleServiceImpl) companions() *roleCompanionRepos {
 // found is false for an id no catalog row carries. archivedAt is non-nil when
 // the row exists but has been retired — Permission archives ONE WAY, so that is
 // a normal long-lived state and not an edge case.
+// The memo prefix, named for THIS service: the memo hangs off the request's
+// AppContext, which every service of the request shares.
+const roleCatalogMemoPrefix = "authcore.role.catalog:"
+
 type catalogRow struct {
 	found      bool
 	archivedAt *time.Time
@@ -106,63 +111,40 @@ func (r catalogRow) isWildcard() bool {
 	return r.resource == vos.PermissionWildcard || r.action == vos.PermissionWildcard
 }
 
-// catalogRow resolves one catalog permission, memoised for the request.
+// catalogRows resolves every requested catalog permission in ONE read,
+// memoised for the request — so the three facts below share it and a role
+// granting twenty permissions pays for one query.
 //
-// The memo lives on the AppContext, so it is per REQUEST and never shared
-// between two writes. Outside a request (tests, background jobs) there is no
-// context to memoise on and every call is a fresh read, which is correct rather
-// than merely acceptable: a long-lived cache of catalog rows would answer with
-// a permission's state from an arbitrary point in the past.
+// The batch arithmetic — dedup, the canonical key, the parse guard, what an id
+// the read did not answer for means — lives in row_resolution.go.
 //
-// Archived rows are INCLUDED in the read. The three callers need to tell "no
-// such permission" from "a permission that was retired", and an active-only
-// scope collapses both into "not found".
-func (s *RoleServiceImpl) catalogRow(permissionID domain.ID) catalogRow {
-	const memoPrefix = "authcore.role.catalog:"
+// ARCHIVED ROWS ARE INCLUDED in the read, and that is this resolver's one
+// difference from its neighbours. The three callers need to tell "no such
+// permission" from "a permission that was retired", and an active-only scope
+// collapses both into "not found".
+func (s *RoleServiceImpl) catalogRows(permissionIDs []domain.ID) map[domain.ID]catalogRow {
+	return resolveRows(s.ctx, roleCatalogMemoPrefix, permissionIDs, func(missing []domain.ID) map[string]catalogRow {
+		q := criteria.Where(criteria.In("ID", idArgs(missing)...)).IncludeArchived()
+		found, err := s.companions().permissions.Loader.FindAll(s.queryContext(), q)
+		if err != nil {
+			// A failed probe PANICS rather than inventing an answer. The
+			// pipeline turns it into a 500 and the write never happens — the
+			// only safe outcome, because every caller of this row is a security
+			// rule and a plausible answer would skip the invariant it enforces.
+			panic("Role: catalog probe failed for the " + strconv.Itoa(len(missing)) + " permission(s) this write grants")
+		}
 
-	if s.ctx != nil {
-		if cached, ok := s.ctx.Get(memoPrefix + permissionID.String()); ok {
-			if row, ok := cached.(catalogRow); ok {
-				return row
+		rows := make(map[string]catalogRow, len(found))
+		for _, permission := range found {
+			rows[canonicalIDOf(permission.GetID())] = catalogRow{
+				found:      true,
+				archivedAt: permission.GetDeletedAt(),
+				resource:   permission.Key.Resource,
+				action:     permission.Key.Action,
 			}
 		}
-	}
-
-	// DEFENCE IN DEPTH. The domain already refuses a grant id that is not a
-	// usable UUID before asking, but this is the seat that would pay for it: an
-	// unparseable value binds into a criterion against a UUID column, the driver
-	// rejects it, and the panic below turns a validation problem into a 500.
-	// Answering "not found" is both safe and true — no catalog row carries it.
-	if _, err := permissionID.UUID(); err != nil {
-		return catalogRow{found: false}
-	}
-
-	q := criteria.Where(criteria.Eq("ID", permissionID)).IncludeArchived()
-	found, err := s.companions().permissions.Loader.FindOne(s.queryContext(), q)
-
-	var row catalogRow
-	switch {
-	case err == nil:
-		row = catalogRow{
-			found:      true,
-			archivedAt: found.GetDeletedAt(),
-			resource:   found.Key.Resource,
-			action:     found.Key.Action,
-		}
-	case isRecordNotFound(err):
-		row = catalogRow{found: false}
-	default:
-		// A failed probe PANICS rather than inventing an answer. The pipeline
-		// turns it into a 500 and the write never happens — which is the only
-		// safe outcome, because every caller of this row is a security rule and
-		// a plausible answer would skip the invariant it exists to enforce.
-		panic("Role: catalog probe failed for permission " + permissionID.String())
-	}
-
-	if s.ctx != nil {
-		s.ctx.Set(memoPrefix+permissionID.String(), row)
-	}
-	return row
+		return rows
+	})
 }
 
 // isRecordNotFound separates "the row is not there" from "the query failed".
@@ -226,15 +208,27 @@ func (s *RoleServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
 // point at neither. The README's rule is what makes the archived half matter —
 // a retired permission comes back as a NEW row with a NEW id, so re-granting the
 // old id must be refused rather than silently honoured.
-func (s *RoleServiceImpl) PermissionIsNotInCatalog(permissionID domain.ID) bool {
-	return !s.catalogRow(permissionID).active()
+func (s *RoleServiceImpl) PermissionIsNotInCatalog(permissionIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.catalogRows(permissionIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = !row.active()
+	}
+	return out
 }
 
 // PermissionIsWildcard reports whether the catalog row behind this id carries a
 // wildcard in either part. Answers true when the id is unknown, so an
 // unresolvable grant never reaches the escalation probe.
-func (s *RoleServiceImpl) PermissionIsWildcard(permissionID domain.ID) bool {
-	return s.catalogRow(permissionID).isWildcard()
+func (s *RoleServiceImpl) PermissionIsWildcard(permissionIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.catalogRows(permissionIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = row.isWildcard()
+	}
+	return out
 }
 
 // CallerDoesNotHoldPermission reports whether the requesting caller lacks the
@@ -249,24 +243,34 @@ func (s *RoleServiceImpl) PermissionIsWildcard(permissionID domain.ID) bool {
 // matching authz.noIdentity: an identity is nil only under auth.mode disabled,
 // which the framework's own boot guard permits in the dev profile alone. An
 // identity that IS present and lacks the permission refuses.
-func (s *RoleServiceImpl) CallerDoesNotHoldPermission(permissionID domain.ID) bool {
+func (s *RoleServiceImpl) CallerDoesNotHoldPermission(permissionIDSet []domain.ID) map[domain.ID]bool {
 	if s.ctx == nil {
-		return false
+		return nil
 	}
 	identity := s.ctx.Identity()
 	if identity == nil {
-		return false
+		// STANDS DOWN WITHOUT READING ANYTHING. An empty answer raises nothing
+		// — an absent key is this fact answering nothing for that entry — and
+		// there is no caller to compare the catalog against, so resolving it
+		// would be work for no verdict.
+		return nil
 	}
 
-	row := s.catalogRow(permissionID)
-	if row.isWildcard() {
-		// Never handed to HasPermission — it panics on a wildcard. The wildcard
-		// rule refuses this grant on its own; this is the second lock.
-		return true
-	}
+	rows := s.catalogRows(permissionIDSet)
 
-	key := vos.PermissionKey{Resource: row.resource, Action: row.action}
-	return !identity.HasPermission(key.String())
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		if row.isWildcard() {
+			// Never handed to HasPermission — it panics on a wildcard. The
+			// wildcard rule refuses this grant on its own; this is the second
+			// lock, and it is why the batch may ask about every entry.
+			out[id] = true
+			continue
+		}
+		key := vos.PermissionKey{Resource: row.resource, Action: row.action}
+		out[id] = !identity.HasPermission(key.String())
+	}
+	return out
 }
 
 // CallerIsSuperAdmin reports whether the caller holds *:*.

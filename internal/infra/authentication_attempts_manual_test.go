@@ -567,3 +567,140 @@ func TestLockedUntil_IterationFailureSurfaces(t *testing.T) {
 		t.Errorf("locked = %v, err = %v — an iteration failure must not read as 'not locked'", locked, err)
 	}
 }
+
+// ── a recording seam ────────────────────────────────────────────────────────
+
+// recordingQuerier captures every statement and argument list the store issues,
+// which is what lets these tests assert the SHAPE of a write without a database.
+//
+// IT LIVES HERE BECAUSE THIS IS NOW ITS ONLY USER. The refresh token store shared
+// it until it moved onto a DirectRepository and stopped writing statements at all;
+// this store still renders its own — upserts with arithmetic in the conflict
+// branch, which the Direct write verbs do not express — so asserting the rendered
+// SQL is still asserting a decision this file makes.
+type recordingQuerier struct {
+	execs    []string
+	execArgs [][]any
+	execErr  error
+	// execErrAfter lets N statements through before execErr starts applying, so a
+	// test can fail the SECOND statement of a two-statement write. Zero — the
+	// default — fails from the first, which is what every earlier test expects.
+	execErrAfter int
+
+	// rowsScanErr and rowsIterErr make the replayed result set fail mid-scan and
+	// after iteration — the two branches a fixed set of rows cannot otherwise
+	// reach.
+	rowsScanErr error
+	rowsIterErr error
+
+	queried  []string
+	scanErr  error
+	scanFill func(dest ...any) error
+
+	// The multi-row side, used by the attempt store's lockout probe. `rows` is
+	// scanned one []any per row, in the order the statement would produce them.
+	queries   []string
+	queryArgs [][]any
+	queryErr  error
+	rows      [][]any
+}
+
+func (q *recordingQuerier) Query(_ context.Context, sql string, args ...any) (core.Rows, error) {
+	q.queries = append(q.queries, sql)
+	q.queryArgs = append(q.queryArgs, args)
+	if q.queryErr != nil {
+		return nil, q.queryErr
+	}
+	return &recordingCursor{rows: q.rows, scanErr: q.rowsScanErr, iterErr: q.rowsIterErr}, nil
+}
+
+// recordingCursor replays a fixed result set. Deliberately minimal: the tests that
+// use it assert the DECISION taken over the rows, not the driver's behaviour.
+type recordingCursor struct {
+	rows    [][]any
+	at      int
+	scanErr error
+	iterErr error
+}
+
+func (r *recordingCursor) Next() bool {
+	if r.at >= len(r.rows) {
+		return false
+	}
+	r.at++
+	return true
+}
+
+func (r *recordingCursor) Scan(dest ...any) error {
+	if r.scanErr != nil {
+		return r.scanErr
+	}
+	row := r.rows[r.at-1]
+	for i := range dest {
+		if i >= len(row) {
+			break
+		}
+		switch target := dest[i].(type) {
+		case *int:
+			if v, ok := row[i].(int); ok {
+				*target = v
+			}
+		case *time.Time:
+			if v, ok := row[i].(time.Time); ok {
+				*target = v
+			}
+		case **time.Time:
+			if v, ok := row[i].(*time.Time); ok {
+				*target = v
+			}
+		case **bool:
+			if v, ok := row[i].(*bool); ok {
+				*target = v
+			}
+		}
+	}
+	return nil
+}
+
+func (r *recordingCursor) Err() error   { return r.iterErr }
+func (r *recordingCursor) Close() error { return nil }
+
+func (q *recordingQuerier) QueryRow(_ context.Context, sql string, _ ...any) core.Row {
+	q.queried = append(q.queried, sql)
+	return &recordingRow{q: q}
+}
+
+func (q *recordingQuerier) QueryMaps(context.Context, string, ...any) ([]map[string]any, error) {
+	panic("the refresh store never issues a dynamic-shape read")
+}
+
+// Exec is what core.Exec widens the querier to. Without it the store's writes
+// would not reach this recorder at all.
+func (q *recordingQuerier) Exec(_ context.Context, sql string, args ...any) error {
+	q.execs = append(q.execs, sql)
+	q.execArgs = append(q.execArgs, args)
+	if len(q.execs) <= q.execErrAfter {
+		return nil
+	}
+	return q.execErr
+}
+
+type recordingRow struct{ q *recordingQuerier }
+
+func (r *recordingRow) Scan(dest ...any) error {
+	if r.q.scanErr != nil {
+		return r.q.scanErr
+	}
+	if r.q.scanFill != nil {
+		return r.q.scanFill(dest...)
+	}
+	return nil
+}
+
+// fakeSeam is the whole dependency this store has — which is the point of the
+// narrow SQLSeam it takes instead of the full engine: two methods to fake, not
+// eleven.
+type fakeSeam struct{ q *recordingQuerier }
+
+func (s *fakeSeam) Querier() core.Querier { return s.q }
+func (s *fakeSeam) Dialect() core.Dialect { return testDialect{} }

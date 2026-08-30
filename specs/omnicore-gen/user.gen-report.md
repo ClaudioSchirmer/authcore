@@ -122,43 +122,55 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
 
-**`GroupIsUnavailableInTenant(tenantID domain.ID, groupID domain.ID) bool`**
+**`GroupIsUnavailableInTenant(tenantID domain.ID, groupIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this group id is absent from the groups table, points at an archived group, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
 
-**`GroupGrantsWildcard(groupID domain.ID) bool`**
+**`GroupGrantsWildcard(groupIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether any role this group confers grants a permission carrying a wildcard in either part. Answers TRUE when the id is unknown, so an unresolvable membership never reaches the escalation probe.
 
-**`CallerLacksAnyPermissionOfGroup(groupID domain.ID) bool`**
+**`CallerLacksAnyPermissionOfGroup(groupIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the requesting caller fails to hold at least one permission conferred by any role in this group — the transitive, three-hop half of the escalation rule. Shares the single resolution GroupGrantsWildcard performs. GUARDS THE WILDCARD ITSELF and answers "lacks" rather than calling through, because a panic on a security rule is a 500. A *:* superadmin passes by construction.
 
-**`RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool`**
+**`RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this role id is absent from the roles table, points at an archived role, or belongs to a tenant OTHER than the one passed. One answer for all three.
 
-**`RoleGrantsWildcard(roleID domain.ID) bool`**
+**`RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the role behind this id grants any permission carrying a wildcard. Resolve it through RoleRepository.Loader, whose declared read join fills every grant's resource and action. Answers TRUE for an unknown id.
 
-**`CallerLacksAnyPermissionOfRole(roleID domain.ID) bool`**
+**`CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the requesting caller fails to hold at least one of the permissions this role grants. Shares RoleGrantsWildcard's single read, and guards the wildcard itself.
 
-**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool`**
+**`ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether this claim id is absent from the claims table, points at an archived definition, or belongs to a tenant OTHER than the one passed. One answer for all three — the caller-facing message must not distinguish them.
 
-**`ClaimDoesNotApplyToUser(claimID domain.ID) bool`**
+**`ClaimDoesNotApplyToUser(claimIDSet []domain.ID) map[domain.ID]bool`**
 
 > Whether the definition behind this id declares appliesTo: client, so no user may hold a value for it. user and both answer false. Answers TRUE for an unknown id.
 
-**`ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool`**
+**`ClaimValueDoesNotMatchValueType(entries []UserClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool`**
 
 > Whether the value fails to parse as the ValueType the definition declares: `number` wants a valid decimal number, `bool` wants exactly "true" or "false", `string` wants any non-empty value. The same three readings the catalog's own default-value check uses. Answers TRUE for an unknown id.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+### `internal/infra/user_service_manual.go` — bodies the spec no longer asks for
+
+This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
+
+- `func (s *UserServiceImpl) companions(...)`
+- `func (s *UserServiceImpl) roleRow(...)`
+- `func (s *UserServiceImpl) groupRow(...)`
+- `func (s *UserServiceImpl) callerLacksAnyPermissionOfRole(...)`
+- `func (s *UserServiceImpl) claimRow(...)`
+
+⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
 ### `internal/application/queries/user_computed_manual.go`
 
@@ -400,54 +412,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the users feature (repository + view + mount) | `bootstrap/users_feature.go` |
-| the archive command and result | `internal/application/commands/archive_user_command.go` |
-| the insert command and result | `internal/application/commands/insert_user_command.go` |
-| the patch command and result | `internal/application/commands/patch_user_command.go` |
-| the shapes for 3 child collection(s) | `internal/application/commands/user_child_results.go` |
-| the per-entry commands for user_claims | `internal/application/commands/user_claim_commands.go` |
-| tests for the command mappers | `internal/application/commands/user_commands_test.go` |
-| the per-entry commands for user_groups | `internal/application/commands/user_group_commands.go` |
-| the per-entry commands for user_roles | `internal/application/commands/user_role_commands.go` |
-| the UserClaim input DTO | `internal/application/dtos/user_claim_input.go` |
-| tests for the 3 collection input mapper(s) | `internal/application/dtos/user_dtos_test.go` |
-| the UserGroup input DTO | `internal/application/dtos/user_group_input.go` |
-| the UserRole input DTO | `internal/application/dtos/user_role_input.go` |
-| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/user_queries_test.go` |
-| the read shapes for 3 child collection(s) | `internal/application/queries/user_row_results.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/user_translations_test.go` |
-| tests for the collection types | `internal/domain/aggregatevos/user_children_test.go` |
-| the UserClaim child value object | `internal/domain/aggregatevos/user_claim.go` |
-| the UserGroup child value object | `internal/domain/aggregatevos/user_group.go` |
-| the UserRole child value object | `internal/domain/aggregatevos/user_role.go` |
-| the User aggregate root, its modes and its rules | `internal/domain/user.go` |
 | the User service port (13 fact(s)) | `internal/domain/user_service.go` |
 | tests for User's rules | `internal/domain/user_test.go` |
-| the ClaimValue value object | `internal/domain/vos/claim_value.go` |
-| the Email value object | `internal/domain/vos/email.go` |
-| the UserStatus enumeration (2 members) | `internal/domain/vos/user_status.go` |
-| tests for 3 value object(s) | `internal/domain/vos/user_vos_test.go` |
-| the user_claims child schema | `internal/infra/schemas/user_claim_schema.go` |
-| the user_groups child schema | `internal/infra/schemas/user_group_schema.go` |
-| the user_roles child schema | `internal/infra/schemas/user_role_schema.go` |
-| the users schema (9 columns) | `internal/infra/schemas/user_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/user_schemas_test.go` |
-| the User repository and its constraint bindings | `internal/infra/user_repository.go` |
 | the User service implementation | `internal/infra/user_service.go` |
-| the users view (relational-backed) | `internal/infra/views/user_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/user_view_test.go` |
-| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
-| the listing request and response | `internal/web/requests/find_users_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_user.go` |
-| the patch request and response | `internal/web/requests/patch_user.go` |
-| the wire types for 3 child collection(s) | `internal/web/requests/user_children.go` |
-| the per-entry wire types for user_claims | `internal/web/requests/user_claim_requests.go` |
-| the per-entry wire types for user_groups | `internal/web/requests/user_group_requests.go` |
-| the request mapper tests | `internal/web/requests/user_requests_test.go` |
-| the per-entry wire types for user_roles | `internal/web/requests/user_role_requests.go` |
-| the 5 user endpoints | `internal/web/user_routes.go` |
 
 **Left untouched** (yours, by design):
 
@@ -457,7 +424,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-1 file(s) were already up to date.
+46 file(s) were already up to date.
 
 ## What was NOT generated
 

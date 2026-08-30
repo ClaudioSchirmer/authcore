@@ -38,13 +38,13 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 **`claims-per-tenant-cap-users`**
 
-> At most 20 ACTIVE claim definitions per tenant may admit a USER — that is, may carry AppliesTo `user` or `both`. Ask ActiveClaimsWithAppliesTo twice and add the two answers: the `user` member plus the `both` member. Fire ONLY when this write ADDS the user kind — on an insert whose AppliesTo admits users, and on an update whose OLD AppliesTo did not admit users while the new one does. A write that neither inserts nor widens into `user` must ask NOTHING and always pass, including a narrowing and an edit that leaves AppliesTo alone. Refuse when the bucket already holds 20 or more, since the row being written would be the 21st. Read the enum member off AppliesTo through ClaimAdmitsUsers rather than comparing raw strings, so an unknown member — which the value object already refused — reaches no second answer here. The bound reaches the message through the notification's {max} tvar.
+> At most 20 ACTIVE claim definitions per tenant may admit a USER — that is, may carry AppliesTo `user` or `both`. Ask ActiveClaimsByAppliesTo ONCE and add up the groups whose member admits users: the `user` group plus the `both` group. Fire ONLY when this write ADDS the user kind — on an insert whose AppliesTo admits users, and on an update whose OLD AppliesTo did not admit users while the new one does. A write that neither inserts nor widens into `user` must ask NOTHING and always pass, including a narrowing and an edit that leaves AppliesTo alone. Refuse when the bucket already holds 20 or more, since the row being written would be the 21st. Read the enum member off AppliesTo through ClaimAdmitsUsers rather than comparing raw strings, so an unknown member — which the value object already refused — reaches no second answer here. The bound reaches the message through the notification's {max} tvar.
 
 - fires under `IfInsertOrUpdate` · raise `TooManyUserClaimsInTenantNotification{}` · attach it to `AppliesTo`
 
 **`claims-per-tenant-cap-clients`**
 
-> The client half of the same budget, and the same contract in every respect: at most 20 ACTIVE claim definitions per tenant may admit a machine CLIENT — AppliesTo `client` or `both`. Add the `client` member's count to the `both` member's, fire only when this write ADDS the client kind, read the member through ClaimAdmitsClients, and refuse at 20 or more. The two buckets are independent: a full user side must never block a definition that admits only clients.
+> The client half of the same budget, and the same contract in every respect: at most 20 ACTIVE claim definitions per tenant may admit a machine CLIENT — AppliesTo `client` or `both`. It reads the SAME single grouped answer the user half reads, adding up the groups ClaimAdmitsClients accepts; fire only when this write ADDS the client kind and refuse at 20 or more. The two buckets are independent: a full user side must never block a definition that admits only clients.
 
 - fires under `IfInsertOrUpdate` · raise `TooManyClientClaimsInTenantNotification{}` · attach it to `AppliesTo`
 
@@ -58,15 +58,26 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 > Whether the owning tenant is missing, archived, or commercially SUSPENDED. Queries the tenants table by its primary key. A trial tenant is a live customer and is available.
 
-**`ClaimIsHeldByAUser(tenantID domain.ID, name string) bool`**
+**`ClaimIsHeldByAUser(id domain.ID) bool`**
 
-> Whether any ACTIVE user_claims row references the ACTIVE claim definition identified by this tenant and name. Join user_claims to claims on claim_id and require user_claims.deleted_at IS NULL AND claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape, and the archived-definition half is what keeps a retired row's leftovers out of the answer.
+> Whether any ACTIVE user_claims row references this claim definition. Read user_claims alone, by claim_id, requiring user_claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape.
 
-**`ClaimIsHeldByAClient(tenantID domain.ID, name string) bool`**
+**`ClaimIsHeldByAClient(id domain.ID) bool`**
 
-> Whether any ACTIVE client_claims row references the ACTIVE claim definition identified by this tenant and name. Same join and the same two archive predicates as its user twin.
+> Whether any ACTIVE client_claims row references this claim definition. Same single-table read and the same archive predicate as its user twin, on the other side of the chain.
 
 The method returns a plain value and no error, so decide what an unavailable source means. Failing loudly is the safe default — returning a plausible answer skips the rule this exists to enforce.
+
+**Before writing one of these against another TABLE, check the door.** The facts beside this file run over this entity's own repository, so a question about another aggregate's child table, a control table or a lookup cannot be asked there. If the pinned framework documents a DIRECT schema — one table, no aggregate behind it — that table gets its own anchor and the body keeps the same existence probe and aggregate DSL, in every dialect, inside the caller's transaction. Hand-written SQL and a whole aggregate declared for a table that is only ever counted are both the wrong answer to that question.
+
+### `internal/infra/claim_service_manual.go` — bodies the spec no longer asks for
+
+This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
+
+- `func (s *ClaimServiceImpl) tenants(...)`
+- `func (s *ClaimServiceImpl) claimIsHeldBy(...)`
+
+⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
 ### The migration — already yours
 
@@ -176,33 +187,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the claims feature (repository + view + mount) | `bootstrap/claims_feature.go` |
-| the archive command and result | `internal/application/commands/archive_claim_command.go` |
-| tests for the command mappers | `internal/application/commands/claim_commands_test.go` |
-| the insert command and result | `internal/application/commands/insert_claim_command.go` |
-| the patch command and result | `internal/application/commands/patch_claim_command.go` |
-| the read criteria tests | `internal/application/queries/claim_queries_test.go` |
-| the by-id query and its result | `internal/application/queries/find_claim_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_claims_by_params_query.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/claim_translations_test.go` |
-| the Claim aggregate root, its modes and its rules | `internal/domain/claim.go` |
 | the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
 | tests for Claim's rules | `internal/domain/claim_test.go` |
-| the ClaimAppliesTo enumeration (3 members) | `internal/domain/vos/claim_applies_to.go` |
-| the ClaimValueType enumeration (3 members) | `internal/domain/vos/claim_value_type.go` |
-| tests for 2 value object(s) | `internal/domain/vos/claim_vos_test.go` |
-| the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
 | the Claim service implementation | `internal/infra/claim_service.go` |
-| the claims schema (6 columns) | `internal/infra/schemas/claim_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/claim_schemas_test.go` |
-| the claims view (relational-backed) | `internal/infra/views/claim_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/claim_view_test.go` |
-| the 5 claim endpoints | `internal/web/claim_routes.go` |
-| the request mapper tests | `internal/web/requests/claim_requests_test.go` |
-| the by-id request and response | `internal/web/requests/find_claim_by_id.go` |
-| the listing request and response | `internal/web/requests/find_claims_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_claim.go` |
-| the patch request and response | `internal/web/requests/patch_claim.go` |
 
 **Left untouched** (yours, by design):
 
@@ -211,7 +198,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-1 file(s) were already up to date.
+25 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -221,14 +208,15 @@ Owned by other tools:
 - integration events (publish/subscribe) — `/omnicore:implement`
 - read models spanning more than this entity — `/omnicore:scaffold-view`
 - changing this entity once it exists — `/omnicore:evolve-entity`, which edits this spec and regenerates. The CODE comes back from the spec; the DATABASE never does — the migration a change needs is written by hand, and that skill's impact map is what carries it, along with the orphans a shrinking spec leaves and everything outside this generator's ownership
+- a table with NO aggregate behind it — a control table, a job queue, a lookup, an idempotency ledger. This generator writes aggregates and this spec language cannot say "not one"; that does not mean the framework has no answer. If the pinned version documents a DIRECT schema (one table, no entity), it is the door for those, and `/omnicore:implement` owns wiring it. Neither hand-written SQL nor an entity declared for a table that is only ever queried is the right shape
 
 Read controls this listing does NOT serve: `?search=`. That is a contract, not an omission — sending one is answered with a typed 400 rather than being ignored.
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.63.0)
+Verdict: **exact** (project pins v0.64.0)
 
-framework v0.63.0 meets the required v0.63.0
+framework v0.64.0 meets the required v0.64.0
 
 Verify what was generated:
 

@@ -23,10 +23,14 @@
 package infra
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/command/read"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/criteria"
 )
 
@@ -35,6 +39,17 @@ var (
 	// Keyed by the OWNING repository — see the note in the file header. Never a
 	// bare package-level singleton.
 	claimTenantsByRepo = map[*ClaimRepository]*TenantRepository{}
+
+	// Held as edgeHolder, NOT as the concrete repository, and that narrowing is
+	// the point rather than tidiness. read.DirectRepository carries a writer
+	// beside its reader — Insert, Update, Delete, Archive — so storing it whole
+	// would leave every caller in this package one field access away from writing
+	// into another aggregate's collection, outside its root, with no rules, no
+	// revision guard and no audit. The probe needs one question answered; the
+	// interface below is exactly that question, and the write half stays
+	// unreachable from here.
+	claimUserEdgesByRepo   = map[*ClaimRepository]claimEdge{}
+	claimClientEdgesByRepo = map[*ClaimRepository]claimEdge{}
 )
 
 // tenants returns the repository this fact reads across, building it once per
@@ -104,84 +119,125 @@ func (s *ClaimServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
 
 // ── the narrowing guard: does anybody still hold a value for this definition ──
 //
-// These two are the only probes in this service that read a COLLECTION table
-// rather than an aggregate root, and that is why they drop to SQL instead of a
-// criteria. An AggregateLoader answers questions about roots — "is there a claim
-// like this" — and the question here is "is there an ENTRY of another
-// aggregate's collection pointing at this row", which no criteria over `claims`
-// can phrase and no criteria over `users` can either: a collection's columns are
-// load-only, served inside the entry and never filterable. Querier is the
-// framework's own seam for exactly this ("the loader, composer and the
-// consumer's own custom reads"), and both statements are strictly READ-ONLY.
+// These two probes read a COLLECTION table that belongs to ANOTHER aggregate —
+// user_claims is User's, client_claims is Client's — and that is the whole reason
+// they exist as hand-written facts. A criteria over `claims` cannot phrase the
+// question, and one over `users` cannot either: the loader's resolver offers the
+// anchor, its siblings, its shared base and its ROOT joins, and refuses a child's
+// fields in as many words — "child joins are load-only … filtering the root by a
+// field of a 1:N child is a pushdown a single root SELECT cannot express".
 //
-// Dialect-neutral by construction rather than by luck: every identifier goes
-// through QuoteIdent, every bound value through EncodeArg, and the placeholders
-// come from Placeholder. Postgres is this project's only target today, and none
-// of that is a reason to hand-render "$1".
-
-// claimIsHeldBy answers whether an ACTIVE row of the given edge table points at
-// the ACTIVE claim definition identified by this tenant and name.
+// The answer is to stop entering through a root. core.NewDirectSchema anchors a
+// schema ON THE TABLE, and read.DirectRepository reads it with the loader's own
+// vocabulary — so these two are ordinary Exists calls, with no SQL written here
+// and no column named here. The schemas live beside the generated ones, in
+// internal/infra/schemas/claim_edge_direct_schemas.go, with the reasoning for the
+// second declaration and the test that keeps the two in step.
 //
-// FILTERED BY THE NATURAL KEY, not the row id, because a fact's filters must
-// name declared fields of the spec and the primary key is not one of them.
-// (TenantID, Name) identifies the definition exactly: both are immutable, and
-// Name is unique per tenant.
-//
-// TWO archive predicates, and the second is the one that is easy to miss. That
-// uniqueness is scoped to the ACTIVE rows, so an archived definition may share
-// the pair with the live one — and its leftover edges would otherwise block a
-// narrowing on the row that replaced it, forever, with no way to see why.
-func (s *ClaimServiceImpl) claimIsHeldBy(edgeTable string, tenantID domain.ID, name string) bool {
-	// Usable, not merely non-empty: an unparseable owner would bind into a
-	// comparison against a UUID column and make the driver reject the
-	// statement. Nobody holds a value under a tenant that cannot exist.
-	if _, err := tenantID.UUID(); err != nil {
-		return false
-	}
+// ONE PREDICATE EACH, and it is worth saying what that replaced. While the spec
+// could not filter a fact by the row id (before omnicore-gen 0.52.0) these facts
+// took (TenantID, Name) and paid twice for it: a join to `claims` that existed
+// only to translate the name back into the id the edge row already stores, and a
+// second archive predicate on that join, because (tenant, name) is ambiguous
+// between a live definition and an archived one still sharing the pair. The id is
+// never ambiguous, so both are gone.
 
-	d := s.repo.Engine.Dialect()
-	q := d.QuoteIdent
-
-	// COUNT(*), NOT `SELECT 1 … LIMIT 1`, and the difference is a bug rather than
-	// a preference. This project's Querier hands back the driver's own Row, so a
-	// SELECT that matches nothing fails the Scan with the DRIVER's no-rows
-	// sentinel — pgx.ErrNoRows here — which isRecordNotFound does not recognise
-	// (it looks for a framework DomainError). The panic below would then fire on
-	// the ORDINARY case: a definition nobody holds a value for, which is exactly
-	// the narrowing that must be allowed. Every legitimate narrowing would answer
-	// 500.
-	//
-	// An aggregate always returns exactly one row, so there is no no-rows case to
-	// spell, on any engine. Any error left is a genuine failure and the panic is
-	// the honest answer. It also keeps the statement plain ANSI: no LIMIT, no
-	// TOP, no FETCH FIRST, nothing per-dialect.
-	//
-	// The cost is counting instead of stopping at the first match, on a probe
-	// that runs at most twice per claim-definition update — an operator action,
-	// not a hot path — and against the claim_id index the two edge migrations add
-	// by hand.
-	sql := "SELECT COUNT(*) FROM " + q(edgeTable) + " AS e" +
-		" INNER JOIN " + q("claims") + " AS c ON c." + q("id") + " = e." + q("claim_id") +
-		" WHERE e." + q("deleted_at") + " IS NULL" +
-		" AND c." + q("deleted_at") + " IS NULL" +
-		" AND c." + q("tenant_id") + " = " + d.Placeholder(1) +
-		" AND c." + q("name") + " = " + d.Placeholder(2)
-
-	var held int64
-	if err := s.repo.Engine.Querier().
-		QueryRow(s.queryContext(), sql, d.EncodeArg(tenantID), d.EncodeArg(name)).
-		Scan(&held); err != nil {
-		// A failed probe PANICS rather than inventing an answer, like every
-		// other probe in this package. Answering "nobody holds it" would let
-		// the narrowing through and strand the values this rule exists to
-		// protect — the expensive direction, and invisible afterwards.
-		panic("Claim: held-value probe failed on " + edgeTable)
-	}
-	return held > 0
+// edgeHolder is what both probes ask of their repository, and the only thing they
+// ask. Naming it keeps claimEdgeHolds free of the repository's row type, so one
+// body serves both tables without either side widening its reach.
+type edgeHolder interface {
+	Exists(ctx context.Context, q *criteria.Query) (bool, error)
 }
 
-// ClaimIsHeldByAUser reports whether any ACTIVE user_claims row references the
-// ACTIVE definition identified by this tenant and name.
+// claimEdge is one edge table as a probe sees it: the read, and the name to blame
+// when the read fails.
+//
+// The NAME COMES OFF THE SCHEMA rather than being typed at the call site, which
+// is the same discipline the rest of this file follows for columns. A Direct
+// repository exposes its reads and its joins but not its table, so the string is
+// taken where the schema is still in hand — at construction, once — instead of
+// being re-spelled beside every panic. A literal there would be a fourth place
+// naming the table, and the only one nothing checks.
+type claimEdge struct {
+	holder edgeHolder
+	table  string
+}
+
+// claimEdgeFor returns the edge for one table, built once per owning
+// ClaimRepository and cached in the map it is handed.
+//
+// Built lazily and keyed by the OWNING repository, for the reason in the file
+// header: a package-level singleton would build from the first engine it ever saw
+// and hand that to every service constructed afterwards.
+//
+// The row type is the type parameter and the schema is the argument, and the
+// framework cross-checks the two at construction — one schema, one row type — so
+// a pair that does not belong together fails at the first call rather than
+// reading the wrong table quietly.
+func claimEdgeFor[T any](cache map[*ClaimRepository]claimEdge, repo *ClaimRepository, schema *core.TableSchema) claimEdge {
+	claimCompanionsMu.Lock()
+	defer claimCompanionsMu.Unlock()
+
+	if edge, ok := cache[repo]; ok {
+		return edge
+	}
+	edge := claimEdge{
+		holder: read.NewDirectRepository[T](repo.Engine, schema),
+		table:  schema.Table(),
+	}
+	cache[repo] = edge
+	return edge
+}
+
+func (s *ClaimServiceImpl) userClaimEdges() claimEdge {
+	return claimEdgeFor[schemas.UserClaimEdge](claimUserEdgesByRepo, s.repo, schemas.UserClaimEdgeSchema())
+}
+
+func (s *ClaimServiceImpl) clientClaimEdges() claimEdge {
+	return claimEdgeFor[schemas.ClientClaimEdge](claimClientEdgesByRepo, s.repo, schemas.ClientClaimEdgeSchema())
+}
+
+// claimEdgeHolds answers whether any ACTIVE row of one edge table points at this
+// claim definition.
+//
+// ACTIVE is the query's DEFAULT SCOPE rather than a predicate spelled here, and
+// that is exactly what it should be: the schema declares deleted_at, so the gate
+// is the framework's. Archived edges must not count — a value somebody removed is
+// history, and history must not freeze a definition's shape forever, which is the
+// direct consequence of both collections choosing softRemove.
+//
+// The edge arrives as a THUNK, not as a value, and that is load-bearing rather
+// than a style choice: an argument is evaluated before the call, so passing it
+// directly would build the repository — and reach into s.repo — before the guard
+// below had a chance to refuse. A probe that is not going to query should
+// construct nothing, which is also what lets a zero-value service be a legitimate
+// fixture for the guard's own test.
+func claimEdgeHolds(ctx context.Context, edge func() claimEdge, claimID domain.ID) bool {
+	// Usable, not merely non-empty. An id the driver would reject is not a
+	// definition anybody can hold a value for, but it is also not a definition
+	// this probe can answer ABOUT — so it refuses rather than clearing the way.
+	// That is the opposite of the old (tenant, name) shape's guard, and
+	// deliberately: an impossible TENANT meant "nobody holds it", while an
+	// impossible SUBJECT means "no answer", and the narrowing this guards is the
+	// expensive direction to get wrong.
+	if _, err := claimID.UUID(); err != nil {
+		return true
+	}
+
+	e := edge()
+	held, err := e.holder.Exists(ctx, criteria.Where(criteria.Eq("ClaimID", claimID)))
+	if err != nil {
+		// A failed probe PANICS rather than inventing an answer, like every other
+		// probe in this package. Answering "nobody holds it" would let the
+		// narrowing through and strand the values this rule exists to protect —
+		// the expensive direction, and invisible afterwards.
+		panic("Claim: held-value probe failed on " + e.table)
+	}
+	return held
+}
+
+// ClaimIsHeldByAUser reports whether any ACTIVE user_claims row references this
+// claim definition.
 //
 // Named for the PROBLEM, and here that took a moment's care rather than being
 // automatic. The generated suite stubs the service so every probe answers
@@ -189,17 +245,10 @@ func (s *ClaimServiceImpl) claimIsHeldBy(edgeTable string, tenantID domain.ID, n
 // so a narrowing is allowed and the generated happy path passes on the day it is
 // written. The healthy-state spelling — ClaimIsFreeOfUserValues — would read
 // false too, and would then mean "somebody holds it", turning a correct spec red.
-//
-// ARCHIVED EDGES DO NOT COUNT, which is the direct consequence of the two edge
-// collections choosing softRemove: a value somebody removed is history, and
-// history must not freeze a definition's shape forever.
-func (s *ClaimServiceImpl) ClaimIsHeldByAUser(tenantID domain.ID, name string) bool {
-	return s.claimIsHeldBy("user_claims", tenantID, name)
+func (s *ClaimServiceImpl) ClaimIsHeldByAUser(id domain.ID) bool {
+	return claimEdgeHolds(s.queryContext(), s.userClaimEdges, id)
 }
 
-// ClaimIsHeldByAClient reports whether any ACTIVE client_claims row references
-// the ACTIVE definition identified by this tenant and name. Same contract, same
-// two archive predicates, the other side of the chain.
-func (s *ClaimServiceImpl) ClaimIsHeldByAClient(tenantID domain.ID, name string) bool {
-	return s.claimIsHeldBy("client_claims", tenantID, name)
+func (s *ClaimServiceImpl) ClaimIsHeldByAClient(id domain.ID) bool {
+	return claimEdgeHolds(s.queryContext(), s.clientClaimEdges, id)
 }

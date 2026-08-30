@@ -43,6 +43,7 @@
 package infra
 
 import (
+	"strconv"
 	"sync"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
@@ -70,6 +71,10 @@ var (
 //
 // They share that repository's engine, which is what keeps every probe on the
 // same connection pool and the same dialect as the write it is guarding.
+// The memo prefix, named for THIS service: the memo hangs off the request's
+// AppContext, which every service of the request shares.
+const groupRoleMemoPrefix = "authcore.group.role:"
+
 func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 	groupCompanionsMu.Lock()
 	defer groupCompanionsMu.Unlock()
@@ -110,73 +115,32 @@ func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 // hydrated, so a permission the role no longer confers is not judged: it would
 // be fail-closed, but it would refuse an attachment over a grant that does not
 // exist.
-func (s *GroupServiceImpl) roleRow(roleID domain.ID) roleRow {
-	const memoPrefix = "authcore.group.role:"
+func (s *GroupServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
+	return resolveRows(s.ctx, groupRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]roleRow {
+		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
+		if err != nil {
+			// A failed probe PANICS rather than inventing an answer: every
+			// caller of this row is a security rule, and a plausible answer
+			// would skip the invariant it exists to enforce.
+			panic("Group: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write attaches")
+		}
 
-	if s.ctx != nil {
-		if cached, ok := s.ctx.Get(memoPrefix + roleID.String()); ok {
-			if row, ok := cached.(roleRow); ok {
-				return row
+		rows := make(map[string]roleRow, len(found))
+		for _, role := range found {
+			// The grants arrive with resource and action already filled — Role
+			// declares the traversal into the catalog. Nothing here queries it.
+			grants := domain.GetCurrentItemsOf[aggregatevos.RolePermission](role.GetAggregateRoot())
+			keys := make([]vos.PermissionKey, 0, len(grants))
+			for _, grant := range grants {
+				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
+			rows[canonicalIDOf(role.GetID())] = roleRow{found: true, tenantID: role.TenantID, keys: keys}
 		}
-	}
-
-	// DEFENCE IN DEPTH. The domain already refuses an entry id that is not a
-	// usable UUID before asking, but this is the seat that would pay for it: an
-	// unparseable value binds into a criterion against a UUID column, the driver
-	// rejects it, and the panic below turns a validation problem into a 500.
-	// Answering "not found" is both safe and true — no role row carries it.
-	if _, err := roleID.UUID(); err != nil {
-		return roleRow{found: false}
-	}
-
-	q := criteria.Where(criteria.Eq("ID", roleID))
-	found, err := s.companions().roles.Loader.FindOne(s.queryContext(), q)
-
-	var row roleRow
-	switch {
-	case err == nil:
-		// The grants arrive with resource and action already filled — see note 3
-		// in the file header. Nothing here queries the permission catalog.
-		grants := domain.GetCurrentItemsOf[aggregatevos.RolePermission](found.GetAggregateRoot())
-		keys := make([]vos.PermissionKey, 0, len(grants))
-		for _, grant := range grants {
-			keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
-		}
-		row = roleRow{found: true, tenantID: found.TenantID, keys: keys}
-	case isRecordNotFound(err):
-		row = roleRow{found: false}
-	default:
-		// A failed probe PANICS rather than inventing an answer. The pipeline
-		// turns it into a 500 and the write never happens — which is the only
-		// safe outcome, because every caller of this row is a security rule and
-		// a plausible answer would skip the invariant it exists to enforce.
-		panic("Group: role probe failed for role " + roleID.String())
-	}
-
-	if s.ctx != nil {
-		s.ctx.Set(memoPrefix+roleID.String(), row)
-	}
-	return row
+		return rows
+	})
 }
 
-// TenantIsUnavailable reports whether the owning tenant is missing, archived, or
-// commercially SUSPENDED. Queries the tenants table by its primary key.
-//
-// Named for the PROBLEM rather than the healthy state, which is what lets the
-// generated suite's zero-value service stub read as "nothing is wrong".
-//
-// THREE conditions, not two, and the third is the one that is easy to get
-// wrong. Tenant carries its own commercial lifecycle beside the archive stamp,
-// and the two are orthogonal: archiving forces `suspended`, but a tenant can be
-// suspended while perfectly un-archived — a customer who stopped paying. A group
-// confers roles, so minting one inside a suspended tenant sets up access the
-// commercial state says to withhold.
-//
-// TRIAL IS AVAILABLE, and that is deliberate. "Unavailable" is not "not active":
-// a trial is a live customer being onboarded, and an org chart is exactly what
-// they need. Only `suspended` withholds. Reading this as `Status != active`
-// would break every trial signup.
 func (s *GroupServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
 	// Usable, not merely non-empty — the same reason roleRow guards its own
 	// argument. An unparseable owner is not a tenant that exists, so answering
@@ -225,12 +189,14 @@ func (s *GroupServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
 // The database foreign key already covers the EXISTENCE half. What earns this
 // probe its keep is the other two: the FK cannot see the archive stamp, and it
 // cannot see whose tenant the role is in.
-func (s *GroupServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleID domain.ID) bool {
-	row := s.roleRow(roleID)
-	if !row.found {
-		return true
+func (s *GroupServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.roleRows(roleIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = !row.found || row.tenantID != tenantID
 	}
-	return row.tenantID != tenantID
+	return out
 }
 
 // RoleGrantsWildcard reports whether the role behind this id confers any
@@ -240,8 +206,14 @@ func (s *GroupServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleID 
 // The keys it scans came out of the SAME read RoleIsUnavailableInTenant used —
 // filled by the traversal RoleRepository declares into the catalog, so this
 // costs no query of its own.
-func (s *GroupServiceImpl) RoleGrantsWildcard(roleID domain.ID) bool {
-	return s.roleRow(roleID).grantsWildcard()
+func (s *GroupServiceImpl) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool {
+	rows := s.roleRows(roleIDSet)
+
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = row.grantsWildcard()
+	}
+	return out
 }
 
 // CallerLacksAnyPermissionOf reports whether the requesting caller fails to hold
@@ -268,29 +240,26 @@ func (s *GroupServiceImpl) RoleGrantsWildcard(roleID domain.ID) bool {
 // matching authz.noIdentity: an identity is nil only under auth.mode disabled,
 // which the framework's own boot guard permits in the dev profile alone. An
 // identity that IS present and lacks a permission refuses.
-func (s *GroupServiceImpl) CallerLacksAnyPermissionOf(roleID domain.ID) bool {
+func (s *GroupServiceImpl) CallerLacksAnyPermissionOf(roleIDSet []domain.ID) map[domain.ID]bool {
 	if s.ctx == nil {
-		return false
+		return nil
 	}
 	identity := s.ctx.Identity()
 	if identity == nil {
-		return false
+		// STANDS DOWN WITHOUT READING ANYTHING. An empty answer raises nothing
+		// — an absent key is this fact answering nothing for that entry — and
+		// there is no caller to compare the bundles against, so resolving them
+		// would be work for no verdict.
+		return nil
 	}
 
-	row := s.roleRow(roleID)
-	if row.grantsWildcard() {
-		// Never handed to HasPermission — it panics on a wildcard, and this also
-		// covers the unresolvable role. The wildcard rule refuses this
-		// attachment on its own; this is the second lock.
-		return true
-	}
+	rows := s.roleRows(roleIDSet)
 
-	for _, key := range row.keys {
-		if !identity.HasPermission(key.String()) {
-			return true
-		}
+	out := make(map[domain.ID]bool, len(rows))
+	for id, row := range rows {
+		out[id] = callerLacksAnyPermissionOfRole(identity, row)
 	}
-	return false
+	return out
 }
 
 var _ appdomain.GroupService = (*GroupServiceImpl)(nil)

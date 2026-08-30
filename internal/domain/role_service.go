@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-08-29
-// checksum:   sha256:abe64eda8c0ca7b700df6232a0c1b7097eb3182db603ad57ab4339f6b3ccee71
+// checksum:   sha256:2c2d28229b683aab8b2507320759e1f344f95b93929fe5e94fafd869034a8b8e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -48,26 +48,44 @@ type RoleService interface {
 	TenantIsUnavailable(tenantID domain.ID) bool
 
 	// Whether this permission id is absent from the catalog or points at an
-	// archived permission. Asked ONCE PER ENTRY of Permissions, so the answer
-	// is about that entry and the cost of the body is multiplied by the size
-	// of the collection.
-	PermissionIsNotInCatalog(permissionID domain.ID) bool
+	// archived permission. Asked ONCE for the WHOLE of Permissions and
+	// answered per entry, keyed by PermissionID. A key MISSING from the answer
+	// is this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	PermissionIsNotInCatalog(permissionIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the catalog row behind this id carries a wildcard in either
 	// part. Answers true when the id is unknown, so an unresolvable grant
-	// never reaches the escalation probe. Asked ONCE PER ENTRY of Permissions,
-	// so the answer is about that entry and the cost of the body is multiplied
-	// by the size of the collection.
-	PermissionIsWildcard(permissionID domain.ID) bool
+	// never reaches the escalation probe. Asked ONCE for the WHOLE of
+	// Permissions and answered per entry, keyed by PermissionID. A key MISSING
+	// from the answer is this fact answering NOTHING for that entry, and at
+	// the call site Go's zero value settles what that means: absent reads as
+	// false, which is the answer a fact named for the PROBLEM wants, so
+	// nothing is raised. Say "this entry IS the problem" by putting the answer
+	// in the map — never by leaving the key out, which is silence rather
+	// than a verdict. Where the source could not be reached at all, fail: the
+	// port returns no error precisely so that decision is made here.
+	PermissionIsWildcard(permissionIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the requesting caller lacks the permission behind this id. Reads
 	// ctx.Identity() through the request-scoped service. It GUARDS THE
 	// WILDCARD ITSELF and answers "does not hold" rather than calling through
 	// — defence in depth behind the wildcard rule, because a panic on a
-	// security rule is a 500. Asked ONCE PER ENTRY of Permissions, so the
-	// answer is about that entry and the cost of the body is multiplied by the
-	// size of the collection.
-	CallerDoesNotHoldPermission(permissionID domain.ID) bool
+	// security rule is a 500. Asked ONCE for the WHOLE of Permissions and
+	// answered per entry, keyed by PermissionID. A key MISSING from the answer
+	// is this fact answering NOTHING for that entry, and at the call site Go's
+	// zero value settles what that means: absent reads as false, which is the
+	// answer a fact named for the PROBLEM wants, so nothing is raised. Say
+	// "this entry IS the problem" by putting the answer in the map — never
+	// by leaving the key out, which is silence rather than a verdict. Where
+	// the source could not be reached at all, fail: the port returns no error
+	// precisely so that decision is made here.
+	CallerDoesNotHoldPermission(permissionIDSet []domain.ID) map[domain.ID]bool
 
 	// Whether the caller holds *:*. ctx.Identity().IsSuperAdmin() and nothing
 	// else — never HasPermission("*:*"), which panics by design, and never a

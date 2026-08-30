@@ -19,10 +19,24 @@
 -- the values, and the values exist only in the clients that hold them.
 
 CREATE TABLE "authentication_refresh_tokens" (
+  -- The surrogate row id, minted by the framework on every insert.
+  --
+  -- IT IS THE PRIMARY KEY EVEN THOUGH NOTHING LOOKS A ROW UP BY IT, and that is
+  -- the rule rather than a preference: every table in this service is addressed
+  -- by a UUID id, because the framework's whole write and read machinery is built
+  -- on that shape. A natural primary key does not merely differ from it — it puts
+  -- the table OUTSIDE the engine: DirectWriter.Insert mints the identity and
+  -- refuses a caller-supplied one, and the ID slot always binds in the dialect's
+  -- canonical identity form, which a CHAR(64) hex digest is not. An earlier
+  -- version of this file made `hash` the primary key on the grounds that lookup
+  -- is by hash on every redemption; the cost was that this store had to be
+  -- written, and kept, in hand-rolled SQL.
+  "id" UUID NOT NULL,
+
   -- The SHA-256 hash of the opaque value, hex-encoded — 64 characters, always.
-  -- It is the PRIMARY KEY rather than a surrogate id because lookup is BY hash on
-  -- every redemption, and a second unique column would only be a slower path to
-  -- the same row.
+  -- Lookup IS by this column on every redemption, which is what the UNIQUE index
+  -- below serves: it is the same single-row index scan the primary key gave,
+  -- without dragging the table out of the framework's reach.
   "hash" CHAR(64) NOT NULL,
 
   -- All tokens descended from ONE login. Reuse of an already-redeemed token
@@ -55,11 +69,12 @@ CREATE TABLE "authentication_refresh_tokens" (
 
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT "authentication_refresh_tokens_pkey" PRIMARY KEY ("hash")
+  CONSTRAINT "authentication_refresh_tokens_pkey" PRIMARY KEY ("id")
 );
 
 COMMENT ON TABLE "authentication_refresh_tokens" IS 'Opaque refresh tokens, stored as SHA-256 hashes only. Backs the framework''s authcore.RefreshTokenStore port; the Issuer owns rotation and reuse detection, this table owns persistence.';
-COMMENT ON COLUMN "authentication_refresh_tokens"."hash" IS 'SHA-256 of the opaque token value, hex-encoded. The raw value is never stored.';
+COMMENT ON COLUMN "authentication_refresh_tokens"."id" IS 'Surrogate row id, minted by the framework. Every table in this service is addressed by one; the hash is the natural key and carries a UNIQUE index instead.';
+COMMENT ON COLUMN "authentication_refresh_tokens"."hash" IS 'SHA-256 of the opaque token value, hex-encoded. The raw value is never stored. Unique: one row per token.';
 COMMENT ON COLUMN "authentication_refresh_tokens"."family_id" IS 'All tokens descended from one login. A reuse revokes the entire family.';
 COMMENT ON COLUMN "authentication_refresh_tokens"."subject" IS 'The authenticated subject, as handed to the Issuer. Deliberately not a foreign key: the port is framework-owned.';
 COMMENT ON COLUMN "authentication_refresh_tokens"."audience" IS 'JSON array of audiences the redeemed access token carries.';
@@ -67,6 +82,13 @@ COMMENT ON COLUMN "authentication_refresh_tokens"."expires_at" IS 'When this tok
 COMMENT ON COLUMN "authentication_refresh_tokens"."used" IS 'Single-use marker set at redemption. A second redemption of a used hash is the reuse signal.';
 COMMENT ON COLUMN "authentication_refresh_tokens"."revoked" IS 'Set across a whole family when reuse is detected. Distinct from used: that is a normal end of life, this is a kill.';
 COMMENT ON COLUMN "authentication_refresh_tokens"."created_at" IS 'When the token was minted; written by the database default.';
+
+-- THE NATURAL KEY, as an index rather than as the primary key. Every redemption
+-- finds its row through this one, so it carries the lookup the old primary key
+-- used to; UNIQUE because one hash is one token, and a duplicate would mean the
+-- Issuer minted the same opaque value twice.
+CREATE UNIQUE INDEX "authentication_refresh_tokens_hash_key"
+  ON "authentication_refresh_tokens" ("hash");
 
 -- RevokeFamily updates every row of one family, and reuse detection is the one
 -- path that must be fast under attack.

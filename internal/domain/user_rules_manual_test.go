@@ -26,6 +26,16 @@ const (
 	joinedGroupID  = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"
 	grantedRoleID  = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b904"
 	someOtherTenID = "0198f4aa-1111-7c9e-9f2a-6d3b1e77a410"
+
+	// A second and a third of each, for the one case that needs a collection
+	// rather than a single entry: the batched facts are asked once whatever the
+	// size, and a size of one cannot tell that apart from once per entry.
+	secondGroupID = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f62"
+	thirdGroupID  = "0198f3e0-9c25-7a1f-b73d-5e08c4a29f63"
+	secondRoleID  = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b905"
+	thirdRoleID   = "0198f3e0-1a44-7bb2-9c31-77c0d5e1b906"
+	secondClaimID = "0198f3e0-7b31-7c02-8a55-1f9d2e6b4c18"
+	thirdClaimID  = "0198f3e0-7b31-7c02-8a55-1f9d2e6b4c19"
 )
 
 // probingUserService records every question and answers "nothing wrong" by
@@ -60,6 +70,12 @@ type probingUserService struct {
 	askedClaimAvail    []scopedQuestion
 	askedClaimApplies  []domain.ID
 	askedClaimType     []claimTypeQuestion
+
+	// callsPerFact counts how many times each collection fact was ASKED, as
+	// opposed to how many entries it was asked about. `perEntry` promises ONE
+	// call per write whatever the size of the collection, and this is the only
+	// seat that can catch a regression to one call per entry.
+	callsPerFact map[string]int
 }
 
 // claimTypeQuestion records BOTH arguments of the value-type probe: which
@@ -98,34 +114,80 @@ func (s *probingUserService) TenantIsUnavailable(domain.ID) bool {
 	return s.tenantUnavailable
 }
 
-func (s *probingUserService) GroupIsUnavailableInTenant(tenantID, groupID domain.ID) bool {
-	s.askedGroupAvail = append(s.askedGroupAvail, scopedQuestion{tenantID, groupID})
-	return s.groupUnavailable
+// The six collection facts, each asked ONCE for the whole set.
+//
+// The stub keeps recording ONE QUESTION PER ID, because which ids — and for the
+// two availability facts, which TENANT — reach a fact is a property the batch
+// did not change and several cases below still assert. What the batch DID add
+// is asked(): the call count, which is the only thing that can catch a
+// regression to one call per entry, since every assertion about the outcome
+// would pass either way.
+func (s *probingUserService) GroupIsUnavailableInTenant(tenantID domain.ID, groupIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("GroupIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(groupIDSet))
+	for _, id := range groupIDSet {
+		s.askedGroupAvail = append(s.askedGroupAvail, scopedQuestion{tenantID, id})
+		out[id] = s.groupUnavailable
+	}
+	return out
 }
 
-func (s *probingUserService) GroupGrantsWildcard(id domain.ID) bool {
-	s.askedGroupWildcard = append(s.askedGroupWildcard, id)
-	return s.groupWildcard
+func (s *probingUserService) GroupGrantsWildcard(groupIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("GroupGrantsWildcard")
+	out := make(map[domain.ID]bool, len(groupIDSet))
+	for _, id := range groupIDSet {
+		s.askedGroupWildcard = append(s.askedGroupWildcard, id)
+		out[id] = s.groupWildcard
+	}
+	return out
 }
 
-func (s *probingUserService) CallerLacksAnyPermissionOfGroup(id domain.ID) bool {
-	s.askedGroupEscalate = append(s.askedGroupEscalate, id)
-	return s.lacksGroupPerm
+func (s *probingUserService) CallerLacksAnyPermissionOfGroup(groupIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("CallerLacksAnyPermissionOfGroup")
+	out := make(map[domain.ID]bool, len(groupIDSet))
+	for _, id := range groupIDSet {
+		s.askedGroupEscalate = append(s.askedGroupEscalate, id)
+		out[id] = s.lacksGroupPerm
+	}
+	return out
 }
 
-func (s *probingUserService) RoleIsUnavailableInTenant(tenantID, roleID domain.ID) bool {
-	s.askedRoleAvail = append(s.askedRoleAvail, scopedQuestion{tenantID, roleID})
-	return s.roleUnavailable
+func (s *probingUserService) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleAvail = append(s.askedRoleAvail, scopedQuestion{tenantID, id})
+		out[id] = s.roleUnavailable
+	}
+	return out
 }
 
-func (s *probingUserService) RoleGrantsWildcard(id domain.ID) bool {
-	s.askedRoleWildcard = append(s.askedRoleWildcard, id)
-	return s.roleWildcard
+func (s *probingUserService) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("RoleGrantsWildcard")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleWildcard = append(s.askedRoleWildcard, id)
+		out[id] = s.roleWildcard
+	}
+	return out
 }
 
-func (s *probingUserService) CallerLacksAnyPermissionOfRole(id domain.ID) bool {
-	s.askedRoleEscalate = append(s.askedRoleEscalate, id)
-	return s.lacksRolePerm
+func (s *probingUserService) CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("CallerLacksAnyPermissionOfRole")
+	out := make(map[domain.ID]bool, len(roleIDSet))
+	for _, id := range roleIDSet {
+		s.askedRoleEscalate = append(s.askedRoleEscalate, id)
+		out[id] = s.lacksRolePerm
+	}
+	return out
+}
+
+// asked records one CALL of a collection fact.
+func (s *probingUserService) asked(fact string) {
+	if s.callsPerFact == nil {
+		s.callsPerFact = map[string]int{}
+	}
+	s.callsPerFact[fact]++
 }
 
 // userNotificationsOf reads what the aggregate itself recorded — the seat the
@@ -317,19 +379,69 @@ func TestUserInsertIsRefusedWhenTheOwningTenantIsUnavailable(t *testing.T) {
 
 // ── the group walk: order, scope and what it judges ────────────────────────
 
-func TestJoiningAnUnavailableGroupIsRefusedAndStopsTheWalk(t *testing.T) {
-	e := userJoining(joinedGroupID)
-	svc := insertUser(t, e, &probingUserService{groupUnavailable: true})
-
-	if !hasKey(userNotificationKeys(e), "GroupNotAvailableInTenantNotification") {
-		t.Fatalf("an unavailable group was accepted (raised %v)", userNotificationKeys(e))
+// THE COST THE `perEntry` FACTS BUY, pinned where a regression would otherwise
+// be invisible.
+//
+// Every one of the nine collection facts is asked ONCE for the whole write,
+// however many entries it carries — that is what turns a user created with ten
+// memberships from ten round trips into one. Nothing about the OUTCOME changes
+// if this regresses to one call per entry, which is exactly why the call count
+// is asserted and not merely the answers.
+func TestEveryCollectionFactIsAskedOnceForTheWholeWrite(t *testing.T) {
+	e := validUser()
+	for _, id := range []string{joinedGroupID, secondGroupID, thirdGroupID} {
+		e.AddUserGroup(aggregatevos.UserGroup{GroupID: domain.NewID(id)})
 	}
-	// Nothing below can say anything true about a group that is not there, and
-	// the wildcard probe answers TRUE for an unknown id — so reporting all three
-	// for one bad id would be noise the caller has to read past.
-	if len(svc.askedGroupWildcard) != 0 || len(svc.askedGroupEscalate) != 0 {
-		t.Fatalf("an unavailable group still reached the later probes: wildcard=%v escalation=%v",
-			svc.askedGroupWildcard, svc.askedGroupEscalate)
+	for _, id := range []string{grantedRoleID, secondRoleID, thirdRoleID} {
+		e.AddUserRole(aggregatevos.UserRole{RoleID: domain.NewID(id)})
+	}
+	for _, id := range []string{someClaimID, secondClaimID, thirdClaimID} {
+		e.AddUserClaim(aggregatevos.UserClaim{ClaimID: domain.NewID(id), Value: vos.ClaimValue("1000")})
+	}
+
+	svc := insertUser(t, e, &probingUserService{})
+
+	for _, fact := range []string{
+		"GroupIsUnavailableInTenant", "GroupGrantsWildcard", "CallerLacksAnyPermissionOfGroup",
+		"RoleIsUnavailableInTenant", "RoleGrantsWildcard", "CallerLacksAnyPermissionOfRole",
+		"ClaimIsUnavailableInTenant", "ClaimDoesNotApplyToUser", "ClaimValueDoesNotMatchValueType",
+	} {
+		if got := svc.callsPerFact[fact]; got != 1 {
+			t.Errorf("%s was asked %d times for a write carrying three entries, want exactly 1", fact, got)
+		}
+	}
+
+	// And it was asked about EVERY entry: one call, three subjects.
+	if len(svc.askedGroupAvail) != 3 || len(svc.askedRoleAvail) != 3 || len(svc.askedClaimAvail) != 3 {
+		t.Errorf("the single call did not carry every entry: groups=%d roles=%d claims=%d",
+			len(svc.askedGroupAvail), len(svc.askedRoleAvail), len(svc.askedClaimAvail))
+	}
+}
+
+// ONE PROBLEM PER ENTRY. Nothing below can say anything true about a group that
+// is not there, and every later fact answers "the problem is present" for an
+// unknown id — so reporting all three for one bad id would be noise the caller
+// has to read past.
+//
+// The interlock is now about the ANSWER rather than about the question: the
+// three facts are asked once each for the whole collection, so a bad entry's
+// later verdicts are computed. They are simply not read. The stub answers TRUE
+// to all three, which is what makes this assertion mean something.
+func TestJoiningAnUnavailableGroupIsRefusedAndReportsNothingElse(t *testing.T) {
+	e := userJoining(joinedGroupID)
+	insertUser(t, e, &probingUserService{
+		groupUnavailable: true,
+		groupWildcard:    true,
+		lacksGroupPerm:   true,
+	})
+
+	keys := userNotificationKeys(e)
+	if !hasKey(keys, "GroupNotAvailableInTenantNotification") {
+		t.Fatalf("an unavailable group was accepted (raised %v)", keys)
+	}
+	if hasKey(keys, "CannotJoinWildcardGroupNotification") ||
+		hasKey(keys, "CannotJoinGroupWithUnheldPermissionsNotification") {
+		t.Fatalf("one unavailable group produced more than one answer: %v", keys)
 	}
 }
 
@@ -355,20 +467,26 @@ func TestTheGroupWalkAsksTheUsersTenantNotTheCallers(t *testing.T) {
 	}
 }
 
-// TestAWildcardBearingGroupNeverReachesTheEscalationProbe is the interlock, and
-// the order is load-bearing rather than stylistic: Identity.HasPermission PANICS
-// on any argument containing '*', so this is what removes the input that would
-// crash the request into a 500 — on exactly the case the escalation rule exists
-// to stop.
-func TestAWildcardBearingGroupNeverReachesTheEscalationProbe(t *testing.T) {
+// A WILDCARD-BEARING GROUP IS REPORTED AS THAT, and as nothing else.
+//
+// The order of the two rules is load-bearing rather than stylistic, and where
+// the load sits moved with the batch. Identity.HasPermission PANICS on any
+// argument containing '*', and the rule can no longer promise the escalation
+// fact is never ASKED about a wildcard group — it is asked about every entry.
+// What holds is the guarantee the fact's own description carries: it guards the
+// wildcard itself and answers "lacks" instead of calling through
+// (internal/infra/user_service_manual.go, callerLacksAnyPermissionOfRole).
+// What this case pins is the half the domain owns: one answer per entry.
+func TestAWildcardBearingGroupIsReportedAsWildcardAndNothingElse(t *testing.T) {
 	e := userJoining(joinedGroupID)
-	svc := insertUser(t, e, &probingUserService{groupWildcard: true})
+	insertUser(t, e, &probingUserService{groupWildcard: true, lacksGroupPerm: true})
 
-	if !hasKey(userNotificationKeys(e), "CannotJoinWildcardGroupNotification") {
-		t.Fatalf("a wildcard-bearing group was accepted (raised %v)", userNotificationKeys(e))
+	keys := userNotificationKeys(e)
+	if !hasKey(keys, "CannotJoinWildcardGroupNotification") {
+		t.Fatalf("a wildcard-bearing group was accepted (raised %v)", keys)
 	}
-	if len(svc.askedGroupEscalate) != 0 {
-		t.Fatalf("the wildcard group reached the escalation probe: %v", svc.askedGroupEscalate)
+	if hasKey(keys, "CannotJoinGroupWithUnheldPermissionsNotification") {
+		t.Fatalf("the wildcard group was also reported as an escalation: %v", keys)
 	}
 }
 
@@ -415,28 +533,35 @@ func TestAnUnusableGroupIdNeverReachesAProbe(t *testing.T) {
 
 // ── the role walk: the same three, one hop shorter ──────────────────────────
 
-func TestGrantingAnUnavailableRoleIsRefusedAndStopsTheWalk(t *testing.T) {
+// The role half of the same two interlocks, and for the same reasons.
+func TestGrantingAnUnavailableRoleIsRefusedAndReportsNothingElse(t *testing.T) {
 	e := userGranting(grantedRoleID)
-	svc := insertUser(t, e, &probingUserService{roleUnavailable: true})
+	insertUser(t, e, &probingUserService{
+		roleUnavailable: true,
+		roleWildcard:    true,
+		lacksRolePerm:   true,
+	})
 
-	if !hasKey(userNotificationKeys(e), "RoleNotAvailableInTenantNotification") {
-		t.Fatalf("an unavailable role was granted (raised %v)", userNotificationKeys(e))
+	keys := userNotificationKeys(e)
+	if !hasKey(keys, "RoleNotAvailableInTenantNotification") {
+		t.Fatalf("an unavailable role was granted (raised %v)", keys)
 	}
-	if len(svc.askedRoleWildcard) != 0 || len(svc.askedRoleEscalate) != 0 {
-		t.Fatalf("an unavailable role still reached the later probes: wildcard=%v escalation=%v",
-			svc.askedRoleWildcard, svc.askedRoleEscalate)
+	if hasKey(keys, "CannotGrantWildcardRoleNotification") ||
+		hasKey(keys, "CannotGrantRoleWithUnheldPermissionsNotification") {
+		t.Fatalf("one unavailable role produced more than one answer: %v", keys)
 	}
 }
 
-func TestAWildcardBearingDirectRoleNeverReachesTheEscalationProbe(t *testing.T) {
+func TestAWildcardBearingDirectRoleIsReportedAsWildcardAndNothingElse(t *testing.T) {
 	e := userGranting(grantedRoleID)
-	svc := insertUser(t, e, &probingUserService{roleWildcard: true})
+	insertUser(t, e, &probingUserService{roleWildcard: true, lacksRolePerm: true})
 
-	if !hasKey(userNotificationKeys(e), "CannotGrantWildcardRoleNotification") {
-		t.Fatalf("a wildcard-bearing role was granted (raised %v)", userNotificationKeys(e))
+	keys := userNotificationKeys(e)
+	if !hasKey(keys, "CannotGrantWildcardRoleNotification") {
+		t.Fatalf("a wildcard-bearing role was granted (raised %v)", keys)
 	}
-	if len(svc.askedRoleEscalate) != 0 {
-		t.Fatalf("the wildcard role reached the escalation probe: %v", svc.askedRoleEscalate)
+	if hasKey(keys, "CannotGrantRoleWithUnheldPermissionsNotification") {
+		t.Fatalf("the wildcard role was also reported as an escalation: %v", keys)
 	}
 }
 
@@ -466,19 +591,41 @@ func TestArchivingForcesSuspended(t *testing.T) {
 	}
 }
 
-func (s *probingUserService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimID domain.ID) bool {
-	s.askedClaimAvail = append(s.askedClaimAvail, scopedQuestion{tenantID: tenantID, targetID: claimID})
-	return s.claimUnavailable
+func (s *probingUserService) ClaimIsUnavailableInTenant(tenantID domain.ID, claimIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("ClaimIsUnavailableInTenant")
+	out := make(map[domain.ID]bool, len(claimIDSet))
+	for _, id := range claimIDSet {
+		s.askedClaimAvail = append(s.askedClaimAvail, scopedQuestion{tenantID: tenantID, targetID: id})
+		out[id] = s.claimUnavailable
+	}
+	return out
 }
 
-func (s *probingUserService) ClaimDoesNotApplyToUser(claimID domain.ID) bool {
-	s.askedClaimApplies = append(s.askedClaimApplies, claimID)
-	return s.claimAppliesElse
+func (s *probingUserService) ClaimDoesNotApplyToUser(claimIDSet []domain.ID) map[domain.ID]bool {
+	s.asked("ClaimDoesNotApplyToUser")
+	out := make(map[domain.ID]bool, len(claimIDSet))
+	for _, id := range claimIDSet {
+		s.askedClaimApplies = append(s.askedClaimApplies, id)
+		out[id] = s.claimAppliesElse
+	}
+	return out
 }
 
-func (s *probingUserService) ClaimValueDoesNotMatchValueType(claimID domain.ID, value string) bool {
-	s.askedClaimType = append(s.askedClaimType, claimTypeQuestion{claimID: claimID, value: value})
-	return s.claimValueBadType
+// The entries arrive whole, so the recorded question keeps carrying BOTH halves
+// — which is what proves a CHANGED entry reaches the fact with its NEW value.
+func (s *probingUserService) ClaimValueDoesNotMatchValueType(
+	entries []UserClaimValueDoesNotMatchValueTypeEntry,
+) map[domain.ID]bool {
+	s.asked("ClaimValueDoesNotMatchValueType")
+	out := make(map[domain.ID]bool, len(entries))
+	for _, entry := range entries {
+		s.askedClaimType = append(s.askedClaimType, claimTypeQuestion{
+			claimID: entry.ClaimID,
+			value:   entry.Value,
+		})
+		out[entry.ClaimID] = s.claimValueBadType
+	}
+	return out
 }
 
 // ── the claims collection: the three per-entry rules ────────────────────────
@@ -540,12 +687,23 @@ func TestAnUnavailableDefinitionIsNotDistinguishedFromAForeignOne(t *testing.T) 
 	}
 }
 
-func TestNothingBelowIsAskedAboutADefinitionThatIsNotThere(t *testing.T) {
-	svc := insertUser(t, userHolding(someClaimID, "1000"), &probingUserService{claimUnavailable: true})
+// The claims half of the same interlock: an unresolvable definition is ONE
+// problem, however many facts would answer TRUE about it.
+func TestNothingBelowIsReportedAboutADefinitionThatIsNotThere(t *testing.T) {
+	e := userHolding(someClaimID, "1000")
+	insertUser(t, e, &probingUserService{
+		claimUnavailable:  true,
+		claimAppliesElse:  true,
+		claimValueBadType: true,
+	})
 
-	if len(svc.askedClaimApplies) != 0 || len(svc.askedClaimType) != 0 {
-		t.Fatalf("the later probes ran on an unresolvable definition: applies=%d type=%d",
-			len(svc.askedClaimApplies), len(svc.askedClaimType))
+	keys := userNotificationKeys(e)
+	if !hasKey(keys, "ClaimNotAvailableInTenantNotification") {
+		t.Fatalf("an unavailable definition was accepted (raised %v)", keys)
+	}
+	if hasKey(keys, "ClaimDoesNotApplyToUserNotification") ||
+		hasKey(keys, "ClaimValueDoesNotMatchValueTypeNotification") {
+		t.Fatalf("one unresolvable definition produced more than one answer: %v", keys)
 	}
 }
 
