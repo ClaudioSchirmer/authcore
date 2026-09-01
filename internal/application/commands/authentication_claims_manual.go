@@ -38,9 +38,9 @@ import (
 	"strconv"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
-	"github.com/ClaudioSchirmer/omnicore/domain"
+	"github.com/ClaudioSchirmer/authcore/internal/infra"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
 )
 
 // customClaimBudget is how many tenant-defined claims one token may carry.
@@ -117,21 +117,18 @@ type resolvedClaim struct {
 // is for. It costs nothing to hold that line — the change-password route is
 // this service's own and reads no custom claim — and the alternative is a token
 // with no authority carrying tenant facts a consumer might still branch on.
-func resolveCustomClaims(user *appdomain.User, catalog []*appdomain.Claim) map[string]any {
+func resolveCustomClaims(account *schemas.SignInAccount, bundle infra.SignInBundle) map[string]any {
 	resolved := map[string]any{}
-	if user == nil || user.MustChangePassword {
+	if account == nil || account.MustChangePassword {
 		return resolved
 	}
 
-	held := heldClaimValues(user)
+	held := bundle.ClaimValues
 
 	// Two buckets rather than one, because the budget spends them in order.
 	var specialised, defaulted []resolvedClaim
-	for _, definition := range catalog {
-		if definition == nil {
-			continue
-		}
-		name := definition.Name.Value()
+	for _, definition := range bundle.Definitions {
+		name := definition.Name
 		if _, reserved := platformClaimNames[name]; reserved {
 			// Not a refusal to the caller: the sign-in has exactly ONE refusal
 			// and a catalog problem must not become a second. The operator who
@@ -142,7 +139,7 @@ func resolveCustomClaims(user *appdomain.User, catalog []*appdomain.Claim) map[s
 		}
 
 		value, fromUser := "", false
-		if v, ok := held[definitionID(definition)]; ok {
+		if v, ok := held[definition.ID]; ok {
 			value, fromUser = v, true
 		} else if definition.DefaultValue != nil {
 			value = *definition.DefaultValue
@@ -151,7 +148,7 @@ func resolveCustomClaims(user *appdomain.User, catalog []*appdomain.Claim) map[s
 			continue
 		}
 
-		typed, ok := typedClaimValue(definition.ValueType, value)
+		typed, ok := typedClaimValue(vos.ClaimValueType(definition.ValueType), value)
 		if !ok {
 			// Unreachable through the API — both levels validate against this
 			// same value type on the way in — and reachable by a migration or a
@@ -160,7 +157,7 @@ func resolveCustomClaims(user *appdomain.User, catalog []*appdomain.Claim) map[s
 			// answer is the honest one.
 			slog.Default().Warn("token.claim.unreadable_value_skipped",
 				slog.String("claim", name),
-				slog.String("valueType", definition.ValueType.Value()))
+				slog.String("valueType", definition.ValueType))
 			continue
 		}
 
@@ -202,34 +199,6 @@ func resolveCustomClaims(user *appdomain.User, catalog []*appdomain.Claim) map[s
 			slog.Any("dropped", dropped))
 	}
 	return resolved
-}
-
-// heldClaimValues indexes level 1 by the definition each entry points at.
-//
-// GetCurrentItemsOf and not GetAddedItemsOf: this reads a loaded aggregate on
-// the token path, where nothing is being written, so "current" is the whole
-// stored collection. Archived entries are already absent — the loader's scope
-// excludes them — which is what makes a removed claim value stop minting
-// without this function knowing anything about the archive stamp.
-func heldClaimValues(user *appdomain.User) map[domain.ID]string {
-	entries := domain.GetCurrentItemsOf[aggregatevos.UserClaim](user.GetAggregateRoot())
-	out := make(map[domain.ID]string, len(entries))
-	for _, entry := range entries {
-		out[entry.ClaimID] = entry.Value.Value()
-	}
-	return out
-}
-
-// definitionID reads a definition's own id, which is what an entry points at.
-//
-// A definition with no id cannot match any entry, so the zero value is the
-// correct miss rather than a case worth refusing: it can only come from a row
-// that was never persisted.
-func definitionID(definition *appdomain.Claim) domain.ID {
-	if id := definition.GetID(); id != nil {
-		return *id
-	}
-	return domain.ID{}
 }
 
 // typedClaimValue renders a stored string as the JSON type its definition

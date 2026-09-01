@@ -121,40 +121,15 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the tenants feature (repository + view + mount) | `bootstrap/tenants_feature.go` |
-| the archive command and result | `internal/application/commands/archive_tenant_command.go` |
-| the insert command and result | `internal/application/commands/insert_tenant_command.go` |
-| the patch command and result | `internal/application/commands/patch_tenant_command.go` |
-| tests for the command mappers | `internal/application/commands/tenant_commands_test.go` |
-| the unarchive command and result | `internal/application/commands/unarchive_tenant_command.go` |
-| the by-id query and its result | `internal/application/queries/find_tenant_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_tenants_by_params_query.go` |
-| the read criteria tests | `internal/application/queries/tenant_queries_test.go` |
-| the translation coverage test — every notification must be translatable in every catalog | `internal/application/translations/tenant_translations_test.go` |
-| the Tenant aggregate root, its modes and its rules | `internal/domain/tenant.go` |
-| the Tenant service port (1 fact(s)) | `internal/domain/tenant_service.go` |
-| tests for Tenant's rules | `internal/domain/tenant_test.go` |
-| the vos package documentation | `internal/domain/vos/doc.go` |
-| the TenantStatus enumeration (3 members) | `internal/domain/vos/tenant_status.go` |
-| tests for 1 value object(s) | `internal/domain/vos/tenant_vos_test.go` |
-| the tenants schema (4 columns) | `internal/infra/schemas/tenant_schema.go` |
-| the schema builder tests — they run the builders, so a boot panic is a test failure | `internal/infra/schemas/tenant_schemas_test.go` |
-| the Tenant repository and its constraint bindings | `internal/infra/tenant_repository.go` |
 | the Tenant service implementation | `internal/infra/tenant_service.go` |
-| the tenants view (relational-backed) | `internal/infra/views/tenant_view.go` |
-| the view definition test — it builds the definition, so a boot panic is a test failure | `internal/infra/views/tenant_view_test.go` |
-| the by-id request and response | `internal/web/requests/find_tenant_by_id.go` |
-| the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
-| the insert request and response | `internal/web/requests/insert_tenant.go` |
-| the patch request and response | `internal/web/requests/patch_tenant.go` |
-| the request mapper tests | `internal/web/requests/tenant_requests_test.go` |
-| the 6 tenant endpoints | `internal/web/tenant_routes.go` |
 
 **Left untouched** (yours, by design):
 
 - `internal/domain/tenant_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
+
+27 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -164,14 +139,15 @@ Owned by other tools:
 - integration events (publish/subscribe) — `/omnicore:implement`
 - read models spanning more than this entity — `/omnicore:scaffold-view`
 - changing this entity once it exists — `/omnicore:evolve-entity`, which edits this spec and regenerates. The CODE comes back from the spec; the DATABASE never does — the migration a change needs is written by hand, and that skill's impact map is what carries it, along with the orphans a shrinking spec leaves and everything outside this generator's ownership
+- a table with NO aggregate behind it — a control table, a job queue, a lookup, an idempotency ledger. This generator writes aggregates and this spec language cannot say "not one"; that does not mean the framework has no answer. If the pinned version documents a DIRECT schema (one table, no entity), it is the door for those, and `/omnicore:implement` owns wiring it. Neither hand-written SQL nor an entity declared for a table that is only ever queried is the right shape
 
 Read controls this listing does NOT serve: `?search=`. That is a contract, not an omission — sending one is answered with a typed 400 rather than being ignored.
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.63.0)
+Verdict: **exact** (project pins v0.68.0)
 
-framework v0.63.0 meets the required v0.63.0
+framework v0.68.0 meets the required v0.68.0
 
 Verify what was generated:
 

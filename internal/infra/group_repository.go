@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:3e7cd5c2f1eafc1cf85d5930a9874630c6db4720a7963534fef3dbed8f947c1b
+// generated:  2026-08-31
+// checksum:   sha256:799cfef8524752c07abc491bd7a2a72b4d22586b69360e5ff58e7485f0ecb546
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -68,17 +68,24 @@ func NewGroupRepository(engine core.RelationalEngine) *GroupRepository {
 	// Read joins: read-only traversals across a foreign key into another
 	// aggregate. They fill ordinary fields of the entity on every load and are
 	// absent from the TableSchema, so no write can carry them.
+	//
+	// Each target is reduced with AsDirectSchema(): a traversal puts ONE table
+	// in the FROM, so it takes a schema that IS one table. The reduction is a
+	// copy — the target's own declaration is untouched — and it drops exactly
+	// what a join never enters: that aggregate's children, facets and shared
+	// base.
 	r.WithJoins(
 		// → Tenant, always in the FROM. No counterpart drops the aggregate
 		// from EVERY read, FindByID included — which is why the framework
 		// allows it only over a non-nullable key.
-		read.InnerJoin(schemas.TenantSchema()).
+		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status"),
 		// GroupRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.GroupRoleSchema()).To(schemas.RoleSchema()).
+		read.InnerJoinInChild(schemas.GroupRoleSchema()).
+			To(schemas.RoleSchema().AsDirectSchema()).
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name"),

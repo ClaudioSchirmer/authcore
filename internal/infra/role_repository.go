@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:f5fd689415418aa0906bbe41cc93736bca40c2f61ba50efd019969826158c801
+// generated:  2026-08-31
+// checksum:   sha256:fd826d7b31c7828941266d112ed0ebe37e94aea3dfd6f51610f401c7c8084fec
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -68,17 +68,24 @@ func NewRoleRepository(engine core.RelationalEngine) *RoleRepository {
 	// Read joins: read-only traversals across a foreign key into another
 	// aggregate. They fill ordinary fields of the entity on every load and are
 	// absent from the TableSchema, so no write can carry them.
+	//
+	// Each target is reduced with AsDirectSchema(): a traversal puts ONE table
+	// in the FROM, so it takes a schema that IS one table. The reduction is a
+	// copy — the target's own declaration is untouched — and it drops exactly
+	// what a join never enters: that aggregate's children, facets and shared
+	// base.
 	r.WithJoins(
 		// → Tenant, always in the FROM. No counterpart drops the aggregate
 		// from EVERY read, FindByID included — which is why the framework
 		// allows it only over a non-nullable key.
-		read.InnerJoin(schemas.TenantSchema()).
+		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status"),
 		// RolePermission → Permission, on every loaded entry. No counterpart
 		// drops the ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.RolePermissionSchema()).To(schemas.PermissionSchema()).
+		read.InnerJoinInChild(schemas.RolePermissionSchema()).
+			To(schemas.PermissionSchema().AsDirectSchema()).
 			On("permission_id").
 			Field("Resource", "resource_name").
 			Field("Action", "action_name"),

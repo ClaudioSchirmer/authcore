@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:982262cd76864f017da16e743d749b08a4628621839d0ff90c6524c4c10c410f
+// generated:  2026-08-31
+// checksum:   sha256:531ab351a5ca3a765b79d8c5af60fda70d37dab6b79b3f2db18d66487b0dadef
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -70,29 +70,38 @@ func NewUserRepository(engine core.RelationalEngine) *UserRepository {
 	// Read joins: read-only traversals across a foreign key into another
 	// aggregate. They fill ordinary fields of the entity on every load and are
 	// absent from the TableSchema, so no write can carry them.
+	//
+	// Each target is reduced with AsDirectSchema(): a traversal puts ONE table
+	// in the FROM, so it takes a schema that IS one table. The reduction is a
+	// copy — the target's own declaration is untouched — and it drops exactly
+	// what a join never enters: that aggregate's children, facets and shared
+	// base.
 	r.WithJoins(
 		// → Tenant, always in the FROM. No counterpart drops the aggregate
 		// from EVERY read, FindByID included — which is why the framework
 		// allows it only over a non-nullable key.
-		read.InnerJoin(schemas.TenantSchema()).
+		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status"),
 		// UserGroup → Group, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.UserGroupSchema()).To(schemas.GroupSchema()).
+		read.InnerJoinInChild(schemas.UserGroupSchema()).
+			To(schemas.GroupSchema().AsDirectSchema()).
 			On("group_id").
 			Field("GroupKey", "group_key").
 			Field("GroupName", "name"),
 		// UserRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.UserRoleSchema()).To(schemas.RoleSchema()).
+		read.InnerJoinInChild(schemas.UserRoleSchema()).
+			To(schemas.RoleSchema().AsDirectSchema()).
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name"),
 		// UserClaim → Claim, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.UserClaimSchema()).To(schemas.ClaimSchema()).
+		read.InnerJoinInChild(schemas.UserClaimSchema()).
+			To(schemas.ClaimSchema().AsDirectSchema()).
 			On("claim_id").
 			Field("ClaimName", "name").
 			Field("ClaimValueType", "value_type"),

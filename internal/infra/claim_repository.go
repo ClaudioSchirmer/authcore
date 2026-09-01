@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a8ba0b68241b37554f32052d5603a3aeb9479a235cebf5b26251a532745b93d5
+// generated:  2026-08-31
+// checksum:   sha256:ac7488dcd40826a6ac410b285228d68e41b0f59e7ad064f541112d6c6bd628db
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -67,11 +67,17 @@ func NewClaimRepository(engine core.RelationalEngine) *ClaimRepository {
 	// Read joins: read-only traversals across a foreign key into another
 	// aggregate. They fill ordinary fields of the entity on every load and are
 	// absent from the TableSchema, so no write can carry them.
+	//
+	// Each target is reduced with AsDirectSchema(): a traversal puts ONE table
+	// in the FROM, so it takes a schema that IS one table. The reduction is a
+	// copy — the target's own declaration is untouched — and it drops exactly
+	// what a join never enters: that aggregate's children, facets and shared
+	// base.
 	r.WithJoins(
 		// → Tenant, always in the FROM. No counterpart drops the aggregate
 		// from EVERY read, FindByID included — which is why the framework
 		// allows it only over a non-nullable key.
-		read.InnerJoin(schemas.TenantSchema()).
+		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status"),

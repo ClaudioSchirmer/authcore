@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:1c45f1f10e5ada597c85b399c2011312a52469efba0d99c0341a7de52046ff04
+// generated:  2026-08-31
+// checksum:   sha256:31520ceb248d965969690a928bdf093f778ce68542e44304de9134561c39d554
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *TenantServiceImpl) queryContext() context.Context {
 // this workspace handle.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a
