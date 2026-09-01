@@ -16,8 +16,9 @@ package requests
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
+	"github.com/ClaudioSchirmer/authcore/internal/web/requests/utils"
 )
 
 // IssueTokenRequest is the body of the sign-in.
@@ -105,7 +106,7 @@ type AuthenticatedUserResponse struct {
 //
 // It is the single seat every surface shares, so REST and any future GraphQL or
 // gRPC mirror of this operation render the same shape from the same result.
-func (TokenResponse) FromResult(result cmdutils.TokenResult) TokenResponse {
+func (TokenResponse) FromResult(result cmddtos.TokenResult) TokenResponse {
 	return TokenResponse{
 		AccessToken:      result.AccessToken,
 		TokenType:        result.TokenType,
@@ -120,10 +121,10 @@ func (TokenResponse) FromResult(result cmdutils.TokenResult) TokenResponse {
 			MustChangePassword: result.User.MustChangePassword,
 			TenantID:           result.User.TenantID,
 			TenantWorkspace:    result.User.TenantWorkspace,
-			Groups:             dtos.NamedGrants(result.User.Groups),
-			Roles:              dtos.NamedGrants(result.User.Roles),
-			Permissions:        dtos.NonNilStrings(result.User.Permissions),
-			Claims:             dtos.NonNilClaims(result.User.Claims),
+			Groups:             utils.NamedGrants(result.User.Groups),
+			Roles:              utils.NamedGrants(result.User.Roles),
+			Permissions:        utils.NonNilStrings(result.User.Permissions),
+			Claims:             utils.NonNilClaims(result.User.Claims),
 		},
 	}
 }

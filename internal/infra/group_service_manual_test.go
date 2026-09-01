@@ -10,7 +10,7 @@
 package infra
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/dtos"
 	"testing"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -36,32 +36,32 @@ func concreteKeys(pairs ...[2]string) []vos.PermissionKey {
 func TestRoleRowGrantsWildcardFailsClosedOnAnUnknownID(t *testing.T) {
 	cases := []struct {
 		name string
-		row  utils.RoleRow
+		row  dtos.RoleRow
 		want bool
 	}{
 		{
 			"a bundle of concrete permissions is not a wildcard",
-			utils.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})},
 			false,
 		},
 		{
 			"one wildcard RESOURCE anywhere in the bundle is",
-			utils.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{vos.PermissionWildcard, vos.PermissionWildcard})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{vos.PermissionWildcard, vos.PermissionWildcard})},
 			true,
 		},
 		{
 			"one wildcard ACTION anywhere in the bundle is",
-			utils.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"tenant", vos.PermissionWildcard})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"tenant", vos.PermissionWildcard})},
 			true,
 		},
 		{
 			"a role granting nothing is not",
-			utils.RoleRow{Found: true},
+			dtos.RoleRow{Found: true},
 			false,
 		},
 		{
 			"an UNKNOWN role is, fail-closed",
-			utils.RoleRow{Found: false},
+			dtos.RoleRow{Found: false},
 			true,
 		},
 	}
@@ -162,7 +162,7 @@ func TestASuperAdminLacksNothingInAConcreteBundle(t *testing.T) {
 
 	// Prime the request memo so the fact answers from it and never queries.
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set(groupRoleMemoPrefix+roleID.String(), utils.RoleRow{
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{
 		Found: true,
 		Keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
@@ -182,7 +182,7 @@ func TestACallerMissingOneKeyOfTheBundleIsRefused(t *testing.T) {
 	svc := &GroupServiceImpl{ctx: ctx}
 
 	roleID := domain.NewID(probedRoleID)
-	held := utils.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})}
+	held := dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})}
 	ctx.Set(groupRoleMemoPrefix+roleID.String(), held)
 	if svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
 		t.Fatal("a caller holding every key of the bundle was refused")
@@ -190,7 +190,7 @@ func TestACallerMissingOneKeyOfTheBundleIsRefused(t *testing.T) {
 
 	// One more key, which the caller does not hold. Nothing else changes.
 	other := domain.NewID("0198f400-1111-7000-8000-aaaaaaaaaaaa")
-	ctx.Set(groupRoleMemoPrefix+other.String(), utils.RoleRow{
+	ctx.Set(groupRoleMemoPrefix+other.String(), dtos.RoleRow{
 		Found: true,
 		Keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
@@ -211,7 +211,7 @@ func TestAWildcardBearingBundleIsRefusedWithoutAskingTheIdentity(t *testing.T) {
 	svc := &GroupServiceImpl{ctx: ctx}
 
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set(groupRoleMemoPrefix+roleID.String(), utils.RoleRow{
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{
 		Found: true,
 		Keys:  concreteKeys([2]string{vos.PermissionWildcard, vos.PermissionWildcard}),
 	})
@@ -229,7 +229,7 @@ func TestTheRoleMemoIsScopedToOneRequest(t *testing.T) {
 	roleID := domain.NewID(probedRoleID)
 
 	first := configuration.NewAppContextWithRandomID(configuration.LangENG)
-	first.Set(groupRoleMemoPrefix+roleID.String(), utils.RoleRow{Found: true})
+	first.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{Found: true})
 
 	if _, ok := first.Get(groupRoleMemoPrefix + roleID.String()); !ok {
 		t.Fatal("the memo did not store the row on its own context")

@@ -44,7 +44,7 @@
 //     moment a test or a second bootstrap uses a different engine. Same shape
 //     GroupServiceImpl and RoleServiceImpl use.
 //
-//  2. THE ROLE ROW IS THE ONE Group ALREADY DECLARED. `utils.RoleRow` and its
+//  2. THE ROLE ROW IS THE ONE Group ALREADY DECLARED. `dtos.RoleRow` and its
 //     grantsWildcard() live in group_service_manual.go, in this package, and
 //     they answer exactly the question this entity asks one level up. A second
 //     copy here would be the same rule written twice, free to disagree about
@@ -80,6 +80,7 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
@@ -141,7 +142,7 @@ func (s *UserServiceImpl) companions() *userCompanionRepos {
 //
 // found is false for a group no ACTIVE row carries — which deliberately
 // collapses "no such group" and "a group this tenant retired" into one state,
-// for the same reason utils.RoleRow does: the notification these facts feed answers
+// for the same reason dtos.RoleRow does: the notification these facts feed answers
 // all three of its questions with one message, because a distinct reply would
 // be an existence oracle over a competitor's org chart.
 //
@@ -168,8 +169,8 @@ const (
 // roleRows resolves every requested role and the permission keys it confers in
 // ONE read, memoised for the request. Same row type GroupServiceImpl uses, on
 // this service's context.
-func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.RoleRow {
-	return utils.ResolveRows(s.ctx, userRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]utils.RoleRow {
+func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]dtos.RoleRow {
+	return utils.ResolveRows(s.ctx, userRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]dtos.RoleRow {
 		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
@@ -179,7 +180,7 @@ func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.Role
 			panic("User: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write reaches")
 		}
 
-		rows := make(map[string]utils.RoleRow, len(found))
+		rows := make(map[string]dtos.RoleRow, len(found))
 		for _, role := range found {
 			// The grants arrive with resource and action already filled — Role
 			// declares the traversal into the catalog. Nothing here queries it.
@@ -188,7 +189,7 @@ func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.Role
 			for _, grant := range grants {
 				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
-			rows[utils.CanonicalIDOf(role.GetID())] = utils.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
+			rows[utils.CanonicalIDOf(role.GetID())] = dtos.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
 		}
 		return rows
 	})
@@ -225,7 +226,7 @@ func (s *UserServiceImpl) groupRows(groupIDs []domain.ID) map[domain.ID]groupRow
 //
 // It shares the role memo with the DIRECT grants, so a role reached both ways
 // is read once — the case note 3 in the header exists for.
-func (s *UserServiceImpl) rolesOfGroups(groups map[domain.ID]groupRow) map[domain.ID]utils.RoleRow {
+func (s *UserServiceImpl) rolesOfGroups(groups map[domain.ID]groupRow) map[domain.ID]dtos.RoleRow {
 	conferred := make([]domain.ID, 0, len(groups))
 	for _, row := range groups {
 		conferred = append(conferred, row.roleIDs...)
@@ -346,10 +347,10 @@ func (s *UserServiceImpl) GroupGrantsWildcard(groupIDSet []domain.ID) map[domain
 
 // groupGrantsWildcard is one group's verdict, read off rows already resolved.
 //
-// A role the second hop did not answer for reads as the zero utils.RoleRow, whose
+// A role the second hop did not answer for reads as the zero dtos.RoleRow, whose
 // grantsWildcard() is TRUE — the fail-closed direction, and the same answer the
 // per-id resolution gave an unknown role before this was a batch.
-func groupGrantsWildcard(group groupRow, roles map[domain.ID]utils.RoleRow) bool {
+func groupGrantsWildcard(group groupRow, roles map[domain.ID]dtos.RoleRow) bool {
 	if !group.found {
 		return true
 	}

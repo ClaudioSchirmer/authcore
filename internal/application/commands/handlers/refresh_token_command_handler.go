@@ -9,8 +9,10 @@ package handlers
 
 import (
 	"errors"
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 	"strings"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 
@@ -22,9 +24,9 @@ import (
 
 // RefreshTokenHandler rotates a refresh token into a new pair.
 type RefreshTokenHandler struct {
-	Store  utils.AuthenticationStore
-	Lookup utils.RefreshTokenLookup
-	Issuer utils.TokenIssuer
+	Store  dtos.AuthenticationStore
+	Lookup dtos.RefreshTokenLookup
+	Issuer dtos.TokenIssuer
 }
 
 // Handle redeems and re-mints.
@@ -43,13 +45,13 @@ type RefreshTokenHandler struct {
 // build before the framework would tell it. The lookup decides nothing — revoked,
 // used and expired are all still the Issuer's call at the redemption below, which
 // is what owns reuse detection and family revocation.
-func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.RefreshTokenCommand) (cmdutils.TokenResult, error) {
+func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.RefreshTokenCommand) (cmddtos.TokenResult, error) {
 	value := strings.TrimSpace(cmd.RefreshToken)
 	if value == "" {
 		// Answered without touching the store: an empty string redeems nothing,
 		// and there is no timing signal to equalise here — this utils.Refusal does not
 		// depend on whether any account exists.
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	subject, err := h.Lookup.SubjectForRefreshToken(ctx, value)
@@ -57,12 +59,12 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *command
 		// A store failure is NOT a credential utils.Refusal: answering 401 would tell a
 		// caller holding a perfectly good token that it was rejected, and would
 		// bury an outage inside a login problem. It escapes as an exception → 500.
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 	if subject == "" {
 		// No record. Resolving grants before this point would have handed anyone
 		// posting random strings a free database walk.
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	account, err := h.Store.LoadAccountByID(ctx, domain.NewID(subject))
@@ -71,7 +73,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *command
 		// account — archived, suspended, or its tenant withdrawn since the last
 		// rotation. The session is over, and it ends with the same utils.Refusal as
 		// every other.
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	// RE-READ ON EVERY ROTATION, never replayed from the token being redeemed —
@@ -81,7 +83,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *command
 	// sign-in, with no invalidation step anywhere.
 	bundle, err := h.Store.ResolveSignIn(ctx, account)
 	if err != nil {
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 	customClaims := utils.ResolveCustomClaims(account, bundle)
 
@@ -97,12 +99,12 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *command
 		// owner is active. The family has already been revoked by the Issuer
 		// before this returns, and the WARN line the store logs is where an
 		// operator sees it.
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	default:
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 
-	return cmdutils.TokenResult{
+	return cmddtos.TokenResult{
 		AccessToken:      access.Token,
 		TokenType:        utils.TokenTypeBearer,
 		ExpiresAt:        access.ExpiresAt.Unix(),

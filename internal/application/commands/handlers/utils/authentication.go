@@ -16,7 +16,7 @@ import (
 	"maps"
 	"strings"
 
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra"
 	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
@@ -260,8 +260,8 @@ func restrictToPasswordChange(permissions []string) []string {
 // request and both readers consume it, so the body cannot advertise a claim the
 // token omits — including the case that makes the two most likely to disagree,
 // where a must-change-password session carries none at all.
-func BuildProfile(account *schemas.SignInAccount, bundle infra.SignInBundle, custom map[string]any) cmdutils.AuthenticatedUserResult {
-	return cmdutils.AuthenticatedUserResult{
+func BuildProfile(account *schemas.SignInAccount, bundle infra.SignInBundle, custom map[string]any) cmddtos.AuthenticatedUserResult {
+	return cmddtos.AuthenticatedUserResult{
 		ID:                 account.ID.Value(),
 		Name:               strings.TrimSpace(account.GivenName + " " + account.FamilyName),
 		Email:              account.Email,
@@ -281,10 +281,10 @@ func BuildProfile(account *schemas.SignInAccount, bundle infra.SignInBundle, cus
 // EVERY ROLE CARRIES A NAME NOW, inherited ones included. The statement this
 // replaced could only name the DIRECT grants — an inherited role was never loaded
 // as a row — so the body used to show a blank name for half of them.
-func NamedGrantsOf(grants []infra.NamedGrant) []cmdutils.NamedGrantResult {
-	out := make([]cmdutils.NamedGrantResult, 0, len(grants))
+func NamedGrantsOf(grants []infra.NamedGrant) []cmddtos.NamedGrantResult {
+	out := make([]cmddtos.NamedGrantResult, 0, len(grants))
 	for _, g := range grants {
-		out = append(out, cmdutils.NamedGrantResult{Key: g.Key, Name: g.Name})
+		out = append(out, cmddtos.NamedGrantResult{Key: g.Key, Name: g.Name})
 	}
 	return out
 }

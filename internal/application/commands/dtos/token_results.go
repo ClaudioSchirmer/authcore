@@ -15,7 +15,7 @@
 // unnoticed until a proxy truncates the header — so the richer profile travels
 // here, in a body read once at sign-in and never re-sent.
 
-package utils
+package dtos
 
 // TokenResult is what both operations answer with.
 //

@@ -23,7 +23,7 @@
 //
 // THE DUPLICATION IS REAL AND IS TESTED. Two declarations of one table can drift,
 // and drift here is silent: a probe reading a renamed column answers "nobody holds
-// it" and lets a narrowing through. claim_edge_direct_schemas_test.go asserts each
+// it" and lets a narrowing through. claim_edge_schemas_test.go asserts each
 // pair agrees on the table and on every column they both name, so a change to one
 // side that forgets the other fails the suite instead of the production answer.
 

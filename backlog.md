@@ -212,7 +212,7 @@ that a definition written straight into the table by migration cannot displace `
 **The third-level question is CLOSED by the construction, 2026-09-01** — it is struck from the
 open list rather than answered by a decision, because the shipped chain leaves it no object. The
 candidate set is `Eq(TenantID, account.TenantID)` AND `In(AppliesTo, user, both)` under the ACTIVE
-scope (`internal/infra/authentication_reader_manual.go:285-288`), so a definition owned by the
+scope (`internal/infra/authentication_reader.go`, the definitions read in `ResolveSignIn`), so a definition owned by the
 reserved platform tenant is never in a member tenant's walk: there is no platform default for a
 tenant to override. What the entry asked for is what the two levels already are — the resolution is
 the SUM of the tenant's catalog and the principal's own entries, and where both carry the same
@@ -364,7 +364,7 @@ reserved platform tenant. Worth doing for three reasons beyond tidiness:
 
 ### Emission
 
-`buildClaims` (`internal/application/commands/authentication_commands_manual.go:572`) keeps
+`buildClaims` (`internal/application/commands/handlers/utils/authentication.go`) keeps
 its fixed set and merges the resolved map on top. A null at both levels means the claim is
 simply absent — an absent claim and an empty one are not the same thing to a consumer. The
 refresh path already rebuilds claims from the database on every redemption, so a corrected

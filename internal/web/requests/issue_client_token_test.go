@@ -9,7 +9,7 @@ package requests
 
 import (
 	"encoding/json"
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	"strings"
 	"testing"
 
@@ -131,7 +131,7 @@ func TestClientTokenResponseCarriesTheResultThrough(t *testing.T) {
 			Status:          "active",
 			TenantID:        "tenant-id",
 			TenantWorkspace: "acme",
-			Roles:           []cmdutils.NamedGrantResult{{Key: "billing-admin", Name: "Billing admin"}},
+			Roles:           []cmddtos.NamedGrantResult{{Key: "billing-admin", Name: "Billing admin"}},
 			Permissions:     []string{"user:read"},
 			Claims:          map[string]any{"x_region": "sa-east-1"},
 		},

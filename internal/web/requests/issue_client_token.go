@@ -15,6 +15,7 @@ package requests
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
+	"github.com/ClaudioSchirmer/authcore/internal/web/requests/utils"
 )
 
 // IssueClientTokenRequest is the body of the machine sign-in.
@@ -108,9 +109,9 @@ func (ClientTokenResponse) FromResult(result commands.ClientTokenResult) ClientT
 			Status:          result.Client.Status,
 			TenantID:        result.Client.TenantID,
 			TenantWorkspace: result.Client.TenantWorkspace,
-			Roles:           dtos.NamedGrants(result.Client.Roles),
-			Permissions:     dtos.NonNilStrings(result.Client.Permissions),
-			Claims:          dtos.NonNilClaims(result.Client.Claims),
+			Roles:           utils.NamedGrants(result.Client.Roles),
+			Permissions:     utils.NonNilStrings(result.Client.Permissions),
+			Claims:          utils.NonNilClaims(result.Client.Claims),
 		},
 	}
 }

@@ -54,6 +54,8 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
+
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 
@@ -71,15 +73,15 @@ import (
 
 // IssueClientTokenHandler turns a client id and a secret into an access token.
 type IssueClientTokenHandler struct {
-	Store    utils.ClientAuthenticationStore
-	Attempts utils.AttemptRecorder
-	Issuer   utils.AccessTokenIssuer
+	Store    dtos.ClientAuthenticationStore
+	Attempts dtos.AttemptRecorder
+	Issuer   dtos.AccessTokenIssuer
 
 	// Events carries the per-attempt record that the rollup table does not keep. A
 	// nil publisher disables the announcements and changes nothing else — the same
 	// semantic the framework gives its own event port, and what lets a test drive
 	// the utils.Refusal branches without one.
-	Events utils.AuthenticationEventPublisher
+	Events dtos.AuthenticationEventPublisher
 }
 
 // journal is this route's view of the shared path to the auxiliary tables and the

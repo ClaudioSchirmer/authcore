@@ -14,10 +14,12 @@
 package handlers
 
 import (
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 	"strconv"
 	"strings"
 	"time"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 
@@ -28,15 +30,15 @@ import (
 
 // IssueTokenHandler turns an e-mail and a password into a token pair.
 type IssueTokenHandler struct {
-	Store    utils.AuthenticationStore
-	Attempts utils.AttemptRecorder
-	Issuer   utils.TokenIssuer
+	Store    dtos.AuthenticationStore
+	Attempts dtos.AttemptRecorder
+	Issuer   dtos.TokenIssuer
 
 	// Events carries the per-attempt record that the rollup table stopped
 	// keeping. A nil publisher disables the announcements and changes nothing
 	// else — the same semantic the framework gives its own event port, and what
 	// lets a test drive the utils.Refusal branches without one.
-	Events utils.AuthenticationEventPublisher
+	Events dtos.AuthenticationEventPublisher
 }
 
 // journal is this route's view of the shared path to the auxiliary tables and
@@ -61,7 +63,7 @@ func (h *IssueTokenHandler) journal() utils.Journal {
 //  3. only then, the account and its tenant have to be usable.
 //
 // Every utils.Refusal is the same notification, the same field name and the same 401.
-func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.IssueTokenCommand) (cmdutils.TokenResult, error) {
+func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.IssueTokenCommand) (cmddtos.TokenResult, error) {
 	// Lowercased and trimmed before ANYTHING else, and that ordering matters
 	// twice: the domain stores addresses lowercase (vos.Email refuses anything
 	// else), and the attempt log counts by this exact string — two spellings of
@@ -82,7 +84,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 		// NOT a utils.Refusal. A lockout probe that cannot run has not established
 		// anything, and answering 401 would tell a caller with a correct password
 		// that it was wrong. It escapes as an exception → 500.
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 	if locked {
 		// Counted, so a reviewer sees somebody kept trying through the lock — and
@@ -96,9 +98,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 		// accounts under attack" is the question that separates a targeted attack
 		// from credential-stuffing noise.
 		if rerr := journal.RefusedWhileLocked(ctx, email, ip, until, knownToExist); rerr != nil {
-			return cmdutils.TokenResult{}, rerr
+			return cmddtos.TokenResult{}, rerr
 		}
-		return cmdutils.TokenResult{}, refuseLocked(until)
+		return cmddtos.TokenResult{}, refuseLocked(until)
 	}
 
 	account, err := h.Store.LoadAccountByEmail(ctx, email)
@@ -131,9 +133,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 			reason = "sign-in Failed: identity lookup could not be performed"
 		}
 		if rerr := journal.Failed(ctx, email, ip, reason, existed); rerr != nil {
-			return cmdutils.TokenResult{}, rerr
+			return cmddtos.TokenResult{}, rerr
 		}
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	// From here the identity provably exists, and every remaining branch says so.
@@ -141,9 +143,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 
 	if !h.Store.PasswordMatches(cmd.Password, account.PasswordHash) {
 		if rerr := journal.Failed(ctx, email, ip, "sign-in Failed: credential rejected", &existed); rerr != nil {
-			return cmdutils.TokenResult{}, rerr
+			return cmddtos.TokenResult{}, rerr
 		}
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	if !utils.AccountIsUsable(account) {
@@ -156,9 +158,9 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 		// the line that explains a support ticket in one read.
 		if rerr := journal.Failed(ctx, email, ip,
 			"sign-in Failed: credential valid but account or tenant not usable", &existed); rerr != nil {
-			return cmdutils.TokenResult{}, rerr
+			return cmddtos.TokenResult{}, rerr
 		}
-		return cmdutils.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
+		return cmddtos.TokenResult{}, utils.Refusal(InvalidCredentialsNotification{})
 	}
 
 	// STEP TWO. Everything a token says, in one concurrent burst.
@@ -169,7 +171,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 	// It escapes as an exception → 500.
 	bundle, err := h.Store.ResolveSignIn(ctx, account)
 	if err != nil {
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 
 	// ONE resolution, two readers. The token below and the profile at the
@@ -181,17 +183,17 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 		Claims:  utils.BuildClaims(account, bundle, customClaims),
 	})
 	if err != nil {
-		return cmdutils.TokenResult{}, err
+		return cmddtos.TokenResult{}, err
 	}
 
 	// Recorded LAST, once the sign-in has actually Succeeded. It is what anchors
 	// the window — every failure before this moment stops counting — so writing it
 	// any earlier would clear a counter for a sign-in that had not happened yet.
 	if rerr := journal.Succeeded(ctx, email, ip); rerr != nil {
-		return cmdutils.TokenResult{}, rerr
+		return cmddtos.TokenResult{}, rerr
 	}
 
-	return cmdutils.TokenResult{
+	return cmddtos.TokenResult{
 		AccessToken:      access.Token,
 		TokenType:        utils.TokenTypeBearer,
 		ExpiresAt:        access.ExpiresAt.Unix(),

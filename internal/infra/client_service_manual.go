@@ -24,7 +24,7 @@
 //     as the write it is guarding — and what keeps two services built over two
 //     engines (a test and a boot) from stealing each other's.
 //
-//  2. THE ROLE WALK IS SHARED WITH User, through utils.RoleRow in role_probe.go. It
+//  2. THE ROLE WALK IS SHARED WITH User, through dtos.RoleRow in role_probe.go. It
 //     is the same question — "one role, resolved, and what does it confer" —
 //     and two copies would be one security rule able to disagree with itself
 //     about the case that matters most.
@@ -43,6 +43,7 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
@@ -104,8 +105,8 @@ const (
 // ONE read, memoised for the request. Same row type GroupServiceImpl and
 // UserServiceImpl use, on this service's context — and the same batch
 // arithmetic, which lives in row_resolution.go.
-func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.RoleRow {
-	return utils.ResolveRows(s.ctx, clientRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]utils.RoleRow {
+func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]dtos.RoleRow {
+	return utils.ResolveRows(s.ctx, clientRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]dtos.RoleRow {
 		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
@@ -115,7 +116,7 @@ func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.Ro
 			panic("Client: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write grants")
 		}
 
-		rows := make(map[string]utils.RoleRow, len(found))
+		rows := make(map[string]dtos.RoleRow, len(found))
 		for _, role := range found {
 			// The grants arrive with resource and action already filled — Role
 			// declares the traversal into the catalog. Nothing here queries it.
@@ -124,7 +125,7 @@ func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.Ro
 			for _, grant := range grants {
 				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
-			rows[utils.CanonicalIDOf(role.GetID())] = utils.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
+			rows[utils.CanonicalIDOf(role.GetID())] = dtos.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
 		}
 		return rows
 	})

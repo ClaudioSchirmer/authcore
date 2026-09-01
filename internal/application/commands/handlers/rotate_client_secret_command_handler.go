@@ -24,7 +24,7 @@ package handlers
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
@@ -34,7 +34,7 @@ import (
 
 // RotateClientSecretHandler mints a new secret and retires the current one.
 type RotateClientSecretHandler struct {
-	Store   utils.ClientSecretStore
+	Store   dtos.ClientSecretStore
 	Service domain.Service
 }
 

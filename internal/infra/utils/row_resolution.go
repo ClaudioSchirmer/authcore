@@ -3,7 +3,7 @@
 // This file holds what "resolve a SET of rows, once" MEANS, and it lives on its
 // own because four aggregates ask it: User, Client, Group and Role, each about
 // a different companion table. It started inside user_service_manual.go and
-// moved here the day the second caller appeared — the same move RoleRow made
+// moved here the day the second caller appeared — the same move dtos.RoleRow made
 // into role_probe.go, and for the same reason: a batch helper hanging off a
 // file named for User would mean that removing User breaks Client for a reason
 // that has nothing to do with users.

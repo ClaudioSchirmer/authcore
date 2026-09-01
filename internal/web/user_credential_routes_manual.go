@@ -31,7 +31,7 @@ package web
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -49,7 +49,7 @@ import (
 // application layer and names exactly the two things they do.
 func MountUserCredentials(
 	app *fiber.App,
-	store utils.UserCredentialStore,
+	store dtos.UserCredentialStore,
 	svc domain.Service,
 	d bootstrap.Deps,
 ) {
@@ -161,7 +161,7 @@ func MountUserCredentials(
 // service uses to mirror a 204.
 func MountUserCredentialsGraphQL(
 	reg *fwgraphql.Registry,
-	store utils.UserCredentialStore,
+	store dtos.UserCredentialStore,
 	svc domain.Service,
 ) {
 	// The id rides the field's own `id` argument, which the framework hands to

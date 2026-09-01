@@ -3,7 +3,7 @@
 // The machine sign-in's COMMAND and RESULT, one level above the handler that
 // consumes them, per the layout standard.
 //
-// THE RESULT IS ITS OWN TYPE RATHER THAN utils.TokenResult, and not for tidiness: four
+// THE RESULT IS ITS OWN TYPE RATHER THAN dtos.TokenResult, and not for tidiness: four
 // of that type's fields have no meaning here — RefreshToken, RefreshExpiresAt,
 // and inside the profile, Email, Groups and MustChangePassword. Sharing it would
 // mean six fields that are always zero, which is six invitations for a client to
@@ -12,13 +12,13 @@
 package commands
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
 )
 
 // ClientTokenResult is what the machine sign-in answers with.
 //
-// A TYPE OF ITS OWN RATHER THAN utils.TokenResult, and not for tidiness: four of that
+// A TYPE OF ITS OWN RATHER THAN dtos.TokenResult, and not for tidiness: four of that
 // type's fields have no meaning here — RefreshToken, RefreshExpiresAt, and inside
 // the profile, Email, Groups and MustChangePassword. Sharing it would mean six
 // fields that are always zero, which is six invitations for a client to read one
@@ -41,7 +41,7 @@ type AuthenticatedClientResult struct {
 	Status          string
 	TenantID        string
 	TenantWorkspace string
-	Roles           []utils.NamedGrantResult
+	Roles           []dtos.NamedGrantResult
 	Permissions     []string
 	// The tenant-defined claims this token carries, resolved down the two-level
 	// chain and typed per each definition's declared value type.

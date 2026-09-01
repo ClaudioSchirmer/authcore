@@ -45,7 +45,7 @@ Honest scope, so nobody reads intent as delivery:
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
-| Effective-permission resolution (group path ∪ direct path) | **built** — `internal/infra/authentication_reader_manual.go` resolves both arrows in ONE statement, composed at construction from the `TableSchema` declarations so a renamed column aborts the boot instead of returning nothing. Archive-gated at every hop: a revoked grant, a retired role, a left group and an archived membership each confer nothing. Proven against the bench with a user holding one permission directly and another only through a group |
+| Effective-permission resolution (group path ∪ direct path) | **built** — `internal/infra/authentication_reader.go` resolves both arrows in ONE statement, composed at construction from the `TableSchema` declarations so a renamed column aborts the boot instead of returning nothing. Archive-gated at every hop: a revoked grant, a retired role, a left group and an archived membership each confer nothing. Proven against the bench with a user holding one permission directly and another only through a group |
 | `Claim` catalog | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/claim.omnicore.yaml` against the model in `specs/scaffold-entity/claim/spec.md`. **Capped at 20 ACTIVE definitions per tenant per identity kind** since 2026-08-28 (`specs/evolve-entity/claim-catalog-cap/spec.md`), which is what closes the token-budget hole the emission row below used to name. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come. **Its definitions now reach a user's token** — see the emission row below and `### Claim` |
 | Custom claims ON THE TOKEN | **built** (2026-08-28) — `POST /auth/user/token` and its refresh resolve the two-level chain into the access token beside the fixed nine: the value set on the user wins, the definition's tenant-wide `defaultValue` fills in when none is, and a claim with neither is **absent** rather than empty. Each value is minted in the JSON type its definition declares, through the same `ClaimValueMatchesValueType` gate both write levels ask, so no fourth reading of what a `bool` is exists. An **archived definition mints nothing**, including for a user still holding a value for it — the emission walks the tenant's ACTIVE catalog, not the user's entries. A definition can never take over a platform claim name: the reserved `x_` prefix stops it at the API, and the merge assigns the fixed set last so a row written by migration cannot either. **At most 20 per token**, values set on the user spent before any tenant-wide default, the rest dropped with a named `Warn` — and since 2026-08-28 that truncation is **unreachable through the API**: the catalog now caps itself at 20 ACTIVE definitions per tenant per identity kind, and the bucket it caps is the *same predicate* this emission walks, so there can never be a 21st candidate. The drop stays as the seatbelt for rows a migration or a direct `UPDATE` put in the table. A `mustChangePassword` session carries **none** of them, and the response body mirrors the token exactly, restriction included. **`POST /auth/client/token` resolves the same chain for a machine since 2026-09-01**, through the same function, over `client_claims` and the `client`/`both` half of the catalog — a `user`-scoped definition mints nothing there, and a machine has no restricted-session state to strip them. Plans in `specs/implement/emit-custom-claims-on-user-token/plan.md` and `specs/implement/client-credentials-token/plan.md` |
 | Reserved platform tenant | not started — and **two** entities DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration. **`Claim` was deliberately built NOT to become the third**: its reserved-prefix rule applies to every definition created through the API with no exception carved for a tenant, so the platform's own nine claims would enter by migration — the same door the `*:*` role enters by — and nothing in that entity needs to know which tenant is reserved |
@@ -737,10 +737,9 @@ of every token the integration presents — so a lock would hand anyone a five-r
 against a credential nothing can guess), and §F's warning about a spoofable
 `X-Forwarded-For` does not apply at this framework pin, which reads no proxy header at all.
 
-**One thing this entity does not do yet**, recorded rather than hidden: `POST /clients` does
-not hand back a secret today: it mints one and stores the hash, so a new client is usable only
-after a rotation call. That gap and its three ways out are in
-`specs/scaffold-entity/client/tasks.md`.
+**`POST /clients` hands back the secret in its `201`**, so a new integration is usable
+immediately — no rotation call in between. (`specs/scaffold-entity/client/tasks.md` still
+records this as an open gap; that entry is stale, and the correction is dated 2026-09-01.)
 
 Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
 `client:grant` (the two role verbs) · **`client:rotate-secret`** · **`client:manage-network`**
@@ -1268,28 +1267,39 @@ The **credential** path — the spec language gates operations by a closed set o
 verbs, and "change a credential" is not one of them:
 
 ```
-internal/domain/password_hasher.go          the port — Hash · Matches
+internal/domain/user_service.go             the port — Hash · Matches
 internal/infra/password_hasher.go           Argon2id, OWASP baseline, PHC-encoded
 internal/domain/user_credential_manual.go   the rules, entered by actionName
 internal/application/commands/…_manual.go   the two commands and their handlers
 internal/web/…_credential_routes_manual.go  the two routes
-internal/infra/role_probe.go                what "one role, resolved" means — shared by Group and User
+internal/infra/utils/role_probe.go          what "one role, resolved" means — shared by Group, User and Client
 ```
 
 The **token** path — same reason, plus the framework ships the Issuer as METHODS and never as
 HTTP endpoints, so every route on top of it is this service's own:
 
 ```
-internal/domain/effective_grants_manual.go        the resolved answer's shape, shared by infra and application
-internal/application/commands/notifications_…     the two 401s — one per subject kind, each generic within its route
-internal/infra/authentication_reader_manual.go    the USER read: both grant paths, schema-composed
-internal/infra/client_authentication_reader_…     the MACHINE read: one grant path, the two hashes, the allow-list
-internal/infra/refresh_token_store_manual.go      authcore.RefreshTokenStore — hash-only, self-sweeping
-internal/application/commands/authentication_…    the user handlers, the shared journal and the claim chain
-internal/application/commands/client_authenti…    the machine handler; no refresh, no lockout refusal
-internal/web/authentication_routes_manual.go      all three routes — one owner of the /auth group, see the IP note
-bootstrap/authentication_feature_manual.go        owns every adapter; Wire only forwards the store
-migrations/postgres/0006_refresh_tokens_manual.*  the table, hand-written: it is not an entity
+internal/application/commands/issue_token_command.go        the sign-in's command
+internal/application/commands/utils/token_results.go       the result BOTH token verbs answer with
+internal/application/commands/handlers/                    one file per hand-written handler, and nothing else
+      issue_token_command_handler.go                       the user sign-in
+      refresh_token_command_handler.go                     the rotation
+      issue_client_token_command_handler.go                the machine sign-in
+      notifications.go                                     the three 401s — types only
+internal/application/commands/handlers/utils/              what more than one handler needs
+      ports.go                                             every port the handlers take
+      authentication.go                                    the claim vocabulary and the two builders
+      claims.go                                            the two-level tenant-claim chain
+      journal.go                                           the one path to the counters and the log stream
+internal/infra/authentication_reader.go                    the USER read: both grant paths, schema-composed
+internal/infra/client_authentication_reader.go             the MACHINE read: one grant path, two hashes, the allow-list
+internal/infra/schemas/sign_in_*_schema.go                 one Direct schema per file, per the layout standard
+internal/infra/refresh_token_store_manual.go               authcore.RefreshTokenStore — hash-only, self-sweeping
+internal/web/requests/issue_token.go · issue_client_token.go   one file per operation
+internal/web/requests/dtos/named_grant.go                  the shapes both token responses share
+internal/web/authentication_routes_manual.go               all three routes — one owner of the /auth group
+bootstrap/authentication_feature_manual.go                 owns every adapter; Wire only forwards the store
+migrations/postgres/0006_refresh_tokens_manual.*           the table, hand-written: it is not an entity
 ```
 
 Both readers are anchored on **Direct schemas this service owns**

@@ -16,7 +16,7 @@ package requests
 
 import (
 	"encoding/json"
-	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 	"strings"
 	"testing"
@@ -37,13 +37,13 @@ func TestRefreshTokenRequest_ToCommand(t *testing.T) {
 }
 
 func TestTokenResponse_FromResult(t *testing.T) {
-	result := cmdutils.TokenResult{
+	result := cmddtos.TokenResult{
 		AccessToken:      "access",
 		TokenType:        "Bearer",
 		ExpiresAt:        1700000000,
 		RefreshToken:     "refresh",
 		RefreshExpiresAt: 1700003600,
-		User: cmdutils.AuthenticatedUserResult{
+		User: cmddtos.AuthenticatedUserResult{
 			ID:                 "user-1",
 			Name:               "Ada Lovelace",
 			Email:              "ada@acme.test",
@@ -51,8 +51,8 @@ func TestTokenResponse_FromResult(t *testing.T) {
 			MustChangePassword: true,
 			TenantID:           "tenant-1",
 			TenantWorkspace:    "acme",
-			Groups:             []cmdutils.NamedGrantResult{{Key: "eng", Name: "Engineering"}},
-			Roles:              []cmdutils.NamedGrantResult{{Key: "viewer"}},
+			Groups:             []cmddtos.NamedGrantResult{{Key: "eng", Name: "Engineering"}},
+			Roles:              []cmddtos.NamedGrantResult{{Key: "viewer"}},
 			Permissions:        []string{"user:change-password"},
 		},
 	}
@@ -83,7 +83,7 @@ func TestTokenResponse_FromResult(t *testing.T) {
 // THE ONE THAT ACTUALLY BITES. A nil slice marshals to null; a client doing
 // `for (const g of user.groups)` then throws instead of iterating nothing.
 func TestTokenResponse_EmptyCollectionsMarshalAsArrays(t *testing.T) {
-	resp := TokenResponse{}.FromResult(cmdutils.TokenResult{})
+	resp := TokenResponse{}.FromResult(cmddtos.TokenResult{})
 
 	encoded, err := json.Marshal(resp)
 	if err != nil {
@@ -105,8 +105,8 @@ func TestTokenResponse_EmptyCollectionsMarshalAsArrays(t *testing.T) {
 // TYPES — a number as a number, a bool as a bool. Rendering them as strings
 // would make every consumer parse what the definition already declared.
 func TestTokenResponse_CarriesTenantClaimsInTheirDeclaredTypes(t *testing.T) {
-	resp := TokenResponse{}.FromResult(cmdutils.TokenResult{
-		User: cmdutils.AuthenticatedUserResult{
+	resp := TokenResponse{}.FromResult(cmddtos.TokenResult{
+		User: cmddtos.AuthenticatedUserResult{
 			Claims: map[string]any{
 				"x_cost_center":  float64(1000),
 				"x_beta_enabled": true,
@@ -147,7 +147,7 @@ func TestNamedGrantResponse_OmitsAnAbsentName(t *testing.T) {
 // of this test used "access" and "refresh" and failed against a perfectly correct
 // response, because those strings also occur inside "accessToken".
 func TestTokenResponse_CarriesEachSecretExactlyOnce(t *testing.T) {
-	resp := TokenResponse{}.FromResult(cmdutils.TokenResult{
+	resp := TokenResponse{}.FromResult(cmddtos.TokenResult{
 		AccessToken:  "SENTINEL-JWT-VALUE",
 		RefreshToken: "SENTINEL-OPAQUE-VALUE",
 	})

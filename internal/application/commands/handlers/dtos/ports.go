@@ -16,10 +16,11 @@
 // NOTHING A CREDENTIAL COULD RIDE IN crosses the attempt seam: there is no
 // parameter a password could arrive in and no column it could be written to.
 
-package utils
+package dtos
 
 import (
 	"context"
+	"time"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/infra"
@@ -166,4 +167,85 @@ type UserCredentialStore interface {
 	// cancellation and trace as the write that follows it.
 	ScopedReader(ctx *configuration.AppContext) domain.Reader[*appdomain.User]
 	Scope(ctx *configuration.AppContext, opts ...persistence.WriteOption[*appdomain.User]) domain.Writer
+}
+
+// AttemptRecorder is the lockout: the counters that decide whether an identity is
+// refused outright, and the lifetime totals beside them.
+//
+// It is a SEPARATE port from AuthenticationStore for the same reason
+// RefreshTokenLookup is: a different adapter implements it, over a different
+// table, and folding them together would give whichever grew first methods it has
+// no business owning.
+//
+// IT IS NOT THE FORENSIC LOG. The per-attempt narrative — every attempt, its
+// origin, its order — is published to the service's log stream through
+// AuthenticationEventPublisher below; what this port owns is the state that has
+// to be transactional, and nothing else.
+//
+// THREE RECORDING METHODS RATHER THAN ONE WITH AN OUTCOME PARAMETER. An earlier
+// draft passed an outcome value and a struct describing the attempt, which forced
+// both a shared enum and a shared type — and neither had a home, since a type both
+// layers name can live only in the domain, where a row shape with an IP in it does
+// not belong. Naming the outcome in the METHOD dissolves the problem: the storage
+// vocabulary stays with the table that owns it, and nothing crosses this seam but
+// strings the caller already had.
+//
+// NOTHING ABOUT THE CREDENTIAL CROSSES IT EITHER. There is no parameter a password
+// could arrive in — see the store and the 0007 migration for why that is a rule
+// rather than an oversight.
+type AttemptRecorder interface {
+	// LockedUntil reports whether an identity is currently refused outright,
+	// until when, and what its failures already established about whether it
+	// names a real account.
+	//
+	// It answers identically for an identity that names an account and one that
+	// does not — that uniformity IS the feature. The existence flag it returns
+	// never reaches the caller of the endpoint; it exists so the log record this
+	// handler publishes about a blocked attempt can say whether a real account is
+	// the one under attack.
+	LockedUntil(ctx context.Context, identity, kind string) (until time.Time, locked bool, identityExisted *bool, err error)
+
+	// RecordFailure counts a credential presented and rejected. The only outcome
+	// that moves the lockout. identityExisted is nil when the lookup itself
+	// Failed and the answer is genuinely unknown — the store then leaves the
+	// stored verdict alone rather than overwriting it with a guess.
+	RecordFailure(ctx context.Context, identity, kind, ip string, identityExisted *bool) error
+
+	// RecordSuccess counts a credential that verified and CLEARS the lockout:
+	// the live counter goes to zero while the lifetime total is untouched, which
+	// is how "a successful sign-in resets the counter" works without erasing
+	// history.
+	RecordSuccess(ctx context.Context, identity, kind, ip string) error
+
+	// RecordLocked counts an attempt refused because the identity was already
+	// locked. It bumps one lifetime counter and moves neither the live count nor
+	// the window anchor, so the persistence is visible to a reviewer and yet
+	// cannot extend the lock.
+	//
+	// It takes no existence flag: this path deliberately never performs a lookup,
+	// and the flag already sits on the row that the failures causing this lock
+	// wrote.
+	RecordLocked(ctx context.Context, identity, kind, ip string) error
+}
+
+// AuthenticationEventPublisher is where the per-attempt record goes now that the
+// attempt table is a rollup: one structured record on the service's always-on log
+// stream for every sign-in outcome, success or failure.
+//
+// IT IS THE FRAMEWORK'S OWN PORT, NARROWED — deliberately spelled with the same
+// signature as omnicore's events.Publisher so *events.SlogPublisher satisfies it
+// structurally and the composition root hands one straight in. No adapter is
+// written, and no type is invented to carry an event across a layer: both
+// persistence.RequestContext and domain.Event are already legal imports above
+// infra, and *configuration.AppContext already satisfies the first.
+//
+// PublishAll is deliberately absent. The framework's write path publishes an
+// entity's accumulated events in a batch; a sign-in has exactly one fact to
+// announce per outcome, and a port that only offers what the caller needs cannot
+// be misused into batching them.
+//
+// WHAT CROSSES IT IS NEVER A CREDENTIAL. The same rule as the table, for the
+// stronger reason: this stream leaves the box.
+type AuthenticationEventPublisher interface {
+	Publish(ctx persistence.RequestContext, event domain.Event) error
 }

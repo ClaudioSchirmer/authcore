@@ -24,6 +24,7 @@ package web
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
@@ -39,13 +40,13 @@ import (
 // and name exactly what these two operations need.
 func MountAuthentication(
 	app *fiber.App,
-	store utils.AuthenticationStore,
-	clients utils.ClientAuthenticationStore,
-	lookup utils.RefreshTokenLookup,
-	attempts utils.AttemptRecorder,
-	events utils.AuthenticationEventPublisher,
-	issuer utils.TokenIssuer,
-	accessIssuer utils.AccessTokenIssuer,
+	store dtos.AuthenticationStore,
+	clients dtos.ClientAuthenticationStore,
+	lookup dtos.RefreshTokenLookup,
+	attempts dtos.AttemptRecorder,
+	events dtos.AuthenticationEventPublisher,
+	issuer dtos.TokenIssuer,
+	accessIssuer dtos.AccessTokenIssuer,
 	d bootstrap.Deps,
 ) {
 	// The group is /auth and the SUBJECT TYPE is the next segment, not a field in

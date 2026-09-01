@@ -29,7 +29,7 @@ package handlers
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/persistence"
@@ -41,7 +41,7 @@ import (
 
 // ChangePasswordHandler serves the self-service path.
 type ChangePasswordHandler struct {
-	Store   utils.UserCredentialStore
+	Store   dtos.UserCredentialStore
 	Service domain.Service
 }
 
