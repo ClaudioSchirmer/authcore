@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:20dea754b675ec88068be035aa4979ccd530dbee65c766e2ec08e88c61d41e2b
+// generated:  2026-09-01
+// checksum:   sha256:5701ac283518a406f2bf8192797fe70c03a06eb6f5948125df7b6ecc149286e6
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -36,6 +36,8 @@ import (
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
 )
 
@@ -96,9 +98,9 @@ type PatchUserResult struct {
 	// FullName is COMPUTED: no column backs it, and FromEntity fills it
 	// from GivenName+FamilyName.
 	FullName string
-	Groups   []UserGroupResult
-	Roles    []UserRoleResult
-	Claims   []UserClaimResult
+	Groups   []cmddtos.UserGroupResult
+	Roles    []cmddtos.UserRoleResult
+	Claims   []cmddtos.UserClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -120,9 +122,9 @@ func (c *PatchUserCommand) FromEntity(ctx *configuration.AppContext, e *appdomai
 		PasswordChangedAt:  e.PasswordChangedAt,
 		MustChangePassword: e.MustChangePassword,
 		Status:             e.Status.Value(),
-		Groups:             projectUserGroups(e),
-		Roles:              projectUserRoles(e),
-		Claims:             projectUserClaims(e),
+		Groups:             cmdutils.ProjectUserGroups(e),
+		Roles:              cmdutils.ProjectUserRoles(e),
+		Claims:             cmdutils.ProjectUserClaims(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family

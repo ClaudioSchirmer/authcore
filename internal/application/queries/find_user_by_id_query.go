@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c1473f6d45e62d2ddaf1bc51ec5fec05cfd4a029f1bd7510ce1b4846a980fc93
+// generated:  2026-09-01
+// checksum:   sha256:c0d64c624594ee31c075895373066b4bd8fc8e0f394c7553b8750f3fddacc3dc
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindUserByIDQuery is the application-side transport for the by-id read.
@@ -124,7 +126,7 @@ type FindUserByIDResult struct {
 	// FullName is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from GivenName+FamilyName.
 	FullName string
-	Groups   []UserGroupRowResult
-	Roles    []UserRoleRowResult
-	Claims   []UserClaimRowResult
+	Groups   []qrydtos.UserGroupRowResult
+	Roles    []qrydtos.UserRoleRowResult
+	Claims   []qrydtos.UserClaimRowResult
 }

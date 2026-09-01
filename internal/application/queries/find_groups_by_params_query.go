@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:0c8bff5c43ec5ad7e4e8673607ac86c812f7829d7103d7c4d1511bb7e4304bdd
+// generated:  2026-09-01
+// checksum:   sha256:66cf8b7025bdb67c6b6d54995b74a0366ceb9e95286e0fcb231eb4b50a28d677
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindGroupsByParamsQuery is the application-side transport for the paged
@@ -103,5 +105,5 @@ type FindGroupsByParamsResult struct {
 	UpdatedAt       *time.Time
 	TenantWorkspace *string
 	TenantStatus    *string
-	Roles           []GroupRoleRowResult
+	Roles           []qrydtos.GroupRoleRowResult
 }

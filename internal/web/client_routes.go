@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:16094e28e19c0c2e642ce0804dfb9996dda1070c2969776efe68272ab9b89d76
+// generated:  2026-09-01
+// checksum:   sha256:8a0b4240f883f420243df4c2082ce74f46a7dbb3b8b302cb8608b4b6ae3324ab
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -149,14 +149,14 @@ func MountClients(
 		},
 		fwopenapi.RequirePermission("client:grant"))
 
-	hRemoveClientRole, sRemoveClientRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveClientRoleRequest{},
+	hArchiveClientRole, sArchiveClientRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveClientRoleRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientRoleCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/roles/:clientRoleId/archive",
-		hRemoveClientRole, sRemoveClientRole,
+		hArchiveClientRole, sArchiveClientRole,
 		fwopenapi.Doc{
 			Summary:     "Archive one ClientRole of a Client",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -179,14 +179,14 @@ func MountClients(
 		},
 		fwopenapi.RequirePermission("client:manage-network"))
 
-	hRemoveClientAllowedCIDR, sRemoveClientAllowedCIDR := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveClientAllowedCIDRRequest{},
+	hArchiveClientAllowedCIDR, sArchiveClientAllowedCIDR := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveClientAllowedCIDRRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientAllowedCIDRCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/allowedCIDRs/:clientAllowedCIDRId/archive",
-		hRemoveClientAllowedCIDR, sRemoveClientAllowedCIDR,
+		hArchiveClientAllowedCIDR, sArchiveClientAllowedCIDR,
 		fwopenapi.Doc{
 			Summary:     "Archive one ClientAllowedCIDR of a Client",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -224,14 +224,14 @@ func MountClients(
 		},
 		fwopenapi.RequirePermission("client:set-claim"))
 
-	hRemoveClientClaim, sRemoveClientClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveClientClaimRequest{},
+	hArchiveClientClaim, sArchiveClientClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveClientClaimRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientClaimCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientClaimCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/claims/:clientClaimId/archive",
-		hRemoveClientClaim, sRemoveClientClaim,
+		hArchiveClientClaim, sArchiveClientClaim,
 		fwopenapi.Doc{
 			Summary:     "Archive one ClientClaim of a Client",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -304,12 +304,12 @@ func MountClientsGraphQL(
 		fwgraphql.RequirePermission("client:grant")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveClientRoleGraphQLRequest](
-		"removeClientRole", requests.RemoveClientRoleGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientRoleCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveClientRoleGraphQLRequest](
+		"archiveClientRole", requests.ArchiveClientRoleGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("client:grant")))
@@ -324,12 +324,12 @@ func MountClientsGraphQL(
 		fwgraphql.RequirePermission("client:manage-network")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveClientAllowedCIDRGraphQLRequest](
-		"removeClientAllowedCIDR", requests.RemoveClientAllowedCIDRGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientAllowedCIDRCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveClientAllowedCIDRGraphQLRequest](
+		"archiveClientAllowedCIDR", requests.ArchiveClientAllowedCIDRGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientAllowedCIDRCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("client:manage-network")))
@@ -356,12 +356,12 @@ func MountClientsGraphQL(
 		fwgraphql.RequirePermission("client:set-claim")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveClientClaimGraphQLRequest](
-		"removeClientClaim", requests.RemoveClientClaimGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.RemoveClientClaimCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveClientClaimGraphQLRequest](
+		"archiveClientClaim", requests.ArchiveClientClaimGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Client, *commands.ArchiveClientClaimCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("client:set-claim")))

@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e2aa9d6cdbe5e0013767079f92555ee9a5cd3910545a553e48c5fa6f45c50abf
+// generated:  2026-09-01
+// checksum:   sha256:6b4c183c48a2fda5485efcc8b45a3f248d2e7b729da88945c1cff5dde3247319
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -32,6 +32,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // InsertGroupRequest is the body of Create a group.
@@ -48,8 +50,8 @@ type InsertGroupRequest struct {
 	// not ignored — it reaches the aggregate, where the row-scope guard
 	// refuses it exactly as it refuses a write into a record that is not
 	// the caller's.
-	TenantID *domain.ID         `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Roles    []GroupRoleRequest `json:"roles"`
+	TenantID *domain.ID                 `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Roles    []webdtos.GroupRoleRequest `json:"roles"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No
@@ -67,12 +69,12 @@ func (r InsertGroupRequest) ToCommand() *commands.InsertGroupCommand {
 type InsertGroupResponse struct {
 	fwresponses.Auto
 
-	ID          domain.ID           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    domain.ID           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         string              `json:"key" example:"engineering"`
-	Name        string              `json:"name" example:"Engineering"`
-	Description string              `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
-	Roles       []GroupRoleResponse `json:"roles"`
+	ID          domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID    domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Key         string                      `json:"key" example:"engineering"`
+	Name        string                      `json:"name" example:"Engineering"`
+	Description string                      `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
+	Roles       []webdtos.GroupRoleResponse `json:"roles"`
 }
 
 // FromResult projects the application Result onto InsertGroupResponse.

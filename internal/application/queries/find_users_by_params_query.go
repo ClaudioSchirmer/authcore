@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:b22f877d350a3d88aa7644cf02d81b451db3d4d98dad94993c25c1508a88a449
+// generated:  2026-09-01
+// checksum:   sha256:d06b5e35aef910bdb41e057c0020bbf2de5cfc4d085c65f81e6e53a425caf8bf
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindUsersByParamsQuery is the application-side transport for the paged read.
@@ -118,7 +120,7 @@ type FindUsersByParamsResult struct {
 	// FullName is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from GivenName+FamilyName.
 	FullName *string
-	Groups   []UserGroupRowResult
-	Roles    []UserRoleRowResult
-	Claims   []UserClaimRowResult
+	Groups   []qrydtos.UserGroupRowResult
+	Roles    []qrydtos.UserRoleRowResult
+	Claims   []qrydtos.UserClaimRowResult
 }

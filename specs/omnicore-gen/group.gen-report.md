@@ -149,7 +149,7 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/group_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -205,7 +205,41 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
+| the groups feature (repository + view + mount) | `bootstrap/group_feature.go` |
+| the add command for one group_roles entry | `internal/application/commands/add_group_role_command.go` |
+| tests for add_group_role_command.go | `internal/application/commands/add_group_role_command_test.go` |
+| tests for archive_group_command.go | `internal/application/commands/archive_group_command_test.go` |
+| the archive command for one group_roles entry | `internal/application/commands/archive_group_role_command.go` |
+| tests for archive_group_role_command.go | `internal/application/commands/archive_group_role_command_test.go` |
+| the write shape of one GroupRole entry | `internal/application/commands/dtos/group_role_result.go` |
+| the insert command and result | `internal/application/commands/insert_group_command.go` |
+| tests for insert_group_command.go | `internal/application/commands/insert_group_command_test.go` |
+| the patch command and result | `internal/application/commands/patch_group_command.go` |
+| tests for patch_group_command.go | `internal/application/commands/patch_group_command_test.go` |
+| the projectors for the roles collection | `internal/application/commands/utils/group_group_role_projection.go` |
+| tests for the group_role_input mapper | `internal/application/dtos/group_role_input_test.go` |
+| the read shape of one GroupRole entry | `internal/application/queries/dtos/group_role_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
+| the read tests for find_group_by_id_query.go | `internal/application/queries/find_group_by_id_query_test.go` |
+| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
+| the read tests for find_groups_by_params_query.go | `internal/application/queries/find_groups_by_params_query_test.go` |
+| tests for the group_role collection type | `internal/domain/aggregatevos/group_role_test.go` |
+| the builder tests for group_role_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/group_role_schema_test.go` |
+| the builder tests for group_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/group_schema_test.go` |
+| the 5 group endpoints | `internal/web/group_routes.go` |
+| the add wire pair for one group_roles entry | `internal/web/requests/add_group_role.go` |
+| the wire mapper tests for add_group_role.go | `internal/web/requests/add_group_role_test.go` |
+| the archive wire pair for one group_roles entry | `internal/web/requests/archive_group_role.go` |
+| the wire mapper tests for archive_group_role.go | `internal/web/requests/archive_group_role_test.go` |
+| the wire shapes of one GroupRole entry | `internal/web/requests/dtos/group_role.go` |
+| the by-id request and response | `internal/web/requests/find_group_by_id.go` |
+| the wire mapper tests for find_group_by_id.go | `internal/web/requests/find_group_by_id_test.go` |
+| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
+| the wire mapper tests for find_groups_by_params.go | `internal/web/requests/find_groups_by_params_test.go` |
+| the insert request and response | `internal/web/requests/insert_group.go` |
+| the wire mapper tests for insert_group.go | `internal/web/requests/insert_group_test.go` |
+| the patch request and response | `internal/web/requests/patch_group.go` |
+| the wire mapper tests for patch_group.go | `internal/web/requests/patch_group_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -214,7 +248,23 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+13 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `bootstrap/groups_feature.go`
+- `internal/application/commands/group_child_results.go`
+- `internal/application/commands/group_commands_test.go`
+- `internal/application/commands/group_role_commands.go`
+- `internal/application/dtos/group_dtos_test.go`
+- `internal/application/queries/group_queries_test.go`
+- `internal/application/queries/group_row_results.go`
+- `internal/application/translations/group_translations_test.go`
+- `internal/domain/aggregatevos/group_children_test.go`
+- `internal/infra/schemas/group_schemas_test.go`
+- `internal/web/requests/group_children.go`
+- `internal/web/requests/group_requests_test.go`
+- `internal/web/requests/group_role_requests.go`
 
 ## What was NOT generated
 
@@ -230,9 +280,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

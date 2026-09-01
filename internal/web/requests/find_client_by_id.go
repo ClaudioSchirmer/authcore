@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c5bda4338fc8ba79c7ebff20090430dc0e19f5c66656ba3ab01fdd5eccd59b14
+// generated:  2026-09-01
+// checksum:   sha256:883757beea641b87814b5e4a949462c4acfdeb65a8971b3634259ef5c1e80e18
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -35,6 +35,7 @@ import (
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // FindClientByIDRequest declares the read controls this endpoint serves.
@@ -69,19 +70,19 @@ func (r FindClientByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *appquer
 type FindClientByIDResponse struct {
 	fwresponses.Auto
 
-	ID                      string                 `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID                domain.ID              `json:"tenantID" exportLabelKey:"ClientTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Name                    string                 `json:"name" exportLabelKey:"ClientNameField" example:"Billing integration"`
-	Description             string                 `json:"description" exportLabelKey:"ClientDescriptionField" example:"Posts invoices from the billing system into the ledger."`
-	SecretChangedAt         time.Time              `json:"secretChangedAt" exportLabelKey:"ClientSecretChangedAtField" example:"2026-08-26T14:03:11Z"`
-	PreviousSecretExpiresAt *time.Time             `json:"previousSecretExpiresAt" exportLabelKey:"ClientPreviousSecretExpiresAtField" example:"2026-08-27T14:03:11Z"`
-	Status                  string                 `json:"status" exportLabelKey:"ClientStatusField" example:"active"`
-	CreatedAt               time.Time              `json:"createdAt" exportLabelKey:"ClientCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt               time.Time              `json:"updatedAt" exportLabelKey:"ClientUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	TenantWorkspace         string                 `json:"tenantWorkspace" exportLabelKey:"ClientTenantWorkspaceField" example:"acme-comercio"`
-	Roles                   []ClientRoleRow        `json:"roles"`
-	AllowedCIDRs            []ClientAllowedCIDRRow `json:"allowedCIDRs"`
-	Claims                  []ClientClaimRow       `json:"claims"`
+	ID                      string                         `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID                domain.ID                      `json:"tenantID" exportLabelKey:"ClientTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Name                    string                         `json:"name" exportLabelKey:"ClientNameField" example:"Billing integration"`
+	Description             string                         `json:"description" exportLabelKey:"ClientDescriptionField" example:"Posts invoices from the billing system into the ledger."`
+	SecretChangedAt         time.Time                      `json:"secretChangedAt" exportLabelKey:"ClientSecretChangedAtField" example:"2026-08-26T14:03:11Z"`
+	PreviousSecretExpiresAt *time.Time                     `json:"previousSecretExpiresAt" exportLabelKey:"ClientPreviousSecretExpiresAtField" example:"2026-08-27T14:03:11Z"`
+	Status                  string                         `json:"status" exportLabelKey:"ClientStatusField" example:"active"`
+	CreatedAt               time.Time                      `json:"createdAt" exportLabelKey:"ClientCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt               time.Time                      `json:"updatedAt" exportLabelKey:"ClientUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	TenantWorkspace         string                         `json:"tenantWorkspace" exportLabelKey:"ClientTenantWorkspaceField" example:"acme-comercio"`
+	Roles                   []webdtos.ClientRoleRow        `json:"roles"`
+	AllowedCIDRs            []webdtos.ClientAllowedCIDRRow `json:"allowedCIDRs"`
+	Claims                  []webdtos.ClientClaimRow       `json:"claims"`
 }
 
 // FromResult projects the application Result onto FindClientByIDResponse.

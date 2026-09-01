@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:6e949a2522bdd9f1c1e8c13a1df5f118df1ec7efd2c68fa9c261680a44ef4a23
+// generated:  2026-09-01
+// checksum:   sha256:127f5ae3cb15c6223eee9ce526541e859c8b17c270afc100c0028a35bf898f6a
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 	"time"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // PatchUserRequest is the body of Update an user (partial).
@@ -61,19 +63,19 @@ func (r PatchUserRequest) ToCommand() *commands.PatchUserCommand {
 type PatchUserResponse struct {
 	fwresponses.Auto
 
-	ID                 domain.ID           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID           domain.ID           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	GivenName          string              `json:"givenName" example:"Maria"`
-	FamilyName         string              `json:"familyName" example:"Souza Lima"`
-	Email              string              `json:"email" example:"maria@acme.com"`
-	EmailVerifiedAt    *time.Time          `json:"emailVerifiedAt,omitempty" example:"2026-08-25T14:03:11Z"`
-	PasswordChangedAt  time.Time           `json:"passwordChangedAt" example:"2026-08-25T14:03:11Z"`
-	MustChangePassword bool                `json:"mustChangePassword" example:"true"`
-	Status             string              `json:"status" example:"active"`
-	FullName           string              `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
-	Groups             []UserGroupResponse `json:"groups"`
-	Roles              []UserRoleResponse  `json:"roles"`
-	Claims             []UserClaimResponse `json:"claims"`
+	ID                 domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID           domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	GivenName          string                      `json:"givenName" example:"Maria"`
+	FamilyName         string                      `json:"familyName" example:"Souza Lima"`
+	Email              string                      `json:"email" example:"maria@acme.com"`
+	EmailVerifiedAt    *time.Time                  `json:"emailVerifiedAt,omitempty" example:"2026-08-25T14:03:11Z"`
+	PasswordChangedAt  time.Time                   `json:"passwordChangedAt" example:"2026-08-25T14:03:11Z"`
+	MustChangePassword bool                        `json:"mustChangePassword" example:"true"`
+	Status             string                      `json:"status" example:"active"`
+	FullName           string                      `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
+	Groups             []webdtos.UserGroupResponse `json:"groups"`
+	Roles              []webdtos.UserRoleResponse  `json:"roles"`
+	Claims             []webdtos.UserClaimResponse `json:"claims"`
 }
 
 // FromResult projects the application Result onto PatchUserResponse.

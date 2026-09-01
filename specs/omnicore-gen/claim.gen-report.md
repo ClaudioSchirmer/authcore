@@ -188,7 +188,21 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
+| the claims feature (repository + view + mount) | `bootstrap/claim_feature.go` |
+| tests for archive_claim_command.go | `internal/application/commands/archive_claim_command_test.go` |
+| tests for insert_claim_command.go | `internal/application/commands/insert_claim_command_test.go` |
+| tests for patch_claim_command.go | `internal/application/commands/patch_claim_command_test.go` |
+| the read tests for find_claim_by_id_query.go | `internal/application/queries/find_claim_by_id_query_test.go` |
+| the read tests for find_claims_by_params_query.go | `internal/application/queries/find_claims_by_params_query_test.go` |
+| the ClaimActiveClaimsByAppliesToGroup answer shape | `internal/domain/claim_active_claims_by_applies_to_group.go` |
+| the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
+| tests for the claim_applies_to value object | `internal/domain/vos/claim_applies_to_test.go` |
+| tests for the claim_value_type value object | `internal/domain/vos/claim_value_type_test.go` |
+| the builder tests for claim_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/claim_schema_test.go` |
+| the wire mapper tests for find_claim_by_id.go | `internal/web/requests/find_claim_by_id_test.go` |
+| the wire mapper tests for find_claims_by_params.go | `internal/web/requests/find_claims_by_params_test.go` |
+| the wire mapper tests for insert_claim.go | `internal/web/requests/insert_claim_test.go` |
+| the wire mapper tests for patch_claim.go | `internal/web/requests/patch_claim_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -197,7 +211,17 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-27 file(s) were already up to date.
+20 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `bootstrap/claims_feature.go`
+- `internal/application/commands/claim_commands_test.go`
+- `internal/application/queries/claim_queries_test.go`
+- `internal/application/translations/claim_translations_test.go`
+- `internal/domain/vos/claim_vos_test.go`
+- `internal/infra/schemas/claim_schemas_test.go`
+- `internal/web/requests/claim_requests_test.go`
 
 ## What was NOT generated
 
@@ -213,9 +237,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

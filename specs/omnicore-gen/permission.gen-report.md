@@ -133,7 +133,17 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Permission service implementation | `internal/infra/permission_service.go` |
+| the permissions feature (repository + view + mount) | `bootstrap/permission_feature.go` |
+| tests for archive_permission_command.go | `internal/application/commands/archive_permission_command_test.go` |
+| tests for insert_permission_command.go | `internal/application/commands/insert_permission_command_test.go` |
+| tests for patch_permission_command.go | `internal/application/commands/patch_permission_command_test.go` |
+| the read tests for find_permission_by_id_query.go | `internal/application/queries/find_permission_by_id_query_test.go` |
+| the read tests for find_permissions_by_params_query.go | `internal/application/queries/find_permissions_by_params_query_test.go` |
+| the builder tests for permission_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/permission_schema_test.go` |
+| the wire mapper tests for find_permission_by_id.go | `internal/web/requests/find_permission_by_id_test.go` |
+| the wire mapper tests for find_permissions_by_params.go | `internal/web/requests/find_permissions_by_params_test.go` |
+| the wire mapper tests for insert_permission.go | `internal/web/requests/insert_permission_test.go` |
+| the wire mapper tests for patch_permission.go | `internal/web/requests/patch_permission_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -142,7 +152,16 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-24 file(s) were already up to date.
+19 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `bootstrap/permissions_feature.go`
+- `internal/application/commands/permission_commands_test.go`
+- `internal/application/queries/permission_queries_test.go`
+- `internal/application/translations/permission_translations_test.go`
+- `internal/infra/schemas/permission_schemas_test.go`
+- `internal/web/requests/permission_requests_test.go`
 
 ## What was NOT generated
 
@@ -158,9 +177,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

@@ -169,7 +169,7 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/role_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -225,7 +225,41 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Role repository and its constraint bindings | `internal/infra/role_repository.go` |
+| the roles feature (repository + view + mount) | `bootstrap/role_feature.go` |
+| the add command for one role_permissions entry | `internal/application/commands/add_role_permission_command.go` |
+| tests for add_role_permission_command.go | `internal/application/commands/add_role_permission_command_test.go` |
+| tests for archive_role_command.go | `internal/application/commands/archive_role_command_test.go` |
+| the archive command for one role_permissions entry | `internal/application/commands/archive_role_permission_command.go` |
+| tests for archive_role_permission_command.go | `internal/application/commands/archive_role_permission_command_test.go` |
+| the write shape of one RolePermission entry | `internal/application/commands/dtos/role_permission_result.go` |
+| the insert command and result | `internal/application/commands/insert_role_command.go` |
+| tests for insert_role_command.go | `internal/application/commands/insert_role_command_test.go` |
+| the patch command and result | `internal/application/commands/patch_role_command.go` |
+| tests for patch_role_command.go | `internal/application/commands/patch_role_command_test.go` |
+| the projectors for the permissions collection | `internal/application/commands/utils/role_role_permission_projection.go` |
+| tests for the role_permission_input mapper | `internal/application/dtos/role_permission_input_test.go` |
+| the read shape of one RolePermission entry | `internal/application/queries/dtos/role_permission_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_role_by_id_query.go` |
+| the read tests for find_role_by_id_query.go | `internal/application/queries/find_role_by_id_query_test.go` |
+| the listing query and its result | `internal/application/queries/find_roles_by_params_query.go` |
+| the read tests for find_roles_by_params_query.go | `internal/application/queries/find_roles_by_params_query_test.go` |
+| tests for the role_permission collection type | `internal/domain/aggregatevos/role_permission_test.go` |
+| the builder tests for role_permission_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/role_permission_schema_test.go` |
+| the builder tests for role_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/role_schema_test.go` |
+| the add wire pair for one role_permissions entry | `internal/web/requests/add_role_permission.go` |
+| the wire mapper tests for add_role_permission.go | `internal/web/requests/add_role_permission_test.go` |
+| the archive wire pair for one role_permissions entry | `internal/web/requests/archive_role_permission.go` |
+| the wire mapper tests for archive_role_permission.go | `internal/web/requests/archive_role_permission_test.go` |
+| the wire shapes of one RolePermission entry | `internal/web/requests/dtos/role_permission.go` |
+| the by-id request and response | `internal/web/requests/find_role_by_id.go` |
+| the wire mapper tests for find_role_by_id.go | `internal/web/requests/find_role_by_id_test.go` |
+| the listing request and response | `internal/web/requests/find_roles_by_params.go` |
+| the wire mapper tests for find_roles_by_params.go | `internal/web/requests/find_roles_by_params_test.go` |
+| the insert request and response | `internal/web/requests/insert_role.go` |
+| the wire mapper tests for insert_role.go | `internal/web/requests/insert_role_test.go` |
+| the patch request and response | `internal/web/requests/patch_role.go` |
+| the wire mapper tests for patch_role.go | `internal/web/requests/patch_role_test.go` |
+| the 5 role endpoints | `internal/web/role_routes.go` |
 
 **Left untouched** (yours, by design):
 
@@ -235,7 +269,23 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+13 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `bootstrap/roles_feature.go`
+- `internal/application/commands/role_child_results.go`
+- `internal/application/commands/role_commands_test.go`
+- `internal/application/commands/role_permission_commands.go`
+- `internal/application/dtos/role_dtos_test.go`
+- `internal/application/queries/role_queries_test.go`
+- `internal/application/queries/role_row_results.go`
+- `internal/application/translations/role_translations_test.go`
+- `internal/domain/aggregatevos/role_children_test.go`
+- `internal/infra/schemas/role_schemas_test.go`
+- `internal/web/requests/role_children.go`
+- `internal/web/requests/role_permission_requests.go`
+- `internal/web/requests/role_requests_test.go`
 
 ## What was NOT generated
 
@@ -251,9 +301,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

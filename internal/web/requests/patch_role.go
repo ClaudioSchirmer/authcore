@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:0253000c22e03f342ec2472795ced76a0e6320a42bdaccf161d0582bad363489
+// generated:  2026-09-01
+// checksum:   sha256:31728e1ef8f67921e23900326938e5c97b327076d1c46f3e172ef6c167de9758
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -32,6 +32,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // PatchRoleRequest is the body of Update a role (partial).
@@ -60,12 +62,12 @@ func (r PatchRoleRequest) ToCommand() *commands.PatchRoleCommand {
 type PatchRoleResponse struct {
 	fwresponses.Auto
 
-	ID          domain.ID                `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    domain.ID                `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         string                   `json:"key" example:"billing-manager"`
-	Name        string                   `json:"name" example:"Billing Manager"`
-	Description string                   `json:"description" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
-	Permissions []RolePermissionResponse `json:"permissions"`
+	ID          domain.ID                        `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID    domain.ID                        `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Key         string                           `json:"key" example:"billing-manager"`
+	Name        string                           `json:"name" example:"Billing Manager"`
+	Description string                           `json:"description" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
+	Permissions []webdtos.RolePermissionResponse `json:"permissions"`
 }
 
 // FromResult projects the application Result onto PatchRoleResponse.

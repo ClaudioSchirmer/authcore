@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a816ea5743328185dfe613ec2fdd0e82a385f566bb38a0a4ed64ad8535dfee30
+// generated:  2026-09-01
+// checksum:   sha256:a6b59813825ca87111e61c0450d40ef4a05039fa7e3d86d4c946a9fc66677368
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindGroupByIDQuery is the application-side transport for the by-id read.
@@ -108,5 +110,5 @@ type FindGroupByIDResult struct {
 	UpdatedAt       time.Time
 	TenantWorkspace string
 	TenantStatus    string
-	Roles           []GroupRoleRowResult
+	Roles           []qrydtos.GroupRoleRowResult
 }

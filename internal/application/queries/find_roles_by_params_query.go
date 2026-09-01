@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:ac88fe19307347ba9c7856e165f8d05a300d7361e1253dc8cf59efd1335e3cea
+// generated:  2026-09-01
+// checksum:   sha256:532d8bd8c6c3e7c5c887fc605de27b95e0495ece435e4514bb01380842138eb3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindRolesByParamsQuery is the application-side transport for the paged read.
@@ -112,5 +114,5 @@ type FindRolesByParamsResult struct {
 	UpdatedAt       *time.Time
 	TenantWorkspace *string
 	TenantStatus    *string
-	Permissions     []RolePermissionRowResult
+	Permissions     []qrydtos.RolePermissionRowResult
 }

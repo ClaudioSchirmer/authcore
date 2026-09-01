@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c81b3cecba9f8150daa8e60d814d23a6753419cd2ee7e29005550332161d04e0
+// generated:  2026-09-01
+// checksum:   sha256:2ec26c8c63e64e962566acfed1f2791100e5aa1a5484c154b10326b877914e93
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -141,18 +141,4 @@ type ClientService interface {
 	// the source could not be reached at all, fail: the port returns no error
 	// precisely so that decision is made here.
 	ClaimValueDoesNotMatchValueType(entries []ClientClaimValueDoesNotMatchValueTypeEntry) map[domain.ID]bool
-}
-
-// ClientClaimValueDoesNotMatchValueTypeEntry is ONE entry of Claims, as
-// ClaimValueDoesNotMatchValueType is asked about it.
-//
-// The question needs ClaimID and Value of the same entry, and they travel
-// together for one reason: two parallel slices are two things a caller can put
-// out of step, and the answer would then be about a different entry than the
-// one whose values were sent.
-//
-// ClaimID is what the answer is keyed by.
-type ClientClaimValueDoesNotMatchValueTypeEntry struct {
-	ClaimID domain.ID
-	Value   string
 }

@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:41442a1c9dcb7ba60903cd3fdfa692c24ca66cc2ec6f2d163d3a10e216f1d606
+// generated:  2026-09-01
+// checksum:   sha256:239b26af28fc8e5024dfa11c8500a553501b91f34ed286f28997eeb4e9ac7973
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 	"time"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // PatchClientRequest is the body of Update a client (partial).
@@ -61,16 +63,16 @@ func (r PatchClientRequest) ToCommand() *commands.PatchClientCommand {
 type PatchClientResponse struct {
 	fwresponses.Auto
 
-	ID                      domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID                domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Name                    string                      `json:"name" example:"Billing integration"`
-	Description             string                      `json:"description" example:"Posts invoices from the billing system into the ledger."`
-	SecretChangedAt         time.Time                   `json:"secretChangedAt" example:"2026-08-26T14:03:11Z"`
-	PreviousSecretExpiresAt *time.Time                  `json:"previousSecretExpiresAt,omitempty" example:"2026-08-27T14:03:11Z"`
-	Status                  string                      `json:"status" example:"active"`
-	Roles                   []ClientRoleResponse        `json:"roles"`
-	AllowedCIDRs            []ClientAllowedCIDRResponse `json:"allowedCIDRs"`
-	Claims                  []ClientClaimResponse       `json:"claims"`
+	ID                      domain.ID                           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID                domain.ID                           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Name                    string                              `json:"name" example:"Billing integration"`
+	Description             string                              `json:"description" example:"Posts invoices from the billing system into the ledger."`
+	SecretChangedAt         time.Time                           `json:"secretChangedAt" example:"2026-08-26T14:03:11Z"`
+	PreviousSecretExpiresAt *time.Time                          `json:"previousSecretExpiresAt,omitempty" example:"2026-08-27T14:03:11Z"`
+	Status                  string                              `json:"status" example:"active"`
+	Roles                   []webdtos.ClientRoleResponse        `json:"roles"`
+	AllowedCIDRs            []webdtos.ClientAllowedCIDRResponse `json:"allowedCIDRs"`
+	Claims                  []webdtos.ClientClaimResponse       `json:"claims"`
 }
 
 // FromResult projects the application Result onto PatchClientResponse.

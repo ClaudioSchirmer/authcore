@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:54694b5c4fbfa9061b3a90b9aa0cc1314d998a1a2378d824595d5fe3e15ddf4e
+// generated:  2026-09-01
+// checksum:   sha256:92cad6bb3f9d18d332dd023b484d221b9db713e3045092e7192e39ff5563cbda
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -63,14 +63,4 @@ type ClaimService interface {
 	// into their overlapping buckets: the user bucket is `user` + `both`, the
 	// client bucket is `client` + `both`.
 	ActiveClaimsByAppliesTo(tenantID domain.ID) []ClaimActiveClaimsByAppliesToGroup
-}
-
-// ClaimActiveClaimsByAppliesToGroup is one group of ActiveClaimsByAppliesTo:
-// the key, and this group's value.
-//
-// A group exists BECAUSE at least one row matched, so an empty set yields no
-// groups at all rather than a row of zeroes. The key is AppliesTo.
-type ClaimActiveClaimsByAppliesToGroup struct {
-	AppliesTo string
-	Value     int64
 }

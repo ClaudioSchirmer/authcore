@@ -346,7 +346,7 @@ The claim NAMES behind these are the framework's to resolve, not this code's: th
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, change, remove — have generated tests in `internal/application/commands/user_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, change, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -415,7 +415,80 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the User repository and its constraint bindings | `internal/infra/user_repository.go` |
+| the users feature (repository + view + mount) | `bootstrap/user_feature.go` |
+| the add command for one user_claims entry | `internal/application/commands/add_user_claim_command.go` |
+| tests for add_user_claim_command.go | `internal/application/commands/add_user_claim_command_test.go` |
+| the add command for one user_groups entry | `internal/application/commands/add_user_group_command.go` |
+| tests for add_user_group_command.go | `internal/application/commands/add_user_group_command_test.go` |
+| the add command for one user_roles entry | `internal/application/commands/add_user_role_command.go` |
+| tests for add_user_role_command.go | `internal/application/commands/add_user_role_command_test.go` |
+| the archive command for one user_claims entry | `internal/application/commands/archive_user_claim_command.go` |
+| tests for archive_user_claim_command.go | `internal/application/commands/archive_user_claim_command_test.go` |
+| tests for archive_user_command.go | `internal/application/commands/archive_user_command_test.go` |
+| the archive command for one user_groups entry | `internal/application/commands/archive_user_group_command.go` |
+| tests for archive_user_group_command.go | `internal/application/commands/archive_user_group_command_test.go` |
+| the archive command for one user_roles entry | `internal/application/commands/archive_user_role_command.go` |
+| tests for archive_user_role_command.go | `internal/application/commands/archive_user_role_command_test.go` |
+| the write shape of one UserClaim entry | `internal/application/commands/dtos/user_claim_result.go` |
+| the write shape of one UserGroup entry | `internal/application/commands/dtos/user_group_result.go` |
+| the write shape of one UserRole entry | `internal/application/commands/dtos/user_role_result.go` |
+| the insert command and result | `internal/application/commands/insert_user_command.go` |
+| tests for insert_user_command.go | `internal/application/commands/insert_user_command_test.go` |
+| the patch command for one user_claims entry | `internal/application/commands/patch_user_claim_command.go` |
+| tests for patch_user_claim_command.go | `internal/application/commands/patch_user_claim_command_test.go` |
+| the patch command and result | `internal/application/commands/patch_user_command.go` |
+| tests for patch_user_command.go | `internal/application/commands/patch_user_command_test.go` |
+| the projectors for the claims collection | `internal/application/commands/utils/user_user_claim_projection.go` |
+| the projectors for the groups collection | `internal/application/commands/utils/user_user_group_projection.go` |
+| the projectors for the roles collection | `internal/application/commands/utils/user_user_role_projection.go` |
+| tests for the user_claim_input mapper | `internal/application/dtos/user_claim_input_test.go` |
+| tests for the user_group_input mapper | `internal/application/dtos/user_group_input_test.go` |
+| tests for the user_role_input mapper | `internal/application/dtos/user_role_input_test.go` |
+| the read shape of one UserClaim entry | `internal/application/queries/dtos/user_claim_row_result.go` |
+| the read shape of one UserGroup entry | `internal/application/queries/dtos/user_group_row_result.go` |
+| the read shape of one UserRole entry | `internal/application/queries/dtos/user_role_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
+| the read tests for find_user_by_id_query.go | `internal/application/queries/find_user_by_id_query_test.go` |
+| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
+| the read tests for find_users_by_params_query.go | `internal/application/queries/find_users_by_params_query_test.go` |
+| tests for the user_claim collection type | `internal/domain/aggregatevos/user_claim_test.go` |
+| tests for the user_group collection type | `internal/domain/aggregatevos/user_group_test.go` |
+| tests for the user_role collection type | `internal/domain/aggregatevos/user_role_test.go` |
+| the UserClaimValueDoesNotMatchValueTypeEntry answer shape | `internal/domain/user_claim_value_does_not_match_value_type_entry.go` |
+| the User service port (13 fact(s)) | `internal/domain/user_service.go` |
+| tests for the claim_value value object | `internal/domain/vos/claim_value_test.go` |
+| tests for the email value object | `internal/domain/vos/email_test.go` |
+| tests for the user_status value object | `internal/domain/vos/user_status_test.go` |
+| the builder tests for user_claim_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/user_claim_schema_test.go` |
+| the builder tests for user_group_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/user_group_schema_test.go` |
+| the builder tests for user_role_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/user_role_schema_test.go` |
+| the builder tests for user_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/user_schema_test.go` |
+| the add wire pair for one user_claims entry | `internal/web/requests/add_user_claim.go` |
+| the wire mapper tests for add_user_claim.go | `internal/web/requests/add_user_claim_test.go` |
+| the add wire pair for one user_groups entry | `internal/web/requests/add_user_group.go` |
+| the wire mapper tests for add_user_group.go | `internal/web/requests/add_user_group_test.go` |
+| the add wire pair for one user_roles entry | `internal/web/requests/add_user_role.go` |
+| the wire mapper tests for add_user_role.go | `internal/web/requests/add_user_role_test.go` |
+| the archive wire pair for one user_claims entry | `internal/web/requests/archive_user_claim.go` |
+| the wire mapper tests for archive_user_claim.go | `internal/web/requests/archive_user_claim_test.go` |
+| the archive wire pair for one user_groups entry | `internal/web/requests/archive_user_group.go` |
+| the wire mapper tests for archive_user_group.go | `internal/web/requests/archive_user_group_test.go` |
+| the archive wire pair for one user_roles entry | `internal/web/requests/archive_user_role.go` |
+| the wire mapper tests for archive_user_role.go | `internal/web/requests/archive_user_role_test.go` |
+| the wire shapes of one UserClaim entry | `internal/web/requests/dtos/user_claim.go` |
+| the wire shapes of one UserGroup entry | `internal/web/requests/dtos/user_group.go` |
+| the wire shapes of one UserRole entry | `internal/web/requests/dtos/user_role.go` |
+| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
+| the wire mapper tests for find_user_by_id.go | `internal/web/requests/find_user_by_id_test.go` |
+| the listing request and response | `internal/web/requests/find_users_by_params.go` |
+| the wire mapper tests for find_users_by_params.go | `internal/web/requests/find_users_by_params_test.go` |
+| the insert request and response | `internal/web/requests/insert_user.go` |
+| the wire mapper tests for insert_user.go | `internal/web/requests/insert_user_test.go` |
+| the patch request and response | `internal/web/requests/patch_user.go` |
+| the patch wire pair for one user_claims entry | `internal/web/requests/patch_user_claim.go` |
+| the wire mapper tests for patch_user_claim.go | `internal/web/requests/patch_user_claim_test.go` |
+| the wire mapper tests for patch_user.go | `internal/web/requests/patch_user_test.go` |
+| the 5 user endpoints | `internal/web/user_routes.go` |
 
 **Left untouched** (yours, by design):
 
@@ -425,7 +498,28 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-48 file(s) were already up to date.
+21 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `bootstrap/users_feature.go`
+- `internal/application/commands/user_child_results.go`
+- `internal/application/commands/user_claim_commands.go`
+- `internal/application/commands/user_commands_test.go`
+- `internal/application/commands/user_group_commands.go`
+- `internal/application/commands/user_role_commands.go`
+- `internal/application/dtos/user_dtos_test.go`
+- `internal/application/queries/user_queries_test.go`
+- `internal/application/queries/user_row_results.go`
+- `internal/application/translations/user_translations_test.go`
+- `internal/domain/aggregatevos/user_children_test.go`
+- `internal/domain/vos/user_vos_test.go`
+- `internal/infra/schemas/user_schemas_test.go`
+- `internal/web/requests/user_children.go`
+- `internal/web/requests/user_claim_requests.go`
+- `internal/web/requests/user_group_requests.go`
+- `internal/web/requests/user_requests_test.go`
+- `internal/web/requests/user_role_requests.go`
 
 ## What was NOT generated
 
@@ -441,9 +535,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

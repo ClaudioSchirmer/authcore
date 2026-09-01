@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:de5f2ce9a46ec74202f70ba830b5b40c506dc35df1d341d3cb66964323d05a65
+// generated:  2026-09-01
+// checksum:   sha256:1c38ec56734e9327a96d786c7f87d66a6450bb486459ab8a18934139695c8524
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 	"time"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // InsertClientRequest is the body of Create a client.
@@ -49,10 +51,10 @@ type InsertClientRequest struct {
 	// not ignored — it reaches the aggregate, where the row-scope guard
 	// refuses it exactly as it refuses a write into a record that is not
 	// the caller's.
-	TenantID     *domain.ID                 `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Roles        []ClientRoleRequest        `json:"roles"`
-	AllowedCIDRs []ClientAllowedCIDRRequest `json:"allowedCIDRs"`
-	Claims       []ClientClaimRequest       `json:"claims"`
+	TenantID     *domain.ID                         `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Roles        []webdtos.ClientRoleRequest        `json:"roles"`
+	AllowedCIDRs []webdtos.ClientAllowedCIDRRequest `json:"allowedCIDRs"`
+	Claims       []webdtos.ClientClaimRequest       `json:"claims"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No
@@ -70,17 +72,17 @@ func (r InsertClientRequest) ToCommand() *commands.InsertClientCommand {
 type InsertClientResponse struct {
 	fwresponses.Auto
 
-	ID                      domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID                domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Name                    string                      `json:"name" example:"Billing integration"`
-	Description             string                      `json:"description" example:"Posts invoices from the billing system into the ledger."`
-	SecretChangedAt         time.Time                   `json:"secretChangedAt" example:"2026-08-26T14:03:11Z"`
-	PreviousSecretExpiresAt *time.Time                  `json:"previousSecretExpiresAt,omitempty" example:"2026-08-27T14:03:11Z"`
-	Status                  string                      `json:"status" example:"active"`
-	Secret                  string                      `json:"secret" example:"acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM"`
-	Roles                   []ClientRoleResponse        `json:"roles"`
-	AllowedCIDRs            []ClientAllowedCIDRResponse `json:"allowedCIDRs"`
-	Claims                  []ClientClaimResponse       `json:"claims"`
+	ID                      domain.ID                           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID                domain.ID                           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Name                    string                              `json:"name" example:"Billing integration"`
+	Description             string                              `json:"description" example:"Posts invoices from the billing system into the ledger."`
+	SecretChangedAt         time.Time                           `json:"secretChangedAt" example:"2026-08-26T14:03:11Z"`
+	PreviousSecretExpiresAt *time.Time                          `json:"previousSecretExpiresAt,omitempty" example:"2026-08-27T14:03:11Z"`
+	Status                  string                              `json:"status" example:"active"`
+	Secret                  string                              `json:"secret" example:"acs_8xQvR2mK9dLpN4wZ7tYcB1hJ6sF3gA5eU0iO8rTvXyM"`
+	Roles                   []webdtos.ClientRoleResponse        `json:"roles"`
+	AllowedCIDRs            []webdtos.ClientAllowedCIDRResponse `json:"allowedCIDRs"`
+	Claims                  []webdtos.ClientClaimResponse       `json:"claims"`
 }
 
 // FromResult projects the application Result onto InsertClientResponse.

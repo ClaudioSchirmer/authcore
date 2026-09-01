@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:80b3a09285daa58795ee5a98ad594655cfd39d278a1e21a8f567f8dea1784185
+// generated:  2026-09-01
+// checksum:   sha256:33eea19104e7bd4bcbdd14325ede513c5e114e36669641d1b5fc9bee484259f4
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -149,14 +149,14 @@ func MountUsers(
 		},
 		fwopenapi.RequirePermission("user:grant"))
 
-	hRemoveUserGroup, sRemoveUserGroup := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveUserGroupRequest{},
+	hArchiveUserGroup, sArchiveUserGroup := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveUserGroupRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserGroupCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserGroupCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/groups/:userGroupId/archive",
-		hRemoveUserGroup, sRemoveUserGroup,
+		hArchiveUserGroup, sArchiveUserGroup,
 		fwopenapi.Doc{
 			Summary:     "Archive one UserGroup of a User",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -179,14 +179,14 @@ func MountUsers(
 		},
 		fwopenapi.RequirePermission("user:grant"))
 
-	hRemoveUserRole, sRemoveUserRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveUserRoleRequest{},
+	hArchiveUserRole, sArchiveUserRole := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveUserRoleRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserRoleCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/roles/:userRoleId/archive",
-		hRemoveUserRole, sRemoveUserRole,
+		hArchiveUserRole, sArchiveUserRole,
 		fwopenapi.Doc{
 			Summary:     "Archive one UserRole of a User",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -224,14 +224,14 @@ func MountUsers(
 		},
 		fwopenapi.RequirePermission("user:set-claim"))
 
-	hRemoveUserClaim, sRemoveUserClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveUserClaimRequest{},
+	hArchiveUserClaim, sArchiveUserClaim := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveUserClaimRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserClaimCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserClaimCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/claims/:userClaimId/archive",
-		hRemoveUserClaim, sRemoveUserClaim,
+		hArchiveUserClaim, sArchiveUserClaim,
 		fwopenapi.Doc{
 			Summary:     "Archive one UserClaim of a User",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -304,12 +304,12 @@ func MountUsersGraphQL(
 		fwgraphql.RequirePermission("user:grant")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserGroupGraphQLRequest](
-		"removeUserGroup", requests.RemoveUserGroupGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserGroupCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveUserGroupGraphQLRequest](
+		"archiveUserGroup", requests.ArchiveUserGroupGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserGroupCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("user:grant")))
@@ -324,12 +324,12 @@ func MountUsersGraphQL(
 		fwgraphql.RequirePermission("user:grant")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserRoleGraphQLRequest](
-		"removeUserRole", requests.RemoveUserRoleGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserRoleCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveUserRoleGraphQLRequest](
+		"archiveUserRole", requests.ArchiveUserRoleGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserRoleCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("user:grant")))
@@ -356,12 +356,12 @@ func MountUsersGraphQL(
 		fwgraphql.RequirePermission("user:set-claim")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveUserClaimGraphQLRequest](
-		"removeUserClaim", requests.RemoveUserClaimGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.User, *commands.RemoveUserClaimCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveUserClaimGraphQLRequest](
+		"archiveUserClaim", requests.ArchiveUserClaimGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.User, *commands.ArchiveUserClaimCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("user:set-claim")))
