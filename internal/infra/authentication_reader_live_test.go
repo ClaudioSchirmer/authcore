@@ -41,6 +41,9 @@ const (
 	roleGrantingNone  = "33333333-3333-4333-8333-333333333334"
 	roleInRetiredTeam = "33333333-3333-4333-8333-333333333335"
 	roleRevokedGrant  = "33333333-3333-4333-8333-333333333336"
+	// A LIVE role the user holds, whose ONLY permission was revoked in the
+	// catalog. It has to survive in the role list and contribute nothing.
+	roleAllPermissionsRevoked = "33333333-3333-4333-8333-333333333337"
 
 	groupLive    = "44444444-4444-4444-8444-444444444441"
 	groupRetired = "44444444-4444-4444-8444-444444444442"
@@ -48,6 +51,10 @@ const (
 	permissionLive    = "55555555-5555-4555-8555-555555555551"
 	permissionRevoked = "55555555-5555-4555-8555-555555555552"
 	permissionShared  = "55555555-5555-4555-8555-555555555553"
+	// Granted ONLY by the retired role, so nothing else can put it in the answer.
+	// Without it, dropping the gate on the owning role changes no result and the
+	// gate is untested — which is exactly what a mutation run found.
+	permissionOnlyViaRetired = "55555555-5555-4555-8555-555555555554"
 )
 
 func grantReader(t *testing.T) (*AuthenticationReader, *postgres.Postgres) {
@@ -135,6 +142,7 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 		{roleGrantingNone, "grants-nothing", ""},
 		{roleInRetiredTeam, "in-retired-team", ""},
 		{roleRevokedGrant, "revoked-grant", ""},
+		{roleAllPermissionsRevoked, "all-revoked", ""},
 	} {
 		archived := "NULL"
 		if r.archived != "" {
@@ -155,15 +163,20 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 	      VALUES ($1, 'invoice', 'delete', '', NOW())`, permissionRevoked)
 	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
 	      VALUES ($1, 'report', 'read', '', NULL)`, permissionShared)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	      VALUES ($1, 'ledger', 'purge', '', NULL)`, permissionOnlyViaRetired)
 
 	// The user's own grants. One live, one onto a retired role, one onto a role
-	// that grants nothing, and one REVOKED grant onto a perfectly live role.
+	// that grants nothing, one onto a role whose every permission was revoked,
+	// and one REVOKED grant onto a perfectly live role.
 	exec(`INSERT INTO user_roles (id, user_id, role_id, deleted_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL),
 	      (gen_random_uuid(), $1, $4, NULL),
-	      (gen_random_uuid(), $1, $5, NOW())`,
-		grantUser, roleHeldDirectly, roleRetired, roleGrantingNone, roleRevokedGrant)
+	      (gen_random_uuid(), $1, $5, NULL),
+	      (gen_random_uuid(), $1, $6, NOW())`,
+		grantUser, roleHeldDirectly, roleRetired, roleGrantingNone,
+		roleAllPermissionsRevoked, roleRevokedGrant)
 
 	// Both memberships are live; one of the groups is not.
 	exec(`INSERT INTO user_groups (id, user_id, group_id, deleted_at) VALUES
@@ -186,10 +199,19 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 	      (gen_random_uuid(), $1, $2, NULL)`, roleInherited, permissionShared)
 	// The retired role and the one behind the retired group both grant something —
 	// so if either leaked into the answer, it would leak a permission too.
+	// The retired role grants a LIVE permission nothing else grants. A gate that
+	// stopped excluding the role would put `ledger:purge` in the answer, and
+	// nothing else can.
 	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
-	      (gen_random_uuid(), $1, $2, NULL)`, roleRetired, permissionLive)
+	      (gen_random_uuid(), $1, $2, NULL),
+	      (gen_random_uuid(), $1, $3, NULL)`, roleRetired, permissionLive, permissionOnlyViaRetired)
 	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, roleInRetiredTeam, permissionLive)
+	// The live role whose ONLY grant points at a REVOKED catalog entry. The grant
+	// itself is live — nobody revoked it — so what drops the permission is the
+	// catalog's own archive stamp, and the role must survive that.
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	      (gen_random_uuid(), $1, $2, NULL)`, roleAllPermissionsRevoked, permissionRevoked)
 	// A REVOKED grant of a live permission, held by a live role. The edge's own
 	// scope gate is what drops this one.
 	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
@@ -207,7 +229,7 @@ func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 		t.Fatalf("resolving grants: %v", err)
 	}
 
-	wantRoles := []string{"direct", "grants-nothing", "inherited"}
+	wantRoles := []string{"all-revoked", "direct", "grants-nothing", "inherited"}
 	if len(roleKeys) != len(wantRoles) {
 		t.Fatalf("roles = %v, want exactly %v", roleKeys, wantRoles)
 	}
@@ -277,7 +299,25 @@ func TestLive_TheGrantWalkDropsEachRetiredThingForItsOwnReason(t *testing.T) {
 		t.Error("a role that confers no permission vanished; a consumer branching on role " +
 			"membership would stop seeing it")
 	}
+	// A ROLE WHOSE EVERY PERMISSION WAS REVOKED IS STILL A ROLE THE USER HOLDS.
+	// This is what would break if the catalog gate were a WHERE clause over the
+	// joined row instead of a filter on the row that comes back: the grant would
+	// be dropped and the role would go with it, even though nobody took the role
+	// away from anybody.
+	if !roles["all-revoked"] {
+		t.Error("a role whose only permission was revoked vanished from the role list — " +
+			"revoking a permission in the catalog must not un-assign a role from a user")
+	}
 
+	// A LIVE PERMISSION granted ONLY by the RETIRED role. This is the assertion
+	// that proves the gate on the owning role, rather than assuming it: every
+	// other permission in the fixture is reachable by some live role too, so
+	// dropping that gate would change no other line of this test.
+	if perms["ledger:purge"] {
+		t.Error("a permission granted only by a RETIRED role is in the answer — the gate on " +
+			"the owning role is missing, and a retired role keeps conferring through a grant " +
+			"nobody revoked")
+	}
 	// A REVOKED PERMISSION behind a live grant of a live role.
 	if perms["invoice:delete"] {
 		t.Error("a REVOKED permission is in the answer — the filter on the joined permission's " +

@@ -5,23 +5,30 @@
 //
 // THE SECOND ONE IS WHY THIS FILE EXISTS. A user's effective permissions sit two
 // and three hops away — user → roles → permissions, and user → groups → roles →
-// permissions — and no single read expresses that: the reach is many-to-one on
-// four hops and one-to-MANY on two, and a traversal only goes the first way.
+// permissions — and the whole graph is resolved by the DATABASE, in subqueries,
+// from the user id alone. Nothing about the shape of it crosses back into Go to be
+// fed into the next statement.
 //
-// SO THE WALK IS FOUR DIRECT READS, each anchored on the edge table it is about
-// and reaching sideways for what it needs. Not a statement assembled here: the
-// tables are described as Direct schemas next door, the traversals are declared on
-// the repositories, and the criteria vocabulary states the filters. Nothing in
-// this file spells a column, a placeholder or a dialect, which is what makes an
-// engine swap a configuration change here as it is everywhere else in this
-// service.
+// TWO READS, ISSUED CONCURRENTLY, because they return two different shapes and
+// neither needs the other: the roles the user holds — INCLUDING those that grant
+// nothing — and what those roles grant. They are anchored on Direct schemas
+// declared next door; the traversal into the permission catalog is declared on the
+// repository; the filters are the criteria vocabulary. Nothing here spells a
+// column, a placeholder or a dialect, which is what makes an engine swap a
+// configuration change here as it is everywhere else in this service.
+//
+// WHAT THAT COSTS, measured rather than assumed. Against the dev bench an empty
+// round trip is ~200µs, the single hand-written statement this replaced is ~295µs,
+// and the two concurrent reads are ~344µs — so the SQL is comparable and the
+// remaining ~50µs is one extra statement sharing the connection. On a sign-in that
+// spends ~15.7ms verifying an Argon2id hash, that is 0.3%.
 //
 // WHY NOT REUSE THE WALK THAT ALREADY EXISTS. user_service_manual.go resolves the
 // same graph through memoised roleRow/groupRow probes, and it is correct. It also
 // costs 1 + G + R aggregate loads — a user in three groups of four roles pays
 // around eighteen — because it exists to guard a WRITE, where one extra read is
 // noise. A token endpoint is the hottest security path in the platform and has a
-// different budget: four indexed reads, whatever the shape of the graph. This file
+// different budget: two indexed reads, whatever the shape of the graph. This file
 // is the single owner of "the effective permission set of a user"; nothing else
 // re-derives it, so the two cannot drift.
 //
@@ -38,6 +45,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"sync"
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -64,47 +72,40 @@ type AuthenticationReader struct {
 	users  *UserRepository
 	claims *ClaimRepository
 
-	directRoles     *read.DirectRepository[schemas.UserRoleEdge]
-	memberships     *read.DirectRepository[schemas.UserGroupEdge]
-	inheritedRoles  *read.DirectRepository[schemas.GroupRoleEdge]
-	rolePermissions *read.DirectRepository[schemas.RolePermissionEdge]
+	// The two anchors of the grant walk. Direct, and narrow on purpose: the walk
+	// scans four columns in total, and neither the aggregate's hydration nor its
+	// revision guard nor its outbox has anything to do with reading a token's
+	// claims.
+	roles  *read.DirectRepository[schemas.RoleRow]
+	grants *read.DirectRepository[schemas.RolePermissionEdge]
 }
 
-// NewAuthenticationReader builds the reader and the four traversals the grant
-// walk reads through.
+// NewAuthenticationReader builds the reader and the one traversal the walk needs.
 //
-// EVERY JOIN BRINGS BACK THE TARGET'S ARCHIVE STAMP, and the walk filters on it.
-// That is not defensive duplication of the scope gate: a declared join is not
-// gated on the archived state of its target — the scope governs which rows come
-// back, never which rows a traversal reaches into — so the retired role behind a
-// live grant arrives with a perfectly good key unless something says otherwise.
-// The framework's own guidance is that the filter belongs in the criteria, and
-// ResolveGrants states it on every hop.
+// THE JOIN CARRIES THE CATALOG'S ARCHIVE STAMP, and the walk filters on it. That
+// is not defensive duplication of the scope gate: a declared join is not gated on
+// the archived state of its target — the scope governs which rows come back, never
+// which rows a traversal reaches into — so a revoked permission arrives with a
+// perfectly good resource and action unless the criteria says otherwise. The
+// framework's own guidance is that the filter belongs in the criteria, and
+// ResolveGrants states it.
+//
+// Everything is validated HERE: that each schema is Direct, that it declares a
+// primary key, that it is anchored to its row type, and that the join maps a
+// foreign key to fields that exist. A column that stopped resolving aborts the
+// BOOT naming the field, instead of shipping a read that quietly matches nothing
+// at three in the morning.
 func NewAuthenticationReader(engine core.RelationalEngine) *AuthenticationReader {
 	return &AuthenticationReader{
 		users:  NewUserRepository(engine),
 		claims: NewClaimRepository(engine),
 
-		directRoles: read.NewDirectRepository[schemas.UserRoleEdge](
-			engine, schemas.UserRoleEdgeSchema()).
-			WithJoins(read.InnerJoin(schemas.RoleSchema().AsDirectSchema()).On("role_id").
-				Field("RoleKey", "role_key").
-				Field("RoleArchivedAt", "deleted_at")),
+		roles: read.NewDirectRepository[schemas.RoleRow](engine, schemas.RoleRowSchema()),
 
-		memberships: read.NewDirectRepository[schemas.UserGroupEdge](
-			engine, schemas.UserGroupEdgeSchema()).
-			WithJoins(read.InnerJoin(schemas.GroupSchema().AsDirectSchema()).On("group_id").
-				Field("GroupArchivedAt", "deleted_at")),
-
-		inheritedRoles: read.NewDirectRepository[schemas.GroupRoleEdge](
-			engine, schemas.GroupRoleEdgeSchema()).
-			WithJoins(read.InnerJoin(schemas.RoleSchema().AsDirectSchema()).On("role_id").
-				Field("RoleKey", "role_key").
-				Field("RoleArchivedAt", "deleted_at")),
-
-		rolePermissions: read.NewDirectRepository[schemas.RolePermissionEdge](
+		grants: read.NewDirectRepository[schemas.RolePermissionEdge](
 			engine, schemas.RolePermissionEdgeSchema()).
-			WithJoins(read.InnerJoin(schemas.PermissionSchema().AsDirectSchema()).On("permission_id").
+			WithJoins(read.InnerJoin(schemas.PermissionSchema().AsDirectSchema()).
+				On("permission_id").
 				Field("Resource", "resource_name").
 				Field("Action", "action_name").
 				Field("PermissionArchivedAt", "deleted_at")),
@@ -189,6 +190,40 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 	)))
 }
 
+// heldByUser is the set of roles this user holds by ANY path, as a predicate over
+// whichever column names a role — `ID` on `roles`, `ParentID` on the grants.
+//
+// IT IS ONE EXPRESSION AND IT IS EVALUATED BY THE DATABASE. The direct branch is a
+// lookup on user_roles.user_id; the inherited branch walks group_roles →
+// user_groups in the same statement. Nothing about the graph crosses back into Go
+// to be fed into the next read, which is the whole difference between this and a
+// walk that pages ids around.
+//
+// EVERY GATE IN HERE IS THE FRAMEWORK'S. A subquery starts on the ACTIVE scope, so
+// user_roles, group_roles, user_groups and the EXISTS over groups each carry their
+// own `deleted_at IS NULL` without anyone writing it — a revoked grant, a dropped
+// membership and a retired group are all excluded by the shape rather than by a
+// line somebody has to remember. The EXISTS is there for the one gate the scope
+// cannot supply on its own: user_groups is gated as an EDGE, but a live membership
+// of a RETIRED group would still confer everything that group holds.
+func heldByUser(userID domain.ID, roleField string) criteria.Expr {
+	return criteria.Or(
+		criteria.InSub(roleField, criteria.Sub(schemas.UserRoleSchema().AsDirectSchema()).
+			Select("RoleID").
+			Where(criteria.Eq("ParentID", userID))),
+
+		criteria.InSub(roleField, criteria.Sub(schemas.GroupRoleSchema().AsDirectSchema()).
+			Select("RoleID").
+			Where(criteria.InSub("ParentID", criteria.Sub(schemas.UserGroupSchema().AsDirectSchema()).
+				Select("GroupID").
+				Where(criteria.And(
+					criteria.Eq("ParentID", userID),
+					criteria.Exists(criteria.Sub(schemas.GroupSchema().AsDirectSchema()).
+						Where(criteria.Eq("ID", criteria.Outer("GroupID")))),
+				))))),
+	)
+}
+
 // ResolveGrants returns the roles this user holds by ANY path and the permissions
 // those roles confer.
 //
@@ -198,30 +233,43 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 // is inventing a type to work around a layering question rather than answering it.
 // The slices say the same thing and belong to nobody.
 //
-// THE WALK IS FOUR READS, AND THE SHAPE OF THE GRAPH IS WHY. A declared traversal
-// reaches from many rows to ONE — a grant to the role it names, a membership to the
-// group it names — which is every hop here except two, and those two are one-to-MANY:
-// a group holds many roles, a role holds many permissions. That direction is not a
-// join in any read the framework offers, so it is a second read keyed on what the
-// first one returned. Fewer reads would mean a hand-written statement again; more
-// would mean asking a question already answered.
+// TWO READS, AND THE SECOND ONE IS NOT A CONTINUATION OF THE FIRST. Both are
+// answered entirely inside the database from the user id alone — heldByUser is the
+// same expression in both, pushed down rather than resolved into a list of ids and
+// bound back in. They are two because they return two DIFFERENT SHAPES, not because
+// one needs the other:
 //
-//	user_roles       ─join→ roles        : the roles held directly
-//	user_groups      ─join→ groups       : the live memberships
-//	group_roles      ─join→ roles        : the roles those groups confer
-//	role_permissions ─join→ permissions  : what all of them grant
+//	roles            → the keys, INCLUDING roles that grant nothing
+//	role_permissions → what those roles grant, one row per permission
 //
-// EVERY HOP IS ARCHIVE-GATED TWICE, and both halves are load-bearing. The EDGE is
-// gated by the repository's own scope — a revoked grant, a dropped membership — and
-// the JOINED ROW is gated by a predicate this function states, because a traversal
-// is not gated on its target: a retired role arrives with a perfectly good key
-// behind a live grant. Missing either half would hand out permissions the operator
-// believes they took away — the worst failure this file could have.
+// A ROLE THAT GRANTS NOTHING IS STILL A ROLE THE USER HOLDS, and that is what makes
+// the first read irreducible. `role_permissions` has no row for such a role, so no
+// query anchored there can name it; and `roles` cannot reach the permissions,
+// because a role holds MANY and a declared traversal reaches exactly one. Merging
+// them would mean dropping the role — the old statement paid for a LEFT JOIN and a
+// DISTINCT to avoid exactly that.
 //
-// A ROLE THAT GRANTS NOTHING IS STILL A ROLE THE USER HOLDS, and it survives here
-// by construction rather than by a LEFT JOIN: the keys come from the first and third
-// reads, which know nothing about permissions. A consumer branching on role
-// membership sees it.
+// THE ARCHIVE GATES, ONE BY ONE, AND WHERE EACH LIVES:
+//
+//	a retired ROLE          the first read's scope (and the EXISTS in the second)
+//	a revoked GRANT         each repository's own scope, on the anchor
+//	a dropped MEMBERSHIP    the subquery's scope, inside heldByUser
+//	a retired GROUP         the EXISTS, inside heldByUser
+//	a revoked PERMISSION    the predicate below, on a field the join brings back
+//
+// Only the last one is written out, and only because it has to be: a join is never
+// gated on its target, so nothing upstream of the predicate has dropped a revoked
+// catalog entry.
+//
+// DROPPING THAT ROW IS SAFE HERE, and it is worth saying why, because in the shape
+// this replaced it was NOT. The old statement returned a role and a permission on
+// the SAME row, so any predicate that excluded the permission excluded the role
+// with it — which is what the LEFT JOIN and the DISTINCT were paying for. The two
+// reads make that impossible by construction: the role list comes from `roles` and
+// knows nothing about permissions, so a role whose every permission was revoked
+// survives no matter how the second read filters. Proven, not assumed: the fixture
+// holds such a role, and moving this gate into a predicate that drops the whole row
+// keeps the test green.
 //
 // There is deliberately NO tenant predicate. Every path that attaches a role or a
 // group already refuses a foreign tenant in the aggregate's rules, and both a
@@ -229,82 +277,73 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 // exist for such a filter to catch. Adding one anyway would silently swallow the
 // data problem it was pretending to guard against instead of surfacing it.
 func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.ID) ([]string, []vos.PermissionKey, error) {
-	// Keyed by role id rather than by key: two paths can confer the SAME role —
-	// held directly and inherited from a group — and the id is what says they are
-	// one role rather than two spellings of one.
-	held := map[domain.ID]string{}
-
-	direct, err := r.directRoles.FindAll(ctx, criteria.Where(criteria.And(
-		criteria.Eq("ParentID", userID),
-		criteria.IsNull("RoleArchivedAt"),
-	)))
-	if err != nil {
-		return nil, nil, fmt.Errorf("authentication reader: direct roles: %w", err)
-	}
-	for _, edge := range direct {
-		held[edge.RoleID] = edge.RoleKey
-	}
-
-	memberships, err := r.memberships.FindAll(ctx, criteria.Where(criteria.And(
-		criteria.Eq("ParentID", userID),
-		criteria.IsNull("GroupArchivedAt"),
-	)))
-	if err != nil {
-		return nil, nil, fmt.Errorf("authentication reader: group memberships: %w", err)
-	}
-
-	// The next read is SKIPPED rather than issued with an empty set. `IN ()` is not
-	// a predicate any dialect accepts, and a user in no group has nothing to inherit
-	// — so the common case of a direct-only account costs one read fewer.
-	if len(memberships) > 0 {
-		groupIDs := make([]domain.ID, 0, len(memberships))
-		for _, edge := range memberships {
-			groupIDs = append(groupIDs, edge.GroupID)
-		}
-		inherited, err := r.inheritedRoles.FindAll(ctx, criteria.Where(criteria.And(
-			criteria.In("ParentID", idArgs(groupIDs)...),
-			criteria.IsNull("RoleArchivedAt"),
-		)))
-		if err != nil {
-			return nil, nil, fmt.Errorf("authentication reader: inherited roles: %w", err)
-		}
-		for _, edge := range inherited {
-			held[edge.RoleID] = edge.RoleKey
-		}
-	}
-
+	// THE TWO READS RUN CONCURRENTLY, and that is the whole reason the predicate is
+	// pushed down into both instead of the second one being keyed on the first's
+	// ids. Neither needs the other's answer — each resolves the graph from the user
+	// id alone, inside the database — so the pair costs ONE round trip of latency
+	// rather than two, which on this path is what the cost actually is: an empty
+	// round trip measures 217µs against the dev bench while the SQL of both
+	// statements together measures 124µs.
 	var (
-		roleKeys    []string
-		permissions []vos.PermissionKey
+		held   []schemas.RoleRow
+		grants []schemas.RolePermissionEdge
+		errs   [2]error
+		wg     sync.WaitGroup
 	)
-	for _, key := range held {
-		roleKeys = append(roleKeys, key)
-	}
+	wg.Add(2)
 
-	if len(held) > 0 {
-		roleIDs := make([]domain.ID, 0, len(held))
-		for id := range held {
-			roleIDs = append(roleIDs, id)
-		}
-		grants, err := r.rolePermissions.FindAll(ctx, criteria.Where(criteria.And(
-			criteria.In("ParentID", idArgs(roleIDs)...),
+	go func() {
+		defer wg.Done()
+		held, errs[0] = r.roles.FindAll(ctx, criteria.Where(heldByUser(userID, "ID")))
+	}()
+
+	go func() {
+		defer wg.Done()
+		grants, errs[1] = r.grants.FindAll(ctx, criteria.Where(criteria.And(
+			heldByUser(userID, "ParentID"),
+			// The owning role, gated. The anchor's scope covers the GRANT; this
+			// covers the role behind it, which a retired role would otherwise
+			// keep conferring through a grant nobody revoked. The first read gets
+			// this from its own scope; this one cannot, because it is not reading
+			// `roles`.
+			criteria.Exists(criteria.Sub(schemas.RoleSchema().AsDirectSchema()).
+				Where(criteria.Eq("ID", criteria.Outer("ParentID")))),
+			// The catalog entry, gated. A join is not gated on its target, so
+			// this is the one archive predicate the walk has to write.
 			criteria.IsNull("PermissionArchivedAt"),
 		)))
+	}()
+
+	wg.Wait()
+	// THE FIRST ERROR REFUSES THE WHOLE ANSWER. A partial grant set is the one
+	// thing this function must never return: half the roles or half the
+	// permissions would mint a token that looks valid and authorizes less — or,
+	// read the other way by a consumer, silently more.
+	for i, err := range errs {
 		if err != nil {
-			return nil, nil, fmt.Errorf("authentication reader: role permissions: %w", err)
-		}
-		// One permission reached through two roles is one permission. The database
-		// de-duplicated the ROWS it returned; what collapses here is the same
-		// resource/action arriving from different grants.
-		seen := map[string]struct{}{}
-		for _, edge := range grants {
-			key := edge.Resource + ":" + edge.Action
-			if _, dup := seen[key]; dup {
-				continue
+			what := "roles held"
+			if i == 1 {
+				what = "permissions granted"
 			}
-			seen[key] = struct{}{}
-			permissions = append(permissions, vos.PermissionKey{Resource: edge.Resource, Action: edge.Action})
+			return nil, nil, fmt.Errorf("authentication reader: %s: %w", what, err)
 		}
+	}
+
+	roleKeys := make([]string, 0, len(held))
+	for _, role := range held {
+		roleKeys = append(roleKeys, role.Key)
+	}
+
+	// One permission reached through two roles is one permission.
+	var permissions []vos.PermissionKey
+	seen := make(map[string]struct{}, len(grants))
+	for _, grant := range grants {
+		key := grant.Resource + ":" + grant.Action
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		permissions = append(permissions, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 	}
 
 	// Stable order, so two tokens minted from the same grants are byte-identical

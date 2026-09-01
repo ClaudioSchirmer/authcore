@@ -78,18 +78,6 @@ func assertGrantEdgePair(t *testing.T, child, direct *core.TableSchema, fkField 
 	}
 }
 
-func TestUserRoleEdgeSchemaAgreesWithTheAggregateChild(t *testing.T) {
-	assertGrantEdgePair(t, UserRoleSchema(), UserRoleEdgeSchema(), "RoleID")
-}
-
-func TestUserGroupEdgeSchemaAgreesWithTheAggregateChild(t *testing.T) {
-	assertGrantEdgePair(t, UserGroupSchema(), UserGroupEdgeSchema(), "GroupID")
-}
-
-func TestGroupRoleEdgeSchemaAgreesWithTheAggregateChild(t *testing.T) {
-	assertGrantEdgePair(t, GroupRoleSchema(), GroupRoleEdgeSchema(), "RoleID")
-}
-
 func TestRolePermissionEdgeSchemaAgreesWithTheAggregateChild(t *testing.T) {
 	assertGrantEdgePair(t, RolePermissionSchema(), RolePermissionEdgeSchema(), "PermissionID")
 }
