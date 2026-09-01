@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra"
@@ -118,7 +117,7 @@ func usableSignInClient() *schemas.SignInClient {
 
 func clientCtxFrom(ip string) *configuration.AppContext {
 	ctx := authCtx()
-	ctx.Set(utils.ContextKeyClientIP, ip)
+	ctx.SetClientIP(ip)
 	return ctx
 }
 

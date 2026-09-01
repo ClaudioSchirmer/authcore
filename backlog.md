@@ -70,18 +70,30 @@ production integration off the air for fifteen minutes, repeatable forever. Ever
 still written to `authentication_attempts` under `identity_kind = 'client'` and to the log
 stream, so the forensic and alerting surface is whole; only the refusal is gone.
 
-**Departure 2 — §F's proxy warning describes a risk this pin does not have.** It said an
-unguarded `X-Forwarded-For` is spoofable. At `omnicore v0.68.0` no header is read at all:
-the framework builds its Fiber app with neither `TrustProxy` nor `ProxyHeader`, and its
-`http:` block carries no key that could reach them, so `c.IP()` is always the socket peer.
-Not spoofable. The real consequence is the other half — **behind an ingress or a load
-balancer every request carries the balancer's address**, so an allow-list of real egress
-ranges refuses everybody and one holding the balancer's range admits everybody. That is
-stated in the OpenAPI description of the route, in the README and in `ACCESS_MATRIX.md`, and
-a framework feature request for a `http.proxy` block was raised rather than reading the
-header here — which would have built the exact vulnerability §F warned about. **Reopen this
-entry when that block ships**: filling in a deployment's trusted range is a
-`/omnicore:configure` job, not this route's.
+**Departure 2 — §F's proxy warning described a risk that pin did not have, and the
+gap it missed is now CLOSED (2026-09-01).** §F said an unguarded `X-Forwarded-For` is
+spoofable. At `v0.68.0` no header was read at all, so nothing was forgeable — the real
+consequence was the other half: behind an ingress every request carried the balancer's
+address, and an allow-list of real egress ranges refused everybody. A framework feature
+request was raised rather than reading the header here, which would have built the exact
+vulnerability §F warned about.
+
+**`http.trustProxy` shipped in omnicore v0.69.0 and this service is on it.** The framework
+resolves the origin **rightmost-untrusted** — it walks the forwarded chain right to left and
+takes the first hop that is not an allowlisted proxy — so an edge that appends (nginx's
+default `proxy_add_x_forwarded_for`) and one that overwrites are both safe, and a peer
+outside the allowlist is never read from the header at all. It publishes the answer as
+`AppContext.ClientIP()`, which is what this route now reads: **authcore's own `/auth` group
+middleware was deleted**, along with the context key it used, because the framework does that
+job and does it better.
+
+What is left is a DEPLOYMENT decision, not a code one: `microservice.prd.yaml` carries the
+`trustProxy` shape commented out, because the trusted range of the edge a deployment sits
+behind is not a fact this repository holds. **Until it is filled in, a proxied deployment is
+comparing `allowedCIDRs` against its own balancer and should leave that collection empty.**
+`microservice.dev.yaml` needs no block and says why: the bench is reached directly, so
+declaring one would make `127.0.0.1` a trusted proxy and let any local process forge its
+origin.
 
 **Still true, and worth repeating wherever this feature is documented:** an allowed CIDR
 constrains where a token is *obtained*, never where it is *used*. authcore does not see the

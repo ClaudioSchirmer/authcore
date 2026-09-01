@@ -69,7 +69,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *commands.
 	// else), and the attempt log counts by this exact string — two spellings of
 	// one address counting toward two windows would mean neither ever locks.
 	email := strings.ToLower(strings.TrimSpace(cmd.Email))
-	ip := utils.ClientIPOf(ctx)
+	ip := ctx.ClientIP()
 
 	// ── the lockout, BEFORE the credential is even looked at ──
 	//

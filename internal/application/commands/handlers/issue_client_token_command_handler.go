@@ -115,7 +115,7 @@ func (h *IssueClientTokenHandler) Handle(ctx *configuration.AppContext, cmd *com
 	// exact string, so normalising case would be inventing a second spelling. The
 	// user route lowercases because vos.Email stores addresses that way.
 	clientID := strings.TrimSpace(cmd.ClientID)
-	ip := utils.ClientIPOf(ctx)
+	ip := ctx.ClientIP()
 	journal := h.journal()
 
 	// NO LOCKOUT PROBE, and the file header holds the argument. The counters below

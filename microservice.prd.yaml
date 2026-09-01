@@ -6,6 +6,33 @@ service: authcore
 http:
   addr: ":8080"
 
+  # ── THE REVERSE-PROXY TOPOLOGY, AND WHY IT IS COMMENTED ──────────────────────
+  #
+  # LEFT UNSET DELIBERATELY, not forgotten. Absent, the framework reads the request's
+  # origin from the SOCKET: unforgeable, and on any deployment with an ingress or a
+  # load balancer in front, that is the BALANCER's address on every request.
+  #
+  # THAT IS NOT ONLY A LOG QUALITY PROBLEM HERE. POST /auth/client/token compares
+  # Client.allowedCIDRs against the resolved address, so an undeclared topology turns
+  # a per-integration network restriction into "anything that reached us through our
+  # own edge". A deployment in that state should leave allowedCIDRs EMPTY rather than
+  # believe a control it does not have.
+  #
+  # Filling it in needs a fact this repository does not hold — the trusted range of
+  # the edge THIS deployment sits behind — so the shape is here for whoever performs
+  # the deploy, the same way the retiring signing key below is. Uncomment, name the
+  # edge, and the allow-list starts meaning what an operator typing a /32 believes.
+  #
+  # trustProxy:
+  #   enabled: true
+  #   # The balancer's own address or range. Prefer this over `private: true`: with
+  #   # private, a caller that is itself on RFC1918 space looks like a proxy hop and
+  #   # its forwarded header becomes believable.
+  #   proxies: ["${TRUSTED_PROXY_CIDR}"]
+  #   # Per edge — CF-Connecting-IP behind Cloudflare, X-Real-IP behind some ingress
+  #   # controllers. Unset means X-Forwarded-For.
+  #   header: X-Forwarded-For
+
 relational:
   dialect: postgres
   dsn: "${DATABASE_URL}"

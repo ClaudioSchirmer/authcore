@@ -1021,7 +1021,7 @@ func TestIssueToken_GrantsFailureRecordsNoAttempt(t *testing.T) {
 // The origin address reaches the log from the context the /auth middleware fills.
 func TestIssueToken_CarriesTheOriginAddressIntoTheLog(t *testing.T) {
 	ctx := authCtx()
-	ctx.Set(utils.ContextKeyClientIP, "203.0.113.7")
+	ctx.SetClientIP("203.0.113.7")
 
 	attempts := &fakeAttempts{}
 	h := &IssueTokenHandler{Store: &fakeAuthStore{}, Attempts: attempts, Issuer: &fakeIssuer{}}

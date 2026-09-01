@@ -208,6 +208,31 @@ the route mounted inside the existing `MountAuthentication` on the one `/auth` g
 `AccessTokenIssuer` port carrying only `Issue`; and `resolveCustomClaims` generalised so both
 token paths resolve the claim chain through one function.
 
+### ✅ RESOLVED (2026-09-01, same day) — the honest no was answered by the framework
+
+§2's last row and §3's DECIDED 2 record a capability the pin did not offer, and the path taken
+was the honest one: name it, refuse to hand-roll it, raise a feature request. **`http.trustProxy`
+shipped in omnicore v0.69.0 within hours**, and this service is on that pin.
+
+It landed with the design point this plan's own analysis contributed and that a plain
+"expose Fiber's knob" would have missed: the address is resolved **rightmost-untrusted**
+rather than by Fiber's leftmost-valid rule, which on an edge running nginx's default
+`proxy_add_x_forwarded_for` would have returned the entry the CALLER typed — reopening the
+spoof the block exists to close. It also enforces at boot the two guards this plan asked for:
+a field declared without `enabled: true` is refused, and `enabled` with no trusted peer is
+refused.
+
+**What changed here, applied the same day:** the framework now publishes the resolved origin
+as `AppContext.ClientIP()`, so authcore's own `/auth` group middleware and its context key
+were DELETED — the seam existed only because the AppContext exposed no IP. The two sign-ins
+read `ctx.ClientIP()` directly. No other code changed: the allow-list already compared
+whatever address it was handed.
+
+**What is still a deployment decision:** `microservice.prd.yaml` carries the block commented
+out, because the trusted range of a given edge is not a fact this repository holds. Until it
+is filled in, a proxied deployment compares `allowedCIDRs` against its own balancer and should
+leave that collection empty.
+
 ## §4 External contract (integrations only)
 
 `N/A — no external system.` Everything this route reads is in this service's own database,

@@ -25,7 +25,6 @@ package web
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
 	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	fwweb "github.com/ClaudioSchirmer/omnicore/web"
@@ -70,51 +69,27 @@ func MountAuthentication(
 	// way, so the compatibility a single endpoint would buy is not on the table.
 	group := app.Group("/auth")
 
-	// THE ORIGIN ADDRESS, stashed for the handler.
+	// THE ORIGIN ADDRESS IS THE FRAMEWORK'S NOW, and this group registers no
+	// middleware for it.
 	//
-	// A pipeline.Handler receives the AppContext, not the Fiber one, and the
-	// framework's AppContext exposes no IP — so the address is put in its generic
-	// bag here, where the Fiber context still exists. The alternative was MountRaw
-	// to reach c.IP() directly, which would have cost the canonical envelope and
-	// the seven catalogs to carry one string.
+	// Until omnicore v0.69.0 it did: the AppContext exposed no IP, so a Fiber
+	// middleware on this group read c.IP() into its generic bag and the handlers
+	// fished it back out. That seam is gone. The framework resolves the origin
+	// itself and publishes it as AppContext.ClientIP(), which the two sign-ins read
+	// directly.
 	//
-	// It is scoped to THIS group rather than registered globally: only the sign-ins
-	// read it, and a middleware on every route in the service would be a cost every
-	// route pays for the few that benefit.
+	// WHAT THAT VALUE IS depends on one yaml block and nothing in this file. With no
+	// `http.trustProxy`, it is the socket peer: spoof-proof, and the balancer's
+	// address on any deployment that has one. With the block declared, it is the
+	// RIGHTMOST UNTRUSTED entry of the forwarded chain — the last hop the trusted
+	// infrastructure can vouch for — so an edge that appends (nginx's default
+	// proxy_add_x_forwarded_for) and one that overwrites are both safe.
 	//
-	// IT IS ALSO WHY BOTH TOKEN ROUTES ARE MOUNTED FROM THIS ONE FUNCTION. Fiber
-	// binds a group middleware in registration order, so a client-token route
-	// mounted from a second feature under the same `/auth` prefix would run this or
-	// not depending on which feature Wire listed first — and the symptom would be an
-	// empty origin address, which for a client holding an allow-list is a refusal.
-	// One owner of the group is what makes that deterministic.
-	//
-	// ON THE CLIENT ROUTE THIS ADDRESS IS AN AUTHORIZATION INPUT, not merely a
-	// forensic one: Client.allowedCIDRs is compared against it. Read the note on
-	// c.IP() below before changing anything here.
-	//
-	// c.IP() IS THE SOCKET PEER, ALWAYS, at this framework pin. Fiber reads a proxy
-	// header only when both TrustProxy and ProxyHeader are set, and omnicore sets
-	// neither — the `http:` block carries no key that could. So nothing a caller
-	// sends can move this value, which is what makes the allow-list unspoofable.
-	//
-	// The flip side is the one whoever deploys this has to know: behind an ingress
-	// or a load balancer, every request carries the BALANCER's address. The attempt
-	// log then records it instead of the caller, and an allow-list of real egress
-	// ranges refuses everybody while one holding the balancer's range admits
-	// everybody. Until omnicore ships a trusted-proxy block, such a deployment
-	// should leave allowedCIDRs empty rather than believe a restriction it does not
-	// have.
-	//
-	// READING X-Forwarded-For HERE WOULD BE A BUG, not a fix: an unguarded header is
-	// caller-controlled, so an attacker would simply name an allowed range. That is
-	// precisely the vulnerability the framework's silence currently prevents.
-	group.Use(func(c fiber.Ctx) error {
-		if appCtx := fwweb.AppContext(c); appCtx != nil {
-			appCtx.Set(utils.ContextKeyClientIP, c.IP())
-		}
-		return c.Next()
-	})
+	// THIS MATTERS MORE HERE THAN ANYWHERE ELSE IN THE SERVICE. Client.allowedCIDRs
+	// is compared against that address at POST /auth/client/token, so a deployment
+	// that sits behind a proxy and does NOT declare the block is enforcing an
+	// allow-list against its own balancer. The route's OpenAPI description says so;
+	// this comment is where whoever edits the group should meet it.
 
 	// ── the SIGN-IN ──────────────────────────────────────────────────────────
 	//
@@ -280,13 +255,17 @@ func MountAuthentication(
 				"old secret immediately, which is what to do with a leaked one.\n\n" +
 				"**Where from:** if the client declares `allowedCIDRs`, the request's " +
 				"origin address must fall inside one of them; an empty collection means any " +
-				"address. The address compared is the one this service sees on the socket — " +
-				"no proxy header is read, so it cannot be forged, but behind a load " +
-				"balancer it is the balancer's address rather than the caller's. On such a " +
-				"deployment leave the collection empty. And in every deployment the " +
-				"allow-list constrains where a token is *obtained*, never where it is " +
-				"*used*: authcore does not see the requests an integration later makes to " +
-				"other services.",
+				"address. The address compared is the one the framework resolves: on a " +
+				"deployment that declares `http.trustProxy` it is the rightmost untrusted " +
+				"entry of the forwarded chain — the last hop the trusted infrastructure can " +
+				"vouch for, so an edge that appends the header and one that overwrites it " +
+				"are equally safe, and a caller reaching the service directly cannot forge " +
+				"its own origin. **Without that block it is the socket peer**, which is " +
+				"unforgeable but names the load balancer on any deployment that has one; " +
+				"leave the collection empty there rather than trust a restriction that is " +
+				"comparing against your own edge. And in every deployment the allow-list " +
+				"constrains where a token is *obtained*, never where it is *used*: authcore " +
+				"does not see the requests an integration later makes to other services.",
 			// ⚠️ THESE ARE THE LOCAL DEV FIXTURE'S REAL VALUES, not a placeholder.
 			//
 			// The row they name is hand-seeded into the dev bench's `clients` table

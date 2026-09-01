@@ -419,14 +419,25 @@ var secretEqualisationHash = func() string {
 //   - RANGES AND AN ADDRESS → containment, and an unparseable stored range is
 //     skipped rather than treated as universal.
 //
-// WHAT THIS CANNOT PROMISE, and every document about this feature has to say it:
-// the address is the ORIGIN AS THIS PROCESS SEES IT — the socket peer. The framework
-// reads no proxy header, so nothing a caller sends can move it; the flip side is
-// that behind an ingress or a load balancer it is the balancer's address, and the
-// allow-list then means "through this balancer" rather than "from this network".
-// And in every deployment it constrains where a token is OBTAINED, never where it
-// is USED: authcore does not see the requests a client later makes to other
-// services.
+// WHAT IT CAN AND CANNOT PROMISE, and every document about this feature has to say
+// it. The address handed in is AppContext.ClientIP() — what the FRAMEWORK resolved,
+// not what this service read off a socket. Since omnicore v0.69.0 that is:
+//
+//   - with no `http.trustProxy` block, the socket peer. Unforgeable, and the
+//     BALANCER's address on any deployment that has one — so an allow-list of real
+//     egress ranges refuses everybody there.
+//   - with the block declared, the RIGHTMOST UNTRUSTED entry of the forwarded chain.
+//     The framework walks it right to left and takes the first hop that is not an
+//     allowlisted proxy, so an edge that appends and one that overwrites are both
+//     safe, and a caller reaching the service directly cannot forge its own origin.
+//
+// SO THIS CONTROL IS ONLY AS GOOD AS THAT BLOCK. The framework resolves an address;
+// it cannot make an undeclared topology trustworthy. A deployment behind a proxy that
+// has not declared `http.trustProxy` should leave allowedCIDRs empty rather than
+// believe a restriction it does not have.
+//
+// AND IN EVERY DEPLOYMENT it constrains where a token is OBTAINED, never where it is
+// USED: authcore does not see the requests a client later makes to other services.
 func AddressAllowed(ip string, ranges []string) bool {
 	if len(ranges) == 0 {
 		return true

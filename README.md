@@ -735,7 +735,9 @@ departures, both argued in `specs/implement/client-credentials-token/plan.md`: t
 COUNTS every attempt but never refuses on this route (a client id is public — it is the `sub`
 of every token the integration presents — so a lock would hand anyone a five-request outage
 against a credential nothing can guess), and §F's warning about a spoofable
-`X-Forwarded-For` does not apply at this framework pin, which reads no proxy header at all.
+`X-Forwarded-For` described a risk the framework did not have — at the time it read no proxy
+header at all, so nothing was forgeable. The gap it MISSED (behind a balancer the address is
+the balancer's) closed on 2026-09-01 with omnicore v0.69.0's `http.trustProxy`.
 
 **`POST /clients` hands back the secret in its `201`**, so a new integration is usable
 immediately — no rotation call in between. (`specs/scaffold-entity/client/tasks.md` still
@@ -973,9 +975,8 @@ stored, rotated and revoked for nothing; and a claim set that drops three names 
 rest. It also applies a gate the user route has no analogue for — `allowedCIDRs`, checked at
 mint and nowhere else. Two things are worth knowing before relying on it: the **lockout counts
 but never locks** there (a client id is public, so locking would be an outage lever against an
-unguessable credential), and the address the allow-list compares is the **socket peer** — no
-proxy header is read, so it cannot be forged, but behind a load balancer it is the balancer's
-address. `specs/implement/client-credentials-token/plan.md` argues both.
+unguessable credential), and the address the allow-list compares is the one the framework resolves —
+**rightmost-untrusted** when `http.trustProxy` is declared, the socket peer when it is not. `specs/implement/client-credentials-token/plan.md` argues both.
 
 A USER access token carries `sub`, `tenant_id`, `tenant_workspace`, `email`, `name`,
 `permissions`, `groups`, `roles` and `must_change_password`. A CLIENT token carries `sub`,
@@ -1010,7 +1011,10 @@ Three behaviours are deliberate and worth knowing before you debug them:
   the same generic 401 as every other refusal. The reason and the address go to the log
   stream instead, because telling the caller that only the *network* was wrong would confirm
   to whoever holds a stolen secret that the secret itself is good. An empty collection means
-  any address.
+  any address. **The address is `AppContext.ClientIP()`** — resolved rightmost-untrusted from
+  the forwarded chain when `http.trustProxy` is declared, and the socket peer when it is not.
+  A deployment behind an edge that has not declared the block is comparing against its own
+  balancer, and should leave the collection empty until it has.
 - **A replayed refresh token revokes the whole session family.** Not just the value replayed:
   every token descended from that sign-in. A value being presented twice means somebody holds
   a copy, and there is no way to tell which holder is the legitimate one.

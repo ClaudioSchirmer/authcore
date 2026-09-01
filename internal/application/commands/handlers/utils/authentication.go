@@ -20,7 +20,6 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra"
 	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
-	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/exception"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 )
@@ -81,15 +80,6 @@ const (
 	ClaimIdentityKind = "identity_kind"
 )
 
-// ContextKeyClientIP is where the /auth middleware leaves the request's origin
-// address for the handler to read.
-//
-// It rides the AppContext's generic bag because the framework's AppContext
-// exposes no IP of its own, and a pipeline.Handler receives that context rather
-// than the Fiber one. The alternative — MountRaw, to reach c.IP() directly —
-// would have cost the canonical envelope and the seven catalogs for one string.
-const ContextKeyClientIP = "authcore.request.ip"
-
 // Refusal wraps one notification in the carrier the pipeline understands.
 //
 // An APPLICATION error, not a domain one: nothing in the domain decided this, and
@@ -105,23 +95,6 @@ func Refusal(n domain.Notification) error {
 		FieldName:    "credentials",
 		Notification: n,
 	})
-}
-
-// ClientIPOf reads the origin address the /auth middleware left on the context.
-//
-// Absent is "" rather than an error: an attempt with no recorded origin is still
-// an attempt worth counting, and refusing a sign-in because a forensic field was
-// missing would trade the operation for its own log.
-func ClientIPOf(ctx *configuration.AppContext) string {
-	if ctx == nil {
-		return ""
-	}
-	if raw, ok := ctx.Get(ContextKeyClientIP); ok {
-		if ip, ok := raw.(string); ok {
-			return ip
-		}
-	}
-	return ""
 }
 
 // AccountIsUsable reports whether this account may hold a session at all.

@@ -7,6 +7,15 @@ service: authcore
 http:
   addr: ":8080"
 
+  # NO trustProxy BLOCK, and that is correct for this bench: the service is reached
+  # directly on localhost, so the socket peer IS the caller. Declaring one here would
+  # make `127.0.0.1` a trusted proxy and let any local process forge its own origin
+  # through X-Forwarded-For — which is exactly the hole the block exists to close.
+  #
+  # It matters here because POST /auth/client/token compares Client.allowedCIDRs
+  # against the resolved address. On this bench that is `127.0.0.1`, so a fixture
+  # client with an allow-list must name `127.0.0.1/32` and not your LAN range.
+
 # Source of truth. No mongo: block and no transport: block — that absence IS the
 # declaration of the posture: reads are served straight from these tables
 # (.RelationalSource), so a write is visible to the very next read. See
