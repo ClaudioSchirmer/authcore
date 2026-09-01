@@ -76,8 +76,9 @@ type AuthenticationReader struct {
 	// scans four columns in total, and neither the aggregate's hydration nor its
 	// revision guard nor its outbox has anything to do with reading a token's
 	// claims.
-	roles  *read.DirectRepository[schemas.RoleRow]
-	grants *read.DirectRepository[schemas.RolePermissionEdge]
+	roles       *read.DirectRepository[schemas.RoleRow]
+	grants      *read.DirectRepository[schemas.RolePermissionEdge]
+	memberships *read.DirectRepository[schemas.UserGroupEdge]
 }
 
 // NewAuthenticationReader builds the reader and the one traversal the walk needs.
@@ -102,6 +103,13 @@ func NewAuthenticationReader(engine core.RelationalEngine) *AuthenticationReader
 
 		roles: read.NewDirectRepository[schemas.RoleRow](engine, schemas.RoleRowSchema()),
 
+		memberships: read.NewDirectRepository[schemas.UserGroupEdge](
+			engine, schemas.UserGroupEdgeSchema()).
+			WithJoins(read.InnerJoin(schemas.GroupSchema().AsDirectSchema()).
+				On("group_id").
+				Field("GroupKey", "group_key").
+				Field("GroupArchivedAt", "deleted_at")),
+
 		grants: read.NewDirectRepository[schemas.RolePermissionEdge](
 			engine, schemas.RolePermissionEdgeSchema()).
 			WithJoins(read.InnerJoin(schemas.PermissionSchema().AsDirectSchema()).
@@ -124,7 +132,10 @@ func NewAuthenticationReader(engine core.RelationalEngine) *AuthenticationReader
 // here: an archived account must not authenticate, and it must not be
 // distinguishable from an address that was never registered.
 func (r *AuthenticationReader) FindUserByEmail(ctx *configuration.AppContext, email string) (*appdomain.User, error) {
-	found, err := r.users.Loader.FindOne(ctx, criteria.Where(criteria.Eq("Email", email)))
+	found, err := r.users.Loader.FindOne(ctx, criteria.Where(criteria.And(
+		criteria.Eq("Email", email),
+		liveTenant(),
+	)))
 	switch {
 	case err == nil:
 		return found, nil
@@ -153,7 +164,30 @@ func (r *AuthenticationReader) FindUserByEmail(ctx *configuration.AppContext, em
 // full sign-in. Honouring that means re-reading the row and re-resolving the
 // bundle on every refresh — never replaying what the previous token carried.
 func (r *AuthenticationReader) FindUserByID(ctx *configuration.AppContext, id domain.ID) (*appdomain.User, error) {
-	return r.users.Loader.FindOne(ctx, criteria.ByID(id))
+	return r.users.Loader.FindOne(ctx, criteria.Where(criteria.And(
+		criteria.Eq("ID", id),
+		liveTenant(),
+	)))
+}
+
+// liveTenant refuses an account whose owning tenant is archived.
+//
+// IT IS DEPTH, NOT THE MECHANISM, and saying so matters or the next reader will
+// take it for the whole guard. Tenant's own rules force Status to suspended when
+// it is archived (tenant_rules_manual.go, archive-forces-suspended), and the
+// sign-in already refuses a suspended tenant — so through the API the two states
+// cannot come apart. What this catches is a row that reached `deleted_at` without
+// going through the aggregate: a migration, a support script, a hand-run UPDATE.
+//
+// It costs nothing extra: the subquery rides inside the statement the load already
+// issues, and its scope is ACTIVE by default, which IS the check.
+//
+// The tenant's COMMERCIAL state stays where it is — accountIsUsable reads the
+// joined status, because `trial` and `active` both authenticate and only the
+// application knows that distinction.
+func liveTenant() criteria.Expr {
+	return criteria.Exists(criteria.Sub(schemas.TenantSchema().AsDirectSchema()).
+		Where(criteria.Eq("ID", criteria.Outer("TenantID"))))
 }
 
 // ClaimDefinitionsOfTenant returns the claim definitions a user of this tenant
@@ -276,7 +310,9 @@ func heldByUser(userID domain.ID, roleField string) criteria.Expr {
 // role's and a group's owning tenant are immutable after creation, so no row can
 // exist for such a filter to catch. Adding one anyway would silently swallow the
 // data problem it was pretending to guard against instead of surfacing it.
-func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.ID) ([]string, []vos.PermissionKey, error) {
+func (r *AuthenticationReader) ResolveGrants(
+	ctx context.Context, userID domain.ID,
+) ([]string, []string, []vos.PermissionKey, error) {
 	// THE TWO READS RUN CONCURRENTLY, and that is the whole reason the predicate is
 	// pushed down into both instead of the second one being keyed on the first's
 	// ids. Neither needs the other's answer — each resolves the graph from the user
@@ -285,12 +321,13 @@ func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.
 	// round trip measures 217µs against the dev bench while the SQL of both
 	// statements together measures 124µs.
 	var (
-		held   []schemas.RoleRow
-		grants []schemas.RolePermissionEdge
-		errs   [2]error
-		wg     sync.WaitGroup
+		held        []schemas.RoleRow
+		grants      []schemas.RolePermissionEdge
+		memberships []schemas.UserGroupEdge
+		errs        [3]error
+		wg          sync.WaitGroup
 	)
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
@@ -314,6 +351,18 @@ func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.
 		)))
 	}()
 
+	go func() {
+		defer wg.Done()
+		// THE GROUPS THE TOKEN WILL NAME. Gated twice, like everything else here:
+		// the anchor's scope drops a membership that was ended, and the predicate
+		// drops a group that was retired — which the join reaches into regardless,
+		// because a traversal is never gated on its target.
+		memberships, errs[2] = r.memberships.FindAll(ctx, criteria.Where(criteria.And(
+			criteria.Eq("ParentID", userID),
+			criteria.IsNull("GroupArchivedAt"),
+		)))
+	}()
+
 	wg.Wait()
 	// THE FIRST ERROR REFUSES THE WHOLE ANSWER. A partial grant set is the one
 	// thing this function must never return: half the roles or half the
@@ -321,17 +370,19 @@ func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.
 	// read the other way by a consumer, silently more.
 	for i, err := range errs {
 		if err != nil {
-			what := "roles held"
-			if i == 1 {
-				what = "permissions granted"
-			}
-			return nil, nil, fmt.Errorf("authentication reader: %s: %w", what, err)
+			what := [...]string{"roles held", "permissions granted", "group memberships"}[i]
+			return nil, nil, nil, fmt.Errorf("authentication reader: %s: %w", what, err)
 		}
 	}
 
 	roleKeys := make([]string, 0, len(held))
 	for _, role := range held {
 		roleKeys = append(roleKeys, role.Key)
+	}
+
+	groupKeys := make([]string, 0, len(memberships))
+	for _, membership := range memberships {
+		groupKeys = append(groupKeys, membership.GroupKey)
 	}
 
 	// One permission reached through two roles is one permission.
@@ -350,6 +401,7 @@ func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.
 	// in these claims — which is what makes a diff between two tokens readable
 	// when somebody is working out why a permission disappeared.
 	sort.Strings(roleKeys)
+	sort.Strings(groupKeys)
 	sort.Slice(permissions, func(i, j int) bool {
 		a, b := permissions[i], permissions[j]
 		if a.Resource != b.Resource {
@@ -357,7 +409,7 @@ func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.
 		}
 		return a.Action < b.Action
 	})
-	return roleKeys, permissions, nil
+	return groupKeys, roleKeys, permissions, nil
 }
 
 // PasswordMatches reports whether the plaintext produced the stored hash.

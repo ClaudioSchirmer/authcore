@@ -39,6 +39,7 @@ type fakeAuthStore struct {
 	user        *appdomain.User
 	byID        *appdomain.User
 	findErr     error
+	groupKeys   []string
 	roleKeys    []string
 	permissions []vos.PermissionKey
 	grantsErr   error
@@ -73,8 +74,8 @@ func (s *fakeAuthStore) FindUserByID(_ *configuration.AppContext, _ domain.ID) (
 	return s.byID, nil
 }
 
-func (s *fakeAuthStore) ResolveGrants(context.Context, domain.ID) ([]string, []vos.PermissionKey, error) {
-	return s.roleKeys, s.permissions, s.grantsErr
+func (s *fakeAuthStore) ResolveGrants(context.Context, domain.ID) ([]string, []string, []vos.PermissionKey, error) {
+	return s.groupKeys, s.roleKeys, s.permissions, s.grantsErr
 }
 
 func (s *fakeAuthStore) ClaimDefinitionsOfTenant(_ *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error) {
@@ -439,10 +440,20 @@ func TestIssueToken_ClaimSet(t *testing.T) {
 		GroupID:  domain.NewID("33333333-3333-3333-3333-333333333333"),
 		GroupKey: "engineering", GroupName: "Engineering",
 	})
+	// THE AGGREGATE CARRIES A MEMBERSHIP THE RESOLUTION DOES NOT RETURN, and the
+	// claim must follow the resolution. This is the retired-group case in
+	// miniature: the User's child join reaches a group's row whatever its archived
+	// state, so a token built from the aggregate would name a group the operator
+	// took out of service. The reader gates it; the aggregate cannot.
+	domain.AddAggregateChild(user, aggregatevos.UserGroup{
+		GroupID:  domain.NewID("33333333-3333-3333-3333-333333333334"),
+		GroupKey: "retired-team", GroupName: "Retired Team",
+	})
 	store := &fakeAuthStore{
-		user:     user,
-		matches:  true,
-		roleKeys: []string{"billing-admin", "viewer"},
+		user:      user,
+		matches:   true,
+		groupKeys: []string{"engineering"},
+		roleKeys:  []string{"billing-admin", "viewer"},
 		permissions: []vos.PermissionKey{
 			{Resource: "user", Action: "read"},
 			{Resource: "tenant", Action: "update"},
@@ -480,8 +491,11 @@ func TestIssueToken_ClaimSet(t *testing.T) {
 	if issuer.claims["name"] != "Ada Lovelace" {
 		t.Errorf("name claim = %v", issuer.claims["name"])
 	}
+	// The KEYS only, and only the RESOLVED ones: `retired-team` is on the
+	// aggregate and must not be here.
 	if got, _ := issuer.claims["groups"].([]string); len(got) != 1 || got[0] != "engineering" {
-		t.Errorf("groups claim = %v, want the KEYS only", issuer.claims["groups"])
+		t.Errorf("groups claim = %v, want exactly [engineering] — the aggregate also carries "+
+			"`retired-team`, which the resolution excluded", issuer.claims["groups"])
 	}
 	if got, _ := issuer.claims["roles"].([]string); len(got) != 2 {
 		t.Errorf("roles claim = %v, want every role held by any path", issuer.claims["roles"])
@@ -702,7 +716,7 @@ func TestBuildProfile_RolesComeFromTheResolvedGrants(t *testing.T) {
 	// through a group (never loaded here, so it has none).
 	roleKeys := []string{"billing-admin", "inherited-viewer"}
 
-	profile := buildProfile(user, roleKeys, nil, nil)
+	profile := buildProfile(user, nil, roleKeys, nil, nil)
 	if len(profile.Roles) != 2 {
 		t.Fatalf("roles = %+v, want both the direct and the inherited one", profile.Roles)
 	}
@@ -1425,7 +1439,7 @@ func TestBuildClaims_TheFixedSetIsNeverDisplacedByACustomClaim(t *testing.T) {
 		"x_region":       "emea",
 	}
 
-	claims := buildClaims(user, []string{"viewer"}, []vos.PermissionKey{{Resource: "user", Action: "read"}}, hostile)
+	claims := buildClaims(user, nil, []string{"viewer"}, []vos.PermissionKey{{Resource: "user", Action: "read"}}, hostile)
 
 	if got := claims[claimTenantID]; got != user.TenantID.Value() {
 		t.Errorf("tenant_id = %#v, want the loaded row's own tenant", got)

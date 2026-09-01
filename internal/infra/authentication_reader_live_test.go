@@ -24,6 +24,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/engine/postgres"
@@ -224,7 +225,7 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
+	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
 	if err != nil {
 		t.Fatalf("resolving grants: %v", err)
 	}
@@ -238,6 +239,15 @@ func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 			t.Errorf("roles = %v, want exactly %v (sorted)", roleKeys, wantRoles)
 			break
 		}
+	}
+
+	// THE GROUPS THE TOKEN WILL NAME. `retired-team` is a LIVE membership of an
+	// ARCHIVED group, and it must not be here — the join reaches its row whatever
+	// its archived state, so only the reader's predicate keeps it out.
+	wantGroups := []string{"live-team"}
+	if len(groupKeys) != len(wantGroups) || groupKeys[0] != wantGroups[0] {
+		t.Errorf("groups = %v, want exactly %v — the user is also a live member of the "+
+			"ARCHIVED `retired-team`", groupKeys, wantGroups)
 	}
 
 	wantPermissions := []string{"invoice:read", "report:read"}
@@ -262,9 +272,13 @@ func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 func TestLive_TheGrantWalkDropsEachRetiredThingForItsOwnReason(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
+	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
 	if err != nil {
 		t.Fatalf("resolving grants: %v", err)
+	}
+	groups := map[string]bool{}
+	for _, key := range groupKeys {
+		groups[key] = true
 	}
 	roles := map[string]bool{}
 	for _, key := range roleKeys {
@@ -285,6 +299,17 @@ func TestLive_TheGrantWalkDropsEachRetiredThingForItsOwnReason(t *testing.T) {
 	// scope, which is the half the framework supplies.
 	if roles["revoked-grant"] {
 		t.Error("a role whose GRANT was revoked is in the answer — the edge's scope gate is gone")
+	}
+	// THE RETIRED GROUP ITSELF, as a membership. The token names groups by key,
+	// and the User aggregate would have supplied this one: its child join reaches
+	// the group's row whatever its archived state. Only the reader's predicate
+	// keeps it out of the claim.
+	if groups["retired-team"] {
+		t.Error("a RETIRED group is in the group list — the token would name a group the " +
+			"operator took out of service")
+	}
+	if !groups["live-team"] {
+		t.Error("the live membership vanished from the group list")
 	}
 	// A LIVE ROLE conferred by a RETIRED GROUP, through a live membership and a
 	// live group_roles row. Only the group's own archive stamp says otherwise.
@@ -343,12 +368,13 @@ func TestLive_AUserWithNoGrantsAnswersEmpty(t *testing.T) {
 		t.Fatalf("clearing memberships: %v", err)
 	}
 
-	roleKeys, permissions, err := reader.ResolveGrants(ctx, domain.NewID(grantUser))
+	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(ctx, domain.NewID(grantUser))
 	if err != nil {
 		t.Fatalf("resolving grants: %v", err)
 	}
-	if len(roleKeys) != 0 || len(permissions) != 0 {
-		t.Errorf("got roles=%v permissions=%v, want both empty", roleKeys, permissions)
+	if len(groupKeys) != 0 || len(roleKeys) != 0 || len(permissions) != 0 {
+		t.Errorf("got groups=%v roles=%v permissions=%v, want all empty",
+			groupKeys, roleKeys, permissions)
 	}
 }
 
@@ -358,12 +384,53 @@ func TestLive_AUserWithNoGrantsAnswersEmpty(t *testing.T) {
 func TestLive_AnUnknownSubjectAnswersEmpty(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	roleKeys, permissions, err := reader.ResolveGrants(
+	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(
 		context.Background(), domain.NewID("99999999-9999-4999-8999-999999999999"))
 	if err != nil {
 		t.Fatalf("an unknown subject must answer empty, not fail: %v", err)
 	}
-	if len(roleKeys) != 0 || len(permissions) != 0 {
-		t.Errorf("got roles=%v permissions=%v for an id nobody holds", roleKeys, permissions)
+	if len(groupKeys) != 0 || len(roleKeys) != 0 || len(permissions) != 0 {
+		t.Errorf("got groups=%v roles=%v permissions=%v for an id nobody holds",
+			groupKeys, roleKeys, permissions)
+	}
+}
+
+// AN ARCHIVED TENANT CANNOT AUTHENTICATE, through either load.
+//
+// THIS IS DEPTH, NOT THE MECHANISM. Tenant's own rules force Status to suspended
+// when it is archived (archive-forces-suspended), and the sign-in refuses a
+// suspended tenant — so through the API the two states never come apart. What is
+// arranged here is a row that reached `deleted_at` WITHOUT going through the
+// aggregate, which is what a migration or a support script does, and the fixture
+// writes it exactly that way: a direct UPDATE, leaving status untouched.
+//
+// The refusal is an ABSENCE, not an error: the caller cannot tell an archived
+// tenant from an address that was never registered, which is the same answer every
+// other refusal on this path gives.
+func TestLive_AnArchivedTenantAuthenticatesNobody(t *testing.T) {
+	reader, eng := grantReader(t)
+	ctx := &configuration.AppContext{}
+
+	if user, err := reader.FindUserByEmail(ctx, "ada@grant-walk.test"); err != nil || user == nil {
+		t.Fatalf("the fixture user must load while the tenant is live (user=%v err=%v)", user, err)
+	}
+
+	// Straight to the row, on purpose — see the doc comment.
+	if _, err := eng.Pool().Exec(context.Background(),
+		`UPDATE tenants SET deleted_at = NOW() WHERE id = $1`, grantTenant); err != nil {
+		t.Fatalf("archiving the tenant: %v", err)
+	}
+
+	user, err := reader.FindUserByEmail(ctx, "ada@grant-walk.test")
+	if err != nil {
+		t.Fatalf("an archived tenant must read as absence, not as an error: %v", err)
+	}
+	if user != nil {
+		t.Error("a user whose tenant is ARCHIVED still loaded for sign-in")
+	}
+
+	if _, err := reader.FindUserByID(ctx, domain.NewID(grantUser)); err == nil {
+		t.Error("the refresh path still reloaded a user whose tenant is ARCHIVED — a token " +
+			"would keep rotating after the tenant was taken out of service")
 	}
 }

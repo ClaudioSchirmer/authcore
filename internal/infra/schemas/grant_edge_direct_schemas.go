@@ -78,6 +78,40 @@ type RolePermissionEdge struct {
 	PermissionArchivedAt *time.Time
 }
 
+// UserGroupEdge is one row of `user_groups`, with the group it points at resolved
+// through the declared traversal.
+//
+// IT EXISTS BECAUSE THE TOKEN'S `groups` CLAIM CANNOT COME FROM THE AGGREGATE. The
+// User aggregate carries its memberships with GroupKey filled by a child join, and
+// that join — like every join — is not gated on the archived state of its target,
+// so a retired group arrives with a perfectly good key. Reading the memberships
+// here instead, with the gate stated, is the same move the roles already make: the
+// claim is built from what this reader resolved, never from what the aggregate
+// happened to load.
+type UserGroupEdge struct {
+	ID      domain.ID
+	GroupID domain.ID
+
+	// Filled by the declared join into `groups`, never persisted.
+	GroupKey string
+	// The joined group's archive stamp. A user whose group was retired inherits
+	// nothing through it and must not carry its key in a token.
+	GroupArchivedAt *time.Time
+}
+
+// UserGroupEdgeSchema maps UserGroupEdge to `user_groups`.
+//
+// ParentID is the member; DeletedAt gates a membership that was DROPPED, which is
+// distinct from the group being retired and is handled by the repository's scope
+// rather than by a predicate.
+func UserGroupEdgeSchema() *core.TableSchema {
+	return core.NewDirectSchema[UserGroupEdge]("user_groups").
+		ID("id").
+		ParentID("user_id").
+		Field("GroupID", "group_id").
+		DeletedAt("deleted_at")
+}
+
 // RoleRowSchema maps RoleRow to `roles` for a Direct read.
 //
 // DeletedAt is declared because the scope gate reads the COLUMN off the schema,

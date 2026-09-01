@@ -110,11 +110,18 @@ type AuthenticationStore interface {
 	// between logins reaches the mesh at the next rotation rather than at the
 	// next full sign-in.
 	FindUserByID(ctx *configuration.AppContext, id domain.ID) (*appdomain.User, error)
-	// ResolveGrants returns the roles held by ANY path and the permissions they
-	// confer, in one round trip. Two slices and no result struct: see the reader
-	// for why a named type here would have been one invented to work around a
-	// layer boundary rather than to model anything.
-	ResolveGrants(ctx context.Context, userID domain.ID) (roleKeys []string, permissions []vos.PermissionKey, err error)
+	// ResolveGrants returns the groups this user belongs to, the roles held by
+	// ANY path, and the permissions those roles confer. Three slices and no
+	// result struct: see the reader for why a named type here would have been one
+	// invented to work around a layer boundary rather than to model anything.
+	//
+	// THE GROUPS COME FROM HERE AND NOT FROM THE AGGREGATE, and that is the whole
+	// reason this method returns them. The User aggregate carries its memberships
+	// with GroupKey filled by a child join, and a join is never gated on the
+	// archived state of its target — so a RETIRED group arrives with a perfectly
+	// good key and would land in the token's `groups` claim. The reader states the
+	// gate; the aggregate cannot.
+	ResolveGrants(ctx context.Context, userID domain.ID) (groupKeys, roleKeys []string, permissions []vos.PermissionKey, err error)
 	// ClaimDefinitionsOfTenant returns the ACTIVE claim definitions of this
 	// tenant that a user may hold a value for — level 2 of the two-level chain,
 	// and the vocabulary level 1 is resolved against.
@@ -357,7 +364,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		return TokenResult{}, refuseCredentials()
 	}
 
-	roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
+	groupKeys, roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
 	if err != nil {
 		// NOT a credential refusal, and NOT an attempt worth counting: the caller
 		// proved who they are and this service failed them. Recording a failure
@@ -386,7 +393,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 
 	access, refresh, err := h.Issuer.IssueWithRefresh(ctx, authcore.TokenRequest{
 		Subject: idOf(user).Value(),
-		Claims:  buildClaims(user, roleKeys, permissions, customClaims),
+		Claims:  buildClaims(user, groupKeys, roleKeys, permissions, customClaims),
 	})
 	if err != nil {
 		return TokenResult{}, err
@@ -405,7 +412,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, roleKeys, permissions, customClaims),
+		User:             buildProfile(user, groupKeys, roleKeys, permissions, customClaims),
 	}, nil
 }
 
@@ -472,7 +479,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		return TokenResult{}, refuseCredentials()
 	}
 
-	roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
+	groupKeys, roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
 	if err != nil {
 		return TokenResult{}, err
 	}
@@ -488,7 +495,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 	}
 	customClaims := resolveCustomClaims(user, catalog)
 
-	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(user, roleKeys, permissions, customClaims))
+	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(user, groupKeys, roleKeys, permissions, customClaims))
 	switch {
 	case err == nil:
 	case errors.Is(err, authcore.ErrRefreshTokenNotFound),
@@ -511,7 +518,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, roleKeys, permissions, customClaims),
+		User:             buildProfile(user, groupKeys, roleKeys, permissions, customClaims),
 	}, nil
 }
 
@@ -627,7 +634,7 @@ func accountIsUsable(user *appdomain.User) bool {
 // consequence is a tenant claim that quietly does not appear, rather than
 // `permissions` or `tenant_id` being replaced by a value the tenant chose.
 // Those two are read by the framework across the whole mesh.
-func buildClaims(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) map[string]any {
+func buildClaims(user *appdomain.User, groupKeys, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) map[string]any {
 	claims := make(map[string]any, len(custom)+9)
 	maps.Copy(claims, custom)
 	claims[claimIdentityKind] = identityKindUser
@@ -636,7 +643,7 @@ func buildClaims(user *appdomain.User, roleKeys []string, permissions []vos.Perm
 	claims[claimEmail] = user.Email.Value()
 	claims[claimName] = user.Name.FullName()
 	claims[claimPermissions] = effectivePermissions(user, permissions)
-	claims[claimGroups] = groupKeysOf(user)
+	claims[claimGroups] = groupKeys
 	claims[claimRoles] = roleKeys
 	claims[claimMustChangePassword] = user.MustChangePassword
 	return claims
@@ -691,22 +698,6 @@ func restrictToPasswordChange(permissions []string) []string {
 	return []string{}
 }
 
-// groupKeysOf reads the memberships off the loaded aggregate.
-//
-// The KEYS only. A group's display name and description are mutable and nothing
-// decides on them, and the schema says outright that a key — not a display name —
-// is what an API caller and an audit line reference.
-func groupKeysOf(user *appdomain.User) []string {
-	entries := domain.GetCurrentItemsOf[aggregatevos.UserGroup](user.GetAggregateRoot())
-	out := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.GroupKey != "" {
-			out = append(out, entry.GroupKey)
-		}
-	}
-	return out
-}
-
 // buildProfile assembles the richer shape the response body carries.
 //
 // It is where the display names live — the half deliberately kept out of the
@@ -721,11 +712,20 @@ func groupKeysOf(user *appdomain.User) []string {
 // request and both readers consume it, so the body cannot advertise a claim the
 // token omits — including the case that makes the two most likely to disagree,
 // where a must-change-password session carries none at all.
-func buildProfile(user *appdomain.User, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) AuthenticatedUserResult {
-	groupEntries := domain.GetCurrentItemsOf[aggregatevos.UserGroup](user.GetAggregateRoot())
-	groups := make([]NamedGrantResult, 0, len(groupEntries))
-	for _, entry := range groupEntries {
-		groups = append(groups, NamedGrantResult{Key: entry.GroupKey, Name: entry.GroupName})
+func buildProfile(user *appdomain.User, groupKeys, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) AuthenticatedUserResult {
+	// The KEYS come from the resolution, the NAMES from the aggregate — the same
+	// split the roles below make, and for the same reason. The aggregate's
+	// memberships reach a retired group through an ungated join, so listing them
+	// would advertise a group the token does not carry; the resolution is what
+	// decides membership, and the aggregate is only asked to spell the names of
+	// the groups it already agreed on.
+	names := map[string]string{}
+	for _, entry := range domain.GetCurrentItemsOf[aggregatevos.UserGroup](user.GetAggregateRoot()) {
+		names[entry.GroupKey] = entry.GroupName
+	}
+	groups := make([]NamedGrantResult, 0, len(groupKeys))
+	for _, key := range groupKeys {
+		groups = append(groups, NamedGrantResult{Key: key, Name: names[key]})
 	}
 
 	// The direct grants carry a display name from the read join; the inherited
