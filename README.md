@@ -1284,14 +1284,14 @@ HTTP endpoints, so every route on top of it is this service's own:
 
 ```
 internal/application/commands/issue_token_command.go        the sign-in's command
-internal/application/commands/utils/token_results.go       the result BOTH token verbs answer with
+internal/application/commands/dtos/token_results.go        the result BOTH token verbs answer with
 internal/application/commands/handlers/                    one file per hand-written handler, and nothing else
       issue_token_command_handler.go                       the user sign-in
       refresh_token_command_handler.go                     the rotation
       issue_client_token_command_handler.go                the machine sign-in
       notifications.go                                     the three 401s — types only
-internal/application/commands/handlers/utils/              what more than one handler needs
-      ports.go                                             every port the handlers take
+internal/application/commands/handlers/dtos/ports.go       every port the handlers take
+internal/application/commands/handlers/utils/              the FUNCTIONS more than one handler needs
       authentication.go                                    the claim vocabulary and the two builders
       claims.go                                            the two-level tenant-claim chain
       journal.go                                           the one path to the counters and the log stream
