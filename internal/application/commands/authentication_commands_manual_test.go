@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
+	"github.com/ClaudioSchirmer/authcore/internal/infra"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/persistence"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -36,17 +36,18 @@ import (
 // ── fakes ───────────────────────────────────────────────────────────────────
 
 type fakeAuthStore struct {
-	user        *appdomain.User
-	byID        *appdomain.User
+	account     *schemas.SignInAccount
+	byID        *schemas.SignInAccount
 	findErr     error
-	groupKeys   []string
-	roleKeys    []string
+	groups      []infra.NamedGrant
+	roles       []infra.NamedGrant
 	permissions []vos.PermissionKey
+	claimValues map[domain.ID]string
+	definitions []schemas.ClaimDefinition
 	grantsErr   error
 	matches     bool
 	burned      int
 	askedEmail  string
-	catalog     []*appdomain.Claim
 	catalogErr  error
 	// Counted, so the rotation test can assert the catalog is RE-READ rather
 	// than replayed from the token being redeemed.
@@ -54,34 +55,33 @@ type fakeAuthStore struct {
 	askedTenant  domain.ID
 }
 
-func (s *fakeAuthStore) FindUserByEmail(_ *configuration.AppContext, email string) (*appdomain.User, error) {
+func (s *fakeAuthStore) LoadAccountByEmail(_ context.Context, email string) (*schemas.SignInAccount, error) {
 	s.askedEmail = email
 	if s.findErr != nil {
 		return nil, s.findErr
 	}
-	if s.user == nil {
-		// (nil, nil) is the port's "no such account" — distinct from an error,
-		// which means the lookup itself could not run.
-		return nil, nil
-	}
-	return s.user, nil
+	return s.account, nil
 }
 
-func (s *fakeAuthStore) FindUserByID(_ *configuration.AppContext, _ domain.ID) (*appdomain.User, error) {
+func (s *fakeAuthStore) LoadAccountByID(context.Context, domain.ID) (*schemas.SignInAccount, error) {
 	if s.byID == nil {
 		return nil, errors.New("not found")
 	}
 	return s.byID, nil
 }
 
-func (s *fakeAuthStore) ResolveGrants(context.Context, domain.ID) ([]string, []string, []vos.PermissionKey, error) {
-	return s.groupKeys, s.roleKeys, s.permissions, s.grantsErr
-}
-
-func (s *fakeAuthStore) ClaimDefinitionsOfTenant(_ *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error) {
+func (s *fakeAuthStore) ResolveSignIn(context.Context, *schemas.SignInAccount) (infra.SignInBundle, error) {
+	if s.grantsErr != nil {
+		return infra.SignInBundle{}, s.grantsErr
+	}
 	s.catalogReads++
-	s.askedTenant = tenantID
-	return s.catalog, s.catalogErr
+	return infra.SignInBundle{
+		Groups:      s.groups,
+		Roles:       s.roles,
+		Permissions: s.permissions,
+		ClaimValues: s.claimValues,
+		Definitions: s.definitions,
+	}, s.catalogErr
 }
 
 func (s *fakeAuthStore) PasswordMatches(string, string) bool { return s.matches }
@@ -240,19 +240,29 @@ func authCtx() *configuration.AppContext {
 
 // usableUser builds a loaded, signable account: active, in an active tenant, with
 // the joined tenant columns the read joins fill on every real load.
-func usableUser() *appdomain.User {
-	id := domain.NewID("11111111-1111-1111-1111-111111111111")
-	user := &appdomain.User{
+// namedGrants spells a list of keys as the grants the reader returns. The display
+// name mirrors the key: these tests assert on what the TOKEN carries, and the
+// token carries keys.
+func namedGrants(keys ...string) []infra.NamedGrant {
+	out := make([]infra.NamedGrant, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, infra.NamedGrant{Key: k, Name: k})
+	}
+	return out
+}
+
+func usableAccount() *schemas.SignInAccount {
+	return &schemas.SignInAccount{
+		ID:              domain.NewID("11111111-1111-1111-1111-111111111111"),
 		TenantID:        domain.NewID("22222222-2222-2222-2222-222222222222"),
-		Name:            vos.PersonName{Given: "Ada", Family: "Lovelace"},
-		Email:           vos.Email("ada@acme.test"),
+		GivenName:       "Ada",
+		FamilyName:      "Lovelace",
+		Email:           "ada@acme.test",
 		PasswordHash:    "$argon2id$stored",
-		Status:          vos.UserStatusActive,
+		Status:          vos.UserStatusActive.Value(),
 		TenantWorkspace: "acme",
 		TenantStatus:    vos.TenantStatusActive.Value(),
 	}
-	user.SetID(id)
-	return user
 }
 
 // assertCredentialRefusal fails unless err is EXACTLY the shared refusal: the
@@ -304,9 +314,9 @@ func assertCredentialRefusal(t *testing.T, err error) {
 
 func TestIssueToken_Succeeds(t *testing.T) {
 	store := &fakeAuthStore{
-		user:        usableUser(),
+		account:     usableAccount(),
 		matches:     true,
-		roleKeys:    []string{"billing-admin"},
+		roles:       namedGrants("billing-admin"),
 		permissions: []vos.PermissionKey{{Resource: "user", Action: "read"}},
 	}
 	issuer := &fakeIssuer{}
@@ -337,7 +347,7 @@ func TestIssueToken_Succeeds(t *testing.T) {
 // their own address is told their credentials are wrong, because the column
 // stores it lowercase.
 func TestIssueToken_NormalisesEmail(t *testing.T) {
-	store := &fakeAuthStore{user: usableUser(), matches: true}
+	store := &fakeAuthStore{account: usableAccount(), matches: true}
 	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: &fakeIssuer{}}
 
 	if _, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "  Ada@ACME.test ", Password: "x"}); err != nil {
@@ -378,21 +388,21 @@ func TestIssueToken_LookupFailureIsRefusedNotSurfaced(t *testing.T) {
 // Every found-row refusal must be the same answer. Table-driven so a new branch
 // added later without the shared refusal fails here rather than in production.
 func TestIssueToken_EveryFoundRowRefusalIsIdentical(t *testing.T) {
-	suspendedUser := usableUser()
-	suspendedUser.Status = vos.UserStatusSuspended
+	suspendedUser := usableAccount()
+	suspendedUser.Status = vos.UserStatusSuspended.Value()
 
-	suspendedTenant := usableUser()
+	suspendedTenant := usableAccount()
 	suspendedTenant.TenantStatus = vos.TenantStatusSuspended.Value()
 
-	missingTenantJoin := usableUser()
+	missingTenantJoin := usableAccount()
 	missingTenantJoin.TenantStatus = ""
 
 	cases := []struct {
 		name    string
-		user    *appdomain.User
+		account *schemas.SignInAccount
 		matches bool
 	}{
-		{"wrong password", usableUser(), false},
+		{"wrong password", usableAccount(), false},
 		{"suspended account", suspendedUser, true},
 		{"suspended tenant", suspendedTenant, true},
 		{"tenant join produced nothing", missingTenantJoin, true},
@@ -400,7 +410,7 @@ func TestIssueToken_EveryFoundRowRefusalIsIdentical(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := &fakeAuthStore{user: tc.user, matches: tc.matches}
+			store := &fakeAuthStore{account: tc.account, matches: tc.matches}
 			h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: &fakeIssuer{}}
 
 			_, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
@@ -419,7 +429,7 @@ func TestIssueToken_EveryFoundRowRefusalIsIdentical(t *testing.T) {
 // and answering 401 would both lie to them and bury an outage.
 func TestIssueToken_GrantsFailureIsNotACredentialRefusal(t *testing.T) {
 	boom := errors.New("permission query exploded")
-	store := &fakeAuthStore{user: usableUser(), matches: true, grantsErr: boom}
+	store := &fakeAuthStore{account: usableAccount(), matches: true, grantsErr: boom}
 	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: &fakeIssuer{}}
 
 	_, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
@@ -435,25 +445,18 @@ func TestIssueToken_GrantsFailureIsNotACredentialRefusal(t *testing.T) {
 // ── the claim set ───────────────────────────────────────────────────────────
 
 func TestIssueToken_ClaimSet(t *testing.T) {
-	user := usableUser()
-	domain.AddAggregateChild(user, aggregatevos.UserGroup{
-		GroupID:  domain.NewID("33333333-3333-3333-3333-333333333333"),
-		GroupKey: "engineering", GroupName: "Engineering",
-	})
-	// THE AGGREGATE CARRIES A MEMBERSHIP THE RESOLUTION DOES NOT RETURN, and the
-	// claim must follow the resolution. This is the retired-group case in
-	// miniature: the User's child join reaches a group's row whatever its archived
-	// state, so a token built from the aggregate would name a group the operator
-	// took out of service. The reader gates it; the aggregate cannot.
-	domain.AddAggregateChild(user, aggregatevos.UserGroup{
-		GroupID:  domain.NewID("33333333-3333-3333-3333-333333333334"),
-		GroupKey: "retired-team", GroupName: "Retired Team",
-	})
+	// THE MEMBERSHIPS COME FROM THE RESOLUTION AND FROM NOWHERE ELSE, which is
+	// now true by construction rather than by discipline: the account is a ROW,
+	// with no collections hanging off it, so there is no second source for a
+	// membership to arrive from. The version of this test that guarded against
+	// one — an aggregate carrying a retired group the resolution excluded — is
+	// gone with the aggregate.
+	account := usableAccount()
 	store := &fakeAuthStore{
-		user:      user,
-		matches:   true,
-		groupKeys: []string{"engineering"},
-		roleKeys:  []string{"billing-admin", "viewer"},
+		account: account,
+		matches: true,
+		groups:  namedGrants("engineering"),
+		roles:   namedGrants("billing-admin", "viewer"),
 		permissions: []vos.PermissionKey{
 			{Resource: "user", Action: "read"},
 			{Resource: "tenant", Action: "update"},
@@ -491,11 +494,9 @@ func TestIssueToken_ClaimSet(t *testing.T) {
 	if issuer.claims["name"] != "Ada Lovelace" {
 		t.Errorf("name claim = %v", issuer.claims["name"])
 	}
-	// The KEYS only, and only the RESOLVED ones: `retired-team` is on the
-	// aggregate and must not be here.
+	// The KEYS only — the display names are the body's half.
 	if got, _ := issuer.claims["groups"].([]string); len(got) != 1 || got[0] != "engineering" {
-		t.Errorf("groups claim = %v, want exactly [engineering] — the aggregate also carries "+
-			"`retired-team`, which the resolution excluded", issuer.claims["groups"])
+		t.Errorf("groups claim = %v, want exactly [engineering]", issuer.claims["groups"])
 	}
 	if got, _ := issuer.claims["roles"].([]string); len(got) != 2 {
 		t.Errorf("roles claim = %v, want every role held by any path", issuer.claims["roles"])
@@ -514,11 +515,11 @@ func TestIssueToken_ClaimSet(t *testing.T) {
 // ── the restricted session ──────────────────────────────────────────────────
 
 func TestIssueToken_MustChangePasswordRestrictsTheBundle(t *testing.T) {
-	user := usableUser()
-	user.MustChangePassword = true
+	account := usableAccount()
+	account.MustChangePassword = true
 
 	store := &fakeAuthStore{
-		user:    user,
+		account: account,
 		matches: true,
 		permissions: []vos.PermissionKey{
 			{Resource: "user", Action: "read"},
@@ -559,11 +560,11 @@ func TestIssueToken_MustChangePasswordRestrictsTheBundle(t *testing.T) {
 // password and does not hold the permission gets an EMPTY set, not an invented
 // grant and not a wildcard.
 func TestIssueToken_MustChangePasswordWithoutThePermissionIsADeadEnd(t *testing.T) {
-	user := usableUser()
-	user.MustChangePassword = true
+	account := usableAccount()
+	account.MustChangePassword = true
 
 	store := &fakeAuthStore{
-		user:        user,
+		account:     account,
 		matches:     true,
 		permissions: []vos.PermissionKey{{Resource: "user", Action: "read"}},
 	}
@@ -583,8 +584,8 @@ func TestIssueToken_MustChangePasswordWithoutThePermissionIsADeadEnd(t *testing.
 
 func TestRefreshToken_Succeeds(t *testing.T) {
 	store := &fakeAuthStore{
-		byID:        usableUser(),
-		roleKeys:    []string{"viewer"},
+		byID:        usableAccount(),
+		roles:       namedGrants("viewer"),
 		permissions: []vos.PermissionKey{{Resource: "user", Action: "read"}},
 	}
 	lookup := &fakeLookup{subject: "11111111-1111-1111-1111-111111111111"}
@@ -609,11 +610,11 @@ func TestRefreshToken_Succeeds(t *testing.T) {
 
 // A restricted session must not widen itself by rotating.
 func TestRefreshToken_KeepsTheMustChangePasswordRestriction(t *testing.T) {
-	user := usableUser()
-	user.MustChangePassword = true
+	account := usableAccount()
+	account.MustChangePassword = true
 
 	store := &fakeAuthStore{
-		byID: user,
+		byID: account,
 		permissions: []vos.PermissionKey{
 			{Resource: "user", Action: "change-password"},
 			{Resource: "*", Action: "*"},
@@ -641,7 +642,7 @@ func TestRefreshToken_EveryRedemptionFailureIsIdentical(t *testing.T) {
 		authcore.ErrRefreshTokenReused,
 	} {
 		t.Run(sentinel.Error(), func(t *testing.T) {
-			store := &fakeAuthStore{byID: usableUser()}
+			store := &fakeAuthStore{byID: usableAccount()}
 			h := &RefreshTokenHandler{
 				Store:  store,
 				Lookup: &fakeLookup{subject: "s"},
@@ -691,8 +692,8 @@ func TestRefreshToken_LookupFailureEscapes(t *testing.T) {
 // The account went away between rotations — archived, suspended, tenant
 // withdrawn. The session ends, with the same refusal as everything else.
 func TestRefreshToken_UnusableAccountEndsTheSession(t *testing.T) {
-	suspended := usableUser()
-	suspended.Status = vos.UserStatusSuspended
+	suspended := usableAccount()
+	suspended.Status = vos.UserStatusSuspended.Value()
 
 	h := &RefreshTokenHandler{
 		Store:  &fakeAuthStore{byID: suspended},
@@ -705,18 +706,23 @@ func TestRefreshToken_UnusableAccountEndsTheSession(t *testing.T) {
 
 // ── the projections ─────────────────────────────────────────────────────────
 
-func TestBuildProfile_RolesComeFromTheResolvedGrants(t *testing.T) {
-	user := usableUser()
-	domain.AddAggregateChild(user, aggregatevos.UserRole{
-		RoleID:  domain.NewID("44444444-4444-4444-4444-444444444444"),
-		RoleKey: "billing-admin", RoleName: "Billing Admin",
-	})
+// EVERY ROLE CARRIES ITS DISPLAY NAME NOW, inherited ones included.
+//
+// This assertion is the INVERSE of the one it replaces. While the roles were
+// resolved by a statement anchored on the user's own grants, an inherited role was
+// never loaded as a row and the body showed a blank name for it; the test asserted
+// that blank, because naming the ones we could was better than naming none. The
+// grant read is anchored on `roles` itself now — every role the user holds by any
+// path arrives as a row, with its key AND its name — so the blank is gone and
+// asserting it would be asserting a limitation that no longer exists.
+func TestBuildProfile_EveryRoleCarriesItsName(t *testing.T) {
+	profile := buildProfile(usableAccount(), infra.SignInBundle{
+		Roles: []infra.NamedGrant{
+			{Key: "billing-admin", Name: "Billing Admin"},
+			{Key: "inherited-viewer", Name: "Inherited Viewer"},
+		},
+	}, nil)
 
-	// One direct (loaded as a row, so it has a display name) and one inherited
-	// through a group (never loaded here, so it has none).
-	roleKeys := []string{"billing-admin", "inherited-viewer"}
-
-	profile := buildProfile(user, nil, roleKeys, nil, nil)
 	if len(profile.Roles) != 2 {
 		t.Fatalf("roles = %+v, want both the direct and the inherited one", profile.Roles)
 	}
@@ -727,8 +733,9 @@ func TestBuildProfile_RolesComeFromTheResolvedGrants(t *testing.T) {
 	if byKey["billing-admin"] != "Billing Admin" {
 		t.Errorf("the direct grant lost its display name: %+v", profile.Roles)
 	}
-	if byKey["inherited-viewer"] != "" {
-		t.Errorf("an inherited role was given a name it never had: %q", byKey["inherited-viewer"])
+	if byKey["inherited-viewer"] != "Inherited Viewer" {
+		t.Errorf("the INHERITED role lost its display name (%q) — the whole point of anchoring "+
+			"the grant read on `roles` is that it has one", byKey["inherited-viewer"])
 	}
 }
 
@@ -749,20 +756,20 @@ func TestRenderPermissions_DropsHalfKeysAndNeverReturnsNil(t *testing.T) {
 func TestAccountIsUsable(t *testing.T) {
 	cases := []struct {
 		name string
-		mut  func(*appdomain.User)
+		mut  func(*schemas.SignInAccount)
 		want bool
 	}{
-		{"active in an active tenant", func(*appdomain.User) {}, true},
-		{"active in a trial tenant", func(u *appdomain.User) { u.TenantStatus = vos.TenantStatusTrial.Value() }, true},
-		{"suspended account", func(u *appdomain.User) { u.Status = vos.UserStatusSuspended }, false},
-		{"suspended tenant", func(u *appdomain.User) { u.TenantStatus = vos.TenantStatusSuspended.Value() }, false},
-		{"tenant join produced nothing", func(u *appdomain.User) { u.TenantStatus = "" }, false},
+		{"active in an active tenant", func(*schemas.SignInAccount) {}, true},
+		{"active in a trial tenant", func(u *schemas.SignInAccount) { u.TenantStatus = vos.TenantStatusTrial.Value() }, true},
+		{"suspended account", func(u *schemas.SignInAccount) { u.Status = vos.UserStatusSuspended.Value() }, false},
+		{"suspended tenant", func(u *schemas.SignInAccount) { u.TenantStatus = vos.TenantStatusSuspended.Value() }, false},
+		{"tenant join produced nothing", func(u *schemas.SignInAccount) { u.TenantStatus = "" }, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			user := usableUser()
-			tc.mut(user)
-			if got := accountIsUsable(user); got != tc.want {
+			account := usableAccount()
+			tc.mut(account)
+			if got := accountIsUsable(account); got != tc.want {
 				t.Errorf("accountIsUsable = %v, want %v", got, tc.want)
 			}
 		})
@@ -772,11 +779,11 @@ func TestAccountIsUsable(t *testing.T) {
 // A TRIAL tenant signs in. This is the one that is easy to get wrong by reading
 // "unavailable" as "not active" — and doing so would break every trial signup.
 func TestIssueToken_TrialTenantSignsIn(t *testing.T) {
-	user := usableUser()
-	user.TenantStatus = vos.TenantStatusTrial.Value()
+	account := usableAccount()
+	account.TenantStatus = vos.TenantStatusTrial.Value()
 
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: user, matches: true},
+		Store:    &fakeAuthStore{account: account, matches: true},
 		Attempts: &fakeAttempts{},
 		Issuer:   &fakeIssuer{},
 	}
@@ -792,7 +799,7 @@ func TestIssueToken_TrialTenantSignsIn(t *testing.T) {
 // verified, no row is read, and the answer cannot depend on whether the account
 // exists.
 func TestIssueToken_LockedRefusesBeforeTouchingTheCredential(t *testing.T) {
-	store := &fakeAuthStore{user: usableUser(), matches: true}
+	store := &fakeAuthStore{account: usableAccount(), matches: true}
 	attempts := &fakeAttempts{lockedFor: 7 * time.Minute}
 	h := &IssueTokenHandler{Store: store, Attempts: attempts, Issuer: &fakeIssuer{}}
 
@@ -855,7 +862,7 @@ func TestIssueToken_LockedAnswersWithTheRemainingMinutes(t *testing.T) {
 func TestIssueToken_LockoutProbeFailureEscapes(t *testing.T) {
 	boom := errors.New("probe exploded")
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Store:    &fakeAuthStore{account: usableAccount(), matches: true},
 		Attempts: &fakeAttempts{lockErr: boom},
 		Issuer:   &fakeIssuer{},
 	}
@@ -898,7 +905,7 @@ func TestIssueToken_LogsTheExistenceFlagPerBranch(t *testing.T) {
 			wantOutcome: "failure", wantExisted: boolPtr(false),
 		},
 		{
-			name: "wrong password", store: &fakeAuthStore{user: usableUser(), matches: false},
+			name: "wrong password", store: &fakeAuthStore{account: usableAccount(), matches: false},
 			wantOutcome: "failure", wantExisted: boolPtr(true),
 		},
 		{
@@ -906,11 +913,11 @@ func TestIssueToken_LogsTheExistenceFlagPerBranch(t *testing.T) {
 			// nobody got in — and it counts, which is right: repeatedly presenting
 			// a working password for a suspended account is exactly the pattern
 			// worth rate-limiting.
-			name: "suspended account", store: &fakeAuthStore{user: suspendedUser(), matches: true},
+			name: "suspended account", store: &fakeAuthStore{account: suspendedUser(), matches: true},
 			wantOutcome: "failure", wantExisted: boolPtr(true),
 		},
 		{
-			name: "success", store: &fakeAuthStore{user: usableUser(), matches: true},
+			name: "success", store: &fakeAuthStore{account: usableAccount(), matches: true},
 			wantOutcome: "success", wantExisted: boolPtr(true),
 		},
 	}
@@ -955,7 +962,7 @@ func TestIssueToken_LogsTheExistenceFlagPerBranch(t *testing.T) {
 func TestIssueToken_SuccessIsLoggedOnlyAfterTheTokenExists(t *testing.T) {
 	attempts := &fakeAttempts{}
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Store:    &fakeAuthStore{account: usableAccount(), matches: true},
 		Attempts: attempts,
 		Issuer:   &fakeIssuer{issueErr: errors.New("signing key unusable")},
 	}
@@ -973,7 +980,7 @@ func TestIssueToken_SuccessIsLoggedOnlyAfterTheTokenExists(t *testing.T) {
 func TestIssueToken_GrantsFailureRecordsNoAttempt(t *testing.T) {
 	attempts := &fakeAttempts{}
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: usableUser(), matches: true, grantsErr: errors.New("boom")},
+		Store:    &fakeAuthStore{account: usableAccount(), matches: true, grantsErr: errors.New("boom")},
 		Attempts: attempts,
 		Issuer:   &fakeIssuer{},
 	}
@@ -1011,9 +1018,9 @@ func TestIssueToken_MissingOriginAddressIsNotFatal(t *testing.T) {
 
 func boolPtr(b bool) *bool { return &b }
 
-func suspendedUser() *appdomain.User {
-	u := usableUser()
-	u.Status = vos.UserStatusSuspended
+func suspendedUser() *schemas.SignInAccount {
+	u := usableAccount()
+	u.Status = vos.UserStatusSuspended.Value()
 	return u
 }
 
@@ -1145,11 +1152,11 @@ func TestIssueToken_EveryOutcomeIsAnnouncedAtItsOwnSeverity(t *testing.T) {
 			domain.EventWarning, "sign-in failed: no account for this identity"},
 		{"lookup failed", &fakeAuthStore{findErr: errors.New("connection reset")}, &fakeAttempts{},
 			domain.EventWarning, "sign-in failed: identity lookup could not be performed"},
-		{"wrong password", &fakeAuthStore{user: usableUser()}, &fakeAttempts{},
+		{"wrong password", &fakeAuthStore{account: usableAccount()}, &fakeAttempts{},
 			domain.EventWarning, "sign-in failed: credential rejected"},
-		{"suspended account", &fakeAuthStore{user: suspendedUser(), matches: true}, &fakeAttempts{},
+		{"suspended account", &fakeAuthStore{account: suspendedUser(), matches: true}, &fakeAttempts{},
 			domain.EventWarning, "sign-in failed: credential valid but account or tenant not usable"},
-		{"success", &fakeAuthStore{user: usableUser(), matches: true}, &fakeAttempts{},
+		{"success", &fakeAuthStore{account: usableAccount(), matches: true}, &fakeAttempts{},
 			domain.EventLog, "sign-in succeeded"},
 	}
 
@@ -1220,7 +1227,7 @@ func TestIssueToken_AbsenceAndOutageAnnounceDifferently(t *testing.T) {
 func TestIssueToken_AFailedAnnouncementDoesNotRefuseTheSignIn(t *testing.T) {
 	events := &fakePublisher{err: errors.New("stdout is gone")}
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Store:    &fakeAuthStore{account: usableAccount(), matches: true},
 		Attempts: &fakeAttempts{},
 		Events:   events,
 		Issuer:   &fakeIssuer{},
@@ -1235,7 +1242,7 @@ func TestIssueToken_AFailedAnnouncementDoesNotRefuseTheSignIn(t *testing.T) {
 // in this file drive the branches without one.
 func TestIssueToken_NoPublisherIsNotAFailure(t *testing.T) {
 	h := &IssueTokenHandler{
-		Store:    &fakeAuthStore{user: usableUser(), matches: true},
+		Store:    &fakeAuthStore{account: usableAccount(), matches: true},
 		Attempts: &fakeAttempts{},
 		Issuer:   &fakeIssuer{},
 	}
@@ -1253,9 +1260,9 @@ func TestIssueToken_NoAnnouncementCarriesTheCredential(t *testing.T) {
 	stores := []*fakeAuthStore{
 		{},
 		{findErr: errors.New("connection reset")},
-		{user: usableUser()},
-		{user: suspendedUser(), matches: true},
-		{user: usableUser(), matches: true},
+		{account: usableAccount()},
+		{account: suspendedUser(), matches: true},
+		{account: usableAccount(), matches: true},
 	}
 	events := &fakePublisher{}
 	for _, store := range stores {
@@ -1298,7 +1305,7 @@ func TestBuildClaims_TokenDeclaresTheSubjectKindOnBothPaths(t *testing.T) {
 	t.Run("sign-in", func(t *testing.T) {
 		issuer := &fakeIssuer{}
 		h := &IssueTokenHandler{
-			Store:    &fakeAuthStore{user: usableUser(), matches: true},
+			Store:    &fakeAuthStore{account: usableAccount(), matches: true},
 			Attempts: &fakeAttempts{},
 			Issuer:   issuer,
 		}
@@ -1313,8 +1320,8 @@ func TestBuildClaims_TokenDeclaresTheSubjectKindOnBothPaths(t *testing.T) {
 	t.Run("refresh", func(t *testing.T) {
 		issuer := &fakeIssuer{}
 		h := &RefreshTokenHandler{
-			Store:  &fakeAuthStore{byID: usableUser()},
-			Lookup: &fakeLookup{subject: usableUser().GetID().Value()},
+			Store:  &fakeAuthStore{byID: usableAccount()},
+			Lookup: &fakeLookup{subject: usableAccount().ID.Value()},
 			Issuer: issuer,
 		}
 		if _, err := h.Handle(authCtx(), &RefreshTokenCommand{RefreshToken: "v"}); err != nil {
@@ -1366,7 +1373,7 @@ func TestIdentityKinds_AreTheTwoTheRestOfTheServiceUses(t *testing.T) {
 // failure is not: the caller proved who they are and this service failed them.
 func TestIssueToken_CatalogFailureIsNotACredentialRefusal(t *testing.T) {
 	boom := errors.New("claims query exploded")
-	store := &fakeAuthStore{user: usableUser(), matches: true, catalogErr: boom}
+	store := &fakeAuthStore{account: usableAccount(), matches: true, catalogErr: boom}
 	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: &fakeIssuer{}}
 
 	_, err := h.Handle(authCtx(), &IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
@@ -1380,13 +1387,13 @@ func TestIssueToken_CatalogFailureIsNotACredentialRefusal(t *testing.T) {
 }
 
 func TestIssueToken_MintsTheTenantClaimsBesideTheFixedSet(t *testing.T) {
-	user := usableUser()
-	holds(user, claimID(1), "9000")
+	account := usableAccount()
 
 	store := &fakeAuthStore{
-		user:    user,
-		matches: true,
-		catalog: []*appdomain.Claim{
+		account:     account,
+		matches:     true,
+		claimValues: map[domain.ID]string{domain.NewID(claimID(1)): "9000"},
+		definitions: []schemas.ClaimDefinition{
 			definition(claimID(1), "x_cost_center", vos.ClaimValueTypeNumber, stringValue("1000")),
 			definition(claimID(2), "x_region", vos.ClaimValueTypeString, stringValue("emea")),
 		},
@@ -1399,11 +1406,9 @@ func TestIssueToken_MintsTheTenantClaimsBesideTheFixedSet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// The catalog is read for THIS user's tenant. Reading it for another one
-	// would hand a token the vocabulary of a tenant the caller is not in.
-	if store.askedTenant != user.TenantID {
-		t.Errorf("catalog read for tenant %v, want the user's own %v", store.askedTenant, user.TenantID)
-	}
+	// The bundle is resolved FOR THIS ACCOUNT — the reader keys the catalog on
+	// account.TenantID inside the same call, so there is no separate tenant
+	// argument left to get wrong.
 	// Level 1 beat level 2, and level 2 filled the claim level 1 said nothing
 	// about — both, on one token.
 	if got := issuer.claims["x_cost_center"]; got != float64(9000) {
@@ -1432,16 +1437,16 @@ func TestIssueToken_MintsTheTenantClaimsBesideTheFixedSet(t *testing.T) {
 // that quietly does not appear, never `permissions` replaced by a value the
 // tenant chose.
 func TestBuildClaims_TheFixedSetIsNeverDisplacedByACustomClaim(t *testing.T) {
-	user := usableUser()
+	account := usableAccount()
 	hostile := map[string]any{
 		claimPermissions: []string{"*:*"},
 		claimTenantID:    "99999999-9999-9999-9999-999999999999",
 		"x_region":       "emea",
 	}
 
-	claims := buildClaims(user, nil, []string{"viewer"}, []vos.PermissionKey{{Resource: "user", Action: "read"}}, hostile)
+	claims := buildClaims(account, infra.SignInBundle{Roles: namedGrants("viewer"), Permissions: []vos.PermissionKey{{Resource: "user", Action: "read"}}}, hostile)
 
-	if got := claims[claimTenantID]; got != user.TenantID.Value() {
+	if got := claims[claimTenantID]; got != account.TenantID.Value() {
 		t.Errorf("tenant_id = %#v, want the loaded row's own tenant", got)
 	}
 	permissions, ok := claims[claimPermissions].([]string)
@@ -1458,13 +1463,13 @@ func TestBuildClaims_TheFixedSetIsNeverDisplacedByACustomClaim(t *testing.T) {
 // permissions against the token's. A body advertising claims the token does not
 // carry would have a client offering actions every request then refuses.
 func TestIssueToken_BodyClaimsMirrorTheToken(t *testing.T) {
-	user := usableUser()
-	holds(user, claimID(1), "true")
+	account := usableAccount()
 
 	store := &fakeAuthStore{
-		user:    user,
-		matches: true,
-		catalog: []*appdomain.Claim{
+		account:     account,
+		claimValues: map[domain.ID]string{domain.NewID(claimID(1)): "true"},
+		matches:     true,
+		definitions: []schemas.ClaimDefinition{
 			definition(claimID(1), "x_beta_enabled", vos.ClaimValueTypeBool, nil),
 			definition(claimID(2), "x_region", vos.ClaimValueTypeString, stringValue("emea")),
 		},
@@ -1490,14 +1495,14 @@ func TestIssueToken_BodyClaimsMirrorTheToken(t *testing.T) {
 // The case where body and token are MOST likely to disagree, because the
 // restriction applies to one of them for a reason the other does not share.
 func TestIssueToken_BodyAndTokenAgreeOnARestrictedSession(t *testing.T) {
-	user := usableUser()
-	user.MustChangePassword = true
-	holds(user, claimID(1), "emea")
+	account := usableAccount()
+	account.MustChangePassword = true
 
 	store := &fakeAuthStore{
-		user:    user,
-		matches: true,
-		catalog: []*appdomain.Claim{
+		account:     account,
+		claimValues: map[domain.ID]string{domain.NewID(claimID(1)): "emea"},
+		matches:     true,
+		definitions: []schemas.ClaimDefinition{
 			definition(claimID(1), "x_region", vos.ClaimValueTypeString, nil),
 		},
 	}
@@ -1519,12 +1524,12 @@ func TestIssueToken_BodyAndTokenAgreeOnARestrictedSession(t *testing.T) {
 // A corrected value has to propagate at the next rotation, which it only can if
 // the catalog is RE-READ rather than replayed from the token being redeemed.
 func TestRefreshToken_RebuildsTheTenantClaims(t *testing.T) {
-	user := usableUser()
-	holds(user, claimID(1), "9000")
+	account := usableAccount()
 
 	store := &fakeAuthStore{
-		byID:    user,
-		catalog: []*appdomain.Claim{definition(claimID(1), "x_cost_center", vos.ClaimValueTypeNumber, nil)},
+		byID:        account,
+		claimValues: map[domain.ID]string{domain.NewID(claimID(1)): "9000"},
+		definitions: []schemas.ClaimDefinition{definition(claimID(1), "x_cost_center", vos.ClaimValueTypeNumber, nil)},
 	}
 	lookup := &fakeLookup{subject: "11111111-1111-1111-1111-111111111111"}
 	issuer := &fakeIssuer{}
@@ -1548,7 +1553,7 @@ func TestRefreshToken_RebuildsTheTenantClaims(t *testing.T) {
 // A rotation that refuses must not have paid for the catalog either.
 func TestRefreshToken_CatalogFailureIsNotACredentialRefusal(t *testing.T) {
 	boom := errors.New("claims query exploded")
-	store := &fakeAuthStore{byID: usableUser(), catalogErr: boom}
+	store := &fakeAuthStore{byID: usableAccount(), catalogErr: boom}
 	lookup := &fakeLookup{subject: "11111111-1111-1111-1111-111111111111"}
 	h := &RefreshTokenHandler{Store: store, Lookup: lookup, Issuer: &fakeIssuer{}}
 

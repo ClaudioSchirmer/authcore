@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
-	"github.com/ClaudioSchirmer/authcore/internal/domain/aggregatevos"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
+	"github.com/ClaudioSchirmer/authcore/internal/infra"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/application/exception"
 	"github.com/ClaudioSchirmer/omnicore/application/pipeline"
@@ -99,40 +99,33 @@ const (
 // application keeps depending on an interface IT owns — the same reason
 // UserCredentialStore exists one file over.
 type AuthenticationStore interface {
-	// FindUserByEmail loads the account behind an address, active rows only.
+	// LoadAccountByEmail is the account lookup, and the FIRST of the two steps.
+	// One indexed statement, active rows only, and a live tenant.
 	//
 	// (nil, nil) means NO SUCH ACCOUNT; (nil, err) means the lookup could not be
 	// performed. Both are refused identically, but they are LOGGED differently —
 	// see the sign-in — so a reviewer can tell stuffing against addresses that do
 	// not exist from an attack that landed during an outage.
-	FindUserByEmail(ctx *configuration.AppContext, email string) (*appdomain.User, error)
-	// FindUserByID reloads the account on a refresh, so a permission revoked
+	//
+	// IT RETURNS A ROW AND NOT AN AGGREGATE, deliberately. A sign-in has no
+	// invariant to protect and no lifecycle to drive; loading the User aggregate
+	// cost four sequential statements to hydrate three collections this endpoint
+	// does not want. See the reader.
+	LoadAccountByEmail(ctx context.Context, email string) (*schemas.SignInAccount, error)
+	// LoadAccountByID reloads the account on a refresh, so a permission revoked
 	// between logins reaches the mesh at the next rotation rather than at the
 	// next full sign-in.
-	FindUserByID(ctx *configuration.AppContext, id domain.ID) (*appdomain.User, error)
-	// ResolveGrants returns the groups this user belongs to, the roles held by
-	// ANY path, and the permissions those roles confer. Three slices and no
-	// result struct: see the reader for why a named type here would have been one
-	// invented to work around a layer boundary rather than to model anything.
+	LoadAccountByID(ctx context.Context, id domain.ID) (*schemas.SignInAccount, error)
+	// ResolveSignIn reads everything a token says about this account, in one
+	// concurrent burst of statements. It is the SECOND step on purpose: it hides
+	// behind the account read, so a credential-stuffing attempt against an
+	// address nobody holds costs one statement rather than five.
 	//
-	// THE GROUPS COME FROM HERE AND NOT FROM THE AGGREGATE, and that is the whole
-	// reason this method returns them. The User aggregate carries its memberships
-	// with GroupKey filled by a child join, and a join is never gated on the
-	// archived state of its target — so a RETIRED group arrives with a perfectly
-	// good key and would land in the token's `groups` claim. The reader states the
-	// gate; the aggregate cannot.
-	ResolveGrants(ctx context.Context, userID domain.ID) (groupKeys, roleKeys []string, permissions []vos.PermissionKey, err error)
-	// ClaimDefinitionsOfTenant returns the ACTIVE claim definitions of this
-	// tenant that a user may hold a value for — level 2 of the two-level chain,
-	// and the vocabulary level 1 is resolved against.
-	//
-	// It returns the aggregate and NOT a result type of its own, for the reason
-	// ResolveGrants states one method up: a struct with a name, a type and a
-	// default would have no identity, no rule and no validation, and would
-	// exist only to give this port something to name. *appdomain.Claim already
-	// is that shape, and FindUserByEmail already hands the application an
-	// aggregate across this same seam.
-	ClaimDefinitionsOfTenant(ctx *configuration.AppContext, tenantID domain.ID) ([]*appdomain.Claim, error)
+	// THE GROUPS AND ROLES COME FROM HERE AND NOT FROM AN AGGREGATE. A child join
+	// reaches a group's or a role's row whatever its archived state, so a token
+	// built from a loaded aggregate would name things the operator retired. The
+	// reader states every gate; an aggregate load cannot.
+	ResolveSignIn(ctx context.Context, account *schemas.SignInAccount) (infra.SignInBundle, error)
 	// PasswordMatches verifies a plaintext against a stored hash.
 	PasswordMatches(plaintext, encoded string) bool
 	// BurnPasswordVerification spends one verification and discards it, so a
@@ -304,8 +297,8 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		return TokenResult{}, refuseLocked(until)
 	}
 
-	user, err := h.Store.FindUserByEmail(ctx, email)
-	if err != nil || user == nil {
+	account, err := h.Store.LoadAccountByEmail(ctx, email)
+	if err != nil || account == nil {
 		// THE ANSWER IS THE SAME, THE RECORD IS NOT — and holding those two apart
 		// is what lets this branch be both safe and useful.
 		//
@@ -342,14 +335,14 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 	// From here the identity provably exists, and every remaining branch says so.
 	existed := true
 
-	if !h.Store.PasswordMatches(cmd.Password, user.PasswordHash) {
+	if !h.Store.PasswordMatches(cmd.Password, account.PasswordHash) {
 		if rerr := journal.failed(ctx, email, ip, "sign-in failed: credential rejected", &existed); rerr != nil {
 			return TokenResult{}, rerr
 		}
 		return TokenResult{}, refuseCredentials()
 	}
 
-	if !accountIsUsable(user) {
+	if !accountIsUsable(account) {
 		// A suspended account or a withdrawn tenant is a FAILURE in the log, not a
 		// success: nobody got in. It counts toward the lockout like any other,
 		// which is correct — repeatedly presenting a valid credential for a
@@ -364,36 +357,24 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		return TokenResult{}, refuseCredentials()
 	}
 
-	groupKeys, roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
+	// STEP TWO. Everything a token says, in one concurrent burst.
+	//
+	// NOT a credential refusal, and NOT an attempt worth counting: the caller
+	// proved who they are and this service failed them. Recording a failure here
+	// would let a database problem lock out the very users it is already failing.
+	// It escapes as an exception → 500.
+	bundle, err := h.Store.ResolveSignIn(ctx, account)
 	if err != nil {
-		// NOT a credential refusal, and NOT an attempt worth counting: the caller
-		// proved who they are and this service failed them. Recording a failure
-		// here would let a database problem lock out the very users it is already
-		// failing. It escapes as an exception → 500.
 		return TokenResult{}, err
 	}
 
-	// LEVEL 2 of the claim chain. Level 1 came along with the aggregate — the
-	// repository's read join fills every entry — so this is the one extra read
-	// the custom claims cost, and it is an indexed one.
-	//
-	// It fails the way ResolveGrants above fails, and for the same two reasons:
-	// the caller proved who they are and this service failed them, so it is
-	// neither a credential refusal nor an attempt worth counting — counting it
-	// would let a database problem lock out the very users it is already
-	// failing. Minting a token silently missing claims a consumer branches on
-	// is the alternative, and a wrong answer is worse than no answer.
-	catalog, err := h.Store.ClaimDefinitionsOfTenant(ctx, user.TenantID)
-	if err != nil {
-		return TokenResult{}, err
-	}
 	// ONE resolution, two readers. The token below and the profile at the
 	// bottom of this function both receive this exact map.
-	customClaims := resolveCustomClaims(user, catalog)
+	customClaims := resolveCustomClaims(account, bundle)
 
 	access, refresh, err := h.Issuer.IssueWithRefresh(ctx, authcore.TokenRequest{
-		Subject: idOf(user).Value(),
-		Claims:  buildClaims(user, groupKeys, roleKeys, permissions, customClaims),
+		Subject: account.ID.Value(),
+		Claims:  buildClaims(account, bundle, customClaims),
 	})
 	if err != nil {
 		return TokenResult{}, err
@@ -412,7 +393,7 @@ func (h *IssueTokenHandler) Handle(ctx *configuration.AppContext, cmd *IssueToke
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, groupKeys, roleKeys, permissions, customClaims),
+		User:             buildProfile(account, bundle, customClaims),
 	}, nil
 }
 
@@ -470,8 +451,8 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		return TokenResult{}, refuseCredentials()
 	}
 
-	user, err := h.Store.FindUserByID(ctx, domain.NewID(subject))
-	if err != nil || user == nil || !accountIsUsable(user) {
+	account, err := h.Store.LoadAccountByID(ctx, domain.NewID(subject))
+	if err != nil || account == nil || !accountIsUsable(account) {
 		// The record exists but its subject no longer resolves to a usable
 		// account — archived, suspended, or its tenant withdrawn since the last
 		// rotation. The session is over, and it ends with the same refusal as
@@ -479,23 +460,18 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		return TokenResult{}, refuseCredentials()
 	}
 
-	groupKeys, roleKeys, permissions, err := h.Store.ResolveGrants(ctx, idOf(user))
-	if err != nil {
-		return TokenResult{}, err
-	}
-
 	// RE-READ ON EVERY ROTATION, never replayed from the token being redeemed —
-	// the same discipline the grants above already follow, and the reason the
-	// framework takes claims fresh at redemption time. A claim value corrected
-	// while a session is live therefore reaches the mesh at the next rotation
-	// rather than at the next full sign-in, with no invalidation step anywhere.
-	catalog, err := h.Store.ClaimDefinitionsOfTenant(ctx, user.TenantID)
+	// which is the reason the framework takes claims fresh at redemption time. A
+	// permission revoked or a claim value corrected while a session is live
+	// therefore reaches the mesh at the next rotation rather than at the next full
+	// sign-in, with no invalidation step anywhere.
+	bundle, err := h.Store.ResolveSignIn(ctx, account)
 	if err != nil {
 		return TokenResult{}, err
 	}
-	customClaims := resolveCustomClaims(user, catalog)
+	customClaims := resolveCustomClaims(account, bundle)
 
-	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(user, groupKeys, roleKeys, permissions, customClaims))
+	access, refresh, err := h.Issuer.RedeemRefreshToken(ctx, value, buildClaims(account, bundle, customClaims))
 	switch {
 	case err == nil:
 	case errors.Is(err, authcore.ErrRefreshTokenNotFound),
@@ -518,7 +494,7 @@ func (h *RefreshTokenHandler) Handle(ctx *configuration.AppContext, cmd *Refresh
 		ExpiresAt:        access.ExpiresAt.Unix(),
 		RefreshToken:     refresh.Value,
 		RefreshExpiresAt: refresh.ExpiresAt.Unix(),
-		User:             buildProfile(user, groupKeys, roleKeys, permissions, customClaims),
+		User:             buildProfile(account, bundle, customClaims),
 	}, nil
 }
 
@@ -596,15 +572,15 @@ func clientIPOf(ctx *configuration.AppContext) string {
 //
 // The archive stamp needs no check here: the loader's default scope already
 // refuses archived rows, so an archived account never reaches this function.
-func accountIsUsable(user *appdomain.User) bool {
-	if user.Status.Value() != vos.UserStatusActive.Value() {
+func accountIsUsable(account *schemas.SignInAccount) bool {
+	if account.Status != vos.UserStatusActive.Value() {
 		return false
 	}
 	// The joined column, filled on every load by the repository's InnerJoin into
 	// Tenant. An empty value means the join found nothing, which for an INNER join
 	// over a NOT NULL key cannot happen — but reading it as "unusable" is the
 	// fail-closed direction if it ever does.
-	if user.TenantStatus == "" || user.TenantStatus == vos.TenantStatusSuspended.Value() {
+	if account.TenantStatus == "" || account.TenantStatus == vos.TenantStatusSuspended.Value() {
 		return false
 	}
 	return true
@@ -634,19 +610,30 @@ func accountIsUsable(user *appdomain.User) bool {
 // consequence is a tenant claim that quietly does not appear, rather than
 // `permissions` or `tenant_id` being replaced by a value the tenant chose.
 // Those two are read by the framework across the whole mesh.
-func buildClaims(user *appdomain.User, groupKeys, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) map[string]any {
+func buildClaims(account *schemas.SignInAccount, bundle infra.SignInBundle, custom map[string]any) map[string]any {
 	claims := make(map[string]any, len(custom)+9)
 	maps.Copy(claims, custom)
 	claims[claimIdentityKind] = identityKindUser
-	claims[claimTenantID] = user.TenantID.Value()
-	claims[claimTenantWorkspace] = user.TenantWorkspace
-	claims[claimEmail] = user.Email.Value()
-	claims[claimName] = user.Name.FullName()
-	claims[claimPermissions] = effectivePermissions(user, permissions)
-	claims[claimGroups] = groupKeys
-	claims[claimRoles] = roleKeys
-	claims[claimMustChangePassword] = user.MustChangePassword
+	claims[claimTenantID] = account.TenantID.Value()
+	claims[claimTenantWorkspace] = account.TenantWorkspace
+	claims[claimEmail] = account.Email
+	claims[claimName] = strings.TrimSpace(account.GivenName + " " + account.FamilyName)
+	claims[claimPermissions] = effectivePermissions(account, bundle.Permissions)
+	claims[claimGroups] = keysOf(bundle.Groups)
+	claims[claimRoles] = keysOf(bundle.Roles)
+	claims[claimMustChangePassword] = account.MustChangePassword
 	return claims
+}
+
+// keysOf is the token's half of a named grant. The display name is deliberately
+// left in the response body: a claim set is read by every service in the mesh on
+// every request, and a name authorizes nothing.
+func keysOf(grants []infra.NamedGrant) []string {
+	out := make([]string, 0, len(grants))
+	for _, g := range grants {
+		out = append(out, g.Key)
+	}
+	return out
 }
 
 // effectivePermissions is the ONE decision about what this user may attempt, and
@@ -657,9 +644,9 @@ func buildClaims(user *appdomain.User, groupKeys, roleKeys []string, permissions
 // user:change-password would have the client offering actions every request then
 // refuses — and the first version of this file had exactly that bug, caught by
 // the test that compares the two.
-func effectivePermissions(user *appdomain.User, permissions []vos.PermissionKey) []string {
+func effectivePermissions(account *schemas.SignInAccount, permissions []vos.PermissionKey) []string {
 	rendered := renderPermissions(permissions)
-	if user.MustChangePassword {
+	if account.MustChangePassword {
 		return restrictToPasswordChange(rendered)
 	}
 	return rendered
@@ -712,59 +699,31 @@ func restrictToPasswordChange(permissions []string) []string {
 // request and both readers consume it, so the body cannot advertise a claim the
 // token omits — including the case that makes the two most likely to disagree,
 // where a must-change-password session carries none at all.
-func buildProfile(user *appdomain.User, groupKeys, roleKeys []string, permissions []vos.PermissionKey, custom map[string]any) AuthenticatedUserResult {
-	// The KEYS come from the resolution, the NAMES from the aggregate — the same
-	// split the roles below make, and for the same reason. The aggregate's
-	// memberships reach a retired group through an ungated join, so listing them
-	// would advertise a group the token does not carry; the resolution is what
-	// decides membership, and the aggregate is only asked to spell the names of
-	// the groups it already agreed on.
-	names := map[string]string{}
-	for _, entry := range domain.GetCurrentItemsOf[aggregatevos.UserGroup](user.GetAggregateRoot()) {
-		names[entry.GroupKey] = entry.GroupName
-	}
-	groups := make([]NamedGrantResult, 0, len(groupKeys))
-	for _, key := range groupKeys {
-		groups = append(groups, NamedGrantResult{Key: key, Name: names[key]})
-	}
-
-	// The direct grants carry a display name from the read join; the inherited
-	// ones do not exist as rows on this aggregate. Naming the ones we can is
-	// better than naming none, and a client that needs every name has the roles
-	// endpoint.
-	directNames := map[string]string{}
-	for _, entry := range domain.GetCurrentItemsOf[aggregatevos.UserRole](user.GetAggregateRoot()) {
-		directNames[entry.RoleKey] = entry.RoleName
-	}
-	roles := make([]NamedGrantResult, 0, len(roleKeys))
-	for _, key := range roleKeys {
-		roles = append(roles, NamedGrantResult{Key: key, Name: directNames[key]})
-	}
-
+func buildProfile(account *schemas.SignInAccount, bundle infra.SignInBundle, custom map[string]any) AuthenticatedUserResult {
 	return AuthenticatedUserResult{
-		ID:                 idOf(user).Value(),
-		Name:               user.Name.FullName(),
-		Email:              user.Email.Value(),
-		Status:             user.Status.Value(),
-		MustChangePassword: user.MustChangePassword,
-		TenantID:           user.TenantID.Value(),
-		TenantWorkspace:    user.TenantWorkspace,
-		Groups:             groups,
-		Roles:              roles,
-		Permissions:        effectivePermissions(user, permissions),
+		ID:                 account.ID.Value(),
+		Name:               strings.TrimSpace(account.GivenName + " " + account.FamilyName),
+		Email:              account.Email,
+		Status:             account.Status,
+		MustChangePassword: account.MustChangePassword,
+		TenantID:           account.TenantID.Value(),
+		TenantWorkspace:    account.TenantWorkspace,
+		Groups:             namedGrantsOf(bundle.Groups),
+		Roles:              namedGrantsOf(bundle.Roles),
+		Permissions:        effectivePermissions(account, bundle.Permissions),
 		Claims:             custom,
 	}
 }
 
-// idOf reads the loaded row's id.
+// namedGrantsOf is the body's half of a grant: key AND name.
 //
-// GetID answers a pointer that is nil for an entity that was never persisted. A
-// loaded row always has one, so the nil branch is unreachable here — but reading
-// it without checking would be a panic waiting for the first caller who passes an
-// unsaved entity, and the zero ID it returns instead is refused by every consumer.
-func idOf(user *appdomain.User) domain.ID {
-	if id := user.GetID(); id != nil {
-		return *id
+// EVERY ROLE CARRIES A NAME NOW, inherited ones included. The statement this
+// replaced could only name the DIRECT grants — an inherited role was never loaded
+// as a row — so the body used to show a blank name for half of them.
+func namedGrantsOf(grants []infra.NamedGrant) []NamedGrantResult {
+	out := make([]NamedGrantResult, 0, len(grants))
+	for _, g := range grants {
+		out = append(out, NamedGrantResult{Key: g.Key, Name: g.Name})
 	}
-	return domain.ID{}
+	return out
 }

@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ClaudioSchirmer/omnicore/application/configuration"
+	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/engine/postgres"
@@ -76,6 +76,28 @@ func grantReader(t *testing.T) (*AuthenticationReader, *postgres.Postgres) {
 	clearGrantFixture(t, eng)
 	seedGrantFixture(t, eng)
 	return NewAuthenticationReader(eng), eng
+}
+
+// resolveFor runs the endpoint's two read steps and flattens the bundle into the
+// three answers these tests assert on.
+func resolveFor(t *testing.T, reader *AuthenticationReader, email string) (groups, roles []string, permissions []vos.PermissionKey) {
+	t.Helper()
+	ctx := context.Background()
+	account, err := reader.LoadAccountByEmail(ctx, email)
+	if err != nil || account == nil {
+		t.Fatalf("loading %s: %v (nil=%v)", email, err, account == nil)
+	}
+	bundle, err := reader.ResolveSignIn(ctx, account)
+	if err != nil {
+		t.Fatalf("resolving the sign-in: %v", err)
+	}
+	for _, g := range bundle.Groups {
+		groups = append(groups, g.Key)
+	}
+	for _, r := range bundle.Roles {
+		roles = append(roles, r.Key)
+	}
+	return groups, roles, bundle.Permissions
 }
 
 func clearGrantFixture(t *testing.T, eng *postgres.Postgres) {
@@ -225,10 +247,7 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
-	if err != nil {
-		t.Fatalf("resolving grants: %v", err)
-	}
+	groupKeys, roleKeys, permissions := resolveFor(t, reader, "ada@grant-walk.test")
 
 	wantRoles := []string{"all-revoked", "direct", "grants-nothing", "inherited"}
 	if len(roleKeys) != len(wantRoles) {
@@ -272,10 +291,7 @@ func TestLive_TheGrantWalkAnswersEveryPathAndNoRevokedOne(t *testing.T) {
 func TestLive_TheGrantWalkDropsEachRetiredThingForItsOwnReason(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(context.Background(), domain.NewID(grantUser))
-	if err != nil {
-		t.Fatalf("resolving grants: %v", err)
-	}
+	groupKeys, roleKeys, permissions := resolveFor(t, reader, "ada@grant-walk.test")
 	groups := map[string]bool{}
 	for _, key := range groupKeys {
 		groups[key] = true
@@ -368,10 +384,7 @@ func TestLive_AUserWithNoGrantsAnswersEmpty(t *testing.T) {
 		t.Fatalf("clearing memberships: %v", err)
 	}
 
-	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(ctx, domain.NewID(grantUser))
-	if err != nil {
-		t.Fatalf("resolving grants: %v", err)
-	}
+	groupKeys, roleKeys, permissions := resolveFor(t, reader, "ada@grant-walk.test")
 	if len(groupKeys) != 0 || len(roleKeys) != 0 || len(permissions) != 0 {
 		t.Errorf("got groups=%v roles=%v permissions=%v, want all empty",
 			groupKeys, roleKeys, permissions)
@@ -384,11 +397,15 @@ func TestLive_AUserWithNoGrantsAnswersEmpty(t *testing.T) {
 func TestLive_AnUnknownSubjectAnswersEmpty(t *testing.T) {
 	reader, _ := grantReader(t)
 
-	groupKeys, roleKeys, permissions, err := reader.ResolveGrants(
-		context.Background(), domain.NewID("99999999-9999-4999-8999-999999999999"))
+	account, err := reader.LoadAccountByEmail(context.Background(), "nobody@grant-walk.test")
 	if err != nil {
-		t.Fatalf("an unknown subject must answer empty, not fail: %v", err)
+		t.Fatalf("an unknown address must answer absence, not fail: %v", err)
 	}
+	if account != nil {
+		t.Fatalf("an address nobody holds loaded an account: %+v", account)
+	}
+	var groupKeys, roleKeys []string
+	var permissions []vos.PermissionKey
 	if len(groupKeys) != 0 || len(roleKeys) != 0 || len(permissions) != 0 {
 		t.Errorf("got groups=%v roles=%v permissions=%v for an id nobody holds",
 			groupKeys, roleKeys, permissions)
@@ -409,10 +426,10 @@ func TestLive_AnUnknownSubjectAnswersEmpty(t *testing.T) {
 // other refusal on this path gives.
 func TestLive_AnArchivedTenantAuthenticatesNobody(t *testing.T) {
 	reader, eng := grantReader(t)
-	ctx := &configuration.AppContext{}
+	ctx := context.Background()
 
-	if user, err := reader.FindUserByEmail(ctx, "ada@grant-walk.test"); err != nil || user == nil {
-		t.Fatalf("the fixture user must load while the tenant is live (user=%v err=%v)", user, err)
+	if account, err := reader.LoadAccountByEmail(ctx, "ada@grant-walk.test"); err != nil || account == nil {
+		t.Fatalf("the fixture account must load while the tenant is live (err=%v nil=%v)", err, account == nil)
 	}
 
 	// Straight to the row, on purpose — see the doc comment.
@@ -421,16 +438,20 @@ func TestLive_AnArchivedTenantAuthenticatesNobody(t *testing.T) {
 		t.Fatalf("archiving the tenant: %v", err)
 	}
 
-	user, err := reader.FindUserByEmail(ctx, "ada@grant-walk.test")
+	account, err := reader.LoadAccountByEmail(ctx, "ada@grant-walk.test")
 	if err != nil {
 		t.Fatalf("an archived tenant must read as absence, not as an error: %v", err)
 	}
-	if user != nil {
-		t.Error("a user whose tenant is ARCHIVED still loaded for sign-in")
+	if account != nil {
+		t.Error("an account whose tenant is ARCHIVED still loaded for sign-in")
 	}
 
-	if _, err := reader.FindUserByID(ctx, domain.NewID(grantUser)); err == nil {
-		t.Error("the refresh path still reloaded a user whose tenant is ARCHIVED — a token " +
+	byID, err := reader.LoadAccountByID(ctx, domain.NewID(grantUser))
+	if err != nil {
+		t.Fatalf("the refresh path must read absence, not an error: %v", err)
+	}
+	if byID != nil {
+		t.Error("the refresh path still reloaded an account whose tenant is ARCHIVED — a token " +
 			"would keep rotating after the tenant was taken out of service")
 	}
 }
