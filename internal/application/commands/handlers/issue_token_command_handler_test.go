@@ -560,27 +560,51 @@ func TestIssueToken_MustChangePasswordRestrictsTheBundle(t *testing.T) {
 	}
 }
 
-// The dead end, asserted rather than discovered: a user who must change their
-// password and does not hold the permission gets an EMPTY set, not an invented
-// grant and not a wildcard.
-func TestIssueToken_MustChangePasswordWithoutThePermissionIsADeadEnd(t *testing.T) {
-	account := usableAccount()
-	account.MustChangePassword = true
+// The grant is EMBEDDED, not filtered: a must-change session carries
+// user:change-password whatever the bundle holds.
+//
+// Both bundles below would have yielded an empty claim under a filter — one
+// holds an unrelated permission, the other holds only the wildcard, and neither
+// spells the literal the route is gated with. An empty claim is a session that
+// cannot do the one thing it exists to do, which is the deadlock this embedding
+// removes. The reach stays bounded elsewhere: the route this opens is held to
+// the caller's own subject, so the grant can only rotate the password of the
+// account whose credential expired.
+func TestIssueToken_MustChangePasswordEmbedsTheGrantWhateverTheBundleHolds(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bundle []vos.PermissionKey
+	}{
+		{"a bundle that never confers it", []vos.PermissionKey{{Resource: "user", Action: "read"}}},
+		{"the wildcard, which spells no literal", []vos.PermissionKey{{Resource: "*", Action: "*"}}},
+		{"an empty bundle", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			account := usableAccount()
+			account.MustChangePassword = true
 
-	store := &fakeAuthStore{
-		account:     account,
-		matches:     true,
-		permissions: []vos.PermissionKey{{Resource: "user", Action: "read"}},
-	}
-	issuer := &fakeIssuer{}
-	h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: issuer}
+			store := &fakeAuthStore{
+				account:     account,
+				matches:     true,
+				permissions: tc.bundle,
+			}
+			issuer := &fakeIssuer{}
+			h := &IssueTokenHandler{Store: store, Attempts: &fakeAttempts{}, Issuer: issuer}
 
-	if _, err := h.Handle(authCtx(), &commands.IssueTokenCommand{Email: "ada@acme.test", Password: "x"}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	perms, _ := issuer.claims["permissions"].([]string)
-	if len(perms) != 0 {
-		t.Errorf("permissions = %v, want an empty set — inventing the permission would hand out a grant no role confers", perms)
+			result, err := h.Handle(authCtx(), &commands.IssueTokenCommand{Email: "ada@acme.test", Password: "x"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			perms, _ := issuer.claims["permissions"].([]string)
+			if len(perms) != 1 || perms[0] != utils.PermissionChangeOwnPassword {
+				t.Errorf("permissions = %v, want exactly [%s]", perms, utils.PermissionChangeOwnPassword)
+			}
+			// The body mirrors the token; the two must not disagree.
+			if len(result.User.Permissions) != 1 || result.User.Permissions[0] != utils.PermissionChangeOwnPassword {
+				t.Errorf("body permissions = %v, want the same single grant the token carries", result.User.Permissions)
+			}
+		})
 	}
 }
 

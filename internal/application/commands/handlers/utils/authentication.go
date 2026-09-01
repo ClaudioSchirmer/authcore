@@ -26,7 +26,8 @@ import (
 )
 
 // PermissionChangeOwnPassword is the one permission a must-change-password
-// session keeps.
+// session carries — embedded by restrictToPasswordChange rather than filtered
+// out of the bundle, so it is present whether or not a role confers it.
 //
 // It has to be the same string the change route is gated with — that route spells
 // it as a literal in internal/web/user_credential_routes_manual.go, which the
@@ -231,19 +232,22 @@ func RenderPermissions(keys []vos.PermissionKey) []string {
 	return out
 }
 
-// restrictToPasswordChange keeps at most the one permission an expired-credential
-// session is allowed to carry.
-func restrictToPasswordChange(permissions []string) []string {
-	for _, p := range permissions {
-		if p == PermissionChangeOwnPassword {
-			return []string{PermissionChangeOwnPassword}
-		}
-	}
-	// NOT a wildcard fallback, and not the permission granted anyway. A user whose
-	// bundle lacks it is stuck until somebody with user:reset-password acts, and
-	// that is the correct answer: the alternative is minting a grant that no role
-	// in this tenant confers.
-	return []string{}
+// restrictToPasswordChange replaces the bundle with the one permission an
+// expired-credential session is allowed to carry.
+//
+// The parameter is deliberately ignored: the grant is EMBEDDED rather than
+// filtered, so a must-change session carries user:change-password whether or not
+// any role in the tenant confers it. That is what keeps the flow from
+// deadlocking — a bundle that lacks the permission, or that holds only the `*:*`
+// wildcard, would otherwise yield an empty claim and a session that can do
+// nothing at all, including the one thing it exists to do.
+//
+// It grants no reach beyond that: the route this permission opens is
+// PATCH /users/:id/password, which the domain also holds to the caller's own
+// subject, so an embedded grant can only rotate the password of the very
+// account whose credential expired.
+func restrictToPasswordChange(_ []string) []string {
+	return []string{PermissionChangeOwnPassword}
 }
 
 // BuildProfile assembles the richer shape the response body carries.
