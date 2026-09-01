@@ -432,3 +432,54 @@ returns there. That entry therefore stays open on its own terms: the built catal
 collision by construction only along the chain it defines — one name is one definition, and a
 principal holds at most one value per definition — and a group carrier reintroduces exactly the
 multiplicity that construction avoids.
+
+---
+
+## Pool pressure: the sign-in read now takes four connections at once
+
+**Status:** open question — raised 2026-09-01, not approved, not specified. It arrived
+with the sign-in read redesign (`specs/implement/authentication-token-reads/`), which is
+merged; this is the part of it nobody measured.
+
+`ResolveSignIn` issues its four statements **concurrently** — the grants held directly,
+the grants inherited through groups, the caller's own claim values, and the tenant's claim
+catalog. None depends on another's answer, so the four cost one round trip of latency
+instead of four, and that is where most of the endpoint's 2.4x came from.
+
+The consequence is that **one sign-in holds four pool connections for the duration of that
+round trip**, where the shape it replaced held one at a time. The read is fast (~731µs
+against a tenant of 5k roles / 2k permissions / 10k users on the dev bench), so each
+connection is held briefly — but the peak is what matters, and the peak is four times what
+it was.
+
+What is NOT known, because it was never tested:
+
+- **The benchmark is sequential.** Every number in the requirements note comes from one
+  sign-in at a time. Nothing has driven N concurrent sign-ins against a bounded pool.
+- **The pool is not sized for it, and in fact is not sized at all.** Neither
+  `microservice.dev.yaml` nor `microservice.prd.yaml` declares a `relational.pool` block,
+  so the ceiling is pgx's own default (`max(4, NumCPU)` — four connections on a small
+  node). A single sign-in can therefore ask for the WHOLE pool on a 4-core box. That was
+  survivable while the read took one connection at a time; it is the first thing to check
+  now.
+- **The failure mode is untested.** When the pool is empty, the four goroutines block on
+  acquire. Whether that surfaces as a slow sign-in, a context deadline (`http.requestTimeoutSeconds`,
+  30s by default) or something worse has not been observed.
+
+What has to be answered before this becomes a spec:
+
+- **Is four the right fan-out?** Two of the four — the claim values and the catalog — feed
+  the custom-claim chain, which is empty for a tenant that defines no claims. Skipping them
+  when the tenant has no catalog would drop the peak to two for most tenants, at the cost of
+  a check that itself needs a read. Whether that trade is worth it depends on how many
+  tenants actually use the catalog, which nobody has measured either.
+- **Or is the pool simply the thing to size?** The honest alternative is that four is
+  correct and the pool was under-provisioned for it. That is a configuration answer, not a
+  code one — but it has to be a decision rather than a default.
+- **What does the endpoint do when the pool is exhausted?** A sign-in that blocks is worse
+  than a sign-in that fails fast, because the caller retries. If there is a right answer here
+  it belongs to the framework's acquire timeout, not to this file.
+
+The cheap first step is a load test — N concurrent sign-ins against the dev bench with the
+pool set to production's number — which would answer the first two questions with a
+measurement instead of an argument.
