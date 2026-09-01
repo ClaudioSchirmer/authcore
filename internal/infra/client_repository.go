@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e371f644bdf7e4cb68598a8ab76db3ca125e1f86d9b71ac3755f5092ce44ab68
+// generated:  2026-08-31
+// checksum:   sha256:eed1603d05ce72eaf258fe46eb21acf0e889635e9bdd52545b027abcc4b2321e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -70,23 +70,31 @@ func NewClientRepository(engine core.RelationalEngine) *ClientRepository {
 	// Read joins: read-only traversals across a foreign key into another
 	// aggregate. They fill ordinary fields of the entity on every load and are
 	// absent from the TableSchema, so no write can carry them.
+	//
+	// Each target is reduced with AsDirectSchema(): a traversal puts ONE table
+	// in the FROM, so it takes a schema that IS one table. The reduction is a
+	// copy — the target's own declaration is untouched — and it drops exactly
+	// what a join never enters: that aggregate's children, facets and shared
+	// base.
 	r.WithJoins(
 		// → Tenant, always in the FROM. No counterpart drops the aggregate
 		// from EVERY read, FindByID included — which is why the framework
 		// allows it only over a non-nullable key.
-		read.InnerJoin(schemas.TenantSchema()).
+		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status"),
 		// ClientRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.ClientRoleSchema()).To(schemas.RoleSchema()).
+		read.InnerJoinInChild(schemas.ClientRoleSchema()).
+			To(schemas.RoleSchema().AsDirectSchema()).
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name"),
 		// ClientClaim → Claim, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
-		read.InnerJoinInChild(schemas.ClientClaimSchema()).To(schemas.ClaimSchema()).
+		read.InnerJoinInChild(schemas.ClientClaimSchema()).
+			To(schemas.ClaimSchema().AsDirectSchema()).
 			On("claim_id").
 			Field("ClaimName", "name").
 			Field("ClaimValueType", "value_type"),

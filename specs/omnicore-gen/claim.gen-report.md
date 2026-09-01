@@ -75,7 +75,8 @@ The method returns a plain value and no error, so decide what an unavailable sou
 This file still answers for questions the spec has stopped declaring. The generator did not open it and will not: it is yours. **Delete these — a body nothing calls is dead code the next reader has to rule out**, and it goes with the change that stranded it rather than later.
 
 - `func (s *ClaimServiceImpl) tenants(...)`
-- `func (s *ClaimServiceImpl) claimIsHeldBy(...)`
+- `func (s *ClaimServiceImpl) userClaimEdges(...)`
+- `func (s *ClaimServiceImpl) clientClaimEdges(...)`
 
 ⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
@@ -187,9 +188,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
-| tests for Claim's rules | `internal/domain/claim_test.go` |
-| the Claim service implementation | `internal/infra/claim_service.go` |
+| the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
 
 **Left untouched** (yours, by design):
 
@@ -198,7 +197,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-25 file(s) were already up to date.
+27 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -214,9 +213,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.64.0)
+Verdict: **exact** (project pins v0.68.0)
 
-framework v0.64.0 meets the required v0.64.0
+framework v0.68.0 meets the required v0.68.0
 
 Verify what was generated:
 

@@ -5,24 +5,30 @@
 //
 // THE SECOND ONE IS WHY THIS FILE EXISTS. A user's effective permissions sit two
 // and three hops away — user → roles → permissions, and user → groups → roles →
-// permissions — and the framework's read primitives deliberately stop short of
-// that: a read join is 1:1, ONE hop and no collections, and a relational view
-// refuses a filter over a 1:N child with a typed 400. So the honest path is the
-// neutral read seam (core.Querier), which is the same surface the framework's own
-// composer runs on, and NOT a join bent past its documented boundary.
+// permissions — and no single read expresses that: the reach is many-to-one on
+// four hops and one-to-MANY on two, and a traversal only goes the first way.
+//
+// SO THE WALK IS FOUR DIRECT READS, each anchored on the edge table it is about
+// and reaching sideways for what it needs. Not a statement assembled here: the
+// tables are described as Direct schemas next door, the traversals are declared on
+// the repositories, and the criteria vocabulary states the filters. Nothing in
+// this file spells a column, a placeholder or a dialect, which is what makes an
+// engine swap a configuration change here as it is everywhere else in this
+// service.
 //
 // WHY NOT REUSE THE WALK THAT ALREADY EXISTS. user_service_manual.go resolves the
 // same graph through memoised roleRow/groupRow probes, and it is correct. It also
 // costs 1 + G + R aggregate loads — a user in three groups of four roles pays
 // around eighteen — because it exists to guard a WRITE, where one extra read is
 // noise. A token endpoint is the hottest security path in the platform and has a
-// different budget. This file is now the single owner of "the effective
-// permission set of a user"; nothing else re-derives it, so the two cannot drift.
+// different budget: four indexed reads, whatever the shape of the graph. This file
+// is the single owner of "the effective permission set of a user"; nothing else
+// re-derives it, so the two cannot drift.
 //
-// NOT ONE IDENTIFIER IS TYPED BY HAND. Every table and column below is read off
-// the TableSchema declarations, and the statement is assembled at CONSTRUCTION —
-// so a renamed column aborts the boot with the field named, instead of shipping a
-// SELECT that quietly matches nothing at three in the morning.
+// NOT ONE IDENTIFIER IS TYPED BY HAND, and every one of them is validated at
+// CONSTRUCTION — the schemas, the anchors, the foreign keys and the mapped
+// fields — so a renamed column aborts the boot naming the field, instead of
+// shipping a read that quietly matches nothing at three in the morning.
 
 package infra
 
@@ -38,6 +44,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+	"github.com/ClaudioSchirmer/omnicore/infra/db/command/read"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/criteria"
 )
@@ -45,33 +52,63 @@ import (
 // AuthenticationReader serves the sign-in path.
 //
 // It holds the User repository (for the aggregate load, which brings the tenant
-// join and both child collections along) and the neutral engine (for the one
-// statement no aggregate load can express).
+// join and both child collections along), the Claim repository (for the tenant's
+// definition catalog) and the four edge repositories the grant walk runs on.
+//
+// THE FOUR ARE BUILT ONCE, AT CONSTRUCTION, and each validates its schema there:
+// that it is Direct, that it declares a primary key, that it is anchored to its
+// row type, and that every declared join maps a foreign key to a field that
+// exists. So a column that stopped resolving aborts the BOOT, naming the field,
+// instead of shipping a read that quietly matches nothing at three in the morning.
 type AuthenticationReader struct {
 	users  *UserRepository
 	claims *ClaimRepository
-	engine core.RelationalEngine
 
-	// Assembled once, at construction. See the file header: a schema that no
-	// longer resolves is a boot failure, not a runtime surprise.
-	permissionsStmt string
+	directRoles     *read.DirectRepository[schemas.UserRoleEdge]
+	memberships     *read.DirectRepository[schemas.UserGroupEdge]
+	inheritedRoles  *read.DirectRepository[schemas.GroupRoleEdge]
+	rolePermissions *read.DirectRepository[schemas.RolePermissionEdge]
 }
 
-// NewAuthenticationReader builds the reader and, with it, the permission
-// statement.
+// NewAuthenticationReader builds the reader and the four traversals the grant
+// walk reads through.
 //
-// It PANICS when a declared field no longer resolves. That is the intended
-// severity: this runs inside feature construction, so the failure surfaces as a
-// boot abort naming the field — the same class of answer the framework gives for
-// a schema that disagrees with its entity.
+// EVERY JOIN BRINGS BACK THE TARGET'S ARCHIVE STAMP, and the walk filters on it.
+// That is not defensive duplication of the scope gate: a declared join is not
+// gated on the archived state of its target — the scope governs which rows come
+// back, never which rows a traversal reaches into — so the retired role behind a
+// live grant arrives with a perfectly good key unless something says otherwise.
+// The framework's own guidance is that the filter belongs in the criteria, and
+// ResolveGrants states it on every hop.
 func NewAuthenticationReader(engine core.RelationalEngine) *AuthenticationReader {
-	r := &AuthenticationReader{
+	return &AuthenticationReader{
 		users:  NewUserRepository(engine),
 		claims: NewClaimRepository(engine),
-		engine: engine,
+
+		directRoles: read.NewDirectRepository[schemas.UserRoleEdge](
+			engine, schemas.UserRoleEdgeSchema()).
+			WithJoins(read.InnerJoin(schemas.RoleSchema().AsDirectSchema()).On("role_id").
+				Field("RoleKey", "role_key").
+				Field("RoleArchivedAt", "deleted_at")),
+
+		memberships: read.NewDirectRepository[schemas.UserGroupEdge](
+			engine, schemas.UserGroupEdgeSchema()).
+			WithJoins(read.InnerJoin(schemas.GroupSchema().AsDirectSchema()).On("group_id").
+				Field("GroupArchivedAt", "deleted_at")),
+
+		inheritedRoles: read.NewDirectRepository[schemas.GroupRoleEdge](
+			engine, schemas.GroupRoleEdgeSchema()).
+			WithJoins(read.InnerJoin(schemas.RoleSchema().AsDirectSchema()).On("role_id").
+				Field("RoleKey", "role_key").
+				Field("RoleArchivedAt", "deleted_at")),
+
+		rolePermissions: read.NewDirectRepository[schemas.RolePermissionEdge](
+			engine, schemas.RolePermissionEdgeSchema()).
+			WithJoins(read.InnerJoin(schemas.PermissionSchema().AsDirectSchema()).On("permission_id").
+				Field("Resource", "resource_name").
+				Field("Action", "action_name").
+				Field("PermissionArchivedAt", "deleted_at")),
 	}
-	r.permissionsStmt = buildEffectivePermissionsStatement(engine.Dialect())
-	return r
 }
 
 // FindUserByEmail loads the account behind an address.
@@ -153,7 +190,7 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 }
 
 // ResolveGrants returns the roles this user holds by ANY path and the permissions
-// those roles confer, in one round trip.
+// those roles confer.
 //
 // TWO SLICES AND NO STRUCT. A named result type was written and deleted: it had no
 // identity, no rule and no validation, so it was neither an entity nor a value
@@ -161,16 +198,30 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 // is inventing a type to work around a layering question rather than answering it.
 // The slices say the same thing and belong to nobody.
 //
-// Every hop is archive-gated, and each gate is load-bearing rather than
-// defensive: a revoked grant confers nothing, a retired role confers nothing, and
-// a user removed from a group inherits nothing through it. Missing any one of
-// them would hand out permissions the operator believes they took away — the
-// worst failure this file could have.
+// THE WALK IS FOUR READS, AND THE SHAPE OF THE GRAPH IS WHY. A declared traversal
+// reaches from many rows to ONE — a grant to the role it names, a membership to the
+// group it names — which is every hop here except two, and those two are one-to-MANY:
+// a group holds many roles, a role holds many permissions. That direction is not a
+// join in any read the framework offers, so it is a second read keyed on what the
+// first one returned. Fewer reads would mean a hand-written statement again; more
+// would mean asking a question already answered.
 //
-// THE PERMISSION JOIN IS A LEFT JOIN, deliberately. An inner join would drop a
-// role that currently grants nothing, and such a role is still a role the user
-// HOLDS — a consumer branching on role membership has to see it. So the statement
-// is anchored on the roles and reaches out to the permissions, never the reverse.
+//	user_roles       ─join→ roles        : the roles held directly
+//	user_groups      ─join→ groups       : the live memberships
+//	group_roles      ─join→ roles        : the roles those groups confer
+//	role_permissions ─join→ permissions  : what all of them grant
+//
+// EVERY HOP IS ARCHIVE-GATED TWICE, and both halves are load-bearing. The EDGE is
+// gated by the repository's own scope — a revoked grant, a dropped membership — and
+// the JOINED ROW is gated by a predicate this function states, because a traversal
+// is not gated on its target: a retired role arrives with a perfectly good key
+// behind a live grant. Missing either half would hand out permissions the operator
+// believes they took away — the worst failure this file could have.
+//
+// A ROLE THAT GRANTS NOTHING IS STILL A ROLE THE USER HOLDS, and it survives here
+// by construction rather than by a LEFT JOIN: the keys come from the first and third
+// reads, which know nothing about permissions. A consumer branching on role
+// membership sees it.
 //
 // There is deliberately NO tenant predicate. Every path that attaches a role or a
 // group already refuses a foreign tenant in the aggregate's rules, and both a
@@ -178,50 +229,82 @@ func (r *AuthenticationReader) ClaimDefinitionsOfTenant(ctx *configuration.AppCo
 // exist for such a filter to catch. Adding one anyway would silently swallow the
 // data problem it was pretending to guard against instead of surfacing it.
 func (r *AuthenticationReader) ResolveGrants(ctx context.Context, userID domain.ID) ([]string, []vos.PermissionKey, error) {
-	d := r.engine.Dialect()
+	// Keyed by role id rather than by key: two paths can confer the SAME role —
+	// held directly and inherited from a group — and the id is what says they are
+	// one role rather than two spellings of one.
+	held := map[domain.ID]string{}
 
-	// The id is bound TWICE — once per branch — rather than reusing a single
-	// placeholder. Postgres would accept $1 in both positions; MySQL's `?` would
-	// not, and this statement is built to survive an engine swap that is a
-	// configuration change everywhere else in this service.
-	arg := d.EncodeArg(userID)
-	rows, err := r.engine.Querier().Query(ctx, r.permissionsStmt, arg, arg)
+	direct, err := r.directRoles.FindAll(ctx, criteria.Where(criteria.And(
+		criteria.Eq("ParentID", userID),
+		criteria.IsNull("RoleArchivedAt"),
+	)))
 	if err != nil {
-		return nil, nil, fmt.Errorf("authentication reader: resolve grants: %w", err)
+		return nil, nil, fmt.Errorf("authentication reader: direct roles: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+	for _, edge := range direct {
+		held[edge.RoleID] = edge.RoleKey
+	}
+
+	memberships, err := r.memberships.FindAll(ctx, criteria.Where(criteria.And(
+		criteria.Eq("ParentID", userID),
+		criteria.IsNull("GroupArchivedAt"),
+	)))
+	if err != nil {
+		return nil, nil, fmt.Errorf("authentication reader: group memberships: %w", err)
+	}
+
+	// The next read is SKIPPED rather than issued with an empty set. `IN ()` is not
+	// a predicate any dialect accepts, and a user in no group has nothing to inherit
+	// — so the common case of a direct-only account costs one read fewer.
+	if len(memberships) > 0 {
+		groupIDs := make([]domain.ID, 0, len(memberships))
+		for _, edge := range memberships {
+			groupIDs = append(groupIDs, edge.GroupID)
+		}
+		inherited, err := r.inheritedRoles.FindAll(ctx, criteria.Where(criteria.And(
+			criteria.In("ParentID", idArgs(groupIDs)...),
+			criteria.IsNull("RoleArchivedAt"),
+		)))
+		if err != nil {
+			return nil, nil, fmt.Errorf("authentication reader: inherited roles: %w", err)
+		}
+		for _, edge := range inherited {
+			held[edge.RoleID] = edge.RoleKey
+		}
+	}
 
 	var (
 		roleKeys    []string
 		permissions []vos.PermissionKey
-		seenRole    = map[string]struct{}{}
-		seenPerm    = map[string]struct{}{}
 	)
-	for rows.Next() {
-		var (
-			roleKey  string
-			resource *string // NULL for a role that grants nothing — see the LEFT JOIN above
-			action   *string
-		)
-		if err := rows.Scan(&roleKey, &resource, &action); err != nil {
-			return nil, nil, fmt.Errorf("authentication reader: scan grant: %w", err)
-		}
-		if _, dup := seenRole[roleKey]; !dup && roleKey != "" {
-			seenRole[roleKey] = struct{}{}
-			roleKeys = append(roleKeys, roleKey)
-		}
-		if resource == nil || action == nil {
-			continue
-		}
-		key := *resource + ":" + *action
-		if _, dup := seenPerm[key]; dup {
-			continue
-		}
-		seenPerm[key] = struct{}{}
-		permissions = append(permissions, vos.PermissionKey{Resource: *resource, Action: *action})
+	for _, key := range held {
+		roleKeys = append(roleKeys, key)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("authentication reader: iterate grants: %w", err)
+
+	if len(held) > 0 {
+		roleIDs := make([]domain.ID, 0, len(held))
+		for id := range held {
+			roleIDs = append(roleIDs, id)
+		}
+		grants, err := r.rolePermissions.FindAll(ctx, criteria.Where(criteria.And(
+			criteria.In("ParentID", idArgs(roleIDs)...),
+			criteria.IsNull("PermissionArchivedAt"),
+		)))
+		if err != nil {
+			return nil, nil, fmt.Errorf("authentication reader: role permissions: %w", err)
+		}
+		// One permission reached through two roles is one permission. The database
+		// de-duplicated the ROWS it returned; what collapses here is the same
+		// resource/action arriving from different grants.
+		seen := map[string]struct{}{}
+		for _, edge := range grants {
+			key := edge.Resource + ":" + edge.Action
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			seen[key] = struct{}{}
+			permissions = append(permissions, vos.PermissionKey{Resource: edge.Resource, Action: edge.Action})
+		}
 	}
 
 	// Stable order, so two tokens minted from the same grants are byte-identical
@@ -280,126 +363,3 @@ var equalisationHash = func() string {
 	}
 	return userHasher.Hash(hex.EncodeToString(buf))
 }()
-
-// buildEffectivePermissionsStatement assembles the one query, from the schemas.
-//
-// ANCHORED ON THE ROLES, reaching out to the permissions — not the reverse. The
-// two grant paths are two IN branches over the same anchor, so the database does
-// the de-duplication it is built for and the caller gets one cursor instead of
-// two result sets to merge in Go.
-func buildEffectivePermissionsStatement(d core.Dialect) string {
-	var (
-		permission     = schemas.PermissionSchema()
-		rolePermission = schemas.RolePermissionSchema()
-		role           = schemas.RoleSchema()
-		userRole       = schemas.UserRoleSchema()
-		groupRole      = schemas.GroupRoleSchema()
-		userGroup      = schemas.UserGroupSchema()
-		group          = schemas.GroupSchema()
-	)
-
-	// Bare aliases, never `AS <alias>`: `AS` before a TABLE alias is optional in
-	// standard SQL and outright rejected by Oracle — the same reason the
-	// framework's own join renderer writes them bare.
-	const (
-		aP  = "p"
-		aRP = "rp"
-		aR  = "r"
-		aUR = "ur"
-		aGR = "gr"
-		aUG = "ug"
-		aG  = "g"
-	)
-
-	q := d.QuoteIdent
-	// qualified renders `alias.column`. The alias is a literal from the closed set
-	// above, so it needs no quoting; the column comes from a schema and gets the
-	// dialect's own identifier treatment.
-	qualified := func(alias, column string) string { return alias + "." + q(column) }
-	// from renders `table alias`.
-	from := func(s *core.TableSchema, alias string) string { return q(s.Table()) + " " + alias }
-	// live renders the archive gate for one node. Every hop carries one.
-	live := func(s *core.TableSchema, alias string) string {
-		return qualified(alias, mustColumn(s, "DeletedAt")) + " IS NULL"
-	}
-
-	// The direct grants: the roles this user holds in their own right.
-	//
-	// Note which column is selected and which is filtered — they are different and
-	// easy to swap: the SELECT list is the ROLE the entry points at, the WHERE is
-	// the parent key that ties the entry to its user.
-	directRoles := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = %s AND %s",
-		qualified(aUR, mustColumn(userRole, "RoleID")),
-		from(userRole, aUR),
-		qualified(aUR, userRole.ParentIDColumn()),
-		d.Placeholder(1),
-		live(userRole, aUR),
-	)
-
-	// The inherited grants: roles conferred by a group this user belongs to. Three
-	// hops, three archive gates — the membership, the group itself, and the
-	// attachment of the role to the group.
-	groupRoles := fmt.Sprintf(
-		"SELECT %s FROM %s INNER JOIN %s ON %s = %s AND %s INNER JOIN %s ON %s = %s AND %s WHERE %s = %s AND %s",
-		qualified(aGR, mustColumn(groupRole, "RoleID")),
-		from(groupRole, aGR),
-		from(userGroup, aUG),
-		qualified(aUG, mustColumn(userGroup, "GroupID")),
-		qualified(aGR, groupRole.ParentIDColumn()),
-		live(userGroup, aUG),
-		from(group, aG),
-		qualified(aG, group.IDColumn()),
-		qualified(aUG, mustColumn(userGroup, "GroupID")),
-		live(group, aG),
-		qualified(aUG, userGroup.ParentIDColumn()),
-		d.Placeholder(2),
-		live(groupRole, aGR),
-	)
-
-	return fmt.Sprintf(
-		"SELECT DISTINCT %s, %s, %s FROM %s "+
-			"LEFT JOIN %s ON %s = %s AND %s "+
-			"LEFT JOIN %s ON %s = %s AND %s "+
-			"WHERE %s AND (%s IN (%s) OR %s IN (%s))",
-		qualified(aR, mustColumn(role, "Key")),
-		qualified(aP, mustColumn(permission, "Resource")),
-		qualified(aP, mustColumn(permission, "Action")),
-		from(role, aR),
-
-		from(rolePermission, aRP),
-		qualified(aRP, rolePermission.ParentIDColumn()),
-		qualified(aR, role.IDColumn()),
-		live(rolePermission, aRP),
-
-		from(permission, aP),
-		qualified(aP, permission.IDColumn()),
-		qualified(aRP, mustColumn(rolePermission, "PermissionID")),
-		live(permission, aP),
-
-		live(role, aR),
-		qualified(aR, role.IDColumn()), directRoles,
-		qualified(aR, role.IDColumn()), groupRoles,
-	)
-}
-
-// mustColumn resolves a logical field name to its physical column, or panics.
-//
-// Resolve rather than ColumnOf: it is the framework's single read-side resolution
-// surface, and it is the only one that answers for the managed slots — DeletedAt
-// among them — which have no Go field to look up.
-//
-// The panic is the point. This runs at construction, inside feature wiring, so a
-// field that stopped resolving aborts the BOOT with its name in the message. The
-// alternative is a statement that compiles, runs, and returns nothing.
-func mustColumn(s *core.TableSchema, goField string) string {
-	resolved, ok := s.Resolve(goField)
-	if !ok {
-		panic(fmt.Sprintf(
-			"authentication reader: %q does not resolve on the schema for table %q — "+
-				"the effective-permission query is composed from the TableSchema declarations, "+
-				"so a renamed or removed field has to be renamed here too",
-			goField, s.Table()))
-	}
-	return resolved.Column
-}

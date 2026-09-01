@@ -1,191 +1,198 @@
-# Migration plan — omnicore v0.64.0 → v0.65.0
+# Migration plan — omnicore v0.67.1 → v0.68.0
 
 Status: APPROVED
 
-Decision on the open item (§2): **`relational.clock: db`** in both profiles — authcore is
-the IdP, its `deleted_at` stamps carry revocation semantics and its audit trail is read
-and compared across replicas, so one fleet-wide clock is worth one round-trip per write
-transaction.
+Decision on the open item (§4): **(a) regenerate**. The five generated repositories are
+rewritten whole against the v0.68.0 emitter; the four declarations in
+`authentication_reader_manual.go` are edited by hand, as §2 states.
 
-Service: `authcore` · Build tags: `postgres` (engine from `relational.dialect`; neither
-profile declares a `transport:` block, so no transport tag)
+## Why a green build proves nothing here
 
-The bump is already applied — `go.mod`/`go.sum` are on v0.65.0 and
-`go build -tags postgres ./...` is **green**. The rollback snapshot of the pre-bump
-`go.mod`/`go.sum` is in `specs/upgrade/rollback/` (previous pin: `v0.64.0`).
+`go vet -tags postgres ./...` and `go build -tags postgres ./...` both pass on v0.68.0,
+and so does the offline unit suite. That is not evidence.
 
-One release sits in the range. It carries **one compile-visible break** (in a test file),
-**one boot-blocking yaml item** that no compile surfaces, and three additive features that
-are opportunities rather than obligations.
+The join constructors did NOT change shape between the two pins:
 
-## Operational fallout — the five classes, checked
+    v0.67.1  infra/db/command/read/join.go:122  func InnerJoin(target *core.TableSchema) *JoinBinding
+    v0.68.0  infra/db/command/read/join.go:122  func InnerJoin(target *core.TableSchema) *JoinBinding
 
-| Class | Present? | Evidence |
-|---|---|---|
-| (a) required DDL on the service's own tables | no | v0.65.0 adds no mandatory column; `StampedTimeField`/`StampedCounterField` are opt-in declarations |
-| (b) demanded view rebuild | no | no `mongo:` block in either profile — the posture is pure relational source, there is nothing to rebuild |
-| (c) framework embedded migration sequence grew | no | `infra/migration/**` is byte-identical between the two pins (30 `.sql` files, same set, same content) |
-| (d) yaml key moved / renamed / **arrived mandatory** | **yes** | §2 — `relational.clock` |
-| (e) shared gRPC proto contract changed | no | the project ships no `.proto` and no `.pb.go` |
+The new requirement is enforced at runtime, inside `WithJoins(...)`:
 
----
+    v0.68.0  infra/db/command/read/join.go:482
+        if !j.Target.IsDirect() {
+            failAt(path, "%s(%q): the target of a read join is ONE table, so it takes a DIRECT schema — ...")
+        }
+    v0.68.0  infra/db/command/read/join.go:417
+        panic(fmt.Sprintf("read.WithJoins[%s]: ", contextName) + msg)
 
-## §1 — `core.Dialect` gained `UTCNowExpr()`; the test double no longer satisfies it
+`validateJoins` is reached from `directCore.declareJoins` (`direct_core.go:118`), which
+both `DirectRepository.WithJoins` and `AggregateLoader.WithJoins` funnel through — so
+every declaration in this service is covered, root joins and child joins alike
+(`join.go:549-562`: the per-join loop calls the same `walk` for both).
 
-**The error, verbatim** (`go vet -tags postgres ./...`):
+`IsDirect()` is `s.direct` (`core/table_schema.go:288`), a flag set only by
+`NewDirectSchema` and `AsDirectSchema`. Every target this service joins to is built with
+`core.NewTableSchema[...]`:
 
-```
-# github.com/ClaudioSchirmer/authcore/internal/infra
-vet: internal/infra/authentication_reader_manual_test.go:73:22: cannot use testDialect{} (value of struct type testDialect) as core.Dialect value in variable declaration: testDialect does not implement core.Dialect (missing method UTCNowExpr)
-```
+    internal/infra/schemas/tenant_schema.go:44      core.NewTableSchema[*appdomain.Tenant]("tenants")
+    internal/infra/schemas/role_schema.go:44        core.NewTableSchema[*appdomain.Role]("roles")
+    internal/infra/schemas/group_schema.go:44       core.NewTableSchema[*appdomain.Group]("groups")
+    internal/infra/schemas/claim_schema.go:44       core.NewTableSchema[*appdomain.Claim]("claims")
+    internal/infra/schemas/permission_schema.go:45  core.NewTableSchema[*appdomain.Permission]("permissions")
 
-Production code is unaffected — `go build -tags postgres ./...` is green. The only
-implementer of `core.Dialect` in this repository is the `testDialect` stub that
-`buildEffectivePermissionsStatement` is exercised against.
+So all 16 declarations panic the moment their repository is constructed — which is
+bootstrap. The unit suite stayed green because the only test that constructs one
+(`internal/infra/authentication_reader_live_test.go:70`) sits behind
+`//go:build integration && postgres`.
 
-**How it worked at v0.64.0** — `infra/db/core/dialect.go`: the interface carried
-`NowExpr() string` and nothing else clock-shaped. `NowExpr` is the framework's
-control-plane bookkeeping stamp (outbox, failure ledgers), server-timezone by design.
+## How it worked at v0.67.1 / how it works at v0.68.0
 
-**How it works at v0.65.0** — the same file adds one method:
+Owning section: `docs/content/sections/read-joins.html`, read at both pins.
 
-```go
-// UTCNowExpr renders the engine's SQL expression for the current instant in
-// UTC, at the highest sub-second precision the engine offers. It is the
-// source of the write operation's authoritative stamp under
-// relational.clock: db (core.NowFrom), read ONCE per write transaction and
-// then bound as an ordinary argument.
-UTCNowExpr() string
-```
+**v0.67.1** — a traversal took any `*core.TableSchema`. The docs' own examples read
+`read.InnerJoin(schemas.CustomerSchema()).On("customer_id")` (line 17). A schema carrying
+children, siblings or a shared base entered whole and was read in part, silently. Worse,
+`validateJoins` resolved the mapped column through `GoNameForRead`, which merges the
+target's satellites — so `.Field("Doc", "documento")` naming a column of the target's
+SIBLING was accepted at boot and then emitted as `alias.documento` against the target's
+own table: a SQL error on every read through that loader, `FindByID` included.
 
-It is deliberately not `NowExpr`: `NowExpr` is MySQL's bare `NOW()` (zero fractional
-digits) and SQL Server's `CURRENT_TIMESTAMP` (server-local, ~3.33 ms rounding). Entity
-timestamps can afford neither, because the unarchive cascade discriminates on exactly
-that stamp. Postgres renders `NOW() AT TIME ZONE 'UTC'`
-(`infra/db/engine/postgres/dialect.go`). `NowExpr()` is unchanged and keeps its callers.
+**v0.68.0** — new subsection *"The target is one table — a Direct schema"* (lines 46-68):
 
-**Proposed edit** — `internal/infra/authentication_reader_manual_test.go`, one method
-added beside the existing `NowExpr`, following the file's own convention: the methods the
-statement builder actually calls return a value, everything else panics so an unexpected
-call is loud rather than silently plausible. `buildEffectivePermissionsStatement` builds a
-read, never a write, so it never reaches for the write instant — this is a panic seat:
+> A traversal puts the target in the FROM as one table under one alias. So it takes a
+> schema that is one table: a Direct schema. A schema carrying children, siblings or a
+> shared base is refused at the declaration [...] Any schema becomes a target, at the call
+> site, where the reduction is visible.
 
-```go
-func (testDialect) NowExpr() string    { return "NOW()" }
-func (testDialect) UTCNowExpr() string { panic("unexpected UTCNowExpr") }
-```
+The docs' examples move to `read.InnerJoin(schemas.CustomerSchema().AsDirectSchema())`.
+`AsDirectSchema()` (`core/table_schema.go:1473`) returns a COPY reduced to the schema's
+own table; the receiver is untouched. An aggregate root, a child, a role, a shared base
+and a Direct schema all convert — a sibling and an external schema panic instead. Nothing
+reachable before is out of reach now.
 
-Mechanical; no judgment needed.
+## 1. The five generated repositories — 12 declarations
 
----
+    internal/infra/user_repository.go:77    read.InnerJoin(schemas.TenantSchema())
+    internal/infra/user_repository.go:83    ...InChild(schemas.UserGroupSchema()).To(schemas.GroupSchema())
+    internal/infra/user_repository.go:89    ...InChild(schemas.UserRoleSchema()).To(schemas.RoleSchema())
+    internal/infra/user_repository.go:95    ...InChild(schemas.UserClaimSchema()).To(schemas.ClaimSchema())
+    internal/infra/client_repository.go:77  read.InnerJoin(schemas.TenantSchema())
+    internal/infra/client_repository.go:83  ...InChild(schemas.ClientRoleSchema()).To(schemas.RoleSchema())
+    internal/infra/client_repository.go:89  ...InChild(schemas.ClientClaimSchema()).To(schemas.ClaimSchema())
+    internal/infra/group_repository.go:75   read.InnerJoin(schemas.TenantSchema())
+    internal/infra/group_repository.go:81   ...InChild(schemas.GroupRoleSchema()).To(schemas.RoleSchema())
+    internal/infra/role_repository.go:75    read.InnerJoin(schemas.TenantSchema())
+    internal/infra/role_repository.go:81    ...InChild(schemas.RolePermissionSchema()).To(schemas.PermissionSchema())
+    internal/infra/claim_repository.go:74   read.InnerJoin(schemas.TenantSchema())
 
-## §2 — `relational.clock` arrived MANDATORY, with no default — ANSWERED: `db`
+Only the TARGET takes the reduction. The child named by `...InChild(...)` must stay the
+ordinary child schema: `validateJoins` matches it against `root.ChildSchemas()` by table
+name (`join.go:424-426`, `join.go:551-557`), and it is not a FROM entry.
 
-**No compile error. The build is green and the service will not boot.** Neither
-`microservice.dev.yaml` nor `microservice.prd.yaml` declares the key; both currently stop
-at `dialect` + `dsn`.
+All five files carry `// Code generated by omnicore-gen. DO NOT EDIT.` and `doctor`
+reports no adopted hand edits on any of them, so both paths below are open.
+See §4 — this is the plan's one open decision.
 
-**How it worked at v0.64.0** — the key did not exist. The write instant was
-`time.Now().UTC()` in the writing process, unconditionally. (`yaml-reference.html` at
-v0.64.0 has no `relational.clock`; its only "clock" is the JWT `leewaySeconds` skew.)
+## 2. `internal/infra/authentication_reader_manual.go` — 4 declarations
 
-**How it works at v0.65.0** — `yaml-reference.html`, `relational:` block:
+Hand-written; no generator will fix these whichever path §4 takes.
 
-> `clock: db` — **MANDATORY — db | app. NO default, like dialect and dsn**: which clock a
-> service's history is written against is an operator's declaration, and an absent value
-> aborts boot. It governs the instant stamped on the managed timestamp columns —
-> `created_at`, `updated_at` and the archive/unarchive `deleted_at` stamp.
+    :90   read.InnerJoin(schemas.RoleSchema()).On("role_id")        → .RoleSchema().AsDirectSchema()
+    :96   read.InnerJoin(schemas.GroupSchema()).On("group_id")      → .GroupSchema().AsDirectSchema()
+    :101  read.InnerJoin(schemas.RoleSchema()).On("role_id")        → .RoleSchema().AsDirectSchema()
+    :107  read.InnerJoin(schemas.PermissionSchema()).On("permission_id") → .PermissionSchema().AsDirectSchema()
 
-The trade, stated the way the framework states it — including **why the instant is read
-before the write**, without which `db` reads as a gratuitous round-trip:
+Proposed edit: insert `.AsDirectSchema()` on each of the four targets. Nothing else in the
+file changes — the `.On(...)`, `.Field(...)` and archive predicates are untouched, and the
+anchors (`UserRoleEdgeSchema`, `GroupRoleEdgeSchema`, `UserGroupEdgeSchema`,
+`RolePermissionEdgeSchema`) are already Direct schemas built by
+`internal/infra/schemas/grant_edge_direct_schemas.go`.
 
-- The instant is minted **once per operation and bound as an ordinary argument** — never a
-  `NOW()` inside the DML — under **both** settings. One write is several statements (root,
-  children, siblings, base cascade) that must all carry the same instant, and the value has
-  to be known in Go **before `COMMIT`**: the outbox payload, the audit event, the lifecycle
-  hooks and the response are all built from it. The unarchive cascade tells *this* archive's
-  children from the ones already archived on their own by comparing exactly that stamp.
-- **`db`** — one reading from Postgres per write transaction (`NOW() AT TIME ZONE 'UTC'`,
-  microsecond precision, independent of the session time zone). Every replica shares one
-  clock — the one the rows already live on. Cost: one extra round-trip per write TX.
-- **`app`** — `time.Now().UTC()`, the v0.64.0 behavior. No round-trip; correct exactly as
-  far as the fleet's clock discipline is. The app clock is a **per-POD** clock: two
-  replicas drifting apart stamp rows out of order and nothing in the write path can notice.
-- Neither setting makes `updated_at` an ordering token — that is `Revision`, the
-  commit-order counter incremented under the row lock. `db` makes `updated_at` a
-  trustworthy *display* timestamp, not a different kind of thing.
+Worth noting in passing: the fields these four joins map are all columns of the target's
+OWN table (`role_key`, `name`, `resource_name`, `action_name`, `deleted_at`), so this
+service was never hitting the silent-satellite bug the release fixes. The change here is
+conformance, not a latent defect being closed.
 
-**Why this is an OPEN slot and not a mechanical edit:** the framework refused to pick a
-default on purpose. A rename has one right answer; an arrival has a choice, and choosing
-silently would be picking whose timestamps this service trusts.
+## 3. `criteria.Sub` — nothing to do
 
-**Bearing on `authcore` specifically** — the maintainer decides, but the facts:
-`authcore` is the IdP. Its `deleted_at` stamps carry revocation semantics (a revoked
-grant is an archived row), and its audit trail is the record of who was allowed what and
-when. Both are read across replicas and compared against each other. One extra round-trip
-per write TX is paid on writes only; reads are untouched.
+The v0.68.0 subquery API (`Sub`, `Outer`, `InSub`/`NinSub`/`EqSub`/…/`Exists`/`NotExists`)
+is new surface. `grep -rn 'criteria\.Sub' --include='*.go'` returns nothing in this
+service, so the matching Direct-schema requirement on a subquery source
+(`core/criteria_sql.go:473`) has no call site to migrate.
 
-**ANSWERED: `db`.**
+It is worth a separate look later, not in this plan: `AuthenticationReader`'s grant walk
+reads four edge tables in sequence, which is the exact shape
+`Exists(Sub(...).Where(Eq(..., Outer("ID"))))` now expresses in one statement. That is a
+design change with its own trade-offs (one snapshot vs. four, and the per-hop archive
+predicates the reader states by hand), not an upgrade fix.
 
-**Proposed edit once answered** — the SAME value in **both** profiles, `prd` included
-(a per-profile split would mean prd and dev write different histories):
+## 4. ⚠️ OPEN: how to fix the 12 generated declarations
 
-- `microservice.dev.yaml`, inside `relational:`, after `dsn:` — `clock: db`
-- `microservice.prd.yaml`, inside `relational:`, after `dsn:` — `clock: db`
+Both paths end at the same compiling, booting service. They differ in blast radius and in
+what else they carry.
 
-Each with a short comment stating the trade, matching the surrounding files' commenting
-density.
+**(a) Regenerate.** `omnicore-gen check` reports `✓ this spec can be generated` for all
+seven specs at `Framework: v0.68.0 (supported v0.68.0.x) — exact`. The lock records the
+specs at v0.63.0/v0.64.0, so regeneration rewrites the five files whole against the 0.68
+emitter — the join fix arrives with every other emitter change accumulated across five
+releases, which is the point of not having adopted files. The cost is that the diff to
+review is five whole files, not twelve lines, and any of it that is not the join fix is
+unreviewed change landing in the same commit.
 
----
+**(b) Hand-edit the twelve lines.** Insert `.AsDirectSchema()` on each target, exactly as
+§2 does for the manual reader. Deterministic, twelve-line diff, nothing else moves. The
+files keep their `DO NOT EDIT` banner and drift from the emitter — a later `generate`
+would overwrite the edit, which is fine here because the emitter would then write the same
+thing. The cost is that the five releases' worth of other emitter improvements stay
+unclaimed until the next regeneration.
 
-## §3 — Additive, no action required (opportunities)
+Recommendation: **(a)**, and review the resulting diff before anything else — the whole
+reason `doctor` reports no adopted files is that regeneration is supposed to be cheap
+here. If the diff turns out to carry more than expected, (b) stays available.
 
-None of these break anything; they are listed because they land directly on surfaces
-`authcore` already uses, and ignoring them is a choice worth making knowingly.
+**ANSWERED: (a) regenerate.**
 
-- **`DirectWriter.Upsert`** — insert-or-update keyed on a declared conflict key
-  (`write.OnConflict(goFields...)`, named per call by Go field name) instead of on the
-  identity, in one statement, so two callers racing on the same key cannot both decide the
-  row is missing. `authcore` merged its `DirectSchema` work in `5aeaf8d`/`ba80f43`; any
-  place that currently does read-then-insert against a natural key is a candidate.
-  Note two constraints: a schema declaring `DeletedAt` **must** also declare
-  `write.UnarchiveOnConflict()` or `write.KeepArchiveStateOnConflict()` (an
-  `INSERT … ON CONFLICT` has no `WHERE` for its conflict target, so an archived row still
-  holds the unique key and still absorbs the write); and MySQL's `ON DUPLICATE KEY UPDATE`
-  fires on any violated unique key, not the named one — irrelevant here, the service is
-  Postgres-only.
-- **`StampedTimeField`** — a timestamp column whose *when* is the domain's
-  (`o.Stamp("Field")` from a rule, `Values{"Field": write.Stamp}` from a Direct write) and
-  whose *value* is the framework's. `*time.Time`, never written from the struct; an
-  unrequested stamp leaves the statement entirely. This is the seat
-  `CreatedAt`/`UpdatedAt` do not cover — they date the ROW, this dates a FACT. Candidates
-  in an IdP: last-authenticated, password-changed, consent-granted, token-revoked.
-- **`StampedCounterField`** — a per-row `int64` counter the framework increments
-  (`col = col + 1`, computed under the row lock, so racing increments cannot collapse).
-  Per row, never per table — not a sequence. Deliberately absent from the outbox payload
-  and from the write-back onto the entity. Candidate: failed-authentication attempt counts.
-- **`Dialect.UTCNowExpr()`** — §1's method; also usable directly by hand-written infra
-  that needs the engine's UTC instant at full precision.
+## 5. Not auto-fixable — for your attention
 
-Adopting any of these is a separate task (`/omnicore:evolve-entity` for a schema change
-that needs a migration), not part of this upgrade.
+- **Nothing operational.** No new mandatory yaml key in v0.68.0 (`relational.clock` was
+  the v0.65.0 arrival and is already set in both profiles). The framework's embedded
+  migration set is byte-identical between the two pins. No DDL on this service's tables,
+  no view rebuild demanded, no gRPC proto change.
+- **The real verification is the boot, not the build.** Once the plan is applied, the
+  proof is `/omnicore:run` — or the integration suite with
+  `go test -tags 'integration postgres' ./internal/infra/...` against the dev bench, which
+  is the only offline path that actually constructs `AuthenticationReader`.
+- **Upstream doc bug, for the framework repo — not this service.** The v0.68.0
+  `read-joins.html` section *"Joining from an aggregate child"* (line 329) still shows
+  `read.LeftJoinInChild(schemas.EnderecoSchema()).To(schemas.CidadeSchema())` with no
+  `.AsDirectSchema()` on the target. The code refuses that form: the child-join loop calls
+  the same `walk`, so `j.Target.IsDirect()` applies there too. Every other example in the
+  file was updated. The example is stale, not a second contract.
 
----
+## Applied — 2026-08-31
 
-## Behavioral items needing attention — not auto-fixable
+**§1 (regenerate)** — `omnicore-gen generate` on all seven specs. Seven files updated,
+nothing created, `kept as-is` untouched. The diff is exactly the twelve join sites plus a
+comment explaining the reduction, the regenerated checksum/date header, and one reworded
+comment line in `permission_service.go` and `tenant_service.go` ("counting them in Go" →
+"folding the answer in Go"). No behavioral change outside the joins. The emitter writes
+`To(schemas.RoleSchema().AsDirectSchema())` for child joins, which confirms §5's reading
+that the docs' `Joining from an aggregate child` example is stale rather than a second
+contract.
 
-- **`created_at` / `updated_at` / `deleted_at` change their source** the moment §2 is
-  answered `db`: rows written after the bump carry the backend's instant, rows written
-  before carry the writing pod's. Nothing migrates the old rows and nothing should — but a
-  comparison that straddles the bump compares two clocks. Under `app` the source is
-  unchanged and this item is void.
-- **A green build is not a green boot.** §2 is invisible to `go build` and `go vet`; the
-  only proof is a boot. After the edits are applied, run the service (`/omnicore:run`) and
-  confirm both profiles start.
+**§2 (by hand)** — the four targets in `authentication_reader_manual.go` (:90, :96, :101,
+:107) now carry `.AsDirectSchema()`. Nothing else in the file changed.
 
----
+`grep -rnE 'read\.(InnerJoin|LeftJoin)\([^)]*Schema\(\)\)|\.To\(schemas\.[A-Za-z]+Schema\(\)\)'`
+returns nothing: no unreduced target is left.
 
-## Approval
+**Verify:** `gofmt -l internal/` clean · `go vet -tags postgres ./...` clean ·
+`go build -tags postgres ./...` clean · `go test -tags postgres ./...` all packages ok ·
+`go vet -tags 'integration postgres' ./internal/infra/...` clean (the integration suite
+compiles).
 
-§2 was answered `db` by the maintainer; §1 and §2 were then applied exactly as written
-above, and nothing else was touched.
+**Still unproven, by construction.** None of the above constructs a repository, so none of
+it exercises `validateJoins`. No Postgres bench is reachable from this run
+(`DATABASE_URL` unset, no container up), so the boot was not performed. The proof is
+`/omnicore:run`, or `go test -tags 'integration postgres' ./internal/infra/...` against a
+live bench.

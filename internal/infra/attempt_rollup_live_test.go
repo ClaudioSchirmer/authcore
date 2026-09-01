@@ -10,9 +10,11 @@ package infra
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ClaudioSchirmer/omnicore/infra/db/core"
 	"github.com/ClaudioSchirmer/omnicore/infra/db/engine/postgres"
 )
 
@@ -36,6 +38,14 @@ func liveStore(t *testing.T) (*AuthenticationAttemptStore, *postgres.Postgres) {
 	if err != nil {
 		t.Skipf("no dev bench reachable: %v", err)
 	}
+	// THE PRODUCTION CLOCK, because the rollup now depends on it. Both instants on
+	// this row — the window anchor and the last attempt — are stamped columns, so
+	// their value is read from the database once per write transaction rather than
+	// from whichever pod served the request. Testing under the process clock would
+	// prove the arithmetic and leave the configuration every profile declares
+	// (`relational.clock: db`) unexercised, which is the half a drifting replica
+	// would break.
+	eng.SetClock(core.ClockDB)
 	t.Cleanup(func() {
 		_, _ = eng.Pool().Exec(context.Background(),
 			`DELETE FROM authentication_attempts WHERE identity = $1`, liveIdentity)
@@ -314,5 +324,67 @@ func TestLive_TheBurstAfterASuccessGetsAFullWindow(t *testing.T) {
 	if row.windowStart.Before(before.Add(-time.Second)) {
 		t.Errorf("the anchor is %v, older than the burst that opened it (%v) — the lock would expire early",
 			*row.windowStart, before)
+	}
+}
+
+// EVERY WRITE AND THE PROBE SURFACE A DATABASE FAILURE, none of them swallows it.
+//
+// A lockout that stops counting in silence is worse than one that was never
+// built: nobody would know. And a probe that answered "not locked" because it
+// could not read would hand an attacker unlimited guesses against every account
+// in the service, for as long as the trouble lasted.
+//
+// The store is pointed at a schema that holds no tables, so every statement it
+// issues fails at the database for a reason it cannot anticipate — which is the
+// only honest way to reach these branches now that the statements are the
+// framework's.
+func TestLive_EveryWriteSurfacesADatabaseFailure(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://omnicore:omnicore@localhost:5432/authcore_db?sslmode=disable"
+	}
+	sep := "&"
+	if !strings.Contains(dsn, "?") {
+		sep = "?"
+	}
+	eng, err := postgres.NewPostgres(context.Background(), dsn+sep+"search_path=authcore_no_such_schema")
+	if err != nil {
+		t.Skipf("no dev bench reachable: %v", err)
+	}
+	t.Cleanup(eng.Close)
+
+	store := NewAuthenticationAttemptStore(eng)
+	ctx := context.Background()
+	yes := true
+
+	for _, tc := range []struct {
+		name string
+		call func() error
+	}{
+		{"failure", func() error {
+			return store.RecordFailure(ctx, liveIdentity, IdentityKindUser, "203.0.113.7", &yes)
+		}},
+		{"failure with an unknown verdict", func() error {
+			return store.RecordFailure(ctx, liveIdentity, IdentityKindUser, "203.0.113.7", nil)
+		}},
+		{"success", func() error {
+			return store.RecordSuccess(ctx, liveIdentity, IdentityKindUser, "203.0.113.7")
+		}},
+		{"blocked", func() error {
+			return store.RecordLocked(ctx, liveIdentity, IdentityKindUser, "203.0.113.7")
+		}},
+		{"probe", func() error {
+			_, locked, _, err := store.LockedUntil(ctx, liveIdentity, IdentityKindUser)
+			if locked {
+				t.Error("a probe that could not read reported a LOCK; the answer has to be an error")
+			}
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.call(); err == nil {
+				t.Error("the failure was swallowed")
+			}
+		})
 	}
 }

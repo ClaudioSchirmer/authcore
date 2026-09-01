@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:080841cb6933607942f288fbbb0a2bf7806023d181cca9e13a55188336d61029
+// generated:  2026-08-31
+// checksum:   sha256:16a9a0cf95ebf6980ba4e1173a145b916d05f35d714a3e8ed932268ff9bfdef6
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -77,8 +77,8 @@ func (s *PermissionServiceImpl) queryContext() context.Context {
 // this resource and action pair. Excludes the row being updated.
 //
 // It asks the database the question directly instead of loading aggregates and
-// counting them in Go — the probe exists precisely so a yes/no question does
-// not pay for full hydration.
+// folding the answer in Go — the probe exists precisely so a yes/no question
+// does not pay for full hydration.
 //
 // On a query failure it PANICS, and that is the intended behaviour: the
 // pipeline turns the panic into a 500 and the write never happens. Returning a
