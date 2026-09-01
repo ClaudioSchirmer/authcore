@@ -118,6 +118,7 @@ func (esp) Translations() map[string]string {
 		"PasswordResetRequiresAnotherUserNotification":      "Use el endpoint de cambio de contraseña para establecer la suya.",
 		"InvalidCurrentPasswordNotification":                "La contraseña actual es incorrecta.",
 		"InvalidCredentialsNotification":                    "Correo electrónico o contraseña no válidos.",
+		"InvalidClientCredentialsNotification":              "Identificador o secreto de cliente no válidos.",
 		"AccountTemporarilyLockedNotification":              "Demasiados intentos fallidos. Inténtelo de nuevo en {minutes} minutos.",
 		"Authentication":                                    "Autenticación",
 		"InvalidEmailNotification":                          "Correo electrónico inválido. Indíquelo en minúsculas.",

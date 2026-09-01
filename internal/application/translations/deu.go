@@ -118,6 +118,7 @@ func (deu) Translations() map[string]string {
 		"PasswordResetRequiresAnotherUserNotification":      "Verwenden Sie den Endpunkt zur Passwortänderung, um Ihr eigenes Passwort zu setzen.",
 		"InvalidCurrentPasswordNotification":                "Das aktuelle Passwort ist falsch.",
 		"InvalidCredentialsNotification":                    "E-Mail-Adresse oder Passwort ungültig.",
+		"InvalidClientCredentialsNotification":              "Client-ID oder Secret ungültig.",
 		"AccountTemporarilyLockedNotification":              "Zu viele fehlgeschlagene Versuche. Versuchen Sie es in {minutes} Minuten erneut.",
 		"Authentication":                                    "Authentifizierung",
 		"InvalidEmailNotification":                          "Ungültige E-Mail-Adresse. Bitte in Kleinbuchstaben eingeben.",

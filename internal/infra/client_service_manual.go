@@ -24,7 +24,7 @@
 //     as the write it is guarding — and what keeps two services built over two
 //     engines (a test and a boot) from stealing each other's.
 //
-//  2. THE ROLE WALK IS SHARED WITH User, through roleRow in role_probe.go. It
+//  2. THE ROLE WALK IS SHARED WITH User, through utils.RoleRow in role_probe.go. It
 //     is the same question — "one role, resolved, and what does it confer" —
 //     and two copies would be one security rule able to disagree with itself
 //     about the case that matters most.
@@ -43,6 +43,7 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
 
@@ -103,9 +104,9 @@ const (
 // ONE read, memoised for the request. Same row type GroupServiceImpl and
 // UserServiceImpl use, on this service's context — and the same batch
 // arithmetic, which lives in row_resolution.go.
-func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
-	return resolveRows(s.ctx, clientRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]roleRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.RoleRow {
+	return utils.ResolveRows(s.ctx, clientRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]utils.RoleRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			// A failed probe PANICS rather than inventing an answer: every
@@ -114,7 +115,7 @@ func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow 
 			panic("Client: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write grants")
 		}
 
-		rows := make(map[string]roleRow, len(found))
+		rows := make(map[string]utils.RoleRow, len(found))
 		for _, role := range found {
 			// The grants arrive with resource and action already filled — Role
 			// declares the traversal into the catalog. Nothing here queries it.
@@ -123,7 +124,7 @@ func (s *ClientServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow 
 			for _, grant := range grants {
 				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
-			rows[canonicalIDOf(role.GetID())] = roleRow{found: true, tenantID: role.TenantID, keys: keys}
+			rows[utils.CanonicalIDOf(role.GetID())] = utils.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
 		}
 		return rows
 	})
@@ -200,7 +201,7 @@ func (s *ClientServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleID
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = !row.found || row.tenantID != tenantID
+		out[id] = !row.Found || row.TenantID != tenantID
 	}
 	return out
 }
@@ -216,7 +217,7 @@ func (s *ClientServiceImpl) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = row.grantsWildcard()
+		out[id] = row.GrantsWildcard()
 	}
 	return out
 }
@@ -246,7 +247,7 @@ func (s *ClientServiceImpl) CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = callerLacksAnyPermissionOfRole(identity, row)
+		out[id] = utils.CallerLacksAnyPermissionOfRole(identity, row)
 	}
 	return out
 }
@@ -265,8 +266,8 @@ var _ appdomain.ClientService = (*ClientServiceImpl)(nil)
 // request — so the three facts below share it and the write pays for one query
 // however many claims it carries.
 func (s *ClientServiceImpl) claimRows(claimIDs []domain.ID) map[domain.ID]claimRow {
-	return resolveRows(s.ctx, clientClaimMemoPrefix, claimIDs, func(missing []domain.ID) map[string]claimRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+	return utils.ResolveRows(s.ctx, clientClaimMemoPrefix, claimIDs, func(missing []domain.ID) map[string]claimRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().claims.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			panic("Client: claim probe failed for the " + strconv.Itoa(len(missing)) + " claim(s) this write holds")
@@ -278,7 +279,7 @@ func (s *ClientServiceImpl) claimRows(claimIDs []domain.ID) map[domain.ID]claimR
 		// answer the rules want for it.
 		rows := make(map[string]claimRow, len(found))
 		for _, claim := range found {
-			rows[canonicalIDOf(claim.GetID())] = claimRow{
+			rows[utils.CanonicalIDOf(claim.GetID())] = claimRow{
 				found:     true,
 				tenantID:  claim.TenantID,
 				appliesTo: claim.AppliesTo,

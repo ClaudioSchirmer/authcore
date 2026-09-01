@@ -27,7 +27,7 @@
 //
 //  2. ONE ROLE READ PER ENTRY, NOT THREE. RoleIsUnavailableInTenant,
 //     RoleGrantsWildcard and CallerLacksAnyPermissionOf all ask about the same
-//     role. They funnel through roleRow, memoised on the REQUEST-scoped
+//     role. They funnel through utils.RoleRow, memoised on the REQUEST-scoped
 //     AppContext, so three questions about one id cost one query. A group at the
 //     50-role cap therefore pays 50 round trips inside the write transaction
 //     rather than 150.
@@ -43,6 +43,7 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
 
@@ -90,7 +91,7 @@ func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 	return c
 }
 
-// The `roleRow` type and its grantsWildcard() USED TO LIVE HERE. They moved to
+// The `utils.RoleRow` type and its grantsWildcard() USED TO LIVE HERE. They moved to
 // role_probe.go on 2026-08-26, when User needed the same answer: the type is
 // about a ROLE, not about a group, and a second entity depending on a type
 // declared in this file would have made removing Group break User for a reason
@@ -99,7 +100,7 @@ func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 // Nothing about the behaviour changed. The resolution below — the read, the memo
 // and the repositories — stays here, because those are this service's.
 
-// roleRow resolves one role and its conferred permission keys, memoised for the
+// utils.RoleRow resolves one role and its conferred permission keys, memoised for the
 // request.
 //
 // The memo lives on the AppContext, so it is per REQUEST and never shared
@@ -115,9 +116,9 @@ func (s *GroupServiceImpl) companions() *groupCompanionRepos {
 // hydrated, so a permission the role no longer confers is not judged: it would
 // be fail-closed, but it would refuse an attachment over a grant that does not
 // exist.
-func (s *GroupServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
-	return resolveRows(s.ctx, groupRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]roleRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+func (s *GroupServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]utils.RoleRow {
+	return utils.ResolveRows(s.ctx, groupRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]utils.RoleRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			// A failed probe PANICS rather than inventing an answer: every
@@ -126,7 +127,7 @@ func (s *GroupServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
 			panic("Group: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write attaches")
 		}
 
-		rows := make(map[string]roleRow, len(found))
+		rows := make(map[string]utils.RoleRow, len(found))
 		for _, role := range found {
 			// The grants arrive with resource and action already filled — Role
 			// declares the traversal into the catalog. Nothing here queries it.
@@ -135,14 +136,14 @@ func (s *GroupServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
 			for _, grant := range grants {
 				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
-			rows[canonicalIDOf(role.GetID())] = roleRow{found: true, tenantID: role.TenantID, keys: keys}
+			rows[utils.CanonicalIDOf(role.GetID())] = utils.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
 		}
 		return rows
 	})
 }
 
 func (s *GroupServiceImpl) TenantIsUnavailable(tenantID domain.ID) bool {
-	// Usable, not merely non-empty — the same reason roleRow guards its own
+	// Usable, not merely non-empty — the same reason utils.RoleRow guards its own
 	// argument. An unparseable owner is not a tenant that exists, so answering
 	// "unavailable" is the true and fail-closed reading.
 	if _, err := tenantID.UUID(); err != nil {
@@ -194,7 +195,7 @@ func (s *GroupServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDS
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = !row.found || row.tenantID != tenantID
+		out[id] = !row.Found || row.TenantID != tenantID
 	}
 	return out
 }
@@ -211,7 +212,7 @@ func (s *GroupServiceImpl) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = row.grantsWildcard()
+		out[id] = row.GrantsWildcard()
 	}
 	return out
 }
@@ -257,7 +258,7 @@ func (s *GroupServiceImpl) CallerLacksAnyPermissionOf(roleIDSet []domain.ID) map
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = callerLacksAnyPermissionOfRole(identity, row)
+		out[id] = utils.CallerLacksAnyPermissionOfRole(identity, row)
 	}
 	return out
 }

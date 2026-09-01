@@ -23,13 +23,24 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// AuthenticationFeature mounts the sign-in and the rotation.
+// AuthenticationFeature mounts the two user token routes and the machine one.
 //
-// It builds and OWNS both of its adapters, like every other feature here. The
+// It builds and OWNS all of its adapters, like every other feature here. The
 // refresh store is one of them even though the framework also needs it: see
 // RefreshTokenStore below for why that does not move ownership out of this file.
+//
+// THE CLIENT READER LIVES HERE AND NOT IN A FEATURE OF ITS OWN, which is the one
+// placement decision worth stating. The origin-address middleware is registered on
+// the `/auth` group object inside MountAuthentication, and Fiber binds a group
+// middleware in registration order — so a client-token route mounted from a second
+// feature would run that middleware or not depending on which feature Wire happened
+// to list first. On the client route the origin address is an AUTHORIZATION input
+// (Client.allowedCIDRs is compared against it), so "sometimes empty" is not a
+// forensic annoyance, it is a client with an allow-list being refused. One owner of
+// the group removes the ordering question entirely.
 type AuthenticationFeature struct {
 	reader   *appinfra.AuthenticationReader
+	clients  *appinfra.ClientAuthenticationReader
 	store    *appinfra.RefreshTokenStore
 	attempts *appinfra.AuthenticationAttemptStore
 }
@@ -42,6 +53,7 @@ type AuthenticationFeature struct {
 func NewAuthenticationFeature(d bootstrap.Deps) *AuthenticationFeature {
 	return &AuthenticationFeature{
 		reader:   appinfra.NewAuthenticationReader(d.DB),
+		clients:  appinfra.NewClientAuthenticationReader(d.DB),
 		store:    appinfra.NewRefreshTokenStore(d.DB, d.Logger),
 		attempts: appinfra.NewAuthenticationAttemptStore(d.DB),
 	}
@@ -80,6 +92,13 @@ func (f *AuthenticationFeature) Mount(app *fiber.App, d bootstrap.Deps) {
 	// No adapter and no wrapper type: *events.SlogPublisher satisfies the
 	// application's narrow port structurally, which is exactly why that port was
 	// spelled with the framework's own signature.
-	appweb.MountAuthentication(app, f.reader, f.store, f.attempts,
-		events.NewSlogPublisher(d.Logger), d.Issuer, d)
+	//
+	// d.Issuer is handed in TWICE and that is not a slip: the user routes take it
+	// through commands.TokenIssuer (IssueWithRefresh + RedeemRefreshToken) and the
+	// client route through commands.AccessTokenIssuer (Issue alone). Two narrow
+	// ports over one instance, each naming exactly what its consumer calls — which
+	// is what lets the client handler's tests run without a refresh store and
+	// documents that this route mints no refresh token.
+	appweb.MountAuthentication(app, f.reader, f.clients, f.store, f.attempts,
+		events.NewSlogPublisher(d.Logger), d.Issuer, d.Issuer, d)
 }

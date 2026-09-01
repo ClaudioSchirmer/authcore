@@ -76,6 +76,16 @@ auth:
   auditClaims:
     - tenant_workspace
     - email
+    # name is the CLIENT's analogue of email: a machine has no address, so its label
+    # is the only human-readable thing an audit row could carry about who acted. The
+    # user token already mints it, so this is one vocabulary rather than a per-kind
+    # special case — the cost, said plainly, is that user audit rows gain a short
+    # name string beside the email they already carry.
+    - name
+    # identity_kind says PERSON or MACHINE without anybody cross-referencing the
+    # clients table. Both token routes mint it, so an audit row that lacks it was
+    # written by neither.
+    - identity_kind
 
   issuer:
     enabled: true
@@ -122,6 +132,20 @@ auth:
     - GET /readyz
     - POST /auth/user/token
     - POST /auth/user/token/refresh
+    # The machine sign-in. Public for the same reason as the two above, and there is
+    # no /refresh companion: a client-credentials grant issues no refresh token
+    # (RFC 6749 4.4.3) because the client's secret already IS its long-lived
+    # credential.
+    #
+    # WHERE FROM: Client.allowedCIDRs is enforced at this route and nowhere else, and
+    # it compares against the ORIGIN ADDRESS AS THIS PROCESS SEES IT — the socket peer.
+    # The framework reads no proxy header (it sets neither TrustProxy nor ProxyHeader
+    # on the Fiber app), which is why nothing here is spoofable; the flip side is that
+    # behind an ingress or a load balancer every request carries the BALANCER's
+    # address, so an allow-list of real egress ranges refuses everybody and one
+    # holding the balancer's range admits everybody. Leave the collection empty on
+    # such a deployment until omnicore ships a trusted-proxy block.
+    - POST /auth/client/token
 
 shutdown:
   drainTimeoutSeconds: 30

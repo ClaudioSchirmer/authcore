@@ -41,17 +41,17 @@ Honest scope, so nobody reads intent as delivery:
 | User ↔ tenant association | **built** — `users.tenant_id` NOT NULL, FK to `tenants.id`, filled from the caller's `tenant_id` claim and nameable in the body only by a `*:*` operator crossing the scope |
 | Self-service password change | **built** — `PATCH /users/{id}/password`, gated on `user:change-password`: token required, the id on the path must be the caller's own, and the current password is proved before the new one is accepted. *(This row read "not started" until 2026-08-26; it was stale the same day the route landed.)* What is still missing is a FORGOT-password flow for the caller who has no password to prove — e-mail, an expiring link — and that has not been started |
 | User ↔ group / User → role membership | **built** — two owned collections with per-entry join/leave and grant/revoke, both gated on `user:grant` and both refusing an escalation the caller does not already hold |
-| Claim VALUES on a principal | **built** (2026-08-28) — level 1 of the claim chain: a `claims` collection on **both** `User` and `Client`, each holding one row per definition with the value that principal carries. Per-entry add/correct/remove gated on `user:set-claim` / `client:set-claim`. **The correction is a PATCH carrying only `value`** — the definition an entry belongs to is read off the stored row and is absent from the body, so an entry can never become the value of a different claim. Every write is judged against the definition it points at — same tenant, an `appliesTo` that admits this identity kind, and a value that parses as the declared `valueType`. Plans in `specs/evolve-entity/{user,client}/spec.md`. **The USER half now reaches the token** (2026-08-28) — see the emission row below; `Client` has no token route to reach, so its values stay set-read-and-audit until `POST /auth/client/token` exists |
+| Claim VALUES on a principal | **built** (2026-08-28) — level 1 of the claim chain: a `claims` collection on **both** `User` and `Client`, each holding one row per definition with the value that principal carries. Per-entry add/correct/remove gated on `user:set-claim` / `client:set-claim`. **The correction is a PATCH carrying only `value`** — the definition an entry belongs to is read off the stored row and is absent from the body, so an entry can never become the value of a different claim. Every write is judged against the definition it points at — same tenant, an `appliesTo` that admits this identity kind, and a value that parses as the declared `valueType`. Plans in `specs/evolve-entity/{user,client}/spec.md`. **Both halves now reach a token** — the USER half on 2026-08-28 (see the emission row below) and the CLIENT half on 2026-09-01, when `POST /auth/client/token` was built |
 | `Permission` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/permission.omnicore.yaml` against the model in `specs/scaffold-entity/permission/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Role` entity | **built** — five REST endpoints (insert · patch · archive · by-id · listing) plus the two child ops (grant · revoke) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/role.omnicore.yaml` against the model in `specs/scaffold-entity/role/spec.md`. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come |
 | `Group` entity | **built** — five REST endpoints plus the two collection ops (attach · detach), gated on `group:grant`; model in `specs/scaffold-entity/group/spec.md`. *(This row read "specified, not built" until 2026-08-26 — it was stale from the moment the entity merged.)* |
 | Effective-permission resolution (group path ∪ direct path) | **built** — `internal/infra/authentication_reader_manual.go` resolves both arrows in ONE statement, composed at construction from the `TableSchema` declarations so a renamed column aborts the boot instead of returning nothing. Archive-gated at every hop: a revoked grant, a retired role, a left group and an archived membership each confer nothing. Proven against the bench with a user holding one permission directly and another only through a group |
 | `Claim` catalog | **built** — five REST endpoints (insert · patch · archive · by-id · listing) and the matching GraphQL queries/mutations, generated from `specs/omnicore-gen/claim.omnicore.yaml` against the model in `specs/scaffold-entity/claim/spec.md`. **Capped at 20 ACTIVE definitions per tenant per identity kind** since 2026-08-28 (`specs/evolve-entity/claim-catalog-cap/spec.md`), which is what closes the token-budget hole the emission row below used to name. Build, vet and the unit suite are green; the contract suite (`/omnicore:qa`) and a boot against Postgres are still to come. **Its definitions now reach a user's token** — see the emission row below and `### Claim` |
-| Custom claims ON THE TOKEN | **built** (2026-08-28) — `POST /auth/user/token` and its refresh resolve the two-level chain into the access token beside the fixed nine: the value set on the user wins, the definition's tenant-wide `defaultValue` fills in when none is, and a claim with neither is **absent** rather than empty. Each value is minted in the JSON type its definition declares, through the same `ClaimValueMatchesValueType` gate both write levels ask, so no fourth reading of what a `bool` is exists. An **archived definition mints nothing**, including for a user still holding a value for it — the emission walks the tenant's ACTIVE catalog, not the user's entries. A definition can never take over a platform claim name: the reserved `x_` prefix stops it at the API, and the merge assigns the fixed set last so a row written by migration cannot either. **At most 20 per token**, values set on the user spent before any tenant-wide default, the rest dropped with a named `Warn` — and since 2026-08-28 that truncation is **unreachable through the API**: the catalog now caps itself at 20 ACTIVE definitions per tenant per identity kind, and the bucket it caps is the *same predicate* this emission walks, so there can never be a 21st candidate. The drop stays as the seatbelt for rows a migration or a direct `UPDATE` put in the table. A `mustChangePassword` session carries **none** of them, and the response body mirrors the token exactly, restriction included. `POST /auth/client/token` does not exist, so `ClientClaim` reaches no token. Plan in `specs/implement/emit-custom-claims-on-user-token/plan.md` |
+| Custom claims ON THE TOKEN | **built** (2026-08-28) — `POST /auth/user/token` and its refresh resolve the two-level chain into the access token beside the fixed nine: the value set on the user wins, the definition's tenant-wide `defaultValue` fills in when none is, and a claim with neither is **absent** rather than empty. Each value is minted in the JSON type its definition declares, through the same `ClaimValueMatchesValueType` gate both write levels ask, so no fourth reading of what a `bool` is exists. An **archived definition mints nothing**, including for a user still holding a value for it — the emission walks the tenant's ACTIVE catalog, not the user's entries. A definition can never take over a platform claim name: the reserved `x_` prefix stops it at the API, and the merge assigns the fixed set last so a row written by migration cannot either. **At most 20 per token**, values set on the user spent before any tenant-wide default, the rest dropped with a named `Warn` — and since 2026-08-28 that truncation is **unreachable through the API**: the catalog now caps itself at 20 ACTIVE definitions per tenant per identity kind, and the bucket it caps is the *same predicate* this emission walks, so there can never be a 21st candidate. The drop stays as the seatbelt for rows a migration or a direct `UPDATE` put in the table. A `mustChangePassword` session carries **none** of them, and the response body mirrors the token exactly, restriction included. **`POST /auth/client/token` resolves the same chain for a machine since 2026-09-01**, through the same function, over `client_claims` and the `client`/`both` half of the catalog — a `user`-scoped definition mints nothing there, and a machine has no restricted-session state to strip them. Plans in `specs/implement/emit-custom-claims-on-user-token/plan.md` and `specs/implement/client-credentials-token/plan.md` |
 | Reserved platform tenant | not started — and **two** entities DEPEND on it. `Role`: no wildcard permission can be granted through the API, so the platform's own `*:*` role has to be seeded by migration beside that tenant. `Group`: no wildcard-bearing role can be attached to a group through the API either, so the platform's own super-admin **group** has to be seeded in that same migration. **`Claim` was deliberately built NOT to become the third**: its reserved-prefix rule applies to every definition created through the API with no exception carved for a tenant, so the platform's own nine claims would enter by migration — the same door the `*:*` role enters by — and nothing in that entity needs to know which tenant is reserved |
-| Token issuance with the `tenant_id` claim | **built** — `POST /auth/user/token` and `POST /auth/user/token/refresh`, on the framework's `authcore.Issuer` (RS256, opaque single-use refresh tokens, family revocation on reuse). The `tenant_id` claim carries `tenants.id`, the same value the isolation filter compares, with no translation step. This service is now its own IdP: it publishes `GET /.well-known/jwks.json` and any other service accepts its tokens by pointing `auth.jwt.jwksUrl` at it — configuration only, no code |
+| Token issuance with the `tenant_id` claim | **built** — `POST /auth/user/token`, `POST /auth/user/token/refresh` and, since 2026-09-01, `POST /auth/client/token` (machine-to-machine: a client id and a secret, no refresh token per RFC 6749 §4.4.3), on the framework's `authcore.Issuer` (RS256, opaque single-use refresh tokens, family revocation on reuse). The `tenant_id` claim carries `tenants.id`, the same value the isolation filter compares, with no translation step. This service is now its own IdP: it publishes `GET /.well-known/jwks.json` and any other service accepts its tokens by pointing `auth.jwt.jwksUrl` at it — configuration only, no code |
 | Commercial status (`trial` / `active` / `suspended`) | **built and enforced** on Tenant — the transition machine refuses any return to `trial`, and archiving forces `suspended`. Nothing downstream consumes it yet |
-| Brute-force lockout | **built** — 5 failed attempts for one identity inside 15 minutes answer **429** with the remaining window, auto-releasing as the window ages out. The counter is a COLUMN on a rollup row (`authentication_attempts`, migration `0007`) read by a single point lookup, NOT a column on `users`: keyed by the ATTEMPTED identity, so an address that names no account locks exactly as a real one does. That uniformity is the point — a counter on the user row could only exist for real users, which would have made both the message and the response time an existence oracle. The expiry is never stored: it is the window's anchor plus the window, so nothing has to be cleared and nothing can drift. Because the state is in the table, a restart does not release anybody |
+| Brute-force lockout | **built, for USER sign-in only** — 5 failed attempts for one identity inside 15 minutes answer **429** with the remaining window, auto-releasing as the window ages out. The counter is a COLUMN on a rollup row (`authentication_attempts`, migration `0007`) read by a single point lookup, NOT a column on `users`: keyed by the ATTEMPTED identity, so an address that names no account locks exactly as a real one does. That uniformity is the point — a counter on the user row could only exist for real users, which would have made both the message and the response time an existence oracle. The expiry is never stored: it is the window's anchor plus the window, so nothing has to be cleared and nothing can drift. Because the state is in the table, a restart does not release anybody. **`POST /auth/client/token` COUNTS on the same table under `identity_kind = 'client'` and never LOCKS**, decided on 2026-09-01: the lockout makes guessing a ~30-bit human password expensive, while a client secret is 32 random bytes that no rate guesses — and a client id is public (it is the `sub` of every token the integration presents), so locking would hand anyone a five-request outage against a production integration. The counters stay a forensic and alerting surface there |
 | Authentication forensics | **built, and it lives in the LOG STREAM** — every sign-in outcome is published as one structured `"event"` record on the service's stdout channel (identity, kind, outcome, origin IP, whether the identity named a real account, and when a lock lifts), so the per-attempt narrative, the cross-IP patterns and the timeline are questions for the observability stack rather than for SQL. The table keeps only what has to be transactional: the lockout counters, the lifetime totals, the last origin, and `total_blocked` — attempts made THROUGH a lock, counted so the persistence stays visible while being unable to extend the lock. The attempted password enters neither the table nor the stream, in any form. Two consequences to own: retention is now the log pipeline's policy, and the record is best-effort — a publish failure is warned and swallowed, because the lockout is the load-bearing half and it is in SQL |
 | Refresh-token storage | **built** — `authentication_refresh_tokens` (migration `0006`), hash-only: the raw value never reaches the table. Single-use with rotation on every redemption; replaying a redeemed value revokes the entire session family. The table sweeps its own expired rows on every write, so there is no scheduled job to forget to deploy |
 | Contract QA suite (`/omnicore:qa`) | not generated |
@@ -729,11 +729,17 @@ Three behaviours are deliberate and worth knowing before you debug them:
   every script forgets and whose symptom is a generic 401. The restriction is opt-in, and the
   empty array in the response is what says which state a client is in.
 
-**Two things this entity does not do yet**, both recorded rather than hidden:
-`POST /auth/client/token` is not built — the entity is the thing it will authenticate, and
-its contract is written down in the spec's §F. And `POST /clients` does not hand back a
-secret today: it mints one and stores the hash, so a new client is usable only after a
-rotation call. That gap and its three ways out are in
+**`POST /auth/client/token` was built on 2026-09-01** — see *API shape* below. The
+contract it honours is the one the spec's §F wrote down when this entity shipped, with two
+departures, both argued in `specs/implement/client-credentials-token/plan.md`: the lockout
+COUNTS every attempt but never refuses on this route (a client id is public — it is the `sub`
+of every token the integration presents — so a lock would hand anyone a five-request outage
+against a credential nothing can guess), and §F's warning about a spoofable
+`X-Forwarded-For` does not apply at this framework pin, which reads no proxy header at all.
+
+**One thing this entity does not do yet**, recorded rather than hidden: `POST /clients` does
+not hand back a secret today: it mints one and stores the hash, so a new client is usable only
+after a rotation call. That gap and its three ways out are in
 `specs/scaffold-entity/client/tasks.md`.
 
 Permissions: `client:read` · `client:insert` · `client:update` · `client:archive` ·
@@ -824,9 +830,11 @@ spent before any tenant-wide default and the rest dropped with a named `Warn`; a
 `mustChangePassword` session carries **none** of them, the same line already drawn for its
 permissions. The response body mirrors the token exactly, restriction included.
 
-`Client` is untouched by that run, and not by oversight: `POST /auth/client/token` does not
-exist yet, so a client's values have no token to reach. They stay set-read-and-audit until it
-does.
+`Client` was untouched by that run, and its values reached a token on 2026-09-01, when
+`POST /auth/client/token` was built. The chain there is the same two levels resolved by the
+same function, over `client_claims` and the `client`/`both` half of the catalog — the one
+difference being that a machine has no `mustChangePassword` state, so nothing ever restricts a
+client token to an empty claim map.
 
 What the edges DID change is that `appliesTo` finally means something. It used to state as
 data what nothing enforced; now a `user` definition refuses a value on a client and a `client`
@@ -845,8 +853,8 @@ that is the point rather than a coincidence: the emission's candidate set is exa
 `tenant_id = ? AND applies_to IN ('user','both')` over the ACTIVE rows — the *same predicate*
 the user bucket counts — so bounding the catalog is what makes the token's `Warn`-and-drop
 truncation unreachable through the API. It stays in place for rows a migration or a direct
-`UPDATE` wrote. The client half is capped too, so `POST /auth/client/token` will arrive already
-bounded.
+`UPDATE` wrote. The client half is capped the same way, so `POST /auth/client/token` arrived
+already bounded.
 
 The cap asks only about the kinds a write **adds** — an insert, or a widening. An edit that
 leaves `appliesTo` alone queries nothing and is never refused, which is what keeps a tenant that
@@ -941,30 +949,42 @@ WARN   authcore: JWKS endpoint returned no keys on first fetch …
 
 ### API shape
 
-**Everything below needs a token except the two routes that hand one out.**
+**Everything below needs a token except the three routes that hand one out.**
 
 ```
-POST   /auth/user/token           sign in — e-mail + password → access + refresh token
-POST   /auth/user/token/refresh   rotate — an unused refresh token → a fresh pair
+POST   /auth/user/token           sign in    — e-mail + password → access + refresh token
+POST   /auth/user/token/refresh   rotate     — an unused refresh token → a fresh pair
+POST   /auth/client/token         machine    — client id + secret → access token (no refresh)
 GET    /.well-known/jwks.json     the public key, framework-mounted
 ```
 
-**The `user` segment is not decoration.** A client-credentials token — machine-to-machine —
-is planned as `POST /auth/client/token`, and it is a different operation: a client id and a
-secret rather than an e-mail and a password, claims carrying no e-mail and no groups, and no
-refresh token at all, because the client's secret already is its long-lived credential.
-**The subject it will authenticate now exists** — see `Client` above — and the contract that
-run has to honour is written down in `specs/scaffold-entity/client/spec.md` §F, including two
-hard prerequisites: the source IP must be resolved correctly behind the proxy or the
-allow-list is theatre, and the `identity_kind` claim has to be minted on BOTH token routes,
-because a claim carried by one side only is an inference on the other. **The route itself does
-not exist yet.** Each
-subject type keeps its own route, its own request shape and its own OpenAPI page, rather than
-sharing one endpoint behind a `grantType` field whose required fields change with the value.
-That is the same call this service made when it split the two credential routes.
+**The subject type is the SEGMENT, not a field in the body.** Each keeps its own route, its
+own request shape and its own OpenAPI page, rather than sharing one endpoint behind a
+`grantType` field whose required fields change with the value — the same call this service
+made when it split the two credential routes. The market standard is a single token endpoint
+(Auth0, Okta, Keycloak: `POST /oauth/token` + `grant_type`), and it exists because those APIs
+*are* RFC 6749 — form-encoded in, flat snake_case out. This one is neither: JSON in, the
+canonical omnicore envelope out. No off-the-shelf OAuth2 client works against it either way,
+so the compatibility a single endpoint would buy is not on the table.
 
-The access token carries `sub`, `tenant_id`, `tenant_workspace`, `email`, `name`,
-`permissions`, `groups`, `roles` and `must_change_password`. `permissions` is the union of
+**`POST /auth/client/token` is a different operation, not a variant.** A client id and a
+secret rather than an e-mail and a password; **no refresh token at all**, because per RFC 6749
+§4.4.3 the client's secret already is its long-lived credential and a second one would be
+stored, rotated and revoked for nothing; and a claim set that drops three names and keeps the
+rest. It also applies a gate the user route has no analogue for — `allowedCIDRs`, checked at
+mint and nowhere else. Two things are worth knowing before relying on it: the **lockout counts
+but never locks** there (a client id is public, so locking would be an outage lever against an
+unguessable credential), and the address the allow-list compares is the **socket peer** — no
+proxy header is read, so it cannot be forged, but behind a load balancer it is the balancer's
+address. `specs/implement/client-credentials-token/plan.md` argues both.
+
+A USER access token carries `sub`, `tenant_id`, `tenant_workspace`, `email`, `name`,
+`permissions`, `groups`, `roles` and `must_change_password`. A CLIENT token carries `sub`,
+`tenant_id`, `tenant_workspace`, `name`, `permissions`, `roles` and
+**`identity_kind: "client"`** — and deliberately **no `email`** (a machine has none), **no
+`groups`** (a client belongs to none, so an empty list would imply it could) and **no
+`must_change_password`** (there is no credential it can be told to rotate itself). Both kinds
+carry `identity_kind`, because a claim minted by one side only is an inference on the other. `permissions` is the union of
 both grant paths — roles granted directly and roles inherited through a group — as
 `resource:action` strings; `groups` and `roles` are stable **keys**, never display names.
 Display names travel in the response BODY instead, which a client reads once and never
@@ -981,7 +1001,17 @@ Three behaviours are deliberate and worth knowing before you debug them:
   window — the one refusal that is not the generic 401, because a user told nothing has no way
   to learn that waiting is the fix. It discloses nothing: an address with no account locks the
   same way and gets the same message. A successful sign-in anchors the window, so failures
-  before it stop counting.
+  before it stop counting. **This is the USER route only.** `POST /auth/client/token` writes
+  the same counters under `identity_kind = 'client'` and never refuses on them: the lockout
+  exists to make guessing a low-entropy human password expensive, and a client secret is 32
+  bytes from `crypto/rand`. What locking would add is a lever — a client id is not a secret,
+  it is the `sub` of every token that integration presents — so five wrong guesses would take
+  a production integration off the air, repeatably.
+- **A client token is refused when the origin address is outside its `allowedCIDRs`**, with
+  the same generic 401 as every other refusal. The reason and the address go to the log
+  stream instead, because telling the caller that only the *network* was wrong would confirm
+  to whoever holds a stolen secret that the secret itself is good. An empty collection means
+  any address.
 - **A replayed refresh token revokes the whole session family.** Not just the value replayed:
   every token descended from that sign-in. A value being presented twice means somebody holds
   a copy, and there is no way to tell which holder is the legitimate one.
@@ -1251,14 +1281,21 @@ HTTP endpoints, so every route on top of it is this service's own:
 
 ```
 internal/domain/effective_grants_manual.go        the resolved answer's shape, shared by infra and application
-internal/domain/notifications.go                  InvalidCredentialsNotification — one 401 for five questions
-internal/infra/authentication_reader_manual.go    both grant paths in ONE schema-composed statement
+internal/application/commands/notifications_…     the two 401s — one per subject kind, each generic within its route
+internal/infra/authentication_reader_manual.go    the USER read: both grant paths, schema-composed
+internal/infra/client_authentication_reader_…     the MACHINE read: one grant path, the two hashes, the allow-list
 internal/infra/refresh_token_store_manual.go      authcore.RefreshTokenStore — hash-only, self-sweeping
-internal/application/commands/authentication_…    the two handlers and their application-owned ports
-internal/web/authentication_routes_manual.go      POST /auth/user/token · POST /auth/user/token/refresh
-bootstrap/authentication_feature_manual.go        owns both adapters; Wire only forwards the store
+internal/application/commands/authentication_…    the user handlers, the shared journal and the claim chain
+internal/application/commands/client_authenti…    the machine handler; no refresh, no lockout refusal
+internal/web/authentication_routes_manual.go      all three routes — one owner of the /auth group, see the IP note
+bootstrap/authentication_feature_manual.go        owns every adapter; Wire only forwards the store
 migrations/postgres/0006_refresh_tokens_manual.*  the table, hand-written: it is not an entity
 ```
+
+Both readers are anchored on **Direct schemas this service owns**
+(`internal/infra/schemas/…_read_schemas.go`) rather than on the entity repositories: a
+sign-in protects no invariant and drives no lifecycle, so it reads rows. Entering through the
+aggregates cost the user path four sequential statements for the account alone.
 
 ## Where the decisions are written down
 

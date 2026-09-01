@@ -118,6 +118,7 @@ func (nld) Translations() map[string]string {
 		"PasswordResetRequiresAnotherUserNotification":      "Gebruik het eindpunt voor wachtwoordwijziging om uw eigen wachtwoord in te stellen.",
 		"InvalidCurrentPasswordNotification":                "Het huidige wachtwoord is onjuist.",
 		"InvalidCredentialsNotification":                    "Ongeldig e-mailadres of wachtwoord.",
+		"InvalidClientCredentialsNotification":              "Ongeldige client-id of secret.",
 		"AccountTemporarilyLockedNotification":              "Te veel mislukte pogingen. Probeer het over {minutes} minuten opnieuw.",
 		"Authentication":                                    "Authenticatie",
 		"InvalidEmailNotification":                          "Ongeldig e-mailadres. Voer het in kleine letters in.",

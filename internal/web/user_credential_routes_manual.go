@@ -30,7 +30,8 @@
 package web
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/utils"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -48,7 +49,7 @@ import (
 // application layer and names exactly the two things they do.
 func MountUserCredentials(
 	app *fiber.App,
-	store commands.UserCredentialStore,
+	store utils.UserCredentialStore,
 	svc domain.Service,
 	d bootstrap.Deps,
 ) {
@@ -70,7 +71,7 @@ func MountUserCredentials(
 	changeH, changeSpec := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.ChangePasswordRequest{},
 		fwresponses.NoBody,
-		&commands.ChangePasswordHandler{Store: store, Service: svc},
+		&handlers.ChangePasswordHandler{Store: store, Service: svc},
 		fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/password",
 		changeH, changeSpec,
@@ -110,7 +111,7 @@ func MountUserCredentials(
 	resetH, resetSpec := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.ResetPasswordRequest{},
 		fwresponses.NoBody,
-		&commands.ResetPasswordHandler{Store: store, Service: svc},
+		&handlers.ResetPasswordHandler{Store: store, Service: svc},
 		fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/password-reset",
 		resetH, resetSpec,
@@ -160,18 +161,18 @@ func MountUserCredentials(
 // service uses to mirror a 204.
 func MountUserCredentialsGraphQL(
 	reg *fwgraphql.Registry,
-	store commands.UserCredentialStore,
+	store utils.UserCredentialStore,
 	svc domain.Service,
 ) {
 	// The id rides the field's own `id` argument, which the framework hands to
 	// SetPathID — the same value the route took from its path segment.
 	reg.Register(fwgraphql.MutationWithBodyID[requests.ChangePasswordRequest](
 		"changeUserPassword", requests.ChangeUserPasswordGraphQLResponse{}.FromResult,
-		&commands.ChangePasswordHandler{Store: store, Service: svc},
+		&handlers.ChangePasswordHandler{Store: store, Service: svc},
 		fwgraphql.RequirePermission("user:change-password")))
 
 	reg.Register(fwgraphql.MutationWithBodyID[requests.ResetPasswordRequest](
 		"resetUserPassword", requests.ResetUserPasswordGraphQLResponse{}.FromResult,
-		&commands.ResetPasswordHandler{Store: store, Service: svc},
+		&handlers.ResetPasswordHandler{Store: store, Service: svc},
 		fwgraphql.RequirePermission("user:reset-password")))
 }

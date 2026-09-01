@@ -7,80 +7,22 @@ reason.
 
 ---
 
-## Custom claims on `Group`
+## Declined: custom claims on `Group` (2026-09-01)
 
-**Status:** open question — raised 2026-08-24, not approved, not specified.
+Raised 2026-08-24, never specified, and now turned down by the maintainer: **a group will not
+carry claims.** It is recorded here with its reason rather than deleted, so a future reader
+sees a decision instead of an omission.
 
-Today a group carries only its identity (`key`, `name`, `description`) and its **role
-bundle**: belonging to it grants a member every permission of every role attached to it.
-The only thing a group contributes to a token is permissions, and the only non-permission
-claim the platform mints is the scalar `tenant_id` (see README, *One e-mail, one user*).
+The reason is the question the entry never got past. A user reaches several groups, so two of
+them can set the same key to different values, and resolving that needs a precedence rule.
+Effective permissions today have **no precedence and no deny rule**, and a claim map with
+last-writer-wins would be the first place that stops being true — the Keycloak case the
+`Claim` survey below documents, where two mappers target the same name and only one value
+survives in an order that is neither documented nor stable.
 
-We may need groups to carry **arbitrary tenant-defined claims** as well — key/value pairs
-attached to the group and merged into the token of every member who belongs to it, so a
-consuming service can branch on tenant-specific facts (department, cost center, region,
-plan tier) without authcore learning that vocabulary.
-
-Why it might be needed:
-
-- Consumers keep asking authorization questions that are not permission questions.
-  Modelling each one as a permission inflates the catalog with values that gate nothing.
-- The group is already the natural place a tenant expresses "these people are alike" — the
-  same edge that carries the role bundle would carry the attribute.
-
-What has to be answered before this becomes a spec:
-
-- **Merge semantics.** A user reaches several groups; two of them set the same key to
-  different values. Union into a list, last-writer-wins, or refuse the configuration?
-  Effective permissions today have *no precedence and no deny rule* — a claim map with
-  precedence would be the first place that stops being true.
-- **Claim-size budget.** The role bundle is already described as a budget in
-  `specs/omnicore-gen/group.omnicore.yaml`. Free-form key/values on top of it push the JWT
-  toward the header limits of every proxy in the path.
-- **Namespace and reserved keys.** A tenant must not be able to set `tenant_id`, or any
-  future platform claim, from a group. That needs a reserved prefix and a rule that
-  refuses it, not documentation.
-- **Direct grants.** Roles can be granted to a user directly, bypassing groups. Does the
-  same apply to claims — a per-user claim map — or are groups the only carrier?
-- **Type of the value.** String-only keeps the token predictable and the schema trivial;
-  anything richer (numbers, lists, nested objects) is a JSON column and a validation
-  surface.
-
-Alternatives worth weighing against it:
-
-- Leave attributes to the consuming service, keyed by `group.key`, and let authcore issue
-  nothing but permissions.
-- Put the claims on `Tenant` instead of `Group` — one map per tenant, no merge problem —
-  if the real need is tenant-wide facts rather than per-cohort ones.
-
-**The dependency is resolved as of 2026-08-26.** Token issuance is built: `POST /auth/user/token`
-walks both arrows into one effective-permission set and signs it, so there IS now a minting
-path and a claim map to merge into. This entry stops being blocked and starts being a
-decision nobody has taken.
-
-Three things the implementation settled, which sharpen the open questions rather than answer
-them:
-
-- **The claim-size budget is no longer hypothetical.** The shipped token deliberately carries
-  group and role **keys** and not their display names, precisely because a token rides in a
-  header on every request to every service and `description` is a `VARCHAR(500)` per group.
-  Free-form tenant key/values would land on top of a budget that was already argued down to
-  the minimum. Whatever merge rule wins, the size rule has to come with it.
-- **The reserved-key problem now has a concrete list.** The platform mints `sub`, `tenant_id`,
-  `tenant_workspace`, `email`, `name`, `permissions`, `groups`, `roles` and
-  `must_change_password`. A tenant must be unable to set any of them from a group — and two of
-  those (`permissions`, `tenant_id`) are read by the framework itself across the whole mesh,
-  so overwriting one does not merely confuse a consumer, it changes what every service
-  authorizes.
-- **The audit allowlist is a second, separate decision.** `auth.auditClaims` controls which
-  claims reach `audit_events.actorClaims`, and it was deliberately kept to two entries.
-  Tenant-defined claims would need their own answer there: forwarding an arbitrary map into
-  every audit row, one per write, forever, is not the same question as putting it in a token.
-
-The precedence question is still the one that has to be answered first, and it is still the
-one that breaks an existing property: effective permissions today have **no precedence and no
-deny rule**, and a claim map with last-writer-wins would be the first place that stops being
-true.
+The need it described is served by the `Claim` catalog, built 2026-08-28, which removes the
+collision by construction instead of by a rule: one name is one definition, and a principal
+holds at most one value per definition.
 
 ---
 
@@ -103,27 +45,47 @@ different hat, and it inherits the same unanswered problem: effective permission
 precedence question has to be answered first, and answering it for clients alone would mean
 two authorization models in one service.
 
-## Not started: `POST /auth/client/token`
+## Built: `POST /auth/client/token` (2026-09-01)
 
-The `Client` entity exists; the route that authenticates it does not. It is a capability
-rather than an entity, so it belongs to `/omnicore:implement`, and the contract it has to
-honour is already written: `specs/scaffold-entity/client/spec.md` §F lists the row shape it
-reads, the eligibility checks, `identity_kind = 'client'` on every attempt row (which makes
-the existing lockout apply unchanged), no refresh token per RFC 6749 §4.4.3, and the claim
-set — `sub`, `tenant_id`, `tenant_workspace`, `name`, `identity_kind`, `permissions`, `roles`,
-and no `email`, no `groups`, no `must_change_password`.
+**Status: DONE.** The route exists, and the plan that built it is
+`specs/implement/client-credentials-token/plan.md`. This entry stays rather than being
+deleted, because the run departed from the contract in two places and a future reader should
+meet the departures as decisions rather than as omissions.
 
-**Two prerequisites block it, and neither is this route's own work.** The source IP has to be
-resolved correctly behind the proxy — `X-Forwarded-For` unguarded is spoofable, so an attacker
-sets the header to an allowed range and walks through, while the socket IP alone is the load
-balancer and blocks everybody. That is a trusted-proxy configuration and it is
-`/omnicore:configure`'s territory. And `auth.auditClaims` has to gain `name` and
-`identity_kind`, so an audit row says whether the actor was a person or a machine without
-anybody cross-referencing the `clients` table.
+It honours what `specs/scaffold-entity/client/spec.md` §F wrote down when the entity shipped:
+the two hashes with the grace window, `status = active` plus a live tenant, `identity_kind`
+on both token routes, no refresh token, and the claim set — `sub`, `tenant_id`,
+`tenant_workspace`, `name`, `identity_kind`, `permissions`, `roles`, and no `email`, no
+`groups`, no `must_change_password`. It also resolves the tenant's `x_` claims from
+`client_claims`, which §F predates. `auth.auditClaims` gained `name` and `identity_kind` in
+both profiles, as §F prescribed.
 
-**One thing to say out loud in whatever documents that route:** an allowed CIDR constrains
-where a token is *obtained*, never where it is *used*. authcore does not see the requests a
-client later makes to other services.
+**Departure 1 — the lockout counts but never locks.** §F said the existing lockout would
+"apply unchanged". It does not, deliberately. The lockout makes guessing a ~30-bit human
+password expensive; a client secret is 32 bytes from `crypto/rand`, so no rate guesses it and
+the lock buys nothing against the attack it was designed for. What it would buy an attacker is
+a lever: **a client id is not a secret** — it is the row id, the `sub` of every token that
+client presents, and a column of `GET /clients` — so five wrong guesses would take a
+production integration off the air for fifteen minutes, repeatable forever. Every outcome is
+still written to `authentication_attempts` under `identity_kind = 'client'` and to the log
+stream, so the forensic and alerting surface is whole; only the refusal is gone.
+
+**Departure 2 — §F's proxy warning describes a risk this pin does not have.** It said an
+unguarded `X-Forwarded-For` is spoofable. At `omnicore v0.68.0` no header is read at all:
+the framework builds its Fiber app with neither `TrustProxy` nor `ProxyHeader`, and its
+`http:` block carries no key that could reach them, so `c.IP()` is always the socket peer.
+Not spoofable. The real consequence is the other half — **behind an ingress or a load
+balancer every request carries the balancer's address**, so an allow-list of real egress
+ranges refuses everybody and one holding the balancer's range admits everybody. That is
+stated in the OpenAPI description of the route, in the README and in `ACCESS_MATRIX.md`, and
+a framework feature request for a `http.proxy` block was raised rather than reading the
+header here — which would have built the exact vulnerability §F warned about. **Reopen this
+entry when that block ships**: filling in a deployment's trusted range is a
+`/omnicore:configure` job, not this route's.
+
+**Still true, and worth repeating wherever this feature is documented:** an allowed CIDR
+constrains where a token is *obtained*, never where it is *used*. authcore does not see the
+requests a client later makes to other services.
 
 ---
 
@@ -247,8 +209,23 @@ seatbelt: the `x_` prefix stops a collision at the API, and the merge assigns th
 that a definition written straight into the table by migration cannot displace `permissions` or
 `tenant_id` either. The two guards fail in opposite directions on purpose.
 
-**What is still open**: the third-level question, the audit allowlist, and the client half — `ClientClaim` reaches no token because `POST /auth/client/token` does not
-exist, which is the entry two sections up rather than a loose end here.
+**The third-level question is CLOSED by the construction, 2026-09-01** — it is struck from the
+open list rather than answered by a decision, because the shipped chain leaves it no object. The
+candidate set is `Eq(TenantID, account.TenantID)` AND `In(AppliesTo, user, both)` under the ACTIVE
+scope (`internal/infra/authentication_reader_manual.go:285-288`), so a definition owned by the
+reserved platform tenant is never in a member tenant's walk: there is no platform default for a
+tenant to override. What the entry asked for is what the two levels already are — the resolution is
+the SUM of the tenant's catalog and the principal's own entries, and where both carry the same
+definition the principal's value wins (`authentication_claims_manual.go:141-147`). Two residues,
+both deliberate and neither open: an entry pointing at a RETIRED definition mints nothing, since
+the catalog is the vocabulary and the entries only overlay it; and the vocabulary can diverge
+between tenants, which is the trade this entry recorded when it chose two levels over three.
+
+**Both halves now reach a token.** The user one on 2026-08-28, the client one on 2026-09-01
+when `POST /auth/client/token` was built — the same two levels through the same function, over
+`client_claims` and the `client`/`both` half of the catalog. The **audit allowlist** closed in
+that run too: `auth.auditClaims` gained `name` and `identity_kind` in both profiles. Nothing
+from this entry's original list is still open.
 
 The rest of this entry is the original draft, kept because it is where the reasoning lives.
 
@@ -379,7 +356,7 @@ reserved platform tenant. Worth doing for three reasons beyond tidiness:
 
 - the catalog becomes the living documentation of the token's vocabulary, instead of a prose
   list that ages;
-- `AppliesTo` then states as DATA what the `POST /auth/client/token` entry above states as
+- `AppliesTo` then states as DATA what the built `POST /auth/client/token` states as
   text — that a client token carries no `email`, no `groups` and no `must_change_password`;
 - two of those names (`permissions`, `tenant_id`) are read by the framework across the whole
   mesh, so having them present and platform-owned makes their reservation visible to anyone
@@ -426,60 +403,75 @@ the set, or refusing the conflicting grant at bind time — only the last keeps 
 indeterminacy away from the token). The two levels above already deliver "default plus
 specialised" without it.
 
-The earlier `Custom claims on Group` entry asks a related question through a different
+The earlier `Custom claims on Group` entry asked a related question through a different
 carrier; this shape does not answer it, since a user reaches several groups and the collision
-returns there. That entry therefore stays open on its own terms: the built catalog removes the
-collision by construction only along the chain it defines — one name is one definition, and a
-principal holds at most one value per definition — and a group carrier reintroduces exactly the
-multiplicity that construction avoids.
+returns there. **That entry was declined on 2026-09-01** (see the top of this file) rather than
+answered: the built catalog removes the collision by construction only along the chain it
+defines — one name is one definition, and a principal holds at most one value per definition —
+and a group carrier would reintroduce exactly the multiplicity that construction avoids.
 
 ---
 
-## Pool pressure: the sign-in read now takes four connections at once
+## Resolved by measurement: the sign-in read's four concurrent connections (2026-09-01)
 
-**Status:** open question — raised 2026-09-01, not approved, not specified. It arrived
-with the sign-in read redesign (`specs/implement/authentication-token-reads/`), which is
-merged; this is the part of it nobody measured.
+**Status: CLOSED — measured 2026-09-01, the shape is KEPT and nothing changed.** Raised the same
+day it was closed: it arrived with the sign-in read redesign
+(`specs/implement/authentication-token-reads/`), which shipped with only sequential numbers behind
+it. The entry asked three questions and a load test answered all three; it stays as the record,
+because "we measured and left it alone" is a decision, and the next person to see four goroutines
+in `ResolveSignIn` deserves to find it already asked.
 
-`ResolveSignIn` issues its four statements **concurrently** — the grants held directly,
-the grants inherited through groups, the caller's own claim values, and the tenant's claim
-catalog. None depends on another's answer, so the four cost one round trip of latency
-instead of four, and that is where most of the endpoint's 2.4x came from.
+Measured on the dev bench (16 cores, Postgres in Docker on the same host) against a tenant of 5k
+roles / 2k permissions / 10k users, with a principal holding 10 direct grants, 5 groups (20
+inherited roles) and 10 claim values. The concurrent shape was compared against a SERIAL one — the
+same four statements, one after another — under a bounded pool.
 
-The consequence is that **one sign-in holds four pool connections for the duration of that
-round trip**, where the shape it replaced held one at a time. The read is fast (~731µs
-against a tenant of 5k roles / 2k permissions / 10k users on the dev bench), so each
-connection is held briefly — but the peak is what matters, and the peak is four times what
-it was.
+**Is four the right fan-out? YES, and cutting it would be strictly worse.** The fan-out does not
+consume more connection-time, it CONCENTRATES it: four connections for 200µs is the same product as
+one connection for 800µs. So throughput is identical between the two shapes at every pool size
+(pool=4, 64 workers: 1968 rps concurrent vs 2033 serial; pool=16: 4153 vs 3961), and the only place
+they differ is the unqueued latency the concurrency was bought for — 727µs against 1.34ms at
+pool=4. The optimisation this entry floated — skipping the two claim reads for a tenant with no
+catalog — would buy nothing anywhere it was measured.
 
-What is NOT known, because it was never tested:
+**Or is the pool the thing to size? NO, and this is the answer that changed the recommendation.**
+Widening the pool from 4 to 8, 16 and 32 did not improve the one measurement that degrades. The
+default is `max(4, NumCPU)` and it was never the bottleneck: **the credential is**. One Argon2id
+verification (m=19MiB, t=2) costs **15.6ms** and the four-statement read costs **795µs**, so the
+read is under 5% of a sign-in and the endpoint saturates its cores long before it saturates a
+connection. On a 4-core box the same arithmetic holds with more room, not less: Argon2 caps that
+box near 256 sign-ins/s, which asks about a QUARTER of one connection on average against the four
+it has. `relational.pool` is therefore deliberately still unset — a fixed number chosen without
+production data (the backend's `max_connections` over the replica count) can be worse than a
+default that adapts to the node.
 
-- **The benchmark is sequential.** Every number in the requirements note comes from one
-  sign-in at a time. Nothing has driven N concurrent sign-ins against a bounded pool.
-- **The pool is not sized for it, and in fact is not sized at all.** Neither
-  `microservice.dev.yaml` nor `microservice.prd.yaml` declares a `relational.pool` block,
-  so the ceiling is pgx's own default (`max(4, NumCPU)` — four connections on a small
-  node). A single sign-in can therefore ask for the WHOLE pool on a 4-core box. That was
-  survivable while the read took one connection at a time; it is the first thing to check
-  now.
-- **The failure mode is untested.** When the pool is empty, the four goroutines block on
-  acquire. Whether that surfaces as a slow sign-in, a context deadline (`http.requestTimeoutSeconds`,
-  30s by default) or something worse has not been observed.
+**What does it do when the pool is exhausted? It QUEUES, linearly.** Pool of ONE against 32
+workers — four goroutines per request competing for a single connection — completed 320 resolutions
+in 502ms with a p99 of 61ms and zero errors. No deadline, no refusal, and no deadlock: nothing here
+holds a connection while waiting for one, because `ResolveSignIn` runs outside any transaction.
+**That is the property worth guarding**, and it is the one thing about this entry that is not
+self-evident from the code — the day somebody wraps the sign-in in a transaction, four goroutines
+per request stop being harmless.
 
-What has to be answered before this becomes a spec:
+**What the measurement FOUND rather than answered**, recorded because it is the real cost and it is
+not what the entry expected. The sign-in does not hurt itself; it can hurt its NEIGHBOURS — any
+other route drawing on the same pool. An ordinary single-statement read, timed beside a realistic
+sign-in load:
 
-- **Is four the right fan-out?** Two of the four — the claim values and the catalog — feed
-  the custom-claim chain, which is empty for a tenant that defines no claims. Skipping them
-  when the tenant has no catalog would drop the peak to two for most tenants, at the cost of
-  a check that itself needs a read. Whether that trade is worth it depends on how many
-  tenants actually use the catalog, which nobody has measured either.
-- **Or is the pool simply the thing to size?** The honest alternative is that four is
-  correct and the pool was under-provisioned for it. That is a configuration answer, not a
-  code one — but it has to be a decision rather than a default.
-- **What does the endpoint do when the pool is exhausted?** A sign-in that blocks is worse
-  than a sign-in that fails fast, because the caller retries. If there is a right answer here
-  it belongs to the framework's acquire timeout, not to this file.
+| load | neighbour p50, concurrent | serial | ratio |
+|---|---|---|---|
+| idle | 256µs | 256µs | — |
+| 8 workers ≈ 378 sign-ins/s | 318µs | 306µs | 1.04x |
+| 16 workers ≈ 558 sign-ins/s | 3.45ms | 1.17ms | 2.9x–4.0x |
 
-The cheap first step is a load test — N concurrent sign-ins against the dev bench with the
-pool set to production's number — which would answer the first two questions with a
-measurement instead of an argument.
+The 16-worker row reproduced three times (3.96x / 3.44x / 2.86x) and, decisively, **a wider pool
+did not fix it** — which is what identifies it as CPU rather than connections. At that width all 16
+cores are inside Argon2 and the concurrent shape amplifies because it puts four goroutines per
+request on a scheduler with no free core. Below roughly 378 sign-ins/s per instance it costs
+nobody anything.
+
+**The limit of the experiment, stated rather than buried.** It is single-host, with Postgres on the
+same machine. A remote backend lengthens every hold by its round trip, which makes the burst wider
+— but the connection-time totals stay identical between the shapes, so the prediction is that
+throughput is unchanged and burstiness is not. That is a prediction, not a measurement, and it is
+the thing to re-measure if this ever comes back.
