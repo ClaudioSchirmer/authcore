@@ -29,3 +29,4 @@ Thumbs.db
 #   scaffold-service/, scaffold-entity/, omnicore-gen/
 # Those hold the approved model and the per-layer plans this service was built from —
 # the documents a reviewer reads to see what was decided. They are not scratch.
+qa/.logs
