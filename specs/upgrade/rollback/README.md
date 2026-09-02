@@ -1,12 +1,23 @@
-# Rollback snapshot — omnicore v0.67.1 → v0.68.0
+# Rollback point — omnicore v0.69.0
 
-Taken before the bump on 2026-08-31. Exact restore point for `go.mod` + `go.sum`.
+Taken before bumping `github.com/ClaudioSchirmer/omnicore` from **v0.69.0** to **v0.70.0**.
 
-previous version: v0.67.1
-target version:   v0.68.0
+`go.mod` and `go.sum` here are verbatim copies of the files as they stood at v0.69.0.
 
-NOTE: at snapshot time `go.mod`/`go.sum` were UNCOMMITTED at v0.67.1 (HEAD still carried
-v0.67.0), so `git checkout go.mod go.sum` is NOT an equivalent restore — it would land on
-v0.67.0. Use the file copies below.
+## To restore
 
-restore: cp specs/upgrade/rollback/go.mod go.mod && cp specs/upgrade/rollback/go.sum go.sum && go vet -tags postgres ./... && go build -tags postgres ./...
+```sh
+cp specs/upgrade/rollback/go.mod go.mod
+cp specs/upgrade/rollback/go.sum go.sum
+go build -tags postgres ./...
+```
+
+The build tag set is `postgres` (no `transport:` block in either profile) — the same
+set the upgrade was verified with. An untagged build can be green while the tagged one
+is not, so always restore with the tag.
+
+Equivalent via git (`go.mod`/`go.sum` were clean at snapshot time):
+
+```sh
+git checkout go.mod go.sum
+```

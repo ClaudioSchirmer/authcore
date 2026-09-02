@@ -1,198 +1,159 @@
-# Migration plan — omnicore v0.67.1 → v0.68.0
+# Migration plan — omnicore v0.69.0 → v0.70.0
 
-Status: APPROVED
+Status: DRAFT
 
-Decision on the open item (§4): **(a) regenerate**. The five generated repositories are
-rewritten whole against the v0.68.0 emitter; the four declarations in
-`authentication_reader_manual.go` are edited by hand, as §2 states.
+Nothing in this file has been applied. The `go.mod` / `go.sum` bump IS already done and
+verified (`go vet -tags postgres ./...` and `go build -tags postgres ./...` both clean);
+this plan covers only the service-side fallout that a green build cannot see.
 
-## Why a green build proves nothing here
+Rollback point: `specs/upgrade/rollback/` (verbatim `go.mod` + `go.sum` at v0.69.0).
 
-`go vet -tags postgres ./...` and `go build -tags postgres ./...` both pass on v0.68.0,
-and so does the offline unit suite. That is not evidence.
+---
 
-The join constructors did NOT change shape between the two pins:
+## Context — why a green build proves nothing here
 
-    v0.67.1  infra/db/command/read/join.go:122  func InnerJoin(target *core.TableSchema) *JoinBinding
-    v0.68.0  infra/db/command/read/join.go:122  func InnerJoin(target *core.TableSchema) *JoinBinding
+The one SOURCE-breaking change in v0.70.0 (`fwweb.BindPath` returning
+`*queryschema.Violation` instead of `(string, bool)`) does not touch this service: there
+is no occurrence of `BindPath`, `RespondSchemaViolation` or `ApplyFilterValues` in any
+`.go` file. Every handler is a framework auto-handler.
 
-The new requirement is enforced at runtime, inside `WithJoins(...)`:
+The three remaining breaking items are BEHAVIORAL — they change what the wire answers,
+not what compiles. All three land on this service, because its views are relational
+(`relational.dialect: postgres`, no `mongo:` block in either profile), and the relational
+backing is exactly the one whose behavior moved.
 
-    v0.68.0  infra/db/command/read/join.go:482
-        if !j.Target.IsDirect() {
-            failAt(path, "%s(%q): the target of a read join is ONE table, so it takes a DIRECT schema — ...")
-        }
-    v0.68.0  infra/db/command/read/join.go:417
-        panic(fmt.Sprintf("read.WithJoins[%s]: ", contextName) + msg)
+Operational classes checked and clear, by diffing the two module trees:
 
-`validateJoins` is reached from `directCore.declareJoins` (`direct_core.go:118`), which
-both `DirectRepository.WithJoins` and `AggregateLoader.WithJoins` funnel through — so
-every declaration in this service is covered, root joins and child joins alike
-(`join.go:549-562`: the per-join loop calls the same `walk` for both).
+- No DDL required — `application/configuration` is byte-identical between the pins.
+- No embedded migration added — the framework's `.sql` set is identical, so no
+  `autoRun: check` boot abort is coming.
+- No yaml key moved, renamed, or arrived mandatory — both profiles stay valid as written.
+- No shared gRPC proto change — no `.proto` / `.pb.go` differs.
+- The bootstrap seed (`migrations/postgres/0012_bootstrap_seed_manual.up.sql`) writes ids
+  by raw SQL, which is the case the changelog warns about for the identity-probe refusal.
+  Verified safe: all 50 seeded ids are well-formed UUIDs, no literal outside the format.
 
-`IsDirect()` is `s.direct` (`core/table_schema.go:288`), a flag set only by
-`NewDirectSchema` and `AsDirectSchema`. Every target this service joins to is built with
-`core.NewTableSchema[...]`:
+---
 
-    internal/infra/schemas/tenant_schema.go:44      core.NewTableSchema[*appdomain.Tenant]("tenants")
-    internal/infra/schemas/role_schema.go:44        core.NewTableSchema[*appdomain.Role]("roles")
-    internal/infra/schemas/group_schema.go:44       core.NewTableSchema[*appdomain.Group]("groups")
-    internal/infra/schemas/claim_schema.go:44       core.NewTableSchema[*appdomain.Claim]("claims")
-    internal/infra/schemas/permission_schema.go:45  core.NewTableSchema[*appdomain.Permission]("permissions")
+## Item 1 — `qa/tenant.sh:653`, case I5: the notification key moved
 
-So all 16 declarations panic the moment their repository is constructed — which is
-bootstrap. The unit suite stayed green because the only test that constructs one
-(`internal/infra/authentication_reader_live_test.go:70`) sits behind
-`//go:build integration && postgres`.
+**Trigger:** changelog v0.70.0, *"a by-id route no longer answers 500 for a `:id` that is
+not a UUID"*. No compile error — this is an assertion in the in-flight contract suite.
 
-## How it worked at v0.67.1 / how it works at v0.68.0
+**How it worked at v0.69.0** — section `status-mapping.html`: the section's
+`SemanticNotFound → 404` row listed exactly two keys, `RecordNotFoundNotification` and
+`RouteNotFoundNotification`. Nothing in the section addressed a malformed `:id` segment
+at all. The wrapper bound `c.Params("id")` and passed it through; on a Postgres backing
+the string reached the driver and came back as SQLSTATE 22P02, rendered as a **500**.
 
-Owning section: `docs/content/sections/read-joins.html`, read at both pins.
+**How it works at v0.70.0** — same section, `status-mapping.html`: the `404` row now
+reads `RecordNotFoundNotification`, `RouteNotFoundNotification`,
+`UnknownIDAddressNotification`, and the section states the rule directly — *"A malformed
+`:id` segment (present, and not a UUID) is refused by the wrapper BEFORE the handler, in
+context `Request` with `id` echoed on `field` and the rejected segment on `value`. What
+the consumer hears follows the VERB, not the view's backing: a READ answers
+`UnknownIDAddressNotification` → `SemanticNotFound` → 404, a WRITE answers
+`MalformedIDNotification` → `SemanticSchema` → 400."* The section also keeps the three
+404 keys distinct on purpose: *"the route did not exist, the record does not exist, or
+what you sent is not an address at all."*
 
-**v0.67.1** — a traversal took any `*core.TableSchema`. The docs' own examples read
-`read.InnerJoin(schemas.CustomerSchema()).On("customer_id")` (line 17). A schema carrying
-children, siblings or a shared base entered whole and was read in part, silently. Worse,
-`validateJoins` resolved the mapped column through `GoNameForRead`, which merges the
-target's satellites — so `.Field("Doc", "documento")` naming a column of the target's
-SIBLING was accepted at boot and then emitted as `alias.documento` against the target's
-own table: a SQL error on every read through that loader, `FindByID` included.
+**Effect on the case:** `GET /tenants/not-a-uuid` is a READ, so the **status the case
+asserts (404) becomes correct for the first time** — at v0.69.0 this case was asserting a
+contract the service did not deliver. Only the key is now wrong:
+`RecordNotFoundNotification` is reserved for a row that genuinely does not exist.
 
-**v0.68.0** — new subsection *"The target is one table — a Direct schema"* (lines 46-68):
+**Proposed edit — `qa/tenant.sh`, line 651-653:**
 
-> A traversal puts the target in the FROM as one table under one alias. So it takes a
-> schema that is one table: a Direct schema. A schema carrying children, siblings or a
-> shared base is refused at the declaration [...] Any schema becomes a target, at the call
-> site, where the reduction is visible.
+```diff
+-# DECIDED at the gate (Q2): 404 is the only defensible contract for an id that cannot
+-# name a record. A 500 here is a FINDING about the service, not a case to weaken.
++# The pin PROMISES this since v0.70.0: a malformed :id is refused at the wrapper, before
++# the handler, and the answer follows the VERB — a READ names no record, so 404 with its
++# own key, distinct from the 404 of a well-formed id that matched nothing (I1).
+ api GET "/tenants/not-a-uuid"
+-expect "I5 a syntactically impossible id" 404 "RecordNotFoundNotification"
++expect "I5 a syntactically impossible id" 404 "UnknownIDAddressNotification"
+```
 
-The docs' examples move to `read.InnerJoin(schemas.CustomerSchema().AsDirectSchema())`.
-`AsDirectSchema()` (`core/table_schema.go:1473`) returns a COPY reduced to the schema's
-own table; the receiver is untouched. An aggregate root, a child, a role, a shared base
-and a Direct schema all convert — a sibling and an external schema panic instead. Nothing
-reachable before is out of reach now.
+The other six `RecordNotFoundNotification` assertions (`F1`, `F6`, `F7`, `I1`, `J5b`,
+and the GraphQL `J6` idiom) are **unaffected** — every one of them sends a well-formed
+UUID that names no row, which is precisely the meaning v0.70.0 leaves untouched.
 
-## 1. The five generated repositories — 12 declarations
+---
 
-    internal/infra/user_repository.go:77    read.InnerJoin(schemas.TenantSchema())
-    internal/infra/user_repository.go:83    ...InChild(schemas.UserGroupSchema()).To(schemas.GroupSchema())
-    internal/infra/user_repository.go:89    ...InChild(schemas.UserRoleSchema()).To(schemas.RoleSchema())
-    internal/infra/user_repository.go:95    ...InChild(schemas.UserClaimSchema()).To(schemas.ClaimSchema())
-    internal/infra/client_repository.go:77  read.InnerJoin(schemas.TenantSchema())
-    internal/infra/client_repository.go:83  ...InChild(schemas.ClientRoleSchema()).To(schemas.RoleSchema())
-    internal/infra/client_repository.go:89  ...InChild(schemas.ClientClaimSchema()).To(schemas.ClaimSchema())
-    internal/infra/group_repository.go:75   read.InnerJoin(schemas.TenantSchema())
-    internal/infra/group_repository.go:81   ...InChild(schemas.GroupRoleSchema()).To(schemas.RoleSchema())
-    internal/infra/role_repository.go:75    read.InnerJoin(schemas.TenantSchema())
-    internal/infra/role_repository.go:81    ...InChild(schemas.RolePermissionSchema()).To(schemas.PermissionSchema())
-    internal/infra/claim_repository.go:74   read.InnerJoin(schemas.TenantSchema())
+## Item 2 — `specs/qa/tenant/plan.md`, the Q2 decision record is now false
 
-Only the TARGET takes the reduction. The child named by `...InChild(...)` must stay the
-ordinary child schema: `validateJoins` matches it against `root.ChildSchemas()` by table
-name (`join.go:424-426`, `join.go:551-557`), and it is not a FROM entry.
+**Trigger:** the same changelog item. The plan records the reasoning behind case I5, and
+its stated premise stopped being true at the bump.
 
-All five files carry `// Code generated by omnicore-gen. DO NOT EDIT.` and `doctor`
-reports no adopted hand edits on any of them, so both paths below are open.
-See §4 — this is the plan's one open decision.
+The record currently reads (lines 258-262):
 
-## 2. `internal/infra/authentication_reader_manual.go` — 4 declarations
+> `I5` `GET /tenants/not-a-uuid` → **404**. DECIDED (Q2): the pin's docs promise nothing
+> here and `domain.NewID` does not validate — the string is bound against a `uuid` column.
+> 404 is the only defensible contract (a syntactically impossible id names no record); a
+> 500 is a genuine FINDING about the service, reported verbatim and routed to
+> `/omnicore:doctor`, never patched away in the case.
 
-Hand-written; no generator will fix these whichever path §4 takes.
+*"The pin's docs promise nothing here"* was accurate at v0.69.0 — verified: neither
+`UnknownIDAddress`, `MalformedID` nor any malformed-`:id` rule appears in that pin's
+`status-mapping.html`. At v0.70.0 the docs promise exactly this, and the conclusion the
+gate reached by reasoning is now the documented contract.
 
-    :90   read.InnerJoin(schemas.RoleSchema()).On("role_id")        → .RoleSchema().AsDirectSchema()
-    :96   read.InnerJoin(schemas.GroupSchema()).On("group_id")      → .GroupSchema().AsDirectSchema()
-    :101  read.InnerJoin(schemas.RoleSchema()).On("role_id")        → .RoleSchema().AsDirectSchema()
-    :107  read.InnerJoin(schemas.PermissionSchema()).On("permission_id") → .PermissionSchema().AsDirectSchema()
+**Proposed edit — replace that paragraph with:**
 
-Proposed edit: insert `.AsDirectSchema()` on each of the four targets. Nothing else in the
-file changes — the `.On(...)`, `.Field(...)` and archive predicates are untouched, and the
-anchors (`UserRoleEdgeSchema`, `GroupRoleEdgeSchema`, `UserGroupEdgeSchema`,
-`RolePermissionEdgeSchema`) are already Direct schemas built by
-`internal/infra/schemas/grant_edge_direct_schemas.go`.
+> `I5` `GET /tenants/not-a-uuid` → **404** `UnknownIDAddressNotification`. DECIDED (Q2)
+> by reasoning when the pin was v0.69.0, where the docs promised nothing here and a 500
+> was the observed behavior on the relational backing. **v0.70.0 made it a documented
+> contract** (`status-mapping.html`): the wrapper refuses a malformed `:id` before the
+> handler, and the answer follows the verb — a READ answers 404
+> `UnknownIDAddressNotification`, a WRITE answers 400 `MalformedIDNotification`. The key
+> is deliberately NOT `RecordNotFoundNotification`: that one means a well-formed address
+> named no row (`I1`), and the two stay distinct so a consumer can tell a bad address
+> from an unknown one.
 
-Worth noting in passing: the fields these four joins map are all columns of the target's
-OWN table (`role_key`, `name`, `resource_name`, `action_name`, `deleted_at`), so this
-service was never hitting the silent-satellite bug the release fixes. The change here is
-conformance, not a latent defect being closed.
+---
 
-## 3. `criteria.Sub` — nothing to do
+## Item 3 — the route inventory oracle is safe, no edit needed
 
-The v0.68.0 subquery API (`Sub`, `Outer`, `InSub`/`NinSub`/`EqSub`/…/`Exists`/`NotExists`)
-is new surface. `grep -rn 'criteria\.Sub' --include='*.go'` returns nothing in this
-service, so the matching Direct-schema requirement on a subquery source
-(`core/criteria_sql.go:473`) has no call site to migrate.
+Recorded so it is not re-checked later. v0.70.0 adds a `400` response to `HasPathID`
+routes in the OpenAPI document. Case `X1b` (`qa/tenant.sh:266`) projects only
+`.paths | to_entries[] | (method + " " + path)` — method and path keys, never response
+codes — so the added `400` does not move its expected string. **No change.**
 
-It is worth a separate look later, not in this plan: `AuthenticationReader`'s grant walk
-reads four edge tables in sequence, which is the exact shape
-`Exists(Sub(...).Where(Eq(..., Outer("ID"))))` now expresses in one statement. That is a
-design change with its own trade-offs (one snapshot vs. four, and the per-hop archive
-predicates the reader states by hand), not an upgrade fix.
+---
 
-## 4. ⚠️ OPEN: how to fix the 12 generated declarations
+## ⚠️ OPEN: does the suite take on the new contract surface v0.70.0 exposes?
 
-Both paths end at the same compiling, booting service. They differ in blast radius and in
-what else they carry.
+This is a scope question, not a fix, so it is not decided here. v0.70.0 introduces two
+promises the suite currently has **no case for**, and both are cheap to prove on a
+service that already has the fixtures:
 
-**(a) Regenerate.** `omnicore-gen check` reports `✓ this spec can be generated` for all
-seven specs at `Framework: v0.68.0 (supported v0.68.0.x) — exact`. The lock records the
-specs at v0.63.0/v0.64.0, so regeneration rewrites the five files whole against the 0.68
-emitter — the join fix arrives with every other emitter change accumulated across five
-releases, which is the point of not having adopted files. The cost is that the diff to
-review is five whole files, not twelve lines, and any of it that is not the join fix is
-unreviewed change landing in the same commit.
+1. **A by-id WRITE with a malformed id → 400 `MalformedIDNotification`.** The suite's `I`
+   section covers the READ arm (I5) but never the WRITE arm, e.g.
+   `PATCH /tenants/not-a-uuid` or `PATCH /tenants/not-a-uuid/archive`. This is the half of
+   the new rule that behaves DIFFERENTLY from the read, so it is the half a regression
+   would most easily hide in.
+2. **A bad filter value → 400 `InvalidFilterValueNotification`.** Section `H` proves
+   fifteen flavors of typed 400 but every one of them is a violation of the query
+   *grammar* (unknown key, operator outside the allowlist, bad cursor). None sends a
+   well-formed key carrying a value the column cannot hold — e.g. a non-uuid on an
+   identity leaf, which at v0.69.0 was a 500 on Postgres and is now a typed 400.
 
-**(b) Hand-edit the twelve lines.** Insert `.AsDirectSchema()` on each target, exactly as
-§2 does for the manual reader. Deterministic, twelve-line diff, nothing else moves. The
-files keep their `DO NOT EDIT` banner and drift from the emitter — a later `generate`
-would overwrite the edit, which is fine here because the emitter would then write the same
-thing. The cost is that the five releases' worth of other emitter improvements stay
-unclaimed until the next regeneration.
+Adding these is beyond repairing the bump's fallout, and the tenant suite is yours in
+flight on this branch — so: **add both cases now, add neither, or add only one?**
 
-Recommendation: **(a)**, and review the resulting diff before anything else — the whole
-reason `doctor` reports no adopted files is that regeneration is supposed to be cheap
-here. If the diff turns out to carry more than expected, (b) stays available.
+---
 
-**ANSWERED: (a) regenerate.**
+## Needs your attention — not auto-fixable, no edit proposed
 
-## 5. Not auto-fixable — for your attention
-
-- **Nothing operational.** No new mandatory yaml key in v0.68.0 (`relational.clock` was
-  the v0.65.0 arrival and is already set in both profiles). The framework's embedded
-  migration set is byte-identical between the two pins. No DDL on this service's tables,
-  no view rebuild demanded, no gRPC proto change.
-- **The real verification is the boot, not the build.** Once the plan is applied, the
-  proof is `/omnicore:run` — or the integration suite with
-  `go test -tags 'integration postgres' ./internal/infra/...` against the dev bench, which
-  is the only offline path that actually constructs `AuthenticationReader`.
-- **Upstream doc bug, for the framework repo — not this service.** The v0.68.0
-  `read-joins.html` section *"Joining from an aggregate child"* (line 329) still shows
-  `read.LeftJoinInChild(schemas.EnderecoSchema()).To(schemas.CidadeSchema())` with no
-  `.AsDirectSchema()` on the target. The code refuses that form: the child-join loop calls
-  the same `walk`, so `j.Target.IsDirect()` applies there too. Every other example in the
-  file was updated. The example is stale, not a second contract.
-
-## Applied — 2026-08-31
-
-**§1 (regenerate)** — `omnicore-gen generate` on all seven specs. Seven files updated,
-nothing created, `kept as-is` untouched. The diff is exactly the twelve join sites plus a
-comment explaining the reduction, the regenerated checksum/date header, and one reworded
-comment line in `permission_service.go` and `tenant_service.go` ("counting them in Go" →
-"folding the answer in Go"). No behavioral change outside the joins. The emitter writes
-`To(schemas.RoleSchema().AsDirectSchema())` for child joins, which confirms §5's reading
-that the docs' `Joining from an aggregate child` example is stale rather than a second
-contract.
-
-**§2 (by hand)** — the four targets in `authentication_reader_manual.go` (:90, :96, :101,
-:107) now carry `.AsDirectSchema()`. Nothing else in the file changed.
-
-`grep -rnE 'read\.(InnerJoin|LeftJoin)\([^)]*Schema\(\)\)|\.To\(schemas\.[A-Za-z]+Schema\(\)\)'`
-returns nothing: no unreduced target is left.
-
-**Verify:** `gofmt -l internal/` clean · `go vet -tags postgres ./...` clean ·
-`go build -tags postgres ./...` clean · `go test -tags postgres ./...` all packages ok ·
-`go vet -tags 'integration postgres' ./internal/infra/...` clean (the integration suite
-compiles).
-
-**Still unproven, by construction.** None of the above constructs a repository, so none of
-it exercises `validateJoins`. No Postgres bench is reachable from this run
-(`DATABASE_URL` unset, no container up), so the boot was not performed. The proof is
-`/omnicore:run`, or `go test -tags 'integration postgres' ./internal/infra/...` against a
-live bench.
+- **The three behavioral changes affect every entity, not just Tenant.** `Claim`,
+  `Client`, `Group`, `Permission`, `Role` and `User` all serve by-id routes over the same
+  relational backing, so all of them moved from 500 to the contract on a malformed `:id`
+  and on a bad filter value. Nothing is broken by this — it is strictly a service getting
+  better — but any consumer, script or client that was written against the 500 will now
+  see a 404 or a 400. Only the Tenant suite exists so far, so only its assertions are
+  edited here; the same key applies when the remaining six suites are written.
+- **A green build is not a green boot.** vet and build pass under `-tags postgres`, which
+  proves the Go surface compiles against the new pin. It does not exercise the wrapper
+  changes above, all of which are runtime. Running the service and the suite is the
+  actual verification.
