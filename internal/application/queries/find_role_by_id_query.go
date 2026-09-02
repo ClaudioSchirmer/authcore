@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:db03637fb0a33a846538f9d171cb65d92074c9ab0c9be878a400877d4fb126bf
+// generated:  2026-09-01
+// checksum:   sha256:dc4b088b6250058ef8b6a571ec84f70aeae7ae9346716c167bc583b12f8f6438
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,9 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // FindRoleByIDQuery is the application-side transport for the by-id read.
@@ -80,12 +83,12 @@ func (q FindRoleByIDQuery) ToCriteria(ctx *configuration.AppContext) (fwqueries.
 // BEFORE any transport sees it.
 //
 // This read carries computed fields, so the derivation runs here — in
-// internal/application/queries/role_computed_manual.go, which the generator
-// wrote once and never touches again.
+// internal/application/queries/utils/role_computed_manual.go, which the
+// generator wrote once and never touches again.
 func (q FindRoleByIDQuery) FromQueryResult(ctx *configuration.AppContext, r FindRoleByIDResult) (FindRoleByIDResult, error) {
 	for i := range r.Permissions {
 		if r.Permissions[i].Resource != nil && r.Permissions[i].Action != nil {
-			v, err := ComputeRoleRolePermissionPermission(ctx, *r.Permissions[i].Resource, *r.Permissions[i].Action)
+			v, err := qryutils.ComputeRoleRolePermissionPermission(ctx, *r.Permissions[i].Resource, *r.Permissions[i].Action)
 			if err != nil {
 				return r, err
 			}
@@ -118,5 +121,5 @@ type FindRoleByIDResult struct {
 	UpdatedAt       time.Time
 	TenantWorkspace string
 	TenantStatus    string
-	Permissions     []RolePermissionRowResult
+	Permissions     []qrydtos.RolePermissionRowResult
 }

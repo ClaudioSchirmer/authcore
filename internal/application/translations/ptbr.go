@@ -118,6 +118,7 @@ func (ptbr) Translations() map[string]string {
 		"PasswordResetRequiresAnotherUserNotification":      "Use o endpoint de alteração de senha para definir a sua própria.",
 		"InvalidCurrentPasswordNotification":                "A senha atual está incorreta.",
 		"InvalidCredentialsNotification":                    "E-mail ou senha inválidos.",
+		"InvalidClientCredentialsNotification":              "Identificador ou segredo do cliente inválidos.",
 		"AccountTemporarilyLockedNotification":              "Tentativas demais. Tente novamente em {minutes} minutos.",
 		"Authentication":                                    "Autenticação",
 		"InvalidEmailNotification":                          "E-mail inválido. Informe um endereço em letras minúsculas.",

@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:2d274f5f2113f7c55296792ce79996b322b2ba26d736382b3bf3758409ceaba8
+// generated:  2026-09-01
+// checksum:   sha256:cff29bed37d643461528420e8d9394d62af55f58e4d58148765b375f33f9b692
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 	"time"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // InsertUserRequest is the body of Create an user.
@@ -52,10 +54,10 @@ type InsertUserRequest struct {
 	// not ignored — it reaches the aggregate, where the row-scope guard
 	// refuses it exactly as it refuses a write into a record that is not
 	// the caller's.
-	TenantID *domain.ID         `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Groups   []UserGroupRequest `json:"groups"`
-	Roles    []UserRoleRequest  `json:"roles"`
-	Claims   []UserClaimRequest `json:"claims"`
+	TenantID *domain.ID                 `json:"tenantID,omitempty" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Groups   []webdtos.UserGroupRequest `json:"groups"`
+	Roles    []webdtos.UserRoleRequest  `json:"roles"`
+	Claims   []webdtos.UserClaimRequest `json:"claims"`
 }
 
 // ToCommand hands the body to the application layer unchanged. No
@@ -73,19 +75,19 @@ func (r InsertUserRequest) ToCommand() *commands.InsertUserCommand {
 type InsertUserResponse struct {
 	fwresponses.Auto
 
-	ID                 domain.ID           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID           domain.ID           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	GivenName          string              `json:"givenName" example:"Maria"`
-	FamilyName         string              `json:"familyName" example:"Souza Lima"`
-	Email              string              `json:"email" example:"maria@acme.com"`
-	EmailVerifiedAt    *time.Time          `json:"emailVerifiedAt,omitempty" example:"2026-08-25T14:03:11Z"`
-	PasswordChangedAt  time.Time           `json:"passwordChangedAt" example:"2026-08-25T14:03:11Z"`
-	MustChangePassword bool                `json:"mustChangePassword" example:"true"`
-	Status             string              `json:"status" example:"active"`
-	FullName           string              `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
-	Groups             []UserGroupResponse `json:"groups"`
-	Roles              []UserRoleResponse  `json:"roles"`
-	Claims             []UserClaimResponse `json:"claims"`
+	ID                 domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID           domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	GivenName          string                      `json:"givenName" example:"Maria"`
+	FamilyName         string                      `json:"familyName" example:"Souza Lima"`
+	Email              string                      `json:"email" example:"maria@acme.com"`
+	EmailVerifiedAt    *time.Time                  `json:"emailVerifiedAt,omitempty" example:"2026-08-25T14:03:11Z"`
+	PasswordChangedAt  time.Time                   `json:"passwordChangedAt" example:"2026-08-25T14:03:11Z"`
+	MustChangePassword bool                        `json:"mustChangePassword" example:"true"`
+	Status             string                      `json:"status" example:"active"`
+	FullName           string                      `json:"fullName" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
+	Groups             []webdtos.UserGroupResponse `json:"groups"`
+	Roles              []webdtos.UserRoleResponse  `json:"roles"`
+	Claims             []webdtos.UserClaimResponse `json:"claims"`
 }
 
 // FromResult projects the application Result onto InsertUserResponse.

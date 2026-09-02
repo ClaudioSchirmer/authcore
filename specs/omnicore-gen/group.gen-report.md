@@ -149,7 +149,7 @@ If this entity has NOT shipped anywhere yet — you are still the only one who e
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, remove — have generated tests in `internal/application/commands/group_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -203,10 +203,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/domain/group_rules_manual.go` — hand-written rules live here, by design
@@ -214,7 +210,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+48 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -230,9 +226,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

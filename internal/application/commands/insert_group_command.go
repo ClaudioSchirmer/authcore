@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:b84e5265bfa4d448267e96e2c7f2a0ebad6ebd12aa548397ecb3f9ff2940c2b6
+// generated:  2026-09-01
+// checksum:   sha256:2db63dd239e352cb6a1bf0b778947a91e2c7630633bb7d7cded27b8d05851e65
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -36,6 +36,9 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 )
 
 // InsertGroupCommand carries the writable fields of the request.
@@ -95,7 +98,7 @@ type InsertGroupResult struct {
 	Key         string
 	Name        string
 	Description string
-	Roles       []GroupRoleResult
+	Roles       []cmddtos.GroupRoleResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -110,6 +113,6 @@ func (c *InsertGroupCommand) FromEntity(_ *configuration.AppContext, e *appdomai
 		Key:         e.Key.Value(),
 		Name:        e.Name.Value(),
 		Description: e.Description.Value(),
-		Roles:       projectGroupRoles(e),
+		Roles:       cmdutils.ProjectGroupRoles(e),
 	}, nil
 }

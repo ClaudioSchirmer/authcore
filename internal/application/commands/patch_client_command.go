@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e642e3c2a9a3637821920b282804f743cbf362ceaca6f93c5ffd9fb81d7d7336
+// generated:  2026-09-01
+// checksum:   sha256:13256ddfd93b6b69f77e2fe0bd982298939646be1211af04a72694ca08aad0bf
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -35,6 +35,9 @@ import (
 
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 )
 
 // PatchClientCommand carries the writable fields of the request.
@@ -96,9 +99,9 @@ type PatchClientResult struct {
 	PreviousSecretHash      *string
 	PreviousSecretExpiresAt *time.Time
 	Status                  string
-	Roles                   []ClientRoleResult
-	AllowedCIDRs            []ClientAllowedCIDRResult
-	Claims                  []ClientClaimResult
+	Roles                   []cmddtos.ClientRoleResult
+	AllowedCIDRs            []cmddtos.ClientAllowedCIDRResult
+	Claims                  []cmddtos.ClientClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -117,8 +120,8 @@ func (c *PatchClientCommand) FromEntity(_ *configuration.AppContext, e *appdomai
 		PreviousSecretHash:      e.PreviousSecretHash,
 		PreviousSecretExpiresAt: e.PreviousSecretExpiresAt,
 		Status:                  e.Status.Value(),
-		Roles:                   projectClientRoles(e),
-		AllowedCIDRs:            projectClientAllowedCIDRs(e),
-		Claims:                  projectClientClaims(e),
+		Roles:                   cmdutils.ProjectClientRoles(e),
+		AllowedCIDRs:            cmdutils.ProjectClientAllowedCIDRs(e),
+		Claims:                  cmdutils.ProjectClientClaims(e),
 	}, nil
 }

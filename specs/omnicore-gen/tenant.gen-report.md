@@ -119,17 +119,13 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the Tenant service implementation | `internal/infra/tenant_service.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/domain/tenant_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-27 file(s) were already up to date.
+34 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -145,9 +141,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

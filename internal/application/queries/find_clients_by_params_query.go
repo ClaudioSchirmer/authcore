@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c4302cfab2a7a0587b4cededb8ce66cfac3e40ac47366e5d1ce8964488c99f12
+// generated:  2026-09-01
+// checksum:   sha256:f25bb85df1a7e632e09866ebd7e648db3ecf0b737308781a7896369df9374134
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindClientsByParamsQuery is the application-side transport for the paged
@@ -107,7 +109,7 @@ type FindClientsByParamsResult struct {
 	UpdatedAt               *time.Time
 	TenantWorkspace         *string
 	TenantStatus            *string
-	Roles                   []ClientRoleRowResult
-	AllowedCIDRs            []ClientAllowedCIDRRowResult
-	Claims                  []ClientClaimRowResult
+	Roles                   []qrydtos.ClientRoleRowResult
+	AllowedCIDRs            []qrydtos.ClientAllowedCIDRRowResult
+	Claims                  []qrydtos.ClientClaimRowResult
 }

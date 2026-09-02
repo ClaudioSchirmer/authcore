@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:b22f877d350a3d88aa7644cf02d81b451db3d4d98dad94993c25c1508a88a449
+// generated:  2026-09-01
+// checksum:   sha256:6e4419fed750238c7110be3cca7edc4d4ed6f4e2426c6cef84283e1cc71b46c9
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,9 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // FindUsersByParamsQuery is the application-side transport for the paged read.
@@ -75,11 +78,11 @@ func (q FindUsersByParamsQuery) ToCriteria(ctx *configuration.AppContext) (fwque
 // BEFORE any transport sees it.
 //
 // This read carries computed fields, so the derivation runs here — in
-// internal/application/queries/user_computed_manual.go, which the generator
-// wrote once and never touches again.
+// internal/application/queries/utils/user_computed_manual.go, which the
+// generator wrote once and never touches again.
 func (q FindUsersByParamsQuery) FromQueryResult(ctx *configuration.AppContext, r FindUsersByParamsResult) (FindUsersByParamsResult, error) {
 	if r.GivenName != nil && r.FamilyName != nil {
-		v, err := ComputeUserFullName(ctx, *r.GivenName, *r.FamilyName)
+		v, err := qryutils.ComputeUserFullName(ctx, *r.GivenName, *r.FamilyName)
 		if err != nil {
 			return r, err
 		}
@@ -118,7 +121,7 @@ type FindUsersByParamsResult struct {
 	// FullName is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from GivenName+FamilyName.
 	FullName *string
-	Groups   []UserGroupRowResult
-	Roles    []UserRoleRowResult
-	Claims   []UserClaimRowResult
+	Groups   []qrydtos.UserGroupRowResult
+	Roles    []qrydtos.UserRoleRowResult
+	Claims   []qrydtos.UserClaimRowResult
 }

@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:9c0c03d98a47920f3f936d8473bd803cd9882c6bb006c3a82905c9aa2b94cd05
+// generated:  2026-09-01
+// checksum:   sha256:0e4875bc0da00937a5499c80766de119bf5c52c125a00f797aeb99cd43067749
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -36,8 +36,10 @@ import (
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // InsertUserCommand carries the writable fields of the request.
@@ -122,9 +124,9 @@ type InsertUserResult struct {
 	// FullName is COMPUTED: no column backs it, and FromEntity fills it
 	// from GivenName+FamilyName.
 	FullName string
-	Groups   []UserGroupResult
-	Roles    []UserRoleResult
-	Claims   []UserClaimResult
+	Groups   []cmddtos.UserGroupResult
+	Roles    []cmddtos.UserRoleResult
+	Claims   []cmddtos.UserClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -146,14 +148,14 @@ func (c *InsertUserCommand) FromEntity(ctx *configuration.AppContext, e *appdoma
 		PasswordChangedAt:  e.PasswordChangedAt,
 		MustChangePassword: e.MustChangePassword,
 		Status:             e.Status.Value(),
-		Groups:             projectUserGroups(e),
-		Roles:              projectUserRoles(e),
-		Claims:             projectUserClaims(e),
+		Groups:             cmdutils.ProjectUserGroups(e),
+		Roles:              cmdutils.ProjectUserRoles(e),
+		Claims:             cmdutils.ProjectUserClaims(e),
 	}
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family
 	{
-		v, err := appqueries.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
+		v, err := qryutils.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
 		if err != nil {
 			return out, err
 		}

@@ -10,6 +10,7 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/dtos"
 	"testing"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -35,38 +36,38 @@ func concreteKeys(pairs ...[2]string) []vos.PermissionKey {
 func TestRoleRowGrantsWildcardFailsClosedOnAnUnknownID(t *testing.T) {
 	cases := []struct {
 		name string
-		row  roleRow
+		row  dtos.RoleRow
 		want bool
 	}{
 		{
 			"a bundle of concrete permissions is not a wildcard",
-			roleRow{found: true, keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})},
 			false,
 		},
 		{
 			"one wildcard RESOURCE anywhere in the bundle is",
-			roleRow{found: true, keys: concreteKeys([2]string{"tenant", "read"}, [2]string{vos.PermissionWildcard, vos.PermissionWildcard})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{vos.PermissionWildcard, vos.PermissionWildcard})},
 			true,
 		},
 		{
 			"one wildcard ACTION anywhere in the bundle is",
-			roleRow{found: true, keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"tenant", vos.PermissionWildcard})},
+			dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"tenant", vos.PermissionWildcard})},
 			true,
 		},
 		{
 			"a role granting nothing is not",
-			roleRow{found: true},
+			dtos.RoleRow{Found: true},
 			false,
 		},
 		{
 			"an UNKNOWN role is, fail-closed",
-			roleRow{found: false},
+			dtos.RoleRow{Found: false},
 			true,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := c.row.grantsWildcard(); got != c.want {
+			if got := c.row.GrantsWildcard(); got != c.want {
 				t.Errorf("grantsWildcard() = %v, want %v", got, c.want)
 			}
 		})
@@ -100,10 +101,10 @@ func TestAnUnusableRoleIDResolvesToNotFoundWithoutTouchingTheStore(t *testing.T)
 	rows := svc.roleRows(unusable)
 	for _, id := range unusable {
 		row := rows[id]
-		if row.found {
+		if row.Found {
 			t.Errorf("%q resolved to a role", id.String())
 		}
-		if !row.grantsWildcard() {
+		if !row.GrantsWildcard() {
 			t.Errorf("%q did not fail closed on the wildcard question", id.String())
 		}
 	}
@@ -161,9 +162,9 @@ func TestASuperAdminLacksNothingInAConcreteBundle(t *testing.T) {
 
 	// Prime the request memo so the fact answers from it and never queries.
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set(groupRoleMemoPrefix+roleID.String(), roleRow{
-		found: true,
-		keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{
+		Found: true,
+		Keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
 
 	if svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
@@ -181,7 +182,7 @@ func TestACallerMissingOneKeyOfTheBundleIsRefused(t *testing.T) {
 	svc := &GroupServiceImpl{ctx: ctx}
 
 	roleID := domain.NewID(probedRoleID)
-	held := roleRow{found: true, keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})}
+	held := dtos.RoleRow{Found: true, Keys: concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"})}
 	ctx.Set(groupRoleMemoPrefix+roleID.String(), held)
 	if svc.CallerLacksAnyPermissionOf([]domain.ID{roleID})[roleID] {
 		t.Fatal("a caller holding every key of the bundle was refused")
@@ -189,9 +190,9 @@ func TestACallerMissingOneKeyOfTheBundleIsRefused(t *testing.T) {
 
 	// One more key, which the caller does not hold. Nothing else changes.
 	other := domain.NewID("0198f400-1111-7000-8000-aaaaaaaaaaaa")
-	ctx.Set(groupRoleMemoPrefix+other.String(), roleRow{
-		found: true,
-		keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
+	ctx.Set(groupRoleMemoPrefix+other.String(), dtos.RoleRow{
+		Found: true,
+		Keys:  concreteKeys([2]string{"tenant", "read"}, [2]string{"role", "insert"}, [2]string{"group", "grant"}),
 	})
 	if !svc.CallerLacksAnyPermissionOf([]domain.ID{other})[other] {
 		t.Error("a caller was allowed to confer a role granting a permission they do not hold")
@@ -210,9 +211,9 @@ func TestAWildcardBearingBundleIsRefusedWithoutAskingTheIdentity(t *testing.T) {
 	svc := &GroupServiceImpl{ctx: ctx}
 
 	roleID := domain.NewID(probedRoleID)
-	ctx.Set(groupRoleMemoPrefix+roleID.String(), roleRow{
-		found: true,
-		keys:  concreteKeys([2]string{vos.PermissionWildcard, vos.PermissionWildcard}),
+	ctx.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{
+		Found: true,
+		Keys:  concreteKeys([2]string{vos.PermissionWildcard, vos.PermissionWildcard}),
 	})
 
 	// Even for a super-admin: the answer comes from the guard, not the claim.
@@ -228,7 +229,7 @@ func TestTheRoleMemoIsScopedToOneRequest(t *testing.T) {
 	roleID := domain.NewID(probedRoleID)
 
 	first := configuration.NewAppContextWithRandomID(configuration.LangENG)
-	first.Set(groupRoleMemoPrefix+roleID.String(), roleRow{found: true})
+	first.Set(groupRoleMemoPrefix+roleID.String(), dtos.RoleRow{Found: true})
 
 	if _, ok := first.Get(groupRoleMemoPrefix + roleID.String()); !ok {
 		t.Fatal("the memo did not store the row on its own context")

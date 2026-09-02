@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:7a85ab81ce4c581ca4e2a7b414f048ae2b178f007acbcfdcdaaf4dd3d782d9b0
+// generated:  2026-09-01
+// checksum:   sha256:1571e8dcb91f2fe28d6b169a9c50179a92ad84194751c25dea6888bf740c2128
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -149,14 +149,14 @@ func MountRoles(
 		},
 		fwopenapi.RequirePermission("role:grant"))
 
-	hRemoveRolePermission, sRemoveRolePermission := fwweb.CommandWithBodyIDSpec(d.Pipeline,
-		requests.RemoveRolePermissionRequest{},
+	hArchiveRolePermission, sArchiveRolePermission := fwweb.CommandWithBodyIDSpec(d.Pipeline,
+		requests.ArchiveRolePermissionRequest{},
 		fwresponses.NoBody,
-		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.RemoveRolePermissionCommand, fwresults.None]{
+		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.ArchiveRolePermissionCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		}, fiber.StatusNoContent)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/permissions/:rolePermissionId/archive",
-		hRemoveRolePermission, sRemoveRolePermission,
+		hArchiveRolePermission, sArchiveRolePermission,
 		fwopenapi.Doc{
 			Summary:     "Archive one RolePermission of a Role",
 			Description: "Archives ONE entry: the row stays, stamped, and stops being returned — which is why this is not a DELETE. There is no per-entry unarchive: an entry taken out this way does not come back, and adding the same value again mints a NEW entry with a new id. Answers 204 with no body. 404 when the owner is not there, and 404 when it holds no entry with that id.",
@@ -229,12 +229,12 @@ func MountRolesGraphQL(
 		fwgraphql.RequirePermission("role:grant")))
 
 	// REST answers 204 with no body; a GraphQL field must answer SOMETHING,
-	// so the payload is the acknowledgement and nothing more. Whether the
-	// row is archived or deleted follows the child's own declaration, the
-	// same way it does on the REST verb.
-	reg.Register(fwgraphql.MutationWithBodyID[requests.RemoveRolePermissionGraphQLRequest](
-		"removeRolePermission", requests.RemoveRolePermissionGraphQLResponse{}.FromResult,
-		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.RemoveRolePermissionCommand, fwresults.None]{
+	// so the payload is the acknowledgement and nothing more. The field is
+	// named for what the removal DOES here — archive or delete — the same
+	// way the REST verb is.
+	reg.Register(fwgraphql.MutationWithBodyID[requests.ArchiveRolePermissionGraphQLRequest](
+		"archiveRolePermission", requests.ArchiveRolePermissionGraphQLResponse{}.FromResult,
+		&handlers.UpdateCommandHandler[*appdomain.Role, *commands.ArchiveRolePermissionCommand, fwresults.None]{
 			Repo: repo, Service: svc,
 		},
 		fwgraphql.RequirePermission("role:grant")))

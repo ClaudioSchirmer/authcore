@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:4fa4f54d8a2c32d3a32c6d77ba0b22defc40750d4231e8d430ad4384b3c48d1d
+// generated:  2026-09-01
+// checksum:   sha256:6fc06cebba3f0b9087b70e8eac2052bdf5e1bac213deaa5dfc143acb769539fb
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -36,6 +36,9 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 )
 
 // InsertRoleCommand carries the writable fields of the request.
@@ -95,7 +98,7 @@ type InsertRoleResult struct {
 	Key         string
 	Name        string
 	Description string
-	Permissions []RolePermissionResult
+	Permissions []cmddtos.RolePermissionResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -110,6 +113,6 @@ func (c *InsertRoleCommand) FromEntity(_ *configuration.AppContext, e *appdomain
 		Key:         e.Key.Value(),
 		Name:        e.Name.Value(),
 		Description: e.Description.Value(),
-		Permissions: projectRolePermissions(e),
+		Permissions: cmdutils.ProjectRolePermissions(e),
 	}, nil
 }

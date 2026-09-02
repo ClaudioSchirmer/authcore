@@ -26,11 +26,9 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 The tests for them are yours too, and the same check applies.
 
-### `internal/application/queries/permission_computed_manual.go`
+### `internal/application/queries/utils/permission_computed_manual.go`
 
-This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
-
-**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
+The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
 
 **`Permission` (string)** ← `Resource`, `Action`
 
@@ -133,16 +131,23 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Permission service implementation | `internal/infra/permission_service.go` |
+| the insert command and result | `internal/application/commands/insert_permission_command.go` |
+| the patch command and result | `internal/application/commands/patch_permission_command.go` |
+| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
+| the derivations for 1 computed read field(s) | `internal/application/queries/utils/permission_computed_manual.go` |
 
 **Left untouched** (yours, by design):
 
-- `internal/application/queries/permission_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/permission_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-24 file(s) were already up to date.
+26 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `internal/application/queries/permission_computed_manual.go`
 
 ## What was NOT generated
 
@@ -158,9 +163,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

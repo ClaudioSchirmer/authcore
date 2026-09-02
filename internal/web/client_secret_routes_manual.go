@@ -21,7 +21,8 @@
 package web
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	"github.com/ClaudioSchirmer/omnicore/domain"
@@ -38,7 +39,7 @@ import (
 // application layer and names exactly the two things it does.
 func MountClientSecrets(
 	app *fiber.App,
-	store commands.ClientSecretStore,
+	store dtos.ClientSecretStore,
 	svc domain.Service,
 	d bootstrap.Deps,
 ) {
@@ -58,7 +59,7 @@ func MountClientSecrets(
 	rotateH, rotateSpec := fwweb.CommandWithBodyIDSpec(d.Pipeline,
 		requests.RotateClientSecretRequest{},
 		requests.RotateClientSecretResponse{}.FromResult,
-		&commands.RotateClientSecretHandler{Store: store, Service: svc},
+		&handlers.RotateClientSecretHandler{Store: store, Service: svc},
 		fiber.StatusOK)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/:id/secret",
 		rotateH, rotateSpec,
@@ -114,11 +115,11 @@ func intPtr(v int) *int { return &v }
 // an omitted argument into an immediate revocation.
 func MountClientSecretsGraphQL(
 	reg *fwgraphql.Registry,
-	store commands.ClientSecretStore,
+	store dtos.ClientSecretStore,
 	svc domain.Service,
 ) {
 	reg.Register(fwgraphql.MutationWithBodyID[requests.RotateClientSecretRequest](
 		"rotateClientSecret", requests.RotateClientSecretResponse{}.FromResult,
-		&commands.RotateClientSecretHandler{Store: store, Service: svc},
+		&handlers.RotateClientSecretHandler{Store: store, Service: svc},
 		fwgraphql.RequirePermission("client:rotate-secret")))
 }

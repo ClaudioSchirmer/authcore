@@ -1,7 +1,7 @@
 // Hand-written, and not a hook: no generator declares this file.
 //
-// The two routes that make this service an IdP rather than merely a consumer of
-// one. The framework ships the Issuer and mounts the JWKS document; every HTTP
+// The three routes that make this service an IdP rather than merely a consumer of
+// one: a person signs in, rotates, and a machine signs in. The framework ships the Issuer and mounts the JWKS document; every HTTP
 // endpoint on top of that is the consuming service's, and its own manual says so
 // outright — "POST /auth/login, POST /auth/refresh, an introspection endpoint —
 // all of it is built by the consuming service".
@@ -14,16 +14,17 @@
 // catalogs, the AppContext, the audit actor and the OpenAPI schema derived from
 // the DTO rather than from whatever the author remembered to type.
 //
-// BOTH ARE PUBLIC, and they have to be: a sign-in cannot require the credential
-// it is about to grant. Doc.Public satisfies the boot-time authorization scan,
-// but it does NOT bypass the middleware — that comes only from auth.publicRoutes
-// in the yaml, exact "METHOD /path" match, and both profiles list these two. Omit
-// either entry and the route answers 401 before this handler ever runs.
+// ALL THREE ARE PUBLIC, and they have to be: a sign-in cannot require the
+// credential it is about to grant. Doc.Public satisfies the boot-time
+// authorization scan, but it does NOT bypass the middleware — that comes only from
+// auth.publicRoutes in the yaml, exact "METHOD /path" match, and both profiles list
+// all three. Omit an entry and the route answers 401 before its handler ever runs.
 
 package web
 
 import (
-	"github.com/ClaudioSchirmer/authcore/internal/application/commands"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers"
+	"github.com/ClaudioSchirmer/authcore/internal/application/commands/handlers/dtos"
 	"github.com/ClaudioSchirmer/authcore/internal/web/requests"
 	"github.com/ClaudioSchirmer/omnicore/bootstrap"
 	fwweb "github.com/ClaudioSchirmer/omnicore/web"
@@ -31,25 +32,27 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// MountAuthentication mounts the sign-in and the rotation.
+// MountAuthentication mounts the two user token routes and the machine one.
 //
 // It takes the ports rather than the concrete adapters, for the same reason
 // MountUserCredentials does: the interfaces are declared in the application layer
 // and name exactly what these two operations need.
 func MountAuthentication(
 	app *fiber.App,
-	store commands.AuthenticationStore,
-	lookup commands.RefreshTokenLookup,
-	attempts commands.AttemptRecorder,
-	events commands.AuthenticationEventPublisher,
-	issuer commands.TokenIssuer,
+	store dtos.AuthenticationStore,
+	clients dtos.ClientAuthenticationStore,
+	lookup dtos.RefreshTokenLookup,
+	attempts dtos.AttemptRecorder,
+	events dtos.AuthenticationEventPublisher,
+	issuer dtos.TokenIssuer,
+	accessIssuer dtos.AccessTokenIssuer,
 	d bootstrap.Deps,
 ) {
 	// The group is /auth and the SUBJECT TYPE is the next segment, not a field in
 	// the body.
 	//
-	// A client-credentials token is coming, and it is a different operation wearing
-	// a similar name: it takes a client id and a secret instead of an e-mail and a
+	// The client-credentials token below is a different operation wearing a similar
+	// name: it takes a client id and a secret instead of an e-mail and a
 	// password, its claims carry no e-mail and no groups, and per RFC 6749 §4.4.3 it
 	// issues no refresh token at all — the client's secret IS its long-lived
 	// credential. Folding that into one endpoint behind a `grantType` field would
@@ -66,29 +69,27 @@ func MountAuthentication(
 	// way, so the compatibility a single endpoint would buy is not on the table.
 	group := app.Group("/auth")
 
-	// THE ORIGIN ADDRESS, stashed for the handler.
+	// THE ORIGIN ADDRESS IS THE FRAMEWORK'S NOW, and this group registers no
+	// middleware for it.
 	//
-	// A pipeline.Handler receives the AppContext, not the Fiber one, and the
-	// framework's AppContext exposes no IP — so the address is put in its generic
-	// bag here, where the Fiber context still exists. The alternative was MountRaw
-	// to reach c.IP() directly, which would have cost the canonical envelope and
-	// the seven catalogs to carry one string.
+	// Until omnicore v0.69.0 it did: the AppContext exposed no IP, so a Fiber
+	// middleware on this group read c.IP() into its generic bag and the handlers
+	// fished it back out. That seam is gone. The framework resolves the origin
+	// itself and publishes it as AppContext.ClientIP(), which the two sign-ins read
+	// directly.
 	//
-	// It is scoped to THIS group rather than registered globally: only the sign-in
-	// reads it, and a middleware on every route in the service would be a cost
-	// every route pays for one that benefits.
+	// WHAT THAT VALUE IS depends on one yaml block and nothing in this file. With no
+	// `http.trustProxy`, it is the socket peer: spoof-proof, and the balancer's
+	// address on any deployment that has one. With the block declared, it is the
+	// RIGHTMOST UNTRUSTED entry of the forwarded chain — the last hop the trusted
+	// infrastructure can vouch for — so an edge that appends (nginx's default
+	// proxy_add_x_forwarded_for) and one that overwrites are both safe.
 	//
-	// c.IP() honours the proxy headers Fiber is configured to trust. On a
-	// deployment behind a load balancer that trust has to be configured, or every
-	// attempt in the log records the balancer's address and the spray dimension is
-	// worthless — that is a deployment decision, and this comment is where whoever
-	// makes it should find out that it matters.
-	group.Use(func(c fiber.Ctx) error {
-		if appCtx := fwweb.AppContext(c); appCtx != nil {
-			appCtx.Set(commands.ContextKeyClientIP, c.IP())
-		}
-		return c.Next()
-	})
+	// THIS MATTERS MORE HERE THAN ANYWHERE ELSE IN THE SERVICE. Client.allowedCIDRs
+	// is compared against that address at POST /auth/client/token, so a deployment
+	// that sits behind a proxy and does NOT declare the block is enforcing an
+	// allow-list against its own balancer. The route's OpenAPI description says so;
+	// this comment is where whoever edits the group should meet it.
 
 	// ── the SIGN-IN ──────────────────────────────────────────────────────────
 	//
@@ -98,7 +99,7 @@ func MountAuthentication(
 	issueH, issueSpec := fwweb.CommandWithBodySpec(d.Pipeline,
 		requests.IssueTokenRequest{},
 		requests.TokenResponse{}.FromResult,
-		&commands.IssueTokenHandler{Store: store, Attempts: attempts, Events: events, Issuer: issuer},
+		&handlers.IssueTokenHandler{Store: store, Attempts: attempts, Events: events, Issuer: issuer},
 		fiber.StatusOK)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/user/token",
 		issueH, issueSpec,
@@ -155,7 +156,7 @@ func MountAuthentication(
 	refreshH, refreshSpec := fwweb.CommandWithBodySpec(d.Pipeline,
 		requests.RefreshTokenRequest{},
 		requests.TokenResponse{}.FromResult,
-		&commands.RefreshTokenHandler{Store: store, Lookup: lookup, Issuer: issuer},
+		&handlers.RefreshTokenHandler{Store: store, Lookup: lookup, Issuer: issuer},
 		fiber.StatusOK)
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/user/token/refresh",
 		refreshH, refreshSpec,
@@ -189,6 +190,103 @@ func MountAuthentication(
 					Description: "Send back the refreshToken from the previous response.",
 					Value: requests.RefreshTokenRequest{
 						RefreshToken: "Qk9HVVMtUkVGUkVTSC1UT0tFTi1FWEFNUExF",
+					},
+				},
+			},
+		},
+	)
+
+	// ── the MACHINE SIGN-IN ──────────────────────────────────────────────────
+	//
+	// The sibling of the route above, and a different operation: a client id and a
+	// server-minted secret instead of an e-mail and a password.
+	//
+	// NO /client/token/refresh COMPANION, and there never will be one. RFC 6749
+	// §4.4.3 says the client-credentials grant SHOULD NOT issue a refresh token, and
+	// the reason is structural rather than ceremonial: a refresh token exists for a
+	// credential that cannot be re-presented, and a client holds its secret in a file
+	// or a vault by construction. Issuing one would be a second long-lived credential
+	// to store, rotate and revoke, buying nothing.
+	//
+	// 200 for the same reason the user sign-in is 200: a token is an answer, not a
+	// resource.
+	issueClientH, issueClientSpec := fwweb.CommandWithBodySpec(d.Pipeline,
+		requests.IssueClientTokenRequest{},
+		requests.ClientTokenResponse{}.FromResult,
+		&handlers.IssueClientTokenHandler{
+			Store: clients, Attempts: attempts, Events: events, Issuer: accessIssuer,
+		},
+		fiber.StatusOK)
+	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/client/token",
+		issueClientH, issueClientSpec,
+		fwopenapi.Doc{
+			Tags: []string{"Auth"},
+			// Public for the same reason as the two above: this is the route that
+			// hands out the credential every other route demands.
+			Public:  true,
+			Summary: "Authenticate an integration and receive an access token",
+			Description: "Exchanges a client id and its secret for a signed access token. " +
+				"This is the machine-to-machine sign-in; the human one is " +
+				"`POST /auth/user/token`.\n\n" +
+				"**No refresh token is issued, and that is deliberate** — the client's " +
+				"secret already IS its long-lived credential, so an integration renews " +
+				"simply by calling this route again when `expiresAt` passes. There is no " +
+				"`/auth/client/token/refresh`.\n\n" +
+				"The access token carries `identity_kind: \"client\"`, the client id as " +
+				"`sub`, its tenant, its label, and the effective permissions its granted " +
+				"roles confer — with archived roles, grants and catalog entries excluded at " +
+				"every hop. It carries **no `email`, no `groups` and no " +
+				"`must_change_password`**: a machine has no address, a client belongs to no " +
+				"groups, and there is no credential it can be told to rotate itself.\n\n" +
+				"**It also carries the tenant's own claims**, under the reserved `x_` " +
+				"namespace, resolved down the same two-level chain the user token uses — " +
+				"the value set on this client wins, the definition's tenant-wide default " +
+				"fills in when none is, and a claim with neither is absent entirely. Only " +
+				"definitions whose `appliesTo` admits a client take part.\n\n" +
+				"**A failed sign-in always answers the same 401**, whether the id is " +
+				"unknown, the secret is wrong, the secret was rotated out, the integration " +
+				"is suspended, its tenant is, or the request came from an address the " +
+				"client does not allow. Telling those apart would confirm to whoever holds " +
+				"a stolen secret that the secret itself is good.\n\n" +
+				"**A rotation in flight keeps working.** After `POST /clients/{id}/secret` " +
+				"the retiring secret is accepted until its `previousSecretExpiresAt` " +
+				"passes, so an integration can be redeployed without a window in which " +
+				"neither value works. A rotation asking for a zero grace period kills the " +
+				"old secret immediately, which is what to do with a leaked one.\n\n" +
+				"**Where from:** if the client declares `allowedCIDRs`, the request's " +
+				"origin address must fall inside one of them; an empty collection means any " +
+				"address. The address compared is the one the framework resolves: on a " +
+				"deployment that declares `http.trustProxy` it is the rightmost untrusted " +
+				"entry of the forwarded chain — the last hop the trusted infrastructure can " +
+				"vouch for, so an edge that appends the header and one that overwrites it " +
+				"are equally safe, and a caller reaching the service directly cannot forge " +
+				"its own origin. **Without that block it is the socket peer**, which is " +
+				"unforgeable but names the load balancer on any deployment that has one; " +
+				"leave the collection empty there rather than trust a restriction that is " +
+				"comparing against your own edge. And in every deployment the allow-list " +
+				"constrains where a token is *obtained*, never where it is *used*: authcore " +
+				"does not see the requests an integration later makes to other services.",
+			// ⚠️ THESE ARE THE LOCAL DEV FIXTURE'S REAL VALUES, not a placeholder.
+			//
+			// The row they name is hand-seeded into the dev bench's `clients` table
+			// (`Fixture integration`, tenant `acme`), because this bench's permission
+			// catalog carries no `client:insert` and so no operator here can create one
+			// through POST /clients. Having them here means the /docs page is a working
+			// "try it" against a local bench instead of a form to fill in by hand.
+			//
+			// THE COST, SAID OUT LOUD: this is a credential that authenticates, sitting
+			// in the repository and rendered on a page anyone who reaches /docs can read.
+			// It is harmless only while the row exists nowhere but a developer's own
+			// Postgres. **Never seed this fixture into a shared or deployed
+			// environment** — the pair would be a known-good credential for anyone with
+			// the source. If it ever is, rotate it there and replace these two literals.
+			RequestExamples: map[string]fwopenapi.Example{
+				"signIn": {
+					Summary:     "Authenticate",
+					Description: "The everyday case. On the local dev bench these are the seeded fixture's real values.",
+					Value: requests.IssueClientTokenRequest{
+						ClientID:     "0f1c7e5a-0000-4000-8000-c1e17f170001",
+						ClientSecret: "acs_E0a8gj-IkEn1qht-STfTmUwJnmF8iQBVmbbdyrgzjVQ",
 					},
 				},
 			},

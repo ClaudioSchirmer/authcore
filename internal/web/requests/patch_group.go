@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:dd007d59a9d06fbf2a4dc20e257578023f23144fc1c25d6c0e58e88f0aeda98b
+// generated:  2026-09-01
+// checksum:   sha256:3d8823fd377722e5df1f5c1d2bc909892dd5d63c9ad00a786e146cfaca4e8291
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -32,6 +32,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 	fwrequests "github.com/ClaudioSchirmer/omnicore/web/requests"
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
+
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // PatchGroupRequest is the body of Update a group (partial).
@@ -60,12 +62,12 @@ func (r PatchGroupRequest) ToCommand() *commands.PatchGroupCommand {
 type PatchGroupResponse struct {
 	fwresponses.Auto
 
-	ID          domain.ID           `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID    domain.ID           `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key         string              `json:"key" example:"engineering"`
-	Name        string              `json:"name" example:"Engineering"`
-	Description string              `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
-	Roles       []GroupRoleResponse `json:"roles"`
+	ID          domain.ID                   `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID    domain.ID                   `json:"tenantID" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Key         string                      `json:"key" example:"engineering"`
+	Name        string                      `json:"name" example:"Engineering"`
+	Description string                      `json:"description" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
+	Roles       []webdtos.GroupRoleResponse `json:"roles"`
 }
 
 // FromResult projects the application Result onto PatchGroupResponse.

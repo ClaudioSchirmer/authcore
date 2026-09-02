@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:54694b5c4fbfa9061b3a90b9aa0cc1314d998a1a2378d824595d5fe3e15ddf4e
+// generated:  2026-09-01
+// checksum:   sha256:4f6f779a272d55d61d01d2ef1ee5a7765051e383cfd495ecd0438b1f53d57129
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -28,6 +28,16 @@
 package domain
 
 import "github.com/ClaudioSchirmer/omnicore/domain"
+
+// ClaimActiveClaimsByAppliesToGroup is one group of ActiveClaimsByAppliesTo:
+// the key, and this group's value.
+//
+// A group exists BECAUSE at least one row matched, so an empty set yields no
+// groups at all rather than a row of zeroes. The key is AppliesTo.
+type ClaimActiveClaimsByAppliesToGroup struct {
+	AppliesTo string
+	Value     int64
+}
 
 // ClaimService answers the questions Claim's rules cannot answer alone.
 //
@@ -63,14 +73,4 @@ type ClaimService interface {
 	// into their overlapping buckets: the user bucket is `user` + `both`, the
 	// client bucket is `client` + `both`.
 	ActiveClaimsByAppliesTo(tenantID domain.ID) []ClaimActiveClaimsByAppliesToGroup
-}
-
-// ClaimActiveClaimsByAppliesToGroup is one group of ActiveClaimsByAppliesTo:
-// the key, and this group's value.
-//
-// A group exists BECAUSE at least one row matched, so an empty set yields no
-// groups at all rather than a row of zeroes. The key is AppliesTo.
-type ClaimActiveClaimsByAppliesToGroup struct {
-	AppliesTo string
-	Value     int64
 }

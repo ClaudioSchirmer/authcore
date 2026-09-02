@@ -76,10 +76,19 @@ Spec §E adds three entity-specific checks on top of the standard verify gate.
 | 8 | web | spec §9: `POST /clients` is a response that carries the secret | **It does not, and this is the one thing that is not finished.** See the open item at the bottom of this file |
 | 9 | domain | spec §7 C14: one rule, `InsertOrUpdate` + `Archive` | **Split into C14a and C14b** after the maintainer asked whether a client may create a client the way a user may create a user. The answer is no, and it is now DECLARED (`client-may-not-create-clients`, insert only, with its own message) instead of falling out of `sub == id` having nothing to match on an insert. The own-row rule keeps update and archive. The asymmetry with `User` — whose `user:insert` holders create accounts with passwords they chose — is deliberate and recorded in §B-Q8; a `createdBy` column was offered as the mitigation and declined, since `audit_events.Actor` already answers it |
 
-## ⚠️ Open — the create does not hand back a secret
+## ✅ Closed (2026-09-01) — the create DOES hand back the secret
 
-`POST /clients` mints a credential and stores its hash; **nothing renders the plaintext**,
-so the client exists and nobody can sign in as it until `POST /clients/{id}/secret` is
+**This entry was stale and is corrected here rather than deleted.** `InsertClientResult`
+carries `Secret` as a runtime field read off the entity (`insert_client_command.go`), and
+`InsertClientResponse` renders it (`insert_client.go`) — so `POST /clients` answers `201`
+with the plaintext and a new integration is usable immediately. Option 1 below ("leave it as
+two steps") is therefore NOT what shipped; whichever of the three ways out was taken, it was
+taken and nobody updated this file.
+
+What it looked like while it was true, kept because the reasoning is still the record:
+
+`POST /clients` mints a credential and stores its hash; nothing rendered the plaintext,
+so the client existed and nobody could sign in as it until `POST /clients/{id}/secret` was
 called. Two calls where the spec promised one.
 
 The cause was established by RUNNING the generator, not inferred: `omnicore-gen explain keys`

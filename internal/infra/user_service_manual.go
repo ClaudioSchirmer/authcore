@@ -44,7 +44,7 @@
 //     moment a test or a second bootstrap uses a different engine. Same shape
 //     GroupServiceImpl and RoleServiceImpl use.
 //
-//  2. THE ROLE ROW IS THE ONE Group ALREADY DECLARED. `roleRow` and its
+//  2. THE ROLE ROW IS THE ONE Group ALREADY DECLARED. `dtos.RoleRow` and its
 //     grantsWildcard() live in group_service_manual.go, in this package, and
 //     they answer exactly the question this entity asks one level up. A second
 //     copy here would be the same rule written twice, free to disagree about
@@ -80,6 +80,8 @@
 package infra
 
 import (
+	"github.com/ClaudioSchirmer/authcore/internal/infra/dtos"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
 
@@ -140,7 +142,7 @@ func (s *UserServiceImpl) companions() *userCompanionRepos {
 //
 // found is false for a group no ACTIVE row carries — which deliberately
 // collapses "no such group" and "a group this tenant retired" into one state,
-// for the same reason roleRow does: the notification these facts feed answers
+// for the same reason dtos.RoleRow does: the notification these facts feed answers
 // all three of its questions with one message, because a distinct reply would
 // be an existence oracle over a competitor's org chart.
 //
@@ -167,9 +169,9 @@ const (
 // roleRows resolves every requested role and the permission keys it confers in
 // ONE read, memoised for the request. Same row type GroupServiceImpl uses, on
 // this service's context.
-func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
-	return resolveRows(s.ctx, userRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]roleRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]dtos.RoleRow {
+	return utils.ResolveRows(s.ctx, userRoleMemoPrefix, roleIDs, func(missing []domain.ID) map[string]dtos.RoleRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().roles.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			// A failed probe PANICS rather than inventing an answer. Every
@@ -178,7 +180,7 @@ func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
 			panic("User: role probe failed for the " + strconv.Itoa(len(missing)) + " role(s) this write reaches")
 		}
 
-		rows := make(map[string]roleRow, len(found))
+		rows := make(map[string]dtos.RoleRow, len(found))
 		for _, role := range found {
 			// The grants arrive with resource and action already filled — Role
 			// declares the traversal into the catalog. Nothing here queries it.
@@ -187,7 +189,7 @@ func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
 			for _, grant := range grants {
 				keys = append(keys, vos.PermissionKey{Resource: grant.Resource, Action: grant.Action})
 			}
-			rows[canonicalIDOf(role.GetID())] = roleRow{found: true, tenantID: role.TenantID, keys: keys}
+			rows[utils.CanonicalIDOf(role.GetID())] = dtos.RoleRow{Found: true, TenantID: role.TenantID, Keys: keys}
 		}
 		return rows
 	})
@@ -197,8 +199,8 @@ func (s *UserServiceImpl) roleRows(roleIDs []domain.ID) map[domain.ID]roleRow {
 // read, memoised for the request. The roles themselves are resolved by
 // rolesOfGroups, and only for the facts that need their permission keys.
 func (s *UserServiceImpl) groupRows(groupIDs []domain.ID) map[domain.ID]groupRow {
-	return resolveRows(s.ctx, userGroupMemoPrefix, groupIDs, func(missing []domain.ID) map[string]groupRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+	return utils.ResolveRows(s.ctx, userGroupMemoPrefix, groupIDs, func(missing []domain.ID) map[string]groupRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().groups.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			panic("User: group probe failed for the " + strconv.Itoa(len(missing)) + " group(s) this write joins")
@@ -211,7 +213,7 @@ func (s *UserServiceImpl) groupRows(groupIDs []domain.ID) map[domain.ID]groupRow
 			for _, entry := range attached {
 				ids = append(ids, entry.RoleID)
 			}
-			rows[canonicalIDOf(group.GetID())] = groupRow{found: true, tenantID: group.TenantID, roleIDs: ids}
+			rows[utils.CanonicalIDOf(group.GetID())] = groupRow{found: true, tenantID: group.TenantID, roleIDs: ids}
 		}
 		return rows
 	})
@@ -224,7 +226,7 @@ func (s *UserServiceImpl) groupRows(groupIDs []domain.ID) map[domain.ID]groupRow
 //
 // It shares the role memo with the DIRECT grants, so a role reached both ways
 // is read once — the case note 3 in the header exists for.
-func (s *UserServiceImpl) rolesOfGroups(groups map[domain.ID]groupRow) map[domain.ID]roleRow {
+func (s *UserServiceImpl) rolesOfGroups(groups map[domain.ID]groupRow) map[domain.ID]dtos.RoleRow {
 	conferred := make([]domain.ID, 0, len(groups))
 	for _, row := range groups {
 		conferred = append(conferred, row.roleIDs...)
@@ -345,15 +347,15 @@ func (s *UserServiceImpl) GroupGrantsWildcard(groupIDSet []domain.ID) map[domain
 
 // groupGrantsWildcard is one group's verdict, read off rows already resolved.
 //
-// A role the second hop did not answer for reads as the zero roleRow, whose
+// A role the second hop did not answer for reads as the zero dtos.RoleRow, whose
 // grantsWildcard() is TRUE — the fail-closed direction, and the same answer the
 // per-id resolution gave an unknown role before this was a batch.
-func groupGrantsWildcard(group groupRow, roles map[domain.ID]roleRow) bool {
+func groupGrantsWildcard(group groupRow, roles map[domain.ID]dtos.RoleRow) bool {
 	if !group.found {
 		return true
 	}
 	for _, roleID := range group.roleIDs {
-		if roles[roleID].grantsWildcard() {
+		if roles[roleID].GrantsWildcard() {
 			return true
 		}
 	}
@@ -398,7 +400,7 @@ func (s *UserServiceImpl) CallerLacksAnyPermissionOfGroup(groupIDSet []domain.ID
 		}
 		lacks := false
 		for _, roleID := range group.roleIDs {
-			if callerLacksAnyPermissionOfRole(identity, roles[roleID]) {
+			if utils.CallerLacksAnyPermissionOfRole(identity, roles[roleID]) {
 				lacks = true
 				break
 			}
@@ -416,7 +418,7 @@ func (s *UserServiceImpl) RoleIsUnavailableInTenant(tenantID domain.ID, roleIDSe
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = !row.found || row.tenantID != tenantID
+		out[id] = !row.Found || row.TenantID != tenantID
 	}
 	return out
 }
@@ -432,7 +434,7 @@ func (s *UserServiceImpl) RoleGrantsWildcard(roleIDSet []domain.ID) map[domain.I
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = row.grantsWildcard()
+		out[id] = row.GrantsWildcard()
 	}
 	return out
 }
@@ -450,7 +452,7 @@ func (s *UserServiceImpl) CallerLacksAnyPermissionOfRole(roleIDSet []domain.ID) 
 
 	out := make(map[domain.ID]bool, len(rows))
 	for id, row := range rows {
-		out[id] = callerLacksAnyPermissionOfRole(identity, row)
+		out[id] = utils.CallerLacksAnyPermissionOfRole(identity, row)
 	}
 	return out
 }
@@ -489,8 +491,8 @@ type claimRow struct {
 // request — so the three facts below share it and the write pays for one query
 // however many claims it carries.
 func (s *UserServiceImpl) claimRows(claimIDs []domain.ID) map[domain.ID]claimRow {
-	return resolveRows(s.ctx, userClaimMemoPrefix, claimIDs, func(missing []domain.ID) map[string]claimRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...))
+	return utils.ResolveRows(s.ctx, userClaimMemoPrefix, claimIDs, func(missing []domain.ID) map[string]claimRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...))
 		found, err := s.companions().claims.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			panic("User: claim probe failed for the " + strconv.Itoa(len(missing)) + " claim(s) this write holds")
@@ -502,7 +504,7 @@ func (s *UserServiceImpl) claimRows(claimIDs []domain.ID) map[domain.ID]claimRow
 		// answer the rules want for it.
 		rows := make(map[string]claimRow, len(found))
 		for _, claim := range found {
-			rows[canonicalIDOf(claim.GetID())] = claimRow{
+			rows[utils.CanonicalIDOf(claim.GetID())] = claimRow{
 				found:     true,
 				tenantID:  claim.TenantID,
 				appliesTo: claim.AppliesTo,

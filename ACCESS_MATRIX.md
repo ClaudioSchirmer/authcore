@@ -209,7 +209,7 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: three collections (`ro
 | `POST /clients/:id/claims` | `addClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `PATCH /clients/:id/claims/:clientClaimId` | `patchClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
 | `PATCH /clients/:id/claims/:clientClaimId/archive` | `removeClientClaim` | `client:set-claim` | JWT + claim | guard foreign-tenant | — | yes | own tenant | — |
-| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` (dormant) | yes | own tenant | **generated** |
+| `POST /clients/:id/secret` | `rotateClientSecret` | `client:rotate-secret` | JWT + claim | guard foreign-tenant | `kind:client → self` | yes | own tenant | **generated** |
 | `GET /clients` | `clients` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 | `GET /clients/:id` | `client` | `client:read` | JWT + claim | filter TenantID | — | yes | own tenant | — |
 
@@ -217,13 +217,13 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: three collections (`ro
 
 **Everything else a client-subject caller may do, it may do to a sibling**: create, edit, archive, grant a role, edit the allow-list, set a claim value — ordinary tenant-scoped writes, gated by the permission the caller carries and nothing more. Until 2026-08-28 the rule covered every update and the archive, and a companion rule refused a client-subject insert outright; both were narrowed away as closed past the point of usefulness. Rotation is the exception because it is not editing a row: it mints a credential AND starts retiring the one in use, so a machine able to rotate another machine's secret could lock it out and take its place in one call.
 
-**`dormant` means nothing reaches it yet**: it reads `RequestingIdentityKind`, fed from the `identity_kind` claim that only `POST /auth/client/token` mints — an endpoint that does not exist. Until it does the field reads `""`, the rule stands down, and that cell behaves as `—`. Nothing infers the kind from another claim's absence, deliberately.
+**The rule is LIVE since 2026-09-01**: it reads `RequestingIdentityKind`, fed from the `identity_kind` claim, and `POST /auth/client/token` now mints it. A client-subject caller can no longer rotate a sibling integration's secret — a machine able to do that could lock another out and take its place in one call. A USER token still meets no row rule anywhere on this entity, so an operator with `client:rotate-secret` rotates any client in their tenant, the mirror of User's reset. Nothing infers the kind from another claim's absence, deliberately: until 2026-08-27 the field read `""` for everyone and the rule stood down, which is why it was written NEGATIVELY (`!= "client"`) and should not be "improved" into a positive comparison — tokens minted before the claim existed outlive a deploy by their TTL.
 
 - **Secret**: the endpoint mints a credential AND renders the plaintext in its own answer — the create issues the first one, the rotation every one after it. Nowhere else, ever: no read, no listing, no export, no `?fields=`. Shown once, because nothing stores it. See *The secret* below.
 - `client:rotate-secret` is a **sixth verb**, for the reason `user:reset-password` is its own: handing out a production credential is not editing a label.
 - **Four verbs beyond the CRUD four**, one per job: `client:grant` (roles — confers privilege), `client:manage-network` (allowedCIDRs — decides WHERE FROM), `client:rotate-secret` (the credential), `client:set-claim` (claims — see below). `client:update` reaches none of them; it carries `name`, `description`, `status` and nothing else.
 - **`client:set-claim` is its own verb even though a claim gates nothing here.** That is the point rather than a contradiction: a claim value is read by services authcore does not control, and one of them may well authorize on it — so setting a value is potentially conferring privilege in a way THIS service cannot audit. Folding it into `client:grant` would hand everyone who manages roles a reach nothing here can see. Same call `client:manage-network` made three days earlier, one turn further out.
-- **An empty `allowedCIDRs` means ANY address** — `0.0.0.0/0` and `::/0` are refused so there is exactly one spelling of "no restriction". So archiving the last entry opens the credential to the whole internet, which is why the pair left `client:update` on 2026-08-28. Nothing enforces the list yet: it is read by no code until `POST /auth/client/token` exists.
+- **An empty `allowedCIDRs` means ANY address** — `0.0.0.0/0` and `::/0` are refused so there is exactly one spelling of "no restriction". So archiving the last entry opens the credential to the whole internet, which is why the pair left `client:update` on 2026-08-28. **Enforced since 2026-09-01, at `POST /auth/client/token` and nowhere else** — see *The allow-list* below for what that does and does not promise.
 - **Insert**: `tenantID` optional, absent means the claim's. `name` unique per tenant. **Patch** carries `name`, `description`, `status` (`active` ⇄ `suspended`); `tenantID` is immutable.
 - **Archive** forces `status = suspended`. No unarchive, on the root or per entry.
 
@@ -236,6 +236,20 @@ Tenant-scoped: `clients.tenant_id`. The machine identity: three collections (`ro
 | `gracePeriodSeconds` | 0 to 604800, default 86400. **0 retires the old secret immediately** — the leaked case |
 | Row state required | `active`. A suspended client is not handed a fresh credential |
 | Answer | `200` with the plaintext (`rotateClientSecret` returns the same payload) — unlike User's two credential routes, which answer `204`, because those SET a credential the caller chose and this one MINTS one nobody can otherwise learn |
+
+### The allow-list
+
+Enforced at `POST /auth/client/token`, and **nowhere else**.
+
+| | |
+|---|---|
+| What it compares | The request's ORIGIN ADDRESS against the client's active `allowedCIDRs` entries |
+| Empty collection | **Any address.** Fail-open, deliberately: fail-closed would make every newly created client unable to sign in until a second call, a step every provisioning script forgets, whose symptom is a generic 401. The empty array on the read is what says which state a client is in |
+| Non-empty, no usable origin | **Refused.** Fail-closed, because the operator STATED a restriction and admitting a caller whose origin nobody could determine would silently void it |
+| An archived entry | Stops admitting immediately — revoking a range IS archiving it |
+| The refusal | The same generic 401 as every other. Telling the holder of a stolen secret that only the NETWORK was wrong confirms the secret itself is good; the reason and the address go to the log stream, which is where the operator whose egress address changed reads them |
+| **Which address** | `AppContext.ClientIP()` — what the FRAMEWORK resolved. With `http.trustProxy` declared it is the **rightmost untrusted** entry of the forwarded chain: the last hop the trusted infrastructure can vouch for, so an edge that appends the header and one that overwrites it are equally safe, and a peer outside the allowlist is never read from the header at all. **Without the block it is the socket peer** — unforgeable, and the BALANCER's address on any deployment that has one. This control is therefore only as good as that block: leave `allowedCIDRs` empty on a proxied deployment that has not declared it |
+| **What it never constrains** | Where the token is USED. authcore does not see the requests an integration later makes to other services — the list bounds where a token is *obtained*, and that is all |
 
 ### What a client may be granted
 
@@ -296,7 +310,7 @@ A token of kind `user`, holding every permission:
 | `PATCH /users/:id/password` (change) | ✅ | ❌ **403** |
 | `PATCH /users/:id/password-reset` | ❌ **403** | ✅ |
 
-A token of kind `client`, holding every permission *(dormant: no endpoint mints a client token yet)*:
+A token of kind `client`, holding every permission:
 
 | | id = itself | id = another row |
 |---|---|---|
@@ -348,9 +362,15 @@ No JWT, no claim, no permission.
 | `GET /readyz` |
 | `POST /auth/user/token` |
 | `POST /auth/user/token/refresh` |
+| `POST /auth/client/token` |
+
+**There is no `/auth/client/token/refresh`, and there will not be.** A client-credentials
+grant issues no refresh token (RFC 6749 §4.4.3): the client's secret already IS its
+long-lived credential, so an integration renews by calling the route again. A refresh token
+would be a second long-lived credential to store, rotate and revoke, buying nothing.
 
 Every endpoint above answers on REST and on GraphQL alike — the generated ones by the
 generator, and the three hand-written writes (the two user credential verbs and the client
 secret rotation) by a mount written beside them on 2026-08-28, reusing the same handlers and
-the same permissions. **Authentication is the only REST-only surface left**, and the four
+the same permissions. **Authentication is the only REST-only surface left**, and the five
 public routes below are it.

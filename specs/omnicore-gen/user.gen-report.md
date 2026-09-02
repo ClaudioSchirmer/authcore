@@ -175,11 +175,9 @@ This file still answers for questions the spec has stopped declaring. The genera
 
 ⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
-### `internal/application/queries/user_computed_manual.go`
+### `internal/application/queries/utils/user_computed_manual.go`
 
-This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
-
-**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
+The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
 
 **`FullName` (string)** ← `GivenName`, `FamilyName`
 
@@ -346,7 +344,7 @@ The claim NAMES behind these are the framework's to resolve, not this code's: th
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, change, remove — have generated tests in `internal/application/commands/user_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, change, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -415,17 +413,26 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the User repository and its constraint bindings | `internal/infra/user_repository.go` |
+| the insert command and result | `internal/application/commands/insert_user_command.go` |
+| the patch command and result | `internal/application/commands/patch_user_command.go` |
+| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
+| the derivations for 1 computed read field(s) | `internal/application/queries/utils/user_computed_manual.go` |
+| the User service port (13 fact(s)) | `internal/domain/user_service.go` |
 
 **Left untouched** (yours, by design):
 
-- `internal/application/queries/user_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/user_rules_manual.go` — hand-written rules live here, by design
 - `internal/infra/user_service_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-48 file(s) were already up to date.
+89 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `internal/application/queries/user_computed_manual.go`
+- `internal/domain/user_claim_value_does_not_match_value_type_entry.go`
 
 ## What was NOT generated
 
@@ -441,9 +448,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

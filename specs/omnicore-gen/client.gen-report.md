@@ -290,7 +290,7 @@ The claim NAMES behind these are the framework's to resolve, not this code's: th
 
 ### Per-entry command tests are generated now
 
-The verbs that address ONE entry — add, change, remove — have generated tests in `internal/application/commands/client_commands_test.go`: the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
+The verbs that address ONE entry — add, change, remove — have generated tests, each one beside the command it covers under `internal/application/commands/` (`<verb>_<collection>_command_test.go`): the entry is applied and projected back, a change keeps its id, an unknown id projects nothing.
 
 **If you wrote your own tests for those mappers before this run**, the package will not compile until you delete them — Go reports it as `redeclared in this block`, which reads like a generator bug and is not one. The generated cases cover the same ground; anything yours asserts beyond them is worth keeping under a different name.
 
@@ -354,7 +354,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
+| the Client service port (9 fact(s)) | `internal/domain/client_service.go` |
 
 **Left untouched** (yours, by design):
 
@@ -363,7 +363,11 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-46 file(s) were already up to date.
+89 file(s) were already up to date.
+
+**No longer generated** — the spec changed and these are left over:
+
+- `internal/domain/client_claim_value_does_not_match_value_type_entry.go`
 
 ## What was NOT generated
 
@@ -379,9 +383,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.68.0)
+Verdict: **exact** (project pins v0.69.0)
 
-framework v0.68.0 meets the required v0.68.0
+framework v0.69.0 meets the required v0.69.0
 
 Verify what was generated:
 

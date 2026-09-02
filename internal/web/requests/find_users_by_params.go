@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:5f5ed3f3130b8d87c1ababe6128d66c67a8663a7b3c7ad41658b86434f56168c
+// generated:  2026-09-01
+// checksum:   sha256:2a4c1635f439ebe8d31b550a6705286698c80fbfe02228e4edd1767eea62832f
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -35,6 +35,7 @@ import (
 	fwresponses "github.com/ClaudioSchirmer/omnicore/web/responses"
 
 	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	webdtos "github.com/ClaudioSchirmer/authcore/internal/web/requests/dtos"
 )
 
 // FindUsersRequest declares the filters and read controls this listing serves.
@@ -99,10 +100,10 @@ type FindUsersResponse struct {
 	TenantWorkspace    *string    `json:"tenantWorkspace,omitempty" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus       *string    `json:"tenantStatus,omitempty" exportLabelKey:"UserTenantStatusField" example:"active"`
 	// The person's given and family names on one line, for listings.
-	FullName *string        `json:"fullName,omitempty" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
-	Groups   []UserGroupRow `json:"groups,omitempty"`
-	Roles    []UserRoleRow  `json:"roles,omitempty"`
-	Claims   []UserClaimRow `json:"claims,omitempty"`
+	FullName *string                `json:"fullName,omitempty" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
+	Groups   []webdtos.UserGroupRow `json:"groups,omitempty"`
+	Roles    []webdtos.UserRoleRow  `json:"roles,omitempty"`
+	Claims   []webdtos.UserClaimRow `json:"claims,omitempty"`
 }
 
 // FromResult projects the application Result onto FindUsersResponse.

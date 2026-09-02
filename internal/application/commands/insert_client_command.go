@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:b8b32ae9cc3ce8844cbb26f6ee1769722a9926bf681c4f7bb8208778ec295c0f
+// generated:  2026-09-01
+// checksum:   sha256:1b7c995add084f867f561535eaf5765cefcf6ac50524c9120ca4c57d64cc50d0
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -37,6 +37,9 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
+
+	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
+	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 )
 
 // InsertClientCommand carries the writable fields of the request.
@@ -118,9 +121,9 @@ type InsertClientResult struct {
 	// Secret is RUNTIME: no column holds it, and FromEntity reads it off the
 	// entity after the write — whatever the rules minted there.
 	Secret       string
-	Roles        []ClientRoleResult
-	AllowedCIDRs []ClientAllowedCIDRResult
-	Claims       []ClientClaimResult
+	Roles        []cmddtos.ClientRoleResult
+	AllowedCIDRs []cmddtos.ClientAllowedCIDRResult
+	Claims       []cmddtos.ClientClaimResult
 }
 
 // FromEntity projects the aggregate AFTER it was validated and written.
@@ -144,8 +147,8 @@ func (c *InsertClientCommand) FromEntity(_ *configuration.AppContext, e *appdoma
 		PreviousSecretExpiresAt: e.PreviousSecretExpiresAt,
 		Status:                  e.Status.Value(),
 		Secret:                  e.Secret,
-		Roles:                   projectClientRoles(e),
-		AllowedCIDRs:            projectClientAllowedCIDRs(e),
-		Claims:                  projectClientClaims(e),
+		Roles:                   cmdutils.ProjectClientRoles(e),
+		AllowedCIDRs:            cmdutils.ProjectClientAllowedCIDRs(e),
+		Claims:                  cmdutils.ProjectClientClaims(e),
 	}, nil
 }

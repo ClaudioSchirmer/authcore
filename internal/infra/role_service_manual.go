@@ -36,6 +36,7 @@ package infra
 
 import (
 	"errors"
+	"github.com/ClaudioSchirmer/authcore/internal/infra/utils"
 	"strconv"
 	"sync"
 	"time"
@@ -123,8 +124,8 @@ func (r catalogRow) isWildcard() bool {
 // permission" from "a permission that was retired", and an active-only scope
 // collapses both into "not found".
 func (s *RoleServiceImpl) catalogRows(permissionIDs []domain.ID) map[domain.ID]catalogRow {
-	return resolveRows(s.ctx, roleCatalogMemoPrefix, permissionIDs, func(missing []domain.ID) map[string]catalogRow {
-		q := criteria.Where(criteria.In("ID", idArgs(missing)...)).IncludeArchived()
+	return utils.ResolveRows(s.ctx, roleCatalogMemoPrefix, permissionIDs, func(missing []domain.ID) map[string]catalogRow {
+		q := criteria.Where(criteria.In("ID", utils.IDArgs(missing)...)).IncludeArchived()
 		found, err := s.companions().permissions.Loader.FindAll(s.queryContext(), q)
 		if err != nil {
 			// A failed probe PANICS rather than inventing an answer. The
@@ -136,7 +137,7 @@ func (s *RoleServiceImpl) catalogRows(permissionIDs []domain.ID) map[domain.ID]c
 
 		rows := make(map[string]catalogRow, len(found))
 		for _, permission := range found {
-			rows[canonicalIDOf(permission.GetID())] = catalogRow{
+			rows[utils.CanonicalIDOf(permission.GetID())] = catalogRow{
 				found:      true,
 				archivedAt: permission.GetDeletedAt(),
 				resource:   permission.Key.Resource,

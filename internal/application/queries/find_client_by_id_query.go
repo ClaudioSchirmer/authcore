@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:7ae34713608811f1445233880e2a2ea8bce4abec786d0afa14ceb56c8a680b3a
+// generated:  2026-09-01
+// checksum:   sha256:c868af5b22ec35c71d79c014cba416768e90f6ab45ad17e2d3b808bfb12fd536
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -33,6 +33,8 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+
+	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
 )
 
 // FindClientByIDQuery is the application-side transport for the by-id read.
@@ -112,7 +114,7 @@ type FindClientByIDResult struct {
 	UpdatedAt               time.Time
 	TenantWorkspace         string
 	TenantStatus            string
-	Roles                   []ClientRoleRowResult
-	AllowedCIDRs            []ClientAllowedCIDRRowResult
-	Claims                  []ClientClaimRowResult
+	Roles                   []qrydtos.ClientRoleRowResult
+	AllowedCIDRs            []qrydtos.ClientAllowedCIDRRowResult
+	Claims                  []qrydtos.ClientClaimRowResult
 }
