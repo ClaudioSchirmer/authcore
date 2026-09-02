@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-01
-// checksum:   sha256:382acc18fd33f4cab895e376bbff47e964a51a1170fa28bfc9779612c7b9fc7e
+// checksum:   sha256:0e4875bc0da00937a5499c80766de119bf5c52c125a00f797aeb99cd43067749
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -39,7 +39,7 @@ import (
 	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
 	"github.com/ClaudioSchirmer/authcore/internal/application/dtos"
-	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // InsertUserCommand carries the writable fields of the request.
@@ -155,7 +155,7 @@ func (c *InsertUserCommand) FromEntity(ctx *configuration.AppContext, e *appdoma
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family
 	{
-		v, err := appqueries.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
+		v, err := qryutils.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
 		if err != nil {
 			return out, err
 		}

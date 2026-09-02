@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:ee1c37ed8ed1e915f1d3baf5803b0619b927fea8b4be0c7187b0a97024b3108f
+// generated:  2026-09-01
+// checksum:   sha256:1d86dec4430844463fc8626ab99a41271138c3d93dbb92641ae0655fc343204c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -35,7 +35,7 @@ import (
 	appdomain "github.com/ClaudioSchirmer/authcore/internal/domain"
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 
-	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // InsertPermissionCommand carries the writable fields of the request.
@@ -85,7 +85,7 @@ func (c *InsertPermissionCommand) FromEntity(ctx *configuration.AppContext, e *a
 	out.Resource = e.Key.Resource
 	out.Action = e.Key.Action
 	{
-		v, err := appqueries.ComputePermissionPermission(ctx, e.Key.Resource, e.Key.Action)
+		v, err := qryutils.ComputePermissionPermission(ctx, e.Key.Resource, e.Key.Action)
 		if err != nil {
 			return out, err
 		}

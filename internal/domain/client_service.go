@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-01
-// checksum:   sha256:2ec26c8c63e64e962566acfed1f2791100e5aa1a5484c154b10326b877914e93
+// checksum:   sha256:0d8e257028f26e8ecde83936f5dd16deacb80972389958a8116eda21abeca867
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -28,6 +28,20 @@
 package domain
 
 import "github.com/ClaudioSchirmer/omnicore/domain"
+
+// ClientClaimValueDoesNotMatchValueTypeEntry is ONE entry of Claims, as
+// ClaimValueDoesNotMatchValueType is asked about it.
+//
+// The question needs ClaimID and Value of the same entry, and they travel
+// together for one reason: two parallel slices are two things a caller can put
+// out of step, and the answer would then be about a different entry than the
+// one whose values were sent.
+//
+// ClaimID is what the answer is keyed by.
+type ClientClaimValueDoesNotMatchValueTypeEntry struct {
+	ClaimID domain.ID
+	Value   string
+}
 
 // ClientService answers the questions Client's rules cannot answer alone.
 //

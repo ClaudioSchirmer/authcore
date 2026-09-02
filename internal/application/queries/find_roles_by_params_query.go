@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-01
-// checksum:   sha256:532d8bd8c6c3e7c5c887fc605de27b95e0495ece435e4514bb01380842138eb3
+// checksum:   sha256:ecfc30f77fe7095bf422e99e135bf1bbdf3c4dadef791b9ec85f5013212c46e9
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -35,6 +35,7 @@ import (
 	"github.com/ClaudioSchirmer/omnicore/domain"
 
 	qrydtos "github.com/ClaudioSchirmer/authcore/internal/application/queries/dtos"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // FindRolesByParamsQuery is the application-side transport for the paged read.
@@ -77,12 +78,12 @@ func (q FindRolesByParamsQuery) ToCriteria(ctx *configuration.AppContext) (fwque
 // BEFORE any transport sees it.
 //
 // This read carries computed fields, so the derivation runs here — in
-// internal/application/queries/role_computed_manual.go, which the generator
-// wrote once and never touches again.
+// internal/application/queries/utils/role_computed_manual.go, which the
+// generator wrote once and never touches again.
 func (q FindRolesByParamsQuery) FromQueryResult(ctx *configuration.AppContext, r FindRolesByParamsResult) (FindRolesByParamsResult, error) {
 	for i := range r.Permissions {
 		if r.Permissions[i].Resource != nil && r.Permissions[i].Action != nil {
-			v, err := ComputeRoleRolePermissionPermission(ctx, *r.Permissions[i].Resource, *r.Permissions[i].Action)
+			v, err := qryutils.ComputeRoleRolePermissionPermission(ctx, *r.Permissions[i].Resource, *r.Permissions[i].Action)
 			if err != nil {
 				return r, err
 			}

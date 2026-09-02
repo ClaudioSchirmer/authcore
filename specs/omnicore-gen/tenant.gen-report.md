@@ -119,39 +119,13 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the tenants feature (repository + view + mount) | `bootstrap/tenant_feature.go` |
-| tests for archive_tenant_command.go | `internal/application/commands/archive_tenant_command_test.go` |
-| tests for insert_tenant_command.go | `internal/application/commands/insert_tenant_command_test.go` |
-| tests for patch_tenant_command.go | `internal/application/commands/patch_tenant_command_test.go` |
-| tests for unarchive_tenant_command.go | `internal/application/commands/unarchive_tenant_command_test.go` |
-| the read tests for find_tenant_by_id_query.go | `internal/application/queries/find_tenant_by_id_query_test.go` |
-| the read tests for find_tenants_by_params_query.go | `internal/application/queries/find_tenants_by_params_query_test.go` |
-| tests for the tenant_status value object | `internal/domain/vos/tenant_status_test.go` |
-| the builder tests for tenant_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/tenant_schema_test.go` |
-| the wire mapper tests for find_tenant_by_id.go | `internal/web/requests/find_tenant_by_id_test.go` |
-| the wire mapper tests for find_tenants_by_params.go | `internal/web/requests/find_tenants_by_params_test.go` |
-| the wire mapper tests for insert_tenant.go | `internal/web/requests/insert_tenant_test.go` |
-| the wire mapper tests for patch_tenant.go | `internal/web/requests/patch_tenant_test.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/domain/tenant_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-21 file(s) were already up to date.
-
-**No longer generated** — the spec changed and these are left over:
-
-- `bootstrap/tenants_feature.go`
-- `internal/application/commands/tenant_commands_test.go`
-- `internal/application/queries/tenant_queries_test.go`
-- `internal/application/translations/tenant_translations_test.go`
-- `internal/domain/vos/tenant_vos_test.go`
-- `internal/infra/schemas/tenant_schemas_test.go`
-- `internal/web/requests/tenant_requests_test.go`
+34 file(s) were already up to date.
 
 ## What was NOT generated
 

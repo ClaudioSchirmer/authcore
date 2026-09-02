@@ -81,11 +81,9 @@ This file still answers for questions the spec has stopped declaring. The genera
 
 ⚠ **One of these can break the build rather than merely sit there.** A BATCHED per-entry fact (`perEntry`) takes a generated entry carrier declared beside the port, and that type is removed with the fact — so the body naming it stops compiling. The compiler will say `undefined: <Entity><Fact>Entry` and name a symbol; the decision behind it is this line. Deleting the body may also strand the `appdomain` import it was the only user of — the compiler names that one too.
 
-### `internal/application/queries/role_computed_manual.go`
+### `internal/application/queries/utils/role_computed_manual.go`
 
-This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
-
-**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
+The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
 
 **`Permissions.Permission` (string)** ← `Resource`, `Action` — ONCE PER ENTRY of `Permissions`
 
@@ -225,67 +223,22 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the roles feature (repository + view + mount) | `bootstrap/role_feature.go` |
-| the add command for one role_permissions entry | `internal/application/commands/add_role_permission_command.go` |
-| tests for add_role_permission_command.go | `internal/application/commands/add_role_permission_command_test.go` |
-| tests for archive_role_command.go | `internal/application/commands/archive_role_command_test.go` |
-| the archive command for one role_permissions entry | `internal/application/commands/archive_role_permission_command.go` |
-| tests for archive_role_permission_command.go | `internal/application/commands/archive_role_permission_command_test.go` |
-| the write shape of one RolePermission entry | `internal/application/commands/dtos/role_permission_result.go` |
-| the insert command and result | `internal/application/commands/insert_role_command.go` |
-| tests for insert_role_command.go | `internal/application/commands/insert_role_command_test.go` |
-| the patch command and result | `internal/application/commands/patch_role_command.go` |
-| tests for patch_role_command.go | `internal/application/commands/patch_role_command_test.go` |
-| the projectors for the permissions collection | `internal/application/commands/utils/role_role_permission_projection.go` |
-| tests for the role_permission_input mapper | `internal/application/dtos/role_permission_input_test.go` |
-| the read shape of one RolePermission entry | `internal/application/queries/dtos/role_permission_row_result.go` |
 | the by-id query and its result | `internal/application/queries/find_role_by_id_query.go` |
-| the read tests for find_role_by_id_query.go | `internal/application/queries/find_role_by_id_query_test.go` |
 | the listing query and its result | `internal/application/queries/find_roles_by_params_query.go` |
-| the read tests for find_roles_by_params_query.go | `internal/application/queries/find_roles_by_params_query_test.go` |
-| tests for the role_permission collection type | `internal/domain/aggregatevos/role_permission_test.go` |
-| the builder tests for role_permission_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/role_permission_schema_test.go` |
-| the builder tests for role_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/role_schema_test.go` |
-| the add wire pair for one role_permissions entry | `internal/web/requests/add_role_permission.go` |
-| the wire mapper tests for add_role_permission.go | `internal/web/requests/add_role_permission_test.go` |
-| the archive wire pair for one role_permissions entry | `internal/web/requests/archive_role_permission.go` |
-| the wire mapper tests for archive_role_permission.go | `internal/web/requests/archive_role_permission_test.go` |
-| the wire shapes of one RolePermission entry | `internal/web/requests/dtos/role_permission.go` |
-| the by-id request and response | `internal/web/requests/find_role_by_id.go` |
-| the wire mapper tests for find_role_by_id.go | `internal/web/requests/find_role_by_id_test.go` |
-| the listing request and response | `internal/web/requests/find_roles_by_params.go` |
-| the wire mapper tests for find_roles_by_params.go | `internal/web/requests/find_roles_by_params_test.go` |
-| the insert request and response | `internal/web/requests/insert_role.go` |
-| the wire mapper tests for insert_role.go | `internal/web/requests/insert_role_test.go` |
-| the patch request and response | `internal/web/requests/patch_role.go` |
-| the wire mapper tests for patch_role.go | `internal/web/requests/patch_role_test.go` |
-| the 5 role endpoints | `internal/web/role_routes.go` |
+| the derivations for 1 computed read field(s) | `internal/application/queries/utils/role_computed_manual.go` |
 
 **Left untouched** (yours, by design):
 
-- `internal/application/queries/role_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/role_rules_manual.go` — hand-written rules live here, by design
 - `internal/infra/role_service_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-13 file(s) were already up to date.
+46 file(s) were already up to date.
 
 **No longer generated** — the spec changed and these are left over:
 
-- `bootstrap/roles_feature.go`
-- `internal/application/commands/role_child_results.go`
-- `internal/application/commands/role_commands_test.go`
-- `internal/application/commands/role_permission_commands.go`
-- `internal/application/dtos/role_dtos_test.go`
-- `internal/application/queries/role_queries_test.go`
-- `internal/application/queries/role_row_results.go`
-- `internal/application/translations/role_translations_test.go`
-- `internal/domain/aggregatevos/role_children_test.go`
-- `internal/infra/schemas/role_schemas_test.go`
-- `internal/web/requests/role_children.go`
-- `internal/web/requests/role_permission_requests.go`
-- `internal/web/requests/role_requests_test.go`
+- `internal/application/queries/role_computed_manual.go`
 
 ## What was NOT generated
 

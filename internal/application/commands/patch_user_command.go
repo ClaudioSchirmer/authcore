@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-01
-// checksum:   sha256:5701ac283518a406f2bf8192797fe70c03a06eb6f5948125df7b6ecc149286e6
+// checksum:   sha256:0b5266c12f9225c260cbbc0fb892534135981d595e84ee3ea7c0f17333610114
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -38,7 +38,7 @@ import (
 
 	cmddtos "github.com/ClaudioSchirmer/authcore/internal/application/commands/dtos"
 	cmdutils "github.com/ClaudioSchirmer/authcore/internal/application/commands/utils"
-	appqueries "github.com/ClaudioSchirmer/authcore/internal/application/queries"
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // PatchUserCommand carries the writable fields of the request.
@@ -129,7 +129,7 @@ func (c *PatchUserCommand) FromEntity(ctx *configuration.AppContext, e *appdomai
 	out.GivenName = e.Name.Given
 	out.FamilyName = e.Name.Family
 	{
-		v, err := appqueries.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
+		v, err := qryutils.ComputeUserFullName(ctx, e.Name.Given, e.Name.Family)
 		if err != nil {
 			return out, err
 		}

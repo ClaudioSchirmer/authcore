@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:539dd62eaa0216e1cd988728149983839dd0f812f57b09b68e00bfd5998f1ea2
+// generated:  2026-09-01
+// checksum:   sha256:20bc3b850558e20cba491a881af1b466289da475df126c42edd3812544f1515b
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -32,6 +32,8 @@ import (
 
 	"github.com/ClaudioSchirmer/omnicore/application/configuration"
 	fwqueries "github.com/ClaudioSchirmer/omnicore/application/queries"
+
+	qryutils "github.com/ClaudioSchirmer/authcore/internal/application/queries/utils"
 )
 
 // FindPermissionsByParamsQuery is the application-side transport for the paged
@@ -54,11 +56,11 @@ func (q FindPermissionsByParamsQuery) ToCriteria(ctx *configuration.AppContext) 
 // BEFORE any transport sees it.
 //
 // This read carries computed fields, so the derivation runs here — in
-// internal/application/queries/permission_computed_manual.go, which the
+// internal/application/queries/utils/permission_computed_manual.go, which the
 // generator wrote once and never touches again.
 func (q FindPermissionsByParamsQuery) FromQueryResult(ctx *configuration.AppContext, r FindPermissionsByParamsResult) (FindPermissionsByParamsResult, error) {
 	if r.Resource != nil && r.Action != nil {
-		v, err := ComputePermissionPermission(ctx, *r.Resource, *r.Action)
+		v, err := qryutils.ComputePermissionPermission(ctx, *r.Resource, *r.Action)
 		if err != nil {
 			return r, err
 		}

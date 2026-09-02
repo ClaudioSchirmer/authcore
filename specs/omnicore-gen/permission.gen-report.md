@@ -26,11 +26,9 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 The tests for them are yours too, and the same check applies.
 
-### `internal/application/queries/permission_computed_manual.go`
+### `internal/application/queries/utils/permission_computed_manual.go`
 
-This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
-
-**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
+The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
 
 **`Permission` (string)** ← `Resource`, `Action`
 
@@ -133,35 +131,23 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the permissions feature (repository + view + mount) | `bootstrap/permission_feature.go` |
-| tests for archive_permission_command.go | `internal/application/commands/archive_permission_command_test.go` |
-| tests for insert_permission_command.go | `internal/application/commands/insert_permission_command_test.go` |
-| tests for patch_permission_command.go | `internal/application/commands/patch_permission_command_test.go` |
-| the read tests for find_permission_by_id_query.go | `internal/application/queries/find_permission_by_id_query_test.go` |
-| the read tests for find_permissions_by_params_query.go | `internal/application/queries/find_permissions_by_params_query_test.go` |
-| the builder tests for permission_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/permission_schema_test.go` |
-| the wire mapper tests for find_permission_by_id.go | `internal/web/requests/find_permission_by_id_test.go` |
-| the wire mapper tests for find_permissions_by_params.go | `internal/web/requests/find_permissions_by_params_test.go` |
-| the wire mapper tests for insert_permission.go | `internal/web/requests/insert_permission_test.go` |
-| the wire mapper tests for patch_permission.go | `internal/web/requests/patch_permission_test.go` |
+| the insert command and result | `internal/application/commands/insert_permission_command.go` |
+| the patch command and result | `internal/application/commands/patch_permission_command.go` |
+| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
+| the derivations for 1 computed read field(s) | `internal/application/queries/utils/permission_computed_manual.go` |
 
 **Left untouched** (yours, by design):
 
-- `internal/application/queries/permission_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/permission_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-19 file(s) were already up to date.
+26 file(s) were already up to date.
 
 **No longer generated** — the spec changed and these are left over:
 
-- `bootstrap/permissions_feature.go`
-- `internal/application/commands/permission_commands_test.go`
-- `internal/application/queries/permission_queries_test.go`
-- `internal/application/translations/permission_translations_test.go`
-- `internal/infra/schemas/permission_schemas_test.go`
-- `internal/web/requests/permission_requests_test.go`
+- `internal/application/queries/permission_computed_manual.go`
 
 ## What was NOT generated
 

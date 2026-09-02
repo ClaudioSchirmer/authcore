@@ -5,7 +5,7 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen (created this file, does not maintain it)
-// created:    2026-08-24
+// created:    2026-09-01
 //
 // every computed read field renders absent until its derivation is written
 // — quietly, because an empty derivation is indistinguishable from one
@@ -14,7 +14,7 @@
 // There is no checksum here on purpose: this file exists to be edited, so
 // hashing it would report drift every time you did the thing it is for.
 
-package queries
+package utils
 
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
@@ -23,9 +23,12 @@ import (
 
 // The derivations behind this entity's computed read fields.
 //
-// Each runs ONCE per document, below the web boundary, so REST, GraphQL and
-// the CSV/XLSX export all render the same value — that is the whole reason
-// read-side computation lives at this seat instead of in a Response.
+// Each runs below the web boundary, so every surface renders the SAME value
+// — that is the whole reason read-side computation lives at this seat
+// instead of in a Response. A root derivation runs once per document and heads
+// a column of the CSV/XLSX export; a collection's runs once per ENTRY, is
+// handed that entry, and reaches REST and GraphQL only — a tabular row is
+// flat, so no field of a collection is in one, derived or stored.
 //
 // Until a body is written the field renders ABSENT, quietly. The framework
 // cannot detect that: as far as it is concerned the derivation ran and

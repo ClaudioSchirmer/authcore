@@ -354,78 +354,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the clients feature (repository + view + mount) | `bootstrap/client_feature.go` |
-| the add command for one client_allowed_cidrs entry | `internal/application/commands/add_client_allowed_cidr_command.go` |
-| tests for add_client_allowed_cidr_command.go | `internal/application/commands/add_client_allowed_cidr_command_test.go` |
-| the add command for one client_claims entry | `internal/application/commands/add_client_claim_command.go` |
-| tests for add_client_claim_command.go | `internal/application/commands/add_client_claim_command_test.go` |
-| the add command for one client_roles entry | `internal/application/commands/add_client_role_command.go` |
-| tests for add_client_role_command.go | `internal/application/commands/add_client_role_command_test.go` |
-| the archive command for one client_allowed_cidrs entry | `internal/application/commands/archive_client_allowed_cidr_command.go` |
-| tests for archive_client_allowed_cidr_command.go | `internal/application/commands/archive_client_allowed_cidr_command_test.go` |
-| the archive command for one client_claims entry | `internal/application/commands/archive_client_claim_command.go` |
-| tests for archive_client_claim_command.go | `internal/application/commands/archive_client_claim_command_test.go` |
-| tests for archive_client_command.go | `internal/application/commands/archive_client_command_test.go` |
-| the archive command for one client_roles entry | `internal/application/commands/archive_client_role_command.go` |
-| tests for archive_client_role_command.go | `internal/application/commands/archive_client_role_command_test.go` |
-| the write shape of one ClientAllowedCIDR entry | `internal/application/commands/dtos/client_allowed_cidr_result.go` |
-| the write shape of one ClientClaim entry | `internal/application/commands/dtos/client_claim_result.go` |
-| the write shape of one ClientRole entry | `internal/application/commands/dtos/client_role_result.go` |
-| the insert command and result | `internal/application/commands/insert_client_command.go` |
-| tests for insert_client_command.go | `internal/application/commands/insert_client_command_test.go` |
-| the patch command for one client_claims entry | `internal/application/commands/patch_client_claim_command.go` |
-| tests for patch_client_claim_command.go | `internal/application/commands/patch_client_claim_command_test.go` |
-| the patch command and result | `internal/application/commands/patch_client_command.go` |
-| tests for patch_client_command.go | `internal/application/commands/patch_client_command_test.go` |
-| the projectors for the allowedCIDRs collection | `internal/application/commands/utils/client_client_allowed_cidr_projection.go` |
-| the projectors for the claims collection | `internal/application/commands/utils/client_client_claim_projection.go` |
-| the projectors for the roles collection | `internal/application/commands/utils/client_client_role_projection.go` |
-| tests for the client_allowed_cidr_input mapper | `internal/application/dtos/client_allowed_cidr_input_test.go` |
-| tests for the client_claim_input mapper | `internal/application/dtos/client_claim_input_test.go` |
-| tests for the client_role_input mapper | `internal/application/dtos/client_role_input_test.go` |
-| the read shape of one ClientAllowedCIDR entry | `internal/application/queries/dtos/client_allowed_cidr_row_result.go` |
-| the read shape of one ClientClaim entry | `internal/application/queries/dtos/client_claim_row_result.go` |
-| the read shape of one ClientRole entry | `internal/application/queries/dtos/client_role_row_result.go` |
-| the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
-| the read tests for find_client_by_id_query.go | `internal/application/queries/find_client_by_id_query_test.go` |
-| the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
-| the read tests for find_clients_by_params_query.go | `internal/application/queries/find_clients_by_params_query_test.go` |
-| tests for the client_allowed_cidr collection type | `internal/domain/aggregatevos/client_allowed_cidr_test.go` |
-| tests for the client_claim collection type | `internal/domain/aggregatevos/client_claim_test.go` |
-| tests for the client_role collection type | `internal/domain/aggregatevos/client_role_test.go` |
-| the ClientClaimValueDoesNotMatchValueTypeEntry answer shape | `internal/domain/client_claim_value_does_not_match_value_type_entry.go` |
 | the Client service port (9 fact(s)) | `internal/domain/client_service.go` |
-| tests for the client_status value object | `internal/domain/vos/client_status_test.go` |
-| the builder tests for client_allowed_cidr_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/client_allowed_cidr_schema_test.go` |
-| the builder tests for client_claim_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/client_claim_schema_test.go` |
-| the builder tests for client_role_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/client_role_schema_test.go` |
-| the builder tests for client_schema.go — they RUN the builder, so a boot panic is a test failure | `internal/infra/schemas/client_schema_test.go` |
-| the 5 client endpoints | `internal/web/client_routes.go` |
-| the add wire pair for one client_allowed_cidrs entry | `internal/web/requests/add_client_allowed_cidr.go` |
-| the wire mapper tests for add_client_allowed_cidr.go | `internal/web/requests/add_client_allowed_cidr_test.go` |
-| the add wire pair for one client_claims entry | `internal/web/requests/add_client_claim.go` |
-| the wire mapper tests for add_client_claim.go | `internal/web/requests/add_client_claim_test.go` |
-| the add wire pair for one client_roles entry | `internal/web/requests/add_client_role.go` |
-| the wire mapper tests for add_client_role.go | `internal/web/requests/add_client_role_test.go` |
-| the archive wire pair for one client_allowed_cidrs entry | `internal/web/requests/archive_client_allowed_cidr.go` |
-| the wire mapper tests for archive_client_allowed_cidr.go | `internal/web/requests/archive_client_allowed_cidr_test.go` |
-| the archive wire pair for one client_claims entry | `internal/web/requests/archive_client_claim.go` |
-| the wire mapper tests for archive_client_claim.go | `internal/web/requests/archive_client_claim_test.go` |
-| the archive wire pair for one client_roles entry | `internal/web/requests/archive_client_role.go` |
-| the wire mapper tests for archive_client_role.go | `internal/web/requests/archive_client_role_test.go` |
-| the wire shapes of one ClientAllowedCIDR entry | `internal/web/requests/dtos/client_allowed_cidr.go` |
-| the wire shapes of one ClientClaim entry | `internal/web/requests/dtos/client_claim.go` |
-| the wire shapes of one ClientRole entry | `internal/web/requests/dtos/client_role.go` |
-| the by-id request and response | `internal/web/requests/find_client_by_id.go` |
-| the wire mapper tests for find_client_by_id.go | `internal/web/requests/find_client_by_id_test.go` |
-| the listing request and response | `internal/web/requests/find_clients_by_params.go` |
-| the wire mapper tests for find_clients_by_params.go | `internal/web/requests/find_clients_by_params_test.go` |
-| the insert request and response | `internal/web/requests/insert_client.go` |
-| the wire mapper tests for insert_client.go | `internal/web/requests/insert_client_test.go` |
-| the patch request and response | `internal/web/requests/patch_client.go` |
-| the patch wire pair for one client_claims entry | `internal/web/requests/patch_client_claim.go` |
-| the wire mapper tests for patch_client_claim.go | `internal/web/requests/patch_client_claim_test.go` |
-| the wire mapper tests for patch_client.go | `internal/web/requests/patch_client_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -434,28 +363,11 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-19 file(s) were already up to date.
+89 file(s) were already up to date.
 
 **No longer generated** — the spec changed and these are left over:
 
-- `bootstrap/clients_feature.go`
-- `internal/application/commands/client_allowed_cidr_commands.go`
-- `internal/application/commands/client_child_results.go`
-- `internal/application/commands/client_claim_commands.go`
-- `internal/application/commands/client_commands_test.go`
-- `internal/application/commands/client_role_commands.go`
-- `internal/application/dtos/client_dtos_test.go`
-- `internal/application/queries/client_queries_test.go`
-- `internal/application/queries/client_row_results.go`
-- `internal/application/translations/client_translations_test.go`
-- `internal/domain/aggregatevos/client_children_test.go`
-- `internal/domain/vos/client_vos_test.go`
-- `internal/infra/schemas/client_schemas_test.go`
-- `internal/web/requests/client_allowed_cidr_requests.go`
-- `internal/web/requests/client_children.go`
-- `internal/web/requests/client_claim_requests.go`
-- `internal/web/requests/client_requests_test.go`
-- `internal/web/requests/client_role_requests.go`
+- `internal/domain/client_claim_value_does_not_match_value_type_entry.go`
 
 ## What was NOT generated
 
