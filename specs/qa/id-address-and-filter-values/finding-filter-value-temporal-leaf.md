@@ -118,3 +118,75 @@ They turn green on their own when the fix ships; nothing in the suite needs edit
   models (no Mongo, no CDC)
 - `auth.mode: jwt`, `authorization.enabled: true`; reproduced with a `*:*` token, so no
   authorization layer is involved
+
+---
+
+# RESOLVED at omnicore v0.71.0 — verified 2026-09-02
+
+**Status: CLOSED.** The 500 is gone. Verified by running the suite that filed this, plus a
+fresh probe of every leaf kind, against v0.71.0 on the same bench.
+
+The framework's own changelog names the cause exactly where this write-up guessed it — and
+names it more precisely: the defect was the AXIS, not a missing entry in a table.
+
+> *The read-side coercion switched on `reflect.Kind` alone, and its fallback returned the
+> wire string verbatim while reporting success — a conversion it had not performed. A
+> `*time.Time` leaf collapses to `reflect.Struct` … `reflect.Kind` is a closed enum of Go's
+> primitive shapes with no member for a date, an identity or a duration. The declared TYPE
+> is now consulted before the kind.*
+
+That is why the identity and boolean kinds worked while the temporal one did not: they were
+reachable through `Kind`, and a date never was.
+
+## The two cases that were left deliberately RED are now GREEN
+
+`qa/tenant.sh` was not edited — not one character. Both cases turned green on their own, as
+the plan said they would:
+
+```
+── L · filter values outside the leaf's declared kind
+  ✓ GREEN  L1 a range operator on a temporal leaf — HTTP 400 · InvalidFilterValueNotification
+  ✓ GREEN  L2 equality on the same temporal leaf  — HTTP 400 · InvalidFilterValueNotification
+```
+
+Full run at v0.71.0: **445 cases, 2 lanes, 0 RED** (`qa/qa-report.md`).
+
+## Probe of every declared leaf kind, re-run at v0.71.0
+
+| request | leaf kind | v0.70.0 | v0.71.0 |
+|---|---|---|---|
+| `users ?tenantID=lixo` | `*domain.ID` | 400, field `TenantID` | **400, field `tenantID`** ✅ |
+| `roles ?tenantID=lixo` | `*domain.ID` | 400, field `TenantID` | **400, field `tenantID`** ✅ |
+| `users ?mustChangePassword=abc` | `*bool` | 400 ✅ | 400 ✅ |
+| `users ?id=lixo` | `*string` over an identity column | 400, field `ID` | 400, field `ID` — unchanged |
+| `tenants ?createdAt.gte=not-a-date` | `*time.Time` | **500 external** ❌ | **400 `InvalidFilterValueNotification`, field `createdAt.gte`** ✅ |
+| `tenants ?createdAt=not-a-date` | `*time.Time` | **500 external** ❌ | **400, field `createdAt`** ✅ |
+
+The temporal leaf now echoes the wire key including the operator suffix, and the refusal
+carries `semantic: "Schema"` — a consumer typo is reported as a consumer typo.
+
+## What remains — cosmetic, and narrower than reported
+
+The second, smaller discrepancy this finding raised is **fixed for the identity leaves the
+wire can see** (`tenantID` was `TenantID`) and **survives in exactly one place**:
+
+```
+GET /users?id=lixo  →  400 InvalidFilterValueNotification, "field": "ID"
+```
+
+That is the reader-guarded path — a leaf the DTO declares as a plain `*string` over an
+identity column, where the wire cannot see the type and the relational reader mints the
+refusal from the column instead. It is the one layer that knows the column and not the
+query key, so the Go field name is what it has to hand. Cosmetic, one route shape, and
+worth mentioning only because the rest of the same discrepancy is now closed.
+
+No new case was added for it: this service's `?id=` leaf belongs to the user aggregate, and
+asserting it from the tenant or permission lanes would be a case against a route those
+lanes do not own. It belongs to a future `user` lane.
+
+## Environment of the verification
+
+- omnicore `v0.71.0`, omnicore-gen shipped with plugin `0.59.0`
+- Postgres 17, `relational.dialect: postgres`, relational read models, no Mongo/CDC
+- `auth.mode: jwt` with a `*:*` token, so no authorization layer is involved
+- Reproduced through `./qa/run.sh --all` and a direct probe on a throwaway database
