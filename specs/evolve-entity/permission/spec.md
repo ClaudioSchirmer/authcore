@@ -54,6 +54,26 @@ touches · **[H]** hand-written on either path.
 | `internal/domain/permission_test.go`, `permission_rules_manual_test.go`, `internal/application/commands/{insert,patch}_permission_command_test.go`, `internal/infra/schemas/permission_schema_test.go` **[G/H]** | field renames + the two changed assertions (§7) |
 | `qa/permission.sh` **[H]** | cases **E1c**, **E1d** and the D-block comments (§7) |
 
+### Added mid-run, at the maintainer's request
+| File | What moves |
+|---|---|
+| `specs/omnicore-gen/permission.omnicore.yaml` **[H]** | a new `docs:` block — `description` plus `operations` for `insert` / `patch` / `byParams` |
+| `internal/web/permission_routes.go` **[G]** | the OpenAPI `Doc.Description` of all five REST operations |
+
+The gate's §5 said no OpenAPI text moved. The maintainer's answer was that the point of the
+change is lost if the composition is only ever explained *after* a rejection: *"queria ao
+menos no swagger"*. `docs:` is the one block of this spec whose prose reaches the OpenAPI
+document, and the entity declared none — which is why the first regeneration left the
+endpoint documentation untouched. It is purely additive: prose appended to five operation
+descriptions, no schema, no parameter, no status code.
+
+**GraphQL has no equivalent seat at this pin, and that is a framework fact, not a generator
+one.** Checked three ways rather than asserted: `explain keys` exposes no GraphQL docs key;
+nothing in `omnicore/web/graphql/` ever assigns a `Description` on the schema AST; and
+`introspection.go` reads `def.Description` / `f.Description` from a producer that does not
+exist. So the SDL and GraphiQL render descriptionless at v0.72.0 for every entity of this
+service, and nothing this change could declare would alter that.
+
 ### Deliberately NOT touched — and why
 - **No migration.** The physical columns are `resource_name` / `action_name`, declared under
   `parts[].column`; the Go field name reaches no DDL. The unique index

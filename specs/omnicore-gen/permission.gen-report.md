@@ -134,20 +134,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the insert command and result | `internal/application/commands/insert_permission_command.go` |
-| tests for insert_permission_command.go | `internal/application/commands/insert_permission_command_test.go` |
-| the patch command and result | `internal/application/commands/patch_permission_command.go` |
-| 5 updated DEU translation key(s) | `internal/application/translations/deu.go` |
-| 5 updated ENG translation key(s) | `internal/application/translations/eng.go` |
-| 5 updated ESP translation key(s) | `internal/application/translations/esp.go` |
-| 5 updated FRA translation key(s) | `internal/application/translations/fra.go` |
-| 5 updated ITA translation key(s) | `internal/application/translations/ita.go` |
-| 5 updated NLD translation key(s) | `internal/application/translations/nld.go` |
-| 5 updated PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| the Permission aggregate root, its modes and its rules | `internal/domain/permission.go` |
-| tests for Permission's rules | `internal/domain/permission_test.go` |
-| the Permission repository and its constraint bindings | `internal/infra/permission_repository.go` |
-| the listing request and response | `internal/web/requests/find_permissions_by_params.go` |
+| the 5 permission endpoints | `internal/web/permission_routes.go` |
 
 **Left untouched** (yours, by design):
 
@@ -156,7 +143,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-23 file(s) were already up to date.
+29 file(s) were already up to date.
 
 ## What was NOT generated
 

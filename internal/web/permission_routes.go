@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:11bbabf7c483ccc630901c834ece3097663ec5e84c6a945bb10d7f54277327e5
+// generated:  2026-09-03
+// checksum:   sha256:04d8cdd6567d6d428c357817790825005562eab60e21c45919b5ca7a281f30fb
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -69,9 +69,15 @@ func MountPermissions(
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPost, "/",
 		insertH, insertSpec,
 		fwopenapi.Doc{
-			Summary:     "Create a permission",
-			Description: "Creates a permission and returns it as stored — the response reflects any value the domain normalised or defaulted, not an echo of the request.",
-			Tags:        []string{"Permissions"},
+			Summary: "Create a permission",
+			Description: "Creates a permission and returns it as stored — the response reflects any value the domain normalised or defaulted, not an echo of the request.\n\n" +
+				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
+				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
+				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.\n\n" +
+				"Send the two halves separately. They are refused, never repaired: `Tenant`, ` tenant `\nand `tenant:*` are all rejected rather than cleaned up, because the rendered pair is\ncompared byte for byte against a token claim and a quietly repaired value would\nauthorize nothing and explain nothing.\n\n" +
+				"A pair the catalog already holds answers **409**, naming `permission` and handing the\nrefused pair back as `resource:action`. Only ACTIVE rows hold a pair: archiving one\nfrees it, and re-inserting is the only way a retired permission comes back — as a new\nrow, with a new id.\n\n" +
+				"A wildcard `*` is accepted as an ENTIRE half and nowhere else, and a `*` resource\nforces a `*` action: `*:read` is refused, because the claim matcher honours exactly\n`resource:action`, `resource:*` and `*:*`, so such a row would match no route while\nreading like a sweeping grant.",
+			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:insert"))
 
@@ -84,9 +90,14 @@ func MountPermissions(
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id",
 		patchH, patchSpec,
 		fwopenapi.Doc{
-			Summary:     "Update a permission (partial)",
-			Description: "Partial update: only the fields present in the body change. Because an absent field and an explicit null cannot be told apart here, this verb cannot set a value back to null.",
-			Tags:        []string{"Permissions"},
+			Summary: "Update a permission (partial)",
+			Description: "Partial update: only the fields present in the body change. Because an absent field and an explicit null cannot be told apart here, this verb cannot set a value back to null.\n\n" +
+				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
+				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
+				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.\n\n" +
+				"**The pair cannot be changed** — `resource` and `action` are not part of this body, and\nsending them changes nothing. The pair IS the permission's identity in every issued\ntoken and every existing grant, so editing it would rewrite what all of them mean,\nretroactively and invisibly. A permission that should say something else is a new one.\n\n" +
+				"The description is editable, and that is the whole of this operation.",
+			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:update"))
 
@@ -98,9 +109,12 @@ func MountPermissions(
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodPatch, "/:id/archive",
 		archiveH, archiveSpec,
 		fwopenapi.Doc{
-			Summary:     "Archive a permission",
-			Description: "Archives the permission: the row stays but is hidden from reads unless they ask for archived rows. This service mounts no unarchive: the row stays as history and nothing brings it back into the active set.",
-			Tags:        []string{"Permissions"},
+			Summary: "Archive a permission",
+			Description: "Archives the permission: the row stays but is hidden from reads unless they ask for archived rows. This service mounts no unarchive: the row stays as history and nothing brings it back into the active set.\n\n" +
+				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
+				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
+				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.",
+			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:archive"))
 
@@ -113,9 +127,13 @@ func MountPermissions(
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodGet, "/",
 		byParamsH, byParamsSpec,
 		fwopenapi.Doc{
-			Summary:     "List permissions",
-			Description: "Paged listing of permissions. Unknown filter keys and operators are rejected with a typed 400 rather than silently ignored.",
-			Tags:        []string{"Permissions"},
+			Summary: "List permissions",
+			Description: "Paged listing of permissions. Unknown filter keys and operators are rejected with a typed 400 rather than silently ignored.\n\n" +
+				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
+				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
+				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.\n\n" +
+				"Filter and sort the two HALVES — `?filter[resource][eq]=tenant`,\n`?filter[action][in]=read,insert`, `?orderBy=resource`. The rendered `permission` is\nderived per row and backs no column, so it can be SELECTED (`?fields=permission`) but\nnever filtered or ordered; asking for either answers a typed 400.",
+			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:read"))
 
@@ -128,9 +146,12 @@ func MountPermissions(
 	fwopenapi.Mount(d.OpenAPIRegistry, group, fiber.MethodGet, "/:id",
 		byIdH, byIdSpec,
 		fwopenapi.Doc{
-			Summary:     "Get a permission by id",
-			Description: "Reads one permission. Only the controls this endpoint declares are accepted; anything else is rejected with a typed 400.",
-			Tags:        []string{"Permissions"},
+			Summary: "Get a permission by id",
+			Description: "Reads one permission. Only the controls this endpoint declares are accepted; anything else is rejected with a typed 400.\n\n" +
+				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
+				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
+				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.",
+			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:read"))
 

@@ -410,6 +410,57 @@ surfaces:
     enabled: true
   # No CSV/XLSX exports: the catalog is small and operator-facing.
 
+# CALLER-FACING prose, and the only place in this spec that reaches the OpenAPI document.
+# Everything else here explains the entity to whoever maintains it; this block explains it to
+# whoever is about to call it.
+#
+# It exists because the composition is invisible from the wire alone: a request carries
+# `resource` and `action` as two separate keys, a response carries one rendered `permission`,
+# and nothing on either side says the three are one concept. A caller who has not been told
+# reads a 422 naming `action` and a 409 naming `permission` as two unrelated endpoints
+# misbehaving.
+docs:
+  description: |
+    **A permission is `resource:action`** — one pair, written as two keys.
+
+    - `resource` — what is protected, as the enforcing route names it: `tenant`,
+      `user:profile`, or `*` for every resource.
+    - `action` — what may be done to it: `read`, `insert`, or `*` for every action.
+    - `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries
+      and a route compares against, byte for byte. Reads return it; no request sends it.
+
+    A rejection therefore names one of three fields, and which one tells you what to fix:
+    `resource` or `action` when that half is malformed on its own, and `permission` when the
+    complaint is about the PAIR — it is already taken, or it cannot match anything.
+  operations:
+    insert: |
+      Send the two halves separately. They are refused, never repaired: `Tenant`, ` tenant `
+      and `tenant:*` are all rejected rather than cleaned up, because the rendered pair is
+      compared byte for byte against a token claim and a quietly repaired value would
+      authorize nothing and explain nothing.
+
+      A pair the catalog already holds answers **409**, naming `permission` and handing the
+      refused pair back as `resource:action`. Only ACTIVE rows hold a pair: archiving one
+      frees it, and re-inserting is the only way a retired permission comes back — as a new
+      row, with a new id.
+
+      A wildcard `*` is accepted as an ENTIRE half and nowhere else, and a `*` resource
+      forces a `*` action: `*:read` is refused, because the claim matcher honours exactly
+      `resource:action`, `resource:*` and `*:*`, so such a row would match no route while
+      reading like a sweeping grant.
+    patch: |
+      **The pair cannot be changed** — `resource` and `action` are not part of this body, and
+      sending them changes nothing. The pair IS the permission's identity in every issued
+      token and every existing grant, so editing it would rewrite what all of them mean,
+      retroactively and invisibly. A permission that should say something else is a new one.
+
+      The description is editable, and that is the whole of this operation.
+    byParams: |
+      Filter and sort the two HALVES — `?filter[resource][eq]=tenant`,
+      `?filter[action][in]=read,insert`, `?orderBy=resource`. The rendered `permission` is
+      derived per row and backs no column, so it can be SELECTED (`?fields=permission`) but
+      never filtered or ordered; asking for either answers a typed 400.
+
 authz:
   resource: permission
   # The catalog is global by design — not partitioned by tenant, so there is no tenant_id
