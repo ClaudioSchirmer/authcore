@@ -140,8 +140,8 @@ func (s *RoleServiceImpl) catalogRows(permissionIDs []domain.ID) map[domain.ID]c
 			rows[utils.CanonicalIDOf(permission.GetID())] = catalogRow{
 				found:      true,
 				archivedAt: permission.GetDeletedAt(),
-				resource:   permission.Key.Resource,
-				action:     permission.Key.Action,
+				resource:   permission.Permission.Resource,
+				action:     permission.Permission.Action,
 			}
 		}
 		return rows

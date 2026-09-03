@@ -38,13 +38,13 @@ func (e *Permission) customRules(actionName string, service domain.Service, r *d
 		// The description must differ from the rendered resource:action
 		// string under a normalized comparison — case-folded, with
 		// whitespace, colons and hyphens collapsed — which catches the
-		// lazy paste and nothing more. Render the key through
+		// lazy paste and nothing more. Render the pair through
 		// PermissionKey.String(); do not concatenate the parts here, the
 		// value object is the single home of the separator.
 		//
 		// It catches the lazy paste and nothing more: a description that
-		// merely restates the key teaches an operator nothing the listing
-		// did not already show them.
+		// merely restates the permission teaches an operator nothing the
+		// listing did not already show them.
 		// The emptiness test is part of the CONDITION, never an early return.
 		// A return here would skip whatever is added to this clause later, and
 		// it would do it invisibly — the spec would show one rule and the code
@@ -55,7 +55,7 @@ func (e *Permission) customRules(actionName string, service domain.Service, r *d
 		// make, so this rule stays quiet about it rather than saying the same
 		// thing twice. (Tenant's own description rule reads exactly this way.)
 		description := normalizeForEcho(e.Description.Value())
-		if description != "" && description == normalizeForEcho(e.Key.String()) {
+		if description != "" && description == normalizeForEcho(e.Permission.String()) {
 			r.AddNotification("Description", PermissionDescriptionEchoesKeyNotification{}, e.Description.Value())
 		}
 	})
@@ -73,10 +73,10 @@ func (e *Permission) customRules(actionName string, service domain.Service, r *d
 // package, and the difference is not an oversight — it was raised and kept.
 // That one collapses whitespace and hyphens to a single space and PRESERVES
 // punctuation, which is right when the other side of the comparison is a
-// human handle. Here the other side is a KEY that contains the separator, so
-// "tenant:read" would keep its colon and never match "TENANT READ". What the
-// two rules compare against differs, so how they fold differs; neither is the
-// general case of the other.
+// human handle. Here the other side is the rendered PERMISSION, which carries
+// the separator, so "tenant:read" would keep its colon and never match
+// "TENANT READ". What the two rules compare against differs, so how they fold
+// differs; neither is the general case of the other.
 func normalizeForEcho(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))

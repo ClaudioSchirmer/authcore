@@ -11,6 +11,7 @@ The descriptions, examples and labels quoted here are in **en-US**, as the spec 
 Written by hand — `kind: manual`, or a composite with `written: manual` — and already in the project. The generator did not open them and cannot tell whether what they enforce still matches what the spec says they enforce — listed so a description that moved does not leave a stale rule behind it:
 
 - **`PermissionKey`** — `internal/domain/vos/permission_key.go`. A resource together with what may be done to it — the pair a JWT claim carries and a route compares against, byte for byte. The resource is a colon-joined path of 2-64 rune lowercase slugs (tenant, user:profile); the action is exactly one such slug, so the LAST colon segment is always the action and the rendering parses back one way. The wildcard `*` is accepted as an ENTIRE part only, never inside a path and never mixed into a slug, and a `*` resource forces a `*` action — the claim matcher honors exactly three shapes (exact, resource:*, *:*) and anything else would be a row that matches nothing while reading like a grant. No normalization: a value that does not already comply is refused, never repaired.
+  - A unique field over `PermissionKey` declares `echoValue: true`, so a duplicate hands the whole value back with the conflict. **Check that it declares `String()`** — the framework renders the echo through `fmt.Stringer`, and without the method the API answers with a formatted Go struct.
 
 The backing stays a contract across every run: the mappers convert with `vos.<Name>(x)` and read back with `.Value()`, so changing the underlying type of one of these breaks call sites that name neither this report nor the spec. For a composite the contract is its FIELD SET instead: the mappers build it as a `vos.<Name>{Part: v, …}` literal, so a part renamed or retyped there breaks the same way, and the spec's `parts` are what says which names those are.
 
@@ -20,7 +21,7 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 **`description-does-not-echo-key`**
 
-> The description must differ from the rendered resource:action string under a normalized comparison — case-folded, with whitespace, colons and hyphens collapsed — which catches the lazy paste and nothing more. Render the key through PermissionKey.String(); do not concatenate the parts here, the value object is the single home of the separator.
+> The description must differ from the rendered resource:action string under a normalized comparison — case-folded, with whitespace, colons and hyphens collapsed — which catches the lazy paste and nothing more. Render the pair through PermissionKey.String(); do not concatenate the parts here, the value object is the single home of the separator.
 
 - fires under `IfInsertOrUpdate` · raise `PermissionDescriptionEchoesKeyNotification{}` · attach it to `Description`
 
@@ -28,7 +29,9 @@ The tests for them are yours too, and the same check applies.
 
 ### `internal/application/queries/utils/permission_computed_manual.go`
 
-The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
+
+**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
 
 **`Permission` (string)** ← `Resource`, `Action`
 
@@ -131,23 +134,16 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the insert command and result | `internal/application/commands/insert_permission_command.go` |
-| the patch command and result | `internal/application/commands/patch_permission_command.go` |
-| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
-| the derivations for 1 computed read field(s) | `internal/application/queries/utils/permission_computed_manual.go` |
+| the 5 permission endpoints | `internal/web/permission_routes.go` |
 
 **Left untouched** (yours, by design):
 
+- `internal/application/queries/utils/permission_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/permission_rules_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-26 file(s) were already up to date.
-
-**No longer generated** — the spec changed and these are left over:
-
-- `internal/application/queries/permission_computed_manual.go`
+29 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -161,11 +157,15 @@ Owned by other tools:
 
 Read controls this listing does NOT serve: `?search=`. That is a contract, not an omission — sending one is answered with a typed 400 rather than being ignored.
 
+Warnings raised during generation:
+
+- fields[0] (Permission).unique.echoValue: the conflict will echo PermissionKey through its String()
+
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.69.0)
+Verdict: **exact** (project pins v0.72.0)
 
-framework v0.69.0 meets the required v0.69.0
+framework v0.72.0 meets the required v0.72.0
 
 Verify what was generated:
 

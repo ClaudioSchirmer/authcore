@@ -52,18 +52,33 @@ fields:
   # its 409 binding. scope: active-only, because an archived remnant must not block a fresh
   # pair — with no unarchive verb (modes below), re-inserting is the ONLY way a retired
   # permission comes back.
-  - name: Key
+  # The field is named for the CONCEPT, not for its role in the table. That name is what a
+  # rejection puts on the wire: `AddNotification("Permission", …)` renders `field:
+  # "permission"`, the same word the read side already answers with (read.computed below)
+  # and the same word the label renders. It was `Key` once, which named nothing any request
+  # or response carried.
+  #
+  # echoValue: true — the 409 carries the refused pair back, rendered through
+  # PermissionKey.String(). It is off by default on a COMPOSITE because the generator cannot
+  # know the owner renders usefully; this one does, and `check` says so in a warning rather
+  # than a refusal. Without it the answer says a pair is taken and never says which.
+  - name: Permission
     livesOn: root
     hidden: true
     vo: {kind: composite, ref: PermissionKey}
     unique:
       enforce: service-precheck+constraint
       notification: PermissionAlreadyExistsNotification
+      echoValue: true
       scope: active-only
     description: >-
       The permission itself: what resource, and what may be done to it. Stored as two
       columns, rendered as one resource:action string.
-    labelKey: PermissionKeyField
+    # The SAME key the read side's computed field wears. One concept, one label: the two
+    # used to be PermissionKeyField and PermissionPermissionField with identical text in all
+    # seven catalogs, and that duplication existed only because the write field and the read
+    # field were named differently. They no longer are.
+    labelKey: PermissionPermissionField
     text:
       eng: Permission
       ptbr: Permissão
@@ -159,14 +174,19 @@ notifications:
     description: >-
       An ACTIVE permission already holds this resource and action pair. Archived rows do
       not block it — re-inserting is how a retired permission comes back.
+    # The composition is spelled out in every one of these texts on purpose: a caller who
+    # reads only the rejection has to be able to tell WHICH half is wrong. The literal
+    # "resource:action" is NOT translated — those two words are the JSON keys the request
+    # actually carries, in every language, so translating them would point at fields that
+    # do not exist.
     text:
-      eng: This permission already exists.
-      ptbr: Esta permissão já existe.
-      esp: Este permiso ya existe.
-      fra: Cette permission existe déjà.
-      deu: Diese Berechtigung existiert bereits.
-      ita: Questo permesso esiste già.
-      nld: Dit recht bestaat al.
+      eng: 'A permission is "resource:action" — this pair already exists.'
+      ptbr: 'Uma permissão é "resource:action" — este par já existe.'
+      esp: 'Un permiso es "resource:action" — este par ya existe.'
+      fra: 'Une permission est « resource:action » — cette paire existe déjà.'
+      deu: 'Eine Berechtigung ist "resource:action" — dieses Paar existiert bereits.'
+      ita: 'Un permesso è "resource:action" — questa coppia esiste già.'
+      nld: 'Een recht is "resource:action" — dit paar bestaat al.'
 
   - name: PermissionKeyIsImmutableNotification
     semantic: validation
@@ -174,13 +194,13 @@ notifications:
       An attempt to change the resource or the action after creation, which would rewrite
       the meaning of every existing grant and every issued token.
     text:
-      eng: The resource and the action cannot be changed.
-      ptbr: O recurso e a ação não podem ser alterados.
-      esp: El recurso y la acción no se pueden modificar.
-      fra: La ressource et l'action ne peuvent pas être modifiées.
-      deu: Ressource und Aktion können nicht geändert werden.
-      ita: La risorsa e l'azione non possono essere modificate.
-      nld: De resource en de actie kunnen niet worden gewijzigd.
+      eng: 'A permission is "resource:action" — neither half can be changed after creation.'
+      ptbr: 'Uma permissão é "resource:action" — nenhuma das metades pode ser alterada após a criação.'
+      esp: 'Un permiso es "resource:action" — ninguna de las dos mitades se puede modificar tras la creación.'
+      fra: 'Une permission est « resource:action » — aucune des deux moitiés ne peut être modifiée après la création.'
+      deu: 'Eine Berechtigung ist "resource:action" — nach der Erstellung kann keine der beiden Hälften geändert werden.'
+      ita: 'Un permesso è "resource:action" — nessuna delle due metà può essere modificata dopo la creazione.'
+      nld: 'Een recht is "resource:action" — na aanmaak kan geen van beide helften worden gewijzigd.'
 
   - name: PermissionDescriptionEchoesKeyNotification
     semantic: validation
@@ -201,13 +221,13 @@ notifications:
       A resource outside the accepted shape — a colon-joined path of lowercase slugs, or
       the wildcard `*` on its own.
     text:
-      eng: The resource must be lowercase slugs joined by colons, or exactly "*".
-      ptbr: O recurso deve ser composto por slugs minúsculos separados por dois-pontos, ou exatamente "*".
-      esp: El recurso debe ser slugs en minúsculas separados por dos puntos, o exactamente "*".
-      fra: La ressource doit être des slugs en minuscules séparés par des deux-points, ou exactement « * ».
-      deu: Die Ressource muss aus durch Doppelpunkte getrennten Kleinbuchstaben-Slugs bestehen oder genau "*" sein.
-      ita: La risorsa deve essere composta da slug minuscoli separati da due punti, o esattamente "*".
-      nld: De resource moet bestaan uit kleine slugs gescheiden door dubbele punten, of exact "*".
+      eng: 'A permission is "resource:action" — its resource half must be lowercase slugs joined by colons, or exactly "*".'
+      ptbr: 'Uma permissão é "resource:action" — a metade "resource" deve ser composta por slugs minúsculos separados por dois-pontos, ou exatamente "*".'
+      esp: 'Un permiso es "resource:action" — su mitad "resource" debe ser slugs en minúsculas separados por dos puntos, o exactamente "*".'
+      fra: 'Une permission est « resource:action » — sa moitié « resource » doit être des slugs en minuscules séparés par des deux-points, ou exactement « * ».'
+      deu: 'Eine Berechtigung ist "resource:action" — ihre "resource"-Hälfte muss aus durch Doppelpunkte getrennten Kleinbuchstaben-Slugs bestehen oder genau "*" sein.'
+      ita: 'Un permesso è "resource:action" — la sua metà "resource" deve essere composta da slug minuscoli separati da due punti, o esattamente "*".'
+      nld: 'Een recht is "resource:action" — de "resource"-helft moet bestaan uit kleine slugs gescheiden door dubbele punten, of exact "*".'
 
   - name: InvalidActionNameNotification
     package: vos
@@ -216,13 +236,13 @@ notifications:
       An action outside the accepted shape — exactly one lowercase slug, with no colon, or
       the wildcard `*` on its own.
     text:
-      eng: The action must be a single lowercase slug, or exactly "*".
-      ptbr: A ação deve ser um único slug minúsculo, ou exatamente "*".
-      esp: La acción debe ser un único slug en minúsculas, o exactamente "*".
-      fra: L'action doit être un seul slug en minuscules, ou exactement « * ».
-      deu: Die Aktion muss ein einzelner Kleinbuchstaben-Slug oder genau "*" sein.
-      ita: L'azione deve essere un singolo slug minuscolo, o esattamente "*".
-      nld: De actie moet één kleine slug zijn, of exact "*".
+      eng: 'A permission is "resource:action" — its action half must be a single lowercase slug, or exactly "*".'
+      ptbr: 'Uma permissão é "resource:action" — a metade "action" deve ser um único slug minúsculo, ou exatamente "*".'
+      esp: 'Un permiso es "resource:action" — su mitad "action" debe ser un único slug en minúsculas, o exactamente "*".'
+      fra: 'Une permission est « resource:action » — sa moitié « action » doit être un seul slug en minuscules, ou exactement « * ».'
+      deu: 'Eine Berechtigung ist "resource:action" — ihre "action"-Hälfte muss ein einzelner Kleinbuchstaben-Slug oder genau "*" sein.'
+      ita: 'Un permesso è "resource:action" — la sua metà "action" deve essere un singolo slug minuscolo, o esattamente "*".'
+      nld: 'Een recht is "resource:action" — de "action"-helft moet één kleine slug zijn, of exact "*".'
 
   - name: UnmatchablePermissionKeyNotification
     package: vos
@@ -232,13 +252,13 @@ notifications:
       exact, resource:* and *:*, so such a row would match no route while reading like a
       sweeping grant.
     text:
-      eng: A wildcard resource requires the action to be "*" as well.
-      ptbr: Um recurso curinga exige que a ação também seja "*".
-      esp: Un recurso comodín exige que la acción también sea "*".
-      fra: Une ressource joker impose que l'action soit également « * ».
-      deu: Eine Platzhalter-Ressource verlangt, dass auch die Aktion "*" ist.
-      ita: Una risorsa jolly richiede che anche l'azione sia "*".
-      nld: Een jokerteken-resource vereist dat de actie ook "*" is.
+      eng: 'A permission is "resource:action" — a wildcard resource requires the action to be "*" as well.'
+      ptbr: 'Uma permissão é "resource:action" — um recurso curinga exige que a ação também seja "*".'
+      esp: 'Un permiso es "resource:action" — un recurso comodín exige que la acción también sea "*".'
+      fra: 'Une permission est « resource:action » — une ressource joker impose que l''action soit également « * ».'
+      deu: 'Eine Berechtigung ist "resource:action" — eine Platzhalter-Ressource verlangt, dass auch die Aktion "*" ist.'
+      ita: 'Un permesso è "resource:action" — una risorsa jolly richiede che anche l''azione sia "*".'
+      nld: 'Een recht is "resource:action" — een jokerteken-resource vereist dat de actie ook "*" is.'
 
 # No unarchive, no delete. Un-archiving would re-enable, in ONE call, every grant still
 # pointing at that row: old users would silently regain a permission nobody re-approved,
@@ -263,7 +283,7 @@ update:
   # editable, accepts them, assigns them to the entity, and only then refuses — one layer
   # between a caller and a permission that silently changes meaning for everyone who already
   # holds it.
-  patchExcludes: [Key]
+  patchExcludes: [Permission]
 
 delete:
   root: soft
@@ -276,7 +296,7 @@ rules:
     - id: key-immutable
       kind: immutable
       scope: [update]
-      fields: [Key]
+      fields: [Permission]
       notification: PermissionKeyIsImmutableNotification
       description: >-
         The pair IS the permission's identity everywhere except this table — the string in
@@ -290,7 +310,7 @@ rules:
       description: >-
         The description must differ from the rendered resource:action string under a
         normalized comparison — case-folded, with whitespace, colons and hyphens collapsed
-        — which catches the lazy paste and nothing more. Render the key through
+        — which catches the lazy paste and nothing more. Render the pair through
         PermissionKey.String(); do not concatenate the parts here, the value object is the
         single home of the separator.
       scope: [insertOrUpdate]
@@ -389,6 +409,57 @@ surfaces:
     # mounts. mutations and connection exist to SUBTRACT; nothing here is meant to be off.
     enabled: true
   # No CSV/XLSX exports: the catalog is small and operator-facing.
+
+# CALLER-FACING prose, and the only place in this spec that reaches the OpenAPI document.
+# Everything else here explains the entity to whoever maintains it; this block explains it to
+# whoever is about to call it.
+#
+# It exists because the composition is invisible from the wire alone: a request carries
+# `resource` and `action` as two separate keys, a response carries one rendered `permission`,
+# and nothing on either side says the three are one concept. A caller who has not been told
+# reads a 422 naming `action` and a 409 naming `permission` as two unrelated endpoints
+# misbehaving.
+docs:
+  description: |
+    **A permission is `resource:action`** — one pair, written as two keys.
+
+    - `resource` — what is protected, as the enforcing route names it: `tenant`,
+      `user:profile`, or `*` for every resource.
+    - `action` — what may be done to it: `read`, `insert`, or `*` for every action.
+    - `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries
+      and a route compares against, byte for byte. Reads return it; no request sends it.
+
+    A rejection therefore names one of three fields, and which one tells you what to fix:
+    `resource` or `action` when that half is malformed on its own, and `permission` when the
+    complaint is about the PAIR — it is already taken, or it cannot match anything.
+  operations:
+    insert: |
+      Send the two halves separately. They are refused, never repaired: `Tenant`, ` tenant `
+      and `tenant:*` are all rejected rather than cleaned up, because the rendered pair is
+      compared byte for byte against a token claim and a quietly repaired value would
+      authorize nothing and explain nothing.
+
+      A pair the catalog already holds answers **409**, naming `permission` and handing the
+      refused pair back as `resource:action`. Only ACTIVE rows hold a pair: archiving one
+      frees it, and re-inserting is the only way a retired permission comes back — as a new
+      row, with a new id.
+
+      A wildcard `*` is accepted as an ENTIRE half and nowhere else, and a `*` resource
+      forces a `*` action: `*:read` is refused, because the claim matcher honours exactly
+      `resource:action`, `resource:*` and `*:*`, so such a row would match no route while
+      reading like a sweeping grant.
+    patch: |
+      **The pair cannot be changed** — `resource` and `action` are not part of this body, and
+      sending them changes nothing. The pair IS the permission's identity in every issued
+      token and every existing grant, so editing it would rewrite what all of them mean,
+      retroactively and invisibly. A permission that should say something else is a new one.
+
+      The description is editable, and that is the whole of this operation.
+    byParams: |
+      Filter and sort the two HALVES — `?filter[resource][eq]=tenant`,
+      `?filter[action][in]=read,insert`, `?orderBy=resource`. The rendered `permission` is
+      derived per row and backs no column, so it can be SELECTED (`?fields=permission`) but
+      never filtered or ordered; asking for either answers a typed 400.
 
 authz:
   resource: permission

@@ -1583,8 +1583,8 @@
     },
     "Permission": {
       "spec": "specs/omnicore-gen/permission.omnicore.yaml",
-      "specHash": "be262439738852bf22fcfeee5b590eccc17f433f48fd99b420a11f2aa61e199b",
-      "framework": "v0.69.0",
+      "specHash": "2d4ffd0746199539002d030edb56a00373bd0f5903fe753fadc3b47d83dfc4d6",
+      "framework": "v0.72.0",
       "files": {
         "bootstrap/permission_feature.go": {
           "class": "owned",
@@ -1600,15 +1600,15 @@
         },
         "internal/application/commands/insert_permission_command.go": {
           "class": "owned",
-          "hash": "f7085b28193857b414083bf88d0a3d727f463a0eb1b11b1168aa9f15283c1bd7"
+          "hash": "affdfde1f6adb8d10d82c84c3dac2442f0b8439da0393875fd20df353c46fdf2"
         },
         "internal/application/commands/insert_permission_command_test.go": {
           "class": "owned",
-          "hash": "2659897bd75f6b213a2e3ad16d3652b2f7e73b72133641c4d539462999576927"
+          "hash": "70331089fedd03becbd8a8820360d8b653c1659926484581d0996a618c3922dc"
         },
         "internal/application/commands/patch_permission_command.go": {
           "class": "owned",
-          "hash": "a1bf2a0809b58780d99ac58bc8c0c9fccca25678ea643dc6fd9fe1c46968f472"
+          "hash": "1c9dd8852433a678e93c079fc592a65e29eaf931cee9426ea5a28b46d279bcc6"
         },
         "internal/application/commands/patch_permission_command_test.go": {
           "class": "owned",
@@ -1636,7 +1636,7 @@
         },
         "internal/domain/permission.go": {
           "class": "owned",
-          "hash": "15c88a4149afe2eb6f0427eccfa53cd214b56eb6887ebfbde77228e0681bfc9a"
+          "hash": "c793afc578079c44655b7d77c8f1b5b1d2de6fb76b3e0932ffefd2fb09bf8019"
         },
         "internal/domain/permission_rules_manual.go": {
           "class": "hook",
@@ -1648,7 +1648,7 @@
         },
         "internal/domain/permission_test.go": {
           "class": "owned",
-          "hash": "34988044f20627f11864eb2fffc41a729060dba6013753266a93cbe4567ce20d"
+          "hash": "f780275e7b5aeed42b1019475014a59a57d313092ecff849874da0f6182f37c8"
         },
         "internal/domain/vos/doc.go": {
           "class": "owned",
@@ -1656,7 +1656,7 @@
         },
         "internal/infra/permission_repository.go": {
           "class": "owned",
-          "hash": "8148073a9f357cdea2313dae28326fe64c2b705872d1a94e9c681024edf8338f"
+          "hash": "7c17bcee8a02814a61e96bda2a271501c14936f97bfd141b7021fe4de2c0cf36"
         },
         "internal/infra/permission_service.go": {
           "class": "owned",
@@ -1680,7 +1680,7 @@
         },
         "internal/web/permission_routes.go": {
           "class": "owned",
-          "hash": "f7b448e239196a7a55986d14f2846266cfdbeccc798d9922ebd8b11694121f4f"
+          "hash": "e706452593985cdffdb9ce5f4c783fb29e70f90a1f61e675c439ea322fefe6c2"
         },
         "internal/web/requests/find_permission_by_id.go": {
           "class": "owned",
@@ -1692,7 +1692,7 @@
         },
         "internal/web/requests/find_permissions_by_params.go": {
           "class": "owned",
-          "hash": "acd298d3b4a99147a6eb4b4d199f467c10c0f3bb515b502546f759c5fdee74f3"
+          "hash": "02aedeb50eb7715b45afd82cc378aef0741c381e4dd28dab87e71ca9b5c0364a"
         },
         "internal/web/requests/find_permissions_by_params_test.go": {
           "class": "owned",
@@ -1721,116 +1721,109 @@
       "viewShape": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "registrations": {
         "internal/application/translations/deu.go": {
-          "InvalidActionNameNotification": "cd80372a9b7aa857a7c421e72e475ba9fe649483fd9cc3cace5517e9a88981c1",
-          "InvalidResourceNameNotification": "3b78f371797b9314db00cd5fcdbcb1db16f17c3c18746bb8651cb2fdf4cc9e12",
+          "InvalidActionNameNotification": "27cb71fa43f89cb84f0ee37f2d3d9f7c61a0984f9ea9e6ebba7f069949e71550",
+          "InvalidResourceNameNotification": "a5803482b6ef05e1f9661e2467b2d13e87d464944c7cf22b3fb5c7187933ab47",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "a4ad259e71cbbe0cce1beed3d6247c6527a21a76af90efa3322fc5bac2f89acb",
-          "PermissionAlreadyExistsNotification": "9ef8063acd4256a5d77bf1a4d20ae36803b29d342749c4d6c714a2d2a53e20b1",
+          "PermissionAlreadyExistsNotification": "e10a5a2b36e4976b2df0bde91c83c4518af56f7eaf292e2e23017892c6f8e34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "f4335e1f62fc825d198c9756d2d4977046f70660e6fb4fa9a1376d5f787c8dd0",
           "PermissionDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
-          "PermissionKeyField": "a1d35e12528be887c80df6f3b7a35a7e4df91ed50f1f6bc60d692fba4bdd82b5",
-          "PermissionKeyIsImmutableNotification": "9cd33af7c80e1d27a83bf6cc52bf9d16b92eefe67f15e5813eb8a300c87c7af8",
+          "PermissionKeyIsImmutableNotification": "b73bbde4bfcf51f292539c02cde390a7d1cead1bc0ed2c802bbbd881bd128ea8",
           "PermissionPermissionField": "a1d35e12528be887c80df6f3b7a35a7e4df91ed50f1f6bc60d692fba4bdd82b5",
           "PermissionResourceField": "5b93c6897c0e63aa5f81c752e6bbdc82d1725fb5d494c716c188fadcd7b1a8cc",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "bee2a08c02101d33ea7139981a1edd43440ef48276ffd9425df6895b871d6909"
+          "UnmatchablePermissionKeyNotification": "a3c088b08fb1dad9289dc8ba63c08e3e49d97d9f97cca390783b0dc659ca7ab9"
         },
         "internal/application/translations/eng.go": {
-          "InvalidActionNameNotification": "abf01d9d72f00e66d2fa6f70db8fd32175b0287a9fd7f1d5cbfd6f095d881e2f",
-          "InvalidResourceNameNotification": "319baa84fd742102d41145dffa6047429c95c0594714f4b3aa89e5b23de487a8",
+          "InvalidActionNameNotification": "46aaecc99e4461e597af7c93f243a643810faf78090196b7333cfb724dcd9130",
+          "InvalidResourceNameNotification": "07a6258f2be911b86294f5b1664491627432f968637224a669c2c56840a7009b",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "64cff1319d2fd2cbb7a1e84ccecf22c1cc07b24435cdb522f8c0aa525d6002a6",
-          "PermissionAlreadyExistsNotification": "4862393f2a052b24d8d23691a9ce948ce53ffca6630fba393a2c43e42ba6bd64",
+          "PermissionAlreadyExistsNotification": "3fe31615c2cd54e7512d46652d2a1ce4ec985495fb0b215ac8c1fa5dca95f8c2",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "83fec0183528875bbac33af9cadd148cd79efe0e16042819ff910f3261debeac",
           "PermissionDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
-          "PermissionKeyField": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
-          "PermissionKeyIsImmutableNotification": "fb7a993b8ffae5e3913576d0ee548601d3b743d9587da230259ba554a3f87620",
+          "PermissionKeyIsImmutableNotification": "2c125482f52dc4fd7827469a18d91006c8b915493bb1d5f420919e47c099e302",
           "PermissionPermissionField": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionResourceField": "eb7a842ff958c49c6bb5ac2610915c41b9625d8bb553a87deaff5d1884430f34",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "496890e45c340210e75ea7d741fb99a48c403ed803d2727ea28258b1407c5136"
+          "UnmatchablePermissionKeyNotification": "973719b466c5815e62ce1f7f94e6c801c2bc436f961be50665bb8db423de0e9a"
         },
         "internal/application/translations/esp.go": {
-          "InvalidActionNameNotification": "6c11b11f1b9c3b2b3fa0d315f619ef20c6cecabb794093408af6f2a22ef0a206",
-          "InvalidResourceNameNotification": "1cdc679eeb2dc7e96b96855371f8f61cc5dbc48fd316b0c96aa4c2c25d2c829d",
+          "InvalidActionNameNotification": "f49f8d708d12770bc0088712918d87106fbc5ab1639cb03475f4e65b5438ca88",
+          "InvalidResourceNameNotification": "162e725357501fc609c774a6ae23100915ff19f6af52229a37574f633332a93e",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "212e06c386ff2f18fc00aebb6c17d3b301a82635e7f234d7e117904cd2f121cf",
-          "PermissionAlreadyExistsNotification": "486fbe528574e4f05df2958c7b13932bdf45b099f0f185234cd3236a522b397c",
+          "PermissionAlreadyExistsNotification": "8bb65c85af57c42581c02803a5377b4644b4c47940d88c2d710fff2a6c5febb9",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "c7058348671e42cb8a9bd720feb30f62449a5e1453beca1e4007a9ae9e27bb07",
           "PermissionDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
-          "PermissionKeyField": "54b1bd766580eacc09036fead9d5d5ea2b71d1a03c291e808c917c4cbec45786",
-          "PermissionKeyIsImmutableNotification": "23364488c4f0b162eafc2cb1e851c8e8505ebe98401d4345c1ace8571e581f52",
+          "PermissionKeyIsImmutableNotification": "30513b35dd575eb9b7b9b40f7757d1352ad0b7c1edda59c36157a53e97b78751",
           "PermissionPermissionField": "54b1bd766580eacc09036fead9d5d5ea2b71d1a03c291e808c917c4cbec45786",
           "PermissionResourceField": "1305406c2d1c713b1b22434c850edd6c0aa794543262c5b82a5218bf661546bf",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "d0a223b68facb99695c42585e6176ecdabb4310e6e6ccc2e5cf7bb257d024eed"
+          "UnmatchablePermissionKeyNotification": "aff7cf90564e1c70a6a03a86c1a3020dc67c5376899a991a3f68c51f7b94c49f"
         },
         "internal/application/translations/fra.go": {
-          "InvalidActionNameNotification": "6c9d30ab1a4f9880e18739d5faf9086b8e8ef2e706eac2357f01cfd4b99b3cb9",
-          "InvalidResourceNameNotification": "dccafae567225817ccd8717f1530ef2e52e942835638d2a8b763cdd1036d27ad",
+          "InvalidActionNameNotification": "bcddb04c22c1fd4ba71c6010e440321d5fbe4b7c2d1bac563bf585dd3ae31b2f",
+          "InvalidResourceNameNotification": "ff82aa088a31bb5f5525cacc001eb76ce1264451125cc736c8df5790654baac8",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "64cff1319d2fd2cbb7a1e84ccecf22c1cc07b24435cdb522f8c0aa525d6002a6",
-          "PermissionAlreadyExistsNotification": "a4bee793997022b35864a32bb3ef6b43e77e3bdb53aff27636ac4e5878b92002",
+          "PermissionAlreadyExistsNotification": "80b0e753ba21b3b11ed2b68c3a462a5cf5e7efde1d0c50f6a1b1917ad473f1bb",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "a717f45553085a7987da79dac2a36cfd324ccccaf29486b2cd5c7d596a70b066",
           "PermissionDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
-          "PermissionKeyField": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
-          "PermissionKeyIsImmutableNotification": "c4872a8f3e372d92c197472175f55e0ff2db1a99172b250ddcd5c57c2ef327e4",
+          "PermissionKeyIsImmutableNotification": "1a954de17bd8a87cf56ef74fc06967ac27fe53ff56e7796a6d0de3103c914e32",
           "PermissionPermissionField": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionResourceField": "5b93c6897c0e63aa5f81c752e6bbdc82d1725fb5d494c716c188fadcd7b1a8cc",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "890850dc1913ea148a77d3cd47182ab161a3f179470613689f345d415f4f8ca3"
+          "UnmatchablePermissionKeyNotification": "5859f4c07904971547f0277ae3d7e132da803fc10900ccfc7fbe2e62b99b9bf7"
         },
         "internal/application/translations/ita.go": {
-          "InvalidActionNameNotification": "ba8fe4705c7d19610249e3a77e15e876a8df6c7c703e8fb9478c0ca991fed062",
-          "InvalidResourceNameNotification": "b719c761400eaeeb3ddc7cb7b57b44a22c7e9173d16586b3b044a8b784a4adef",
+          "InvalidActionNameNotification": "3537f7571154f85325f7bfbc9860ce9efe135ad0975eaffacb422aa5ff22109e",
+          "InvalidResourceNameNotification": "157281cc000c99838e77dcd717a98fe98448ecf50cde7948f67390f8545c5372",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "b4d17ea7c696e58b7212b962730459d2dd74f14c0f8f4e28b400f2b04528e839",
-          "PermissionAlreadyExistsNotification": "cfc0d8b4be7f468c108ba3d786daee44ec3cc58189ca327a407caeb8b892d2f2",
+          "PermissionAlreadyExistsNotification": "ca623162146b973bbc645e82f8e8752471bb43c958125a30d867270c9303b7dc",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "96b53234ae3c8f67d6b5e7b419b09c79f4dc30a929047541afd50be3bf0c2014",
           "PermissionDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
-          "PermissionKeyField": "7ce2aba022ddfd202307da2c529cd00473de18aa3a86aee3880f74bde30119af",
-          "PermissionKeyIsImmutableNotification": "5fa6eb5705c4b8fcfb62455442160f3772e39003473d90872ced21a3692b8740",
+          "PermissionKeyIsImmutableNotification": "7ceb63dc08a0dfa8b4f0edd0a42433787b7cc547e5812727178b067828f2c3f2",
           "PermissionPermissionField": "7ce2aba022ddfd202307da2c529cd00473de18aa3a86aee3880f74bde30119af",
           "PermissionResourceField": "b030fd19d6a782026b6ac63ca7f0da565eb56261c9c13715aae0f997c452ac81",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "96fa3f39c11e781827891c6c5c7697e8d692ee8117b0a90df4cbb5405dd6cf97"
+          "UnmatchablePermissionKeyNotification": "c3eece0a34ea9542f92d490d454e955f3d18a52e0f6e6a97302329223e358884"
         },
         "internal/application/translations/nld.go": {
-          "InvalidActionNameNotification": "2822b3da114c951045539e8bcd84b34fc0a60f36731645349a717cd4d1e63f4d",
-          "InvalidResourceNameNotification": "faa09ee1f9402d154761f8bd2fb258def3c3c1b087733f921d0c3c33a650c3e8",
+          "InvalidActionNameNotification": "9f52f5a652550b4ea0c3599245df5df9d7321e609514fd9d27142b6434cc3bef",
+          "InvalidResourceNameNotification": "918e3b7e36dbdb3097554fd69a2463f9449c91e1c8a60debfa1a5778ba88294f",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "42c1e7aeeae0345f4dea73869ab4b869f94f1df3a3c00e2112ac6485a2769fb0",
-          "PermissionAlreadyExistsNotification": "443737b3ed78a14cdaa95a7827b99d4594f4cb56acc6687f62c71cd89ba11495",
+          "PermissionAlreadyExistsNotification": "ec52d34c92154760f9d42bff18ea26a82e3d4c60bd61c4a11afc0916735f7611",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "a760d6423012e5f0e20a83e3b8bce01b50ecfceed4d94c16e59204ac87778dc2",
           "PermissionDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
-          "PermissionKeyField": "354c5f61941ee24bdaedaa40772333493a5fcf9e6a91e1ad06ff96645fc0afb0",
-          "PermissionKeyIsImmutableNotification": "d2cf2d109cc473efe2f454d59293320699e26ea913c40872e6516e6ec2a3e691",
+          "PermissionKeyIsImmutableNotification": "ac9d9337efed6c40b0740394e7e240690238ba27714db3f3bca9ba8785b01482",
           "PermissionPermissionField": "354c5f61941ee24bdaedaa40772333493a5fcf9e6a91e1ad06ff96645fc0afb0",
           "PermissionResourceField": "eb7a842ff958c49c6bb5ac2610915c41b9625d8bb553a87deaff5d1884430f34",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "33246bf244595fb7da927cd923f2005f1303c177072cf2b7c1b388c447d63d24"
+          "UnmatchablePermissionKeyNotification": "3c8dd40bbd7cfb243ff0447dae1c1e65e049170f17016c654c692824e5385d84"
         },
         "internal/application/translations/ptbr.go": {
-          "InvalidActionNameNotification": "86841c6462a35bb8c353ded7d3e7b829b8693be89644dc3b725b9511f950a92a",
-          "InvalidResourceNameNotification": "ef67082b7ea4745cc16d1253128fca08dbbb558858f28553e23dd34cedc562eb",
+          "InvalidActionNameNotification": "71241e2a47661de3c915daa9ab9e17b54374e719174fef4c3749e2bb65873936",
+          "InvalidResourceNameNotification": "f721263be722d810f23030dbb9bc5951b2fbb11b62edb936e01d39327b2cdae0",
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "1dfbdde6410ab51a811ae7e551c89cff5e8cb7153b7a28a9e178584430f844d4",
-          "PermissionAlreadyExistsNotification": "442ba8ca2448eb2cf008e418cd99c754e0e00ea918f10e9a175ac9fe541a0418",
+          "PermissionAlreadyExistsNotification": "05f598da8991e6b5b402a8993942da1887179013ea6b85d289bef571cd6b9124",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "PermissionDescriptionEchoesKeyNotification": "5a5ceec275803999dd8d34fcb5fd24336d9f9ea28c30d08ab7d762860af50c79",
           "PermissionDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
-          "PermissionKeyField": "c4e46d78935cec0acb9942381c09ec6e8eef1f542e78487b65e62073ae20a790",
-          "PermissionKeyIsImmutableNotification": "5f6eeb51b21f8fe1f1c6f5dbafcd74bd40c02b1864e9c70095880d75cb6f8a4c",
+          "PermissionKeyIsImmutableNotification": "e3b67ea382302b06a6b92f45d234bf3476542d99d8fe831bb2d02f81ac696422",
           "PermissionPermissionField": "c4e46d78935cec0acb9942381c09ec6e8eef1f542e78487b65e62073ae20a790",
           "PermissionResourceField": "1305406c2d1c713b1b22434c850edd6c0aa794543262c5b82a5218bf661546bf",
           "PermissionUpdatedAtField": "e35c8e4f5cb5c5542b023edfd783ca25792680548ef1ef9ffa4989e3383c7cb2",
-          "UnmatchablePermissionKeyNotification": "4e6c5128c7822cf22371e68b5dbc6c00f36a06b7b69437518759f3b3b0fb067a"
+          "UnmatchablePermissionKeyNotification": "3c24e4c4f356206b43c5a4d5743e8d703c1d23bcda650b7dcec0089e18cc1dba"
         },
         "internal/domain/notifications.go": {
           "PermissionAlreadyExistsNotification": "07ff9eae480dde9e2791c3875452322bd6e38c7566eef5d36e055341c1f4a24f",

@@ -497,7 +497,8 @@ json   "D11b both are reported in ONE answer" \
 # nothing in the OpenAPI request schema claiming a caller may edit it. The wire promise is
 # therefore "these keys change nothing", not "these keys are refused".
 # PermissionKeyIsImmutableNotification guards a door REST cannot open, so no case asserts
-# it — stated here rather than silently skipped.
+# it — stated here rather than silently skipped. When it does fire it names `permission` and
+# echoes the pair, exactly like the 409 above; the unit suite is where that is pinned.
 api PATCH "/permissions/${IMM}" \
   "$(jq -n '{resource:"hijacked", action:"write", description:"An attempt to rewrite the pair through patch."}')"
 expect "D12a a patch carrying resource and action" 200
@@ -516,24 +517,24 @@ expect "E1a a pair the catalog already holds" 409 "PermissionAlreadyExistsNotifi
 json   "E1b the semantic" \
        '[.errors[].messages[] | select(.notificationKey=="PermissionAlreadyExistsNotification") | .semantic][0]' \
        'Conflict'
-# The field names the COMPOSITE, not either wire part — and it names it `key`: the value
-# object the rule raises on (`AddNotification("Key", …)`) and the same name the repository
-# hangs on the unique index. A consumer keying off it must know that `key` stands for the
-# resource:action pair, since no request carries a field by that name and no response
-# returns one — which is exactly why this case pins it instead of leaving it to drift.
+# The field names the COMPOSITE, not either wire part — and it names it `permission`: the
+# value object the rule raises on (`AddNotification("Permission", …)`) and the same name the
+# repository hangs on the unique index, so the service pre-check and the database constraint
+# answer with one word. It is also the word the caller already knows — `permission` is the
+# computed field every read returns (G12) and the label the envelope renders. It used to be
+# `key`, which named nothing any request carried and no response returned.
 json   "E1c the field the envelope names" \
        '[.errors[].messages[] | select(.notificationKey=="PermissionAlreadyExistsNotification") | .field][0]' \
-       'key'
-# A composite is refused as a TUPLE, and the envelope echoes nothing: the generator
-# silences the value on composite uniqueness because it cannot assume the owner formats
-# usefully (omnicore-gen, emitUniquePrecheck) — it never emits a String() for a composite
-# VO, and the one this entity has is hand-written, which the generator cannot see. So
-# `key` names WHAT collided; WHICH pair collided the caller already knows — it just sent
-# it. Pinned rather than dropped: the day the envelope starts echoing here by accident,
-# this line is what says so.
-json   "E1d the tuple itself is not echoed back" \
+       'permission'
+# A composite is refused as a TUPLE, and the envelope hands that tuple BACK — rendered by
+# PermissionKey.String(), the single home of the separator, so the caller reads the same
+# `resource:action` string a token carries and a route compares. `unique.echoValue: true` is
+# what turns it on: it is off by default on a composite because the generator cannot assume
+# the owner renders usefully, and this one does. Saying a pair is taken without saying which
+# is what this case exists to prevent from coming back.
+json   "E1d the refused tuple is echoed back" \
        '[.errors[].messages[] | select(.notificationKey=="PermissionAlreadyExistsNotification") | .value][0]' \
-       'null'
+       'tenant:read'
 
 # Uniqueness is over the TUPLE, so a second action on the same resource is ordinary.
 api POST /permissions "$(perm_body "tenant" "${RUNTOKEN}-verb" "A fresh action on a resource that exists.")"
@@ -748,10 +749,11 @@ section "H · typed 400s"
 api GET "/permissions?bogus=1"
 expect "H1 an unknown field" 400 "SchemaViolationNotification" "bogus"
 
-# The composite's OWN name. It is not a filter, not a projection path, and not a response
-# key — it exists only inside the domain.
+# `key` was the composite's own name until it was renamed to `permission`. It was never a
+# filter, a projection path or a response key, and it still is not — the rename gave the
+# domain field the word the wire already used, it did not open a query parameter.
 api GET "/permissions?key=x"
-expect "H2a the composite's own name is not a filter" 400 "SchemaViolationNotification" "key"
+expect "H2a the old composite name is still not a filter" 400 "SchemaViolationNotification" "key"
 api GET "/permissions?${SCOPE}&fields=key"
 expect "H2b nor a projection path" 400 "SchemaViolationNotification" "fields[key]"
 

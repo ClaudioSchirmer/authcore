@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:91b974ad8d897034bd58c1ad593941285cc4adf0ab5f262e2cc9c299157f4b0a
+// generated:  2026-09-03
+// checksum:   sha256:175890c7c56af55754dcc65c0629d14e56fd32949789c07a1003da96b6a63f78
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -45,11 +45,11 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindPermissionsRequest struct {
-	Resource        *string    `query:"resource" filter:"eq,ne,in,contains,startswith" sort:"asc,desc"`
-	Action          *string    `query:"action" filter:"eq,ne,in,contains" sort:"asc,desc"`
-	Description     *string    `query:"description" filter:"contains" sort:"asc,desc"`
-	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte"`
-	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte"`
+	Resource        *string    `query:"resource" filter:"eq,ne,in,contains,startswith" sort:"asc,desc" description:"The thing being protected, as the enforcing route names it. '*' means every resource."`
+	Action          *string    `query:"action" filter:"eq,ne,in,contains" sort:"asc,desc" description:"What may be done to the resource. '*' means every action on that resource."`
+	Description     *string    `query:"description" filter:"contains" sort:"asc,desc" description:"What holding this permission actually lets a caller do, in the platform operators' own words."`
+	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte" description:"Stamped by the framework: when the row was inserted."`
+	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte" description:"Stamped by the framework: when the row was last written."`
 	First           *int64     `query:"first"`
 	Last            *int64     `query:"last"`
 	After           *string    `query:"after"`

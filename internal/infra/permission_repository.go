@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:90e68960ed6d352ceb57bd73ec1f4509ce3251f19924401f29af18484ccf4e87
+// generated:  2026-09-03
+// checksum:   sha256:4ee17fa1a57f78ca48b556c92f149842a77efff2cd23dc8ed95d2cadb71b3981
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,7 +59,7 @@ func NewPermissionRepository(engine core.RelationalEngine) *PermissionRepository
 	// differently, so every target dialect's key form is bound.
 	r.Constraints = map[string]write.ConstraintBinding{
 		"permissions_pkey":                          {Notification: domain.EntityAlreadyAddedNotification{}, Field: "id"},
-		"permissions_resource_name_action_name_key": {Notification: appdomain.PermissionAlreadyExistsNotification{}, Field: "key"},
+		"permissions_resource_name_action_name_key": {Notification: appdomain.PermissionAlreadyExistsNotification{}, Field: "permission"},
 	}
 
 	r.WithSchema(schemas.PermissionSchema())

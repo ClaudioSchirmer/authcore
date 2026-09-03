@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:ae2ef61b5f4f3c01391be95ec809abbec1e446e9d549a07d60d9421e9ebf4752
+// generated:  2026-09-03
+// checksum:   sha256:3bd7fbc0720cb2bcfd260de89de1c9fc57d5aacfb5298465bf81c74f973eae5d
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,7 @@ import (
 // snapshot the framework takes to compare old and new state.
 type Permission struct {
 	domain.BaseEntity
-	Key         vos.PermissionKey `labelKey:"PermissionKeyField"`         // The permission itself: what resource, and what may be done to it. Stored as two columns, rendered as one resource:action string.
+	Permission  vos.PermissionKey `labelKey:"PermissionPermissionField"`  // The permission itself: what resource, and what may be done to it. Stored as two columns, rendered as one resource:action string.
 	Description vos.Description   `labelKey:"PermissionDescriptionField"` // What holding this permission actually lets a caller do, in the platform operators' own words
 }
 
@@ -86,8 +86,8 @@ func (e *Permission) BuildRules(actionName string, service domain.Service, r *do
 		// editable, which is not a degenerate update: operators improve
 		// wording after they read it.
 		if old := domain.Old(e); old != nil {
-			if old.Key != e.Key {
-				r.AddNotification("Key", PermissionKeyIsImmutableNotification{}, e.Key)
+			if old.Permission != e.Permission {
+				r.AddNotification("Permission", PermissionKeyIsImmutableNotification{}, e.Permission)
 			}
 		}
 	})
@@ -96,15 +96,15 @@ func (e *Permission) BuildRules(actionName string, service domain.Service, r *do
 		// The database unique index is the backstop for the race between this
 		// check and the commit; asking here is what lets the duplicate be
 		// reported together with the other problems instead of alone, later.
-		if e.Key.Resource != "" && e.Key.Action != "" {
+		if e.Permission.Resource != "" && e.Permission.Action != "" {
 			// On an insert there is no row yet, so there is nothing to exclude —
 			// and the id is not minted until after the rules run.
 			var selfID domain.ID
 			if id := e.GetID(); id != nil {
 				selfID = *id
 			}
-			if service.(PermissionService).PermissionKeyTaken(e.Key.Resource, e.Key.Action, selfID) {
-				r.AddNotification("Key", PermissionAlreadyExistsNotification{})
+			if service.(PermissionService).PermissionKeyTaken(e.Permission.Resource, e.Permission.Action, selfID) {
+				r.AddNotification("Permission", PermissionAlreadyExistsNotification{}, e.Permission)
 			}
 		}
 	})
