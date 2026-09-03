@@ -397,11 +397,18 @@ unchanged, with no tenant filter and no `Restrict`; `BuildRules` reads no princi
 field. There is no owner-check to prove and no column to find absent. Anyone holding
 `tenant:read` sees every row, by design (`spec.md` §B Q4).
 
-**⚠️ NOT covered this round, and printed as SKIP by the runner, not folded into GREEN:**
-the middleware tenant-claim gate (`tenant.required: true` → `TenantMissingNotification`,
-403). Reaching it needs a token with no `tenant_id` claim, which this service's own issuer
-never mints — every user row has a NOT NULL `tenant_id`. Proving it would need the
-suite-owned-keypair lane the maintainer did not take. It is named here and in the report.
+**The middleware tenant-claim gate IS covered** (`S21`/`S21b`). `tenant.required: true`
+makes an empty `TenantID()` a 403 `TenantMissingNotification` — the only non-401 outcome
+the middleware itself produces. Reaching it needs a token that is valid in every respect
+except the missing claim, which is the same technique `S7`–`S10` already use: signed by the
+bench's own key, correct `iss`/`aud`/`exp`, differing from a good token in ONE thing. No
+keypair of its own, no credential invented — like every forged token in this lane it exists
+to be REFUSED. `S21b` sends the same token WITH the claim and asserts 200, because without
+that pair a service refusing every token would pass `S21` for the wrong reason.
+
+*(An earlier draft of this section deferred it, reasoning that the service's own issuer
+never mints a claimless token. True and irrelevant: the suite does not need the issuer to
+mint it.)*
 
 ---
 
@@ -507,13 +514,13 @@ Neither `qa/` nor `specs/qa/` is added to `.gitignore` — both are part of the 
 
 ## 9. Run record — 2026-09-03
 
-`./qa/run.sh --all` · **GREEN 244 · RED 0 · SKIPPED 11**, three lanes.
+`./qa/run.sh --all` · **GREEN 246 · RED 0 · SKIPPED 10**, three lanes.
 
 | lane | pass | fail | skip |
 |---|---:|---:|---:|
 | `tenant` | 155 | 0 | 7 |
 | `domain` | 48 | 0 | 1 |
-| `security` | 41 | 0 | 3 |
+| `security` | 43 | 0 | 2 |
 
 **Reconcile:** every case family named in §1, §1b and §3 exists in the generated
 suite and RAN — checked family by family against the run logs, nothing missing.
@@ -553,6 +560,18 @@ mine, verified against the framework's own source, and neither weakened a case:*
    `${4-active}`, which distinguishes "absent" from "present and empty". This was a
    defect in the suite, and worth recording because it is the exact shape of bug that
    makes a suite quietly untrue: the case ran, printed a verdict, and tested nothing.
+
+**What the 10 remaining SKIPs are.** Nine are families the checklist names and this
+service does not have, so a case would be asserting a promise nobody made: no
+state-conflict notification and no revision precondition (`E3`), a flat aggregate with no
+child table (`F7`) and no 1:N leg to push down (`H20`), `?search=` undeclared so the DTO
+gate answers first (`G13`), every declared mode's route mounted so the 403 arm of the
+three-way split is unreachable (`I12`), no gRPC transport (`J11`), no exports (`J12`), and
+authz layers 2 and 3 structurally absent (`BuildRules` reads no principal field, both
+`ToCriteria` return the criteria unchanged). The tenth, `R8b`, is the one that is not a
+plain N/A: `TenantWorkspaceIsImmutableNotification` EXISTS in the model and no surface can
+reach it, because `patchExcludes: [Workspace]` removes the field from the update DTO. That
+is a fact about the model worth seeing rather than a gap in the suite.
 
 **No finding about the service.** Every framework promise in §1, every business rule
 in §1b and every refusal in §3 answered as the plan required.
