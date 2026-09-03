@@ -216,3 +216,45 @@ What lands **by hand on either path**: `permission_rules_manual.go`, `role_servi
 `omnicore-gen check` → `generate` → read the report → `doctor` clean → `prune` clean (it is
 what removes a dead translation key if §6.b takes option 2) → `gofmt -l` / `go vet` /
 `go build` → unit tests → **a real boot** → `qa/run.sh`.
+
+---
+
+## Verification record — 2026-09-03
+
+| Gate | Result |
+|---|---|
+| `omnicore-gen check` | ✓ green; one expected warning (`echoValue` echoes `PermissionKey` through `String()`, which `vos/permission_key.go:82` declares) |
+| `omnicore-gen generate` | 15 files updated across two runs, 4 kept as-is (the `_manual` hooks and the migration pair) |
+| report — migration | *"nothing about the storage changed this run"*; the printed shape and the index `permissions_resource_name_action_name_key` match the existing `0002` pair byte for byte. **No new pair owed** |
+| `omnicore-gen prune` | 7 dead `PermissionKeyField` entries removed (the authorized §6.b deletion), then re-run: *"Nothing to prune"* |
+| `omnicore-gen doctor` | clean — no hand-edited generated file, no unintended adoption, no spec drift |
+| `gofmt -l` · `go vet` · `go build` (tag `postgres`) | clean |
+| `go test ./... -count=1` | all green, including the new `permissionEchoed` assertion |
+| stale-name grep | no `Permission.Key` reference and no `PermissionKeyField` anywhere in Go, shell or yaml |
+| migration pairing | 12 up / 12 down, unchanged |
+| **boot + contract QA** | `./qa/run.sh permission` — real Postgres, real boot, **245 GREEN · 0 RED** |
+
+The three targets, proven on the running service rather than by reading the code:
+
+- `E1c` → `field == permission`
+- `E1d` → `value == tenant:read`
+- `H2a`/`H3` → unchanged; `?key=` and `?permission=` are still typed 400s
+
+### Deviation — one RED, in another lane, and it predates this change
+
+`./qa/run.sh --all` reports **tenant J8** red: `{ __typename }` sent with no bearer expects
+401 and answers 200. It is **v0.72.0 upgrade fallout, not this change**, and the proof is
+not an inference:
+
+- the changelog for v0.72.0 introduces `graphql.introspection: true`, which *"additionally
+  makes an introspection-ONLY POST public"*;
+- `qa/microservice.qa.yaml:65` declares exactly that;
+- `{ __typename }` **is** introspection-only, so it is now public **by design**;
+- the permission lane's own J8 sends a DATA field, stays guarded, and passes 401;
+- the upgrade landed at 12:26 today (`4599324`), and the last tenant run was 00:14 — QA was
+  never re-run in between.
+
+The assertion is stale, not the service. Fixing it is a decision in tenant's lane, outside
+this impact map: either the case expects 200 for an introspection-only document (and gains a
+sibling proving a data field still 401s), or the QA profile sets `introspection: false`.
+**Left untouched and reported.**
