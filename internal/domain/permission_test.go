@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:529c2a7810bc4bbb428b8add5d699508924e5d1c92497ac6849bebc828c6b259
+// generated:  2026-09-03
+// checksum:   sha256:be13f340faf9b79785f9c5af2e9da16c411c9995062f6f4171d9c569abd4d492
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -91,7 +91,7 @@ func (stubPermissionService) PermissionKeyTaken(_ string, _ string, _ domain.ID)
 func validPermission() *Permission {
 	return &Permission{
 		Description: vos.Description("Read tenants: list the tenant registry and fetch a tenant by id."),
-		Key:         vos.PermissionKey{Resource: "tenant", Action: "read"},
+		Permission:  vos.PermissionKey{Resource: "tenant", Action: "read"},
 	}
 }
 
@@ -139,20 +139,20 @@ func TestPermissionNotificationSemantics(t *testing.T) {
 	}
 }
 
-// Key cannot change once set.
+// Permission cannot change once set.
 //
 // It is driven through the update path because the rule reads the previous
 // value, and on an insert there is no previous value to read.
-func TestPermission_Key_IsImmutable(t *testing.T) {
+func TestPermission_Permission_IsImmutable(t *testing.T) {
 	e := validPermission()
 	_, err := domain.GetUpdatable(e, func(x *Permission) error {
-		x.Key = vos.PermissionKey{Resource: "changed-value", Action: "read"}
+		x.Permission = vos.PermissionKey{Resource: "changed-value", Action: "read"}
 		return nil
 	}, &stubPermissionService{}, "GetUpdatable")
 	if err == nil {
-		t.Fatal("changing Key was accepted")
+		t.Fatal("changing Permission was accepted")
 	}
-	if !permissionBlames(err, "Key") {
-		t.Errorf("the rejection should name Key, it named %v", permissionRejectedFields(err))
+	if !permissionBlames(err, "Permission") {
+		t.Errorf("the rejection should name Permission, it named %v", permissionRejectedFields(err))
 	}
 }

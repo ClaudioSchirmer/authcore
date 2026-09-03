@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:b85b4eb91a8678376eeb3522ad39be018068839699f8f51493b0da4952e7b455
+// generated:  2026-09-03
+// checksum:   sha256:621300d6faa787d4ce80c630bcbfbf408da5d3279baad8f548b8c6626f18cb8a
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,10 +49,10 @@ func TestInsertPermissionMapsEveryField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToEntity: %v", err)
 	}
-	if e.Key.Resource != "tenant" {
+	if e.Permission.Resource != "tenant" {
 		t.Errorf("Resource did not survive the mapper")
 	}
-	if e.Key.Action != "read" {
+	if e.Permission.Action != "read" {
 		t.Errorf("Action did not survive the mapper")
 	}
 	if e.Description.Value() != "Read tenants: list the tenant registry and fetch a tenant by id." {

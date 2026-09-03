@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:1d86dec4430844463fc8626ab99a41271138c3d93dbb92641ae0655fc343204c
+// generated:  2026-09-03
+// checksum:   sha256:339224649012b9699bdfa2d83b47bca2df5a3df0a2a7e8b885d1189b0bf77cf2
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,7 +50,7 @@ type InsertPermissionCommand struct {
 func (c *InsertPermissionCommand) ToEntity(ctx *configuration.AppContext) (*appdomain.Permission, error) {
 	e := &appdomain.Permission{}
 	e.Description = vos.Description(c.Description)
-	e.Key = vos.PermissionKey{
+	e.Permission = vos.PermissionKey{
 		Resource: c.Resource,
 		Action:   c.Action,
 	}
@@ -82,10 +82,10 @@ func (c *InsertPermissionCommand) FromEntity(ctx *configuration.AppContext, e *a
 		ID:          *e.GetID(),
 		Description: e.Description.Value(),
 	}
-	out.Resource = e.Key.Resource
-	out.Action = e.Key.Action
+	out.Resource = e.Permission.Resource
+	out.Action = e.Permission.Action
 	{
-		v, err := qryutils.ComputePermissionPermission(ctx, e.Key.Resource, e.Key.Action)
+		v, err := qryutils.ComputePermissionPermission(ctx, e.Permission.Resource, e.Permission.Action)
 		if err != nil {
 			return out, err
 		}

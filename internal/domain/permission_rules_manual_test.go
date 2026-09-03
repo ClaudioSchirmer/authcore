@@ -44,6 +44,26 @@ func permissionAnswers(err error) []string {
 	return out
 }
 
+// permissionEchoed returns the value the named notification carried back, or ""
+// when it carried none. FieldValue is the only place a rejection says WHICH
+// value it refused, and a composite reaches it through fmt.Stringer — so an
+// empty answer here means either the notification did not fire or the echo was
+// silenced, and the caller distinguishes them with permissionRaised.
+func permissionEchoed(err error, notification string) string {
+	var carrier domain.NotificationCarrier
+	if !errors.As(err, &carrier) {
+		return ""
+	}
+	for _, ctx := range carrier.NotificationContexts() {
+		for _, msg := range ctx.Messages() {
+			if domain.NotificationKey(msg.Notification) == notification {
+				return msg.FieldValue
+			}
+		}
+	}
+	return ""
+}
+
 func permissionRaised(err error, notification string) bool {
 	for _, a := range permissionAnswers(err) {
 		if a == notification {
@@ -76,7 +96,7 @@ var echoingKey = vos.PermissionKey{Resource: "permission", Action: "archive"}
 // operator nothing the listing did not already show them.
 func TestPermissionDescriptionMayNotEchoTheKey(t *testing.T) {
 	e := validPermission()
-	e.Key = echoingKey
+	e.Permission = echoingKey
 	e.Description = vos.Description(echoingKey.String())
 
 	_, err := domain.GetInsertable(e, &stubPermissionService{}, "GetInsertable")
@@ -104,7 +124,7 @@ func TestPermissionDescriptionEchoIsDetectedThroughFormatting(t *testing.T) {
 		"permission_archive.",
 	} {
 		e := validPermission()
-		e.Key = echoingKey
+		e.Permission = echoingKey
 		e.Description = vos.Description(in)
 
 		_, err := domain.GetInsertable(e, &stubPermissionService{}, "GetInsertable")
@@ -126,7 +146,7 @@ func TestPermissionDescriptionMayMentionTheKeyInProse(t *testing.T) {
 		"Lets the holder read tenant records, and nothing else.",
 	} {
 		e := validPermission()
-		e.Key = vos.PermissionKey{Resource: "tenant", Action: "read"}
+		e.Permission = vos.PermissionKey{Resource: "tenant", Action: "read"}
 		e.Description = vos.Description(in)
 
 		if _, err := domain.GetInsertable(e, &stubPermissionService{}, "GetInsertable"); err != nil {
@@ -140,7 +160,7 @@ func TestPermissionDescriptionMayMentionTheKeyInProse(t *testing.T) {
 // "improving" it into the key is the realistic way this happens.
 func TestPermissionDescriptionEchoIsRefusedOnUpdateToo(t *testing.T) {
 	e := persistedPermission()
-	e.Key = echoingKey
+	e.Permission = echoingKey
 
 	_, err := domain.GetUpdatable(e, func(x *Permission) error {
 		x.Description = vos.Description("Permission Archive")
@@ -204,8 +224,19 @@ func TestPermissionDuplicateKeyIsRefusedByThePreCheck(t *testing.T) {
 	if !permissionRaised(err, "PermissionAlreadyExistsNotification") {
 		t.Errorf("raised %v, want PermissionAlreadyExistsNotification", permissionAnswers(err))
 	}
-	if !permissionBlames(err, "Key") {
-		t.Errorf("the rejection should name Key, it named %v", permissionRejectedFields(err))
+	// The field names the COMPOSITE, and it names it `permission` — the same
+	// word the read side answers with and the label renders. It was `key` until
+	// the field was renamed, which named nothing any request or response carried.
+	if !permissionBlames(err, "Permission") {
+		t.Errorf("the rejection should name Permission, it named %v", permissionRejectedFields(err))
+	}
+
+	// And it hands the refused pair BACK. Saying a permission is taken without
+	// saying which one is what `unique.echoValue: true` exists to end; the value
+	// travels through PermissionKey.String(), which is why the rendering is
+	// `tenant:read` and not a formatted Go struct.
+	if got := permissionEchoed(err, "PermissionAlreadyExistsNotification"); got != "tenant:read" {
+		t.Errorf("the conflict echoed %q, want the refused pair %q", got, "tenant:read")
 	}
 
 	// The question is asked about the PAIR, not about either half: a second
@@ -222,8 +253,8 @@ func TestPermissionDuplicateKeyIsRefusedByThePreCheck(t *testing.T) {
 // The business rule the maintainer stated is stricter than that: neither half
 // may move on its own.
 //
-// It holds because the rule compares the composite as a value — `old.Key !=
-// e.Key` is a struct comparison over two comparable fields — but "it follows
+// It holds because the rule compares the composite as a value — `old.Permission
+// != e.Permission` is a struct comparison over two comparable fields — but "it follows
 // from the implementation" is not the same as "it is pinned", and this is the
 // invariant that quietly hands the old permission, free, to everyone who
 // already holds it.
@@ -232,10 +263,10 @@ func TestPermissionNeitherHalfOfTheKeyMayChange(t *testing.T) {
 		name   string
 		mutate func(*Permission)
 	}{
-		{"the resource alone", func(x *Permission) { x.Key.Resource = "billing" }},
-		{"the action alone", func(x *Permission) { x.Key.Action = "insert" }},
-		{"both halves", func(x *Permission) { x.Key = vos.PermissionKey{Resource: "billing", Action: "insert"} }},
-		{"a case change on the resource", func(x *Permission) { x.Key.Resource = "Tenant" }},
+		{"the resource alone", func(x *Permission) { x.Permission.Resource = "billing" }},
+		{"the action alone", func(x *Permission) { x.Permission.Action = "insert" }},
+		{"both halves", func(x *Permission) { x.Permission = vos.PermissionKey{Resource: "billing", Action: "insert"} }},
+		{"a case change on the resource", func(x *Permission) { x.Permission.Resource = "Tenant" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := persistedPermission()

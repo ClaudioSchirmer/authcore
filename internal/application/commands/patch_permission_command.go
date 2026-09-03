@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:19cdd2a56cf276f75914ffc08cb172dad1d3e306fc1aaeba5369504c7320c834
+// generated:  2026-09-03
+// checksum:   sha256:e4e19990a3152303c22e9857ea96375f9ce61d5126dc6dfc271d2c0601b24d09
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -85,10 +85,10 @@ func (c *PatchPermissionCommand) FromEntity(ctx *configuration.AppContext, e *ap
 		ID:          *e.GetID(),
 		Description: e.Description.Value(),
 	}
-	out.Resource = e.Key.Resource
-	out.Action = e.Key.Action
+	out.Resource = e.Permission.Resource
+	out.Action = e.Permission.Action
 	{
-		v, err := qryutils.ComputePermissionPermission(ctx, e.Key.Resource, e.Key.Action)
+		v, err := qryutils.ComputePermissionPermission(ctx, e.Permission.Resource, e.Permission.Action)
 		if err != nil {
 			return out, err
 		}
