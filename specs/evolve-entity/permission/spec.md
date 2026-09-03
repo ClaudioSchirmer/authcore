@@ -254,7 +254,17 @@ not an inference:
 - the upgrade landed at 12:26 today (`4599324`), and the last tenant run was 00:14 — QA was
   never re-run in between.
 
-The assertion is stale, not the service. Fixing it is a decision in tenant's lane, outside
-this impact map: either the case expects 200 for an introspection-only document (and gains a
-sibling proving a data field still 401s), or the QA profile sets `introspection: false`.
-**Left untouched and reported.**
+The assertion is stale, not the service.
+
+**RESOLVED, 2026-09-03**, in two steps, both at the maintainer's direction and both outside
+this impact map — recorded here because this run is where they surfaced:
+
+1. **omnicore v0.72.1** fixes `__typename`, which was gated as introspection and resolved by
+   nothing (null at the root with an internal error string, silently null when nested). The
+   full report and its verification are in `omnicore-typename-defect.md` beside this file.
+   Re-verified here: `gofmt`/`vet`/`build`/unit suite/`doctor` all clean on the new pin.
+2. **`qa/tenant.sh` J8** became five cases pinning the real boundary — an introspection-only
+   POST is public by configuration and answers `Query`; a document reaching DATA is still
+   401; a meta field beside a data field smuggles nothing.
+
+`./qa/run.sh --all` — **450 cases, 2/2 suites, ALL GREEN**.

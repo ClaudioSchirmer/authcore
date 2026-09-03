@@ -699,8 +699,37 @@ expect "K4 the collection route is not an empty address" 200
 # J — GraphQL: the same handlers, the other dialect
 # ═════════════════════════════════════════════════════════════════════════════
 section "J · GraphQL surface"
+# J8 — WHO may reach /graphql without a bearer, which is two answers, not one.
+#
+# `graphql.introspection: true` (qa/microservice.qa.yaml) deliberately makes an
+# introspection-ONLY POST public — the analogue of serving /openapi.json to anyone, and the
+# same disclosure. So "GraphQL is not a public route" was never the whole contract, and
+# asserting 401 for `{ __typename }` asserted a rule this profile opted out of.
+#
+# What is worth pinning is the BOUNDARY: the schema is readable, the data is not. Both
+# halves live here, because a case that only proved the first would go green on a service
+# that had stopped guarding anything.
 api_as "" POST /graphql "$(jq -n '{query:"{ __typename }"}')"
-expect "J8 GraphQL is not a public route" 401 "MissingAuthorizationNotification"
+expect "J8a an introspection-only document is public, by configuration" 200
+# It answers the NAME OF THE ROOT TYPE. `__typename` is the String! meta-field the GraphQL
+# specification puts on every object type — NOT introspection, so it resolves whether or not
+# graphql.introspection is on, and every Apollo/urql/Relay client appends it to each
+# selection set for cache normalization. This line exists because it once answered null
+# beside an internal "no resolver" string: a 200 leaking framework internals to an
+# unauthenticated caller (omnicore, fixed in v0.72.1).
+json   "J8b it answers the root type name, not an internal error" '.data.__typename' 'Query'
+jqtrue "J8c and it is a clean answer — nothing in errors[]" \
+       '(.errors // []) | length == 0' 'errors[] is empty'
+
+# The half that actually protects anything: a document that reaches DATA still needs the
+# bearer. If this ever goes green at 200, the introspection grant has become a hole.
+api_as "" POST /graphql "$(jq -n '{query:"{ tenants(first: 1) { totalCount } }"}')"
+expect "J8d a document reaching data is still refused" 401 "MissingAuthorizationNotification"
+
+# And the grant is introspection-ONLY, not "contains an introspection field" — mixing a meta
+# field into a data document must not carry the whole document past the gate.
+api_as "" POST /graphql "$(jq -n '{query:"{ __typename tenants(first: 1) { totalCount } }"}')"
+expect "J8e a meta field beside a data field smuggles nothing" 401 "MissingAuthorizationNotification"
 
 gql "{ tenants(where: {workspace: {startswith: \"${P_PREFIX}\"}}, first: 2) { totalCount pageInfo { hasNextPage hasPreviousPage startCursor endCursor } edges { cursor node { id name workspace status } } } }"
 expect "J1a the connection" 200
