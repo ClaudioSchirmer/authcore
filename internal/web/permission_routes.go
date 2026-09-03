@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-03
-// checksum:   sha256:04d8cdd6567d6d428c357817790825005562eab60e21c45919b5ca7a281f30fb
+// checksum:   sha256:ec93774a5779d13ffb4c66cdd121c3800207fa87847d316b095399b9e1fa8612
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -132,7 +132,7 @@ func MountPermissions(
 				"**A permission is `resource:action`** — one pair, written as two keys.\n\n" +
 				"- `resource` — what is protected, as the enforcing route names it: `tenant`,\n  `user:profile`, or `*` for every resource.\n- `action` — what may be done to it: `read`, `insert`, or `*` for every action.\n- `permission` — the two joined, `tenant:read`. This is the string a JWT claim carries\n  and a route compares against, byte for byte. Reads return it; no request sends it.\n\n" +
 				"A rejection therefore names one of three fields, and which one tells you what to fix:\n`resource` or `action` when that half is malformed on its own, and `permission` when the\ncomplaint is about the PAIR — it is already taken, or it cannot match anything.\n\n" +
-				"Filter and sort the two HALVES — `?filter[resource][eq]=tenant`,\n`?filter[action][in]=read,insert`, `?orderBy=resource`. The rendered `permission` is\nderived per row and backs no column, so it can be SELECTED (`?fields=permission`) but\nnever filtered or ordered; asking for either answers a typed 400.",
+				"Filter and sort the two HALVES — `?resource.eq=tenant`,\n`?action.in=read,insert`, `?orderBy=resource`. The rendered `permission` is\nderived per row and backs no column, so it can be SELECTED (`?fields=permission`) but\nnever filtered or ordered; asking for either answers a typed 400.",
 			Tags: []string{"Permissions"},
 		},
 		fwopenapi.RequirePermission("permission:read"))

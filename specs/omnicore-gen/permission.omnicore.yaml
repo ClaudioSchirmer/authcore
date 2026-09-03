@@ -356,7 +356,7 @@ read:
   # rebuilds the value object and calls String() rather than joining two strings.
   #
   # It is neither filterable nor sortable BY CONSTRUCTION: a computed path backs no column.
-  # Filter the two sources instead — ?filter[resource][eq]=tenant&filter[action][eq]=read.
+  # Filter the two sources instead — ?resource.eq=tenant&action.eq=read.
   computed:
     - name: Permission
       type: string
@@ -400,7 +400,7 @@ read:
       includeArchived: true
       # search is deliberately absent — a relational-served view answers free text with a
       # typed 400, and declaring it would promise what this posture cannot serve.
-      # ?filter[description][contains]= covers the real need.
+      # ?description.contains= covers the real need.
 
 surfaces:
   rest: true
@@ -456,8 +456,8 @@ docs:
 
       The description is editable, and that is the whole of this operation.
     byParams: |
-      Filter and sort the two HALVES — `?filter[resource][eq]=tenant`,
-      `?filter[action][in]=read,insert`, `?orderBy=resource`. The rendered `permission` is
+      Filter and sort the two HALVES — `?resource.eq=tenant`,
+      `?action.in=read,insert`, `?orderBy=resource`. The rendered `permission` is
       derived per row and backs no column, so it can be SELECTED (`?fields=permission`) but
       never filtered or ordered; asking for either answers a typed 400.
 

@@ -163,9 +163,9 @@ Warnings raised during generation:
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.72.0)
+Verdict: **exact** (project pins v0.72.1)
 
-framework v0.72.0 meets the required v0.72.0
+framework v0.72.1 meets the required v0.72.1
 
 Verify what was generated:
 
