@@ -6,7 +6,7 @@
 #   ./qa/run.sh              every lane, fail-fast (stops at the first RED)
 #   ./qa/run.sh --all        every lane, exhaustive sweep (runs them all, reports at the end)
 #   ./qa/run.sh tenant       one lane
-#   ./qa/run.sh --all tenant claim
+#   ./qa/run.sh --all tenant permission
 #
 # Each lane is SELF-CONTAINED: it provisions its own throwaway database, builds and
 # boots its own server on its own port, asserts, then drains that server with SIGTERM
@@ -19,15 +19,21 @@
 # ADDING A LANE: create qa/<entity>.sh AND add <entity> to SUITES below, in the same
 # change. `ls qa/*.sh` minus run.sh must equal SUITES exactly.
 #
+# LANES SHARE ONE THROWAWAY DATABASE (authcore_qa_db) and each drops it as its first
+# act, so they must run SEQUENTIALLY — which is exactly how this runner invokes them.
+# Never add background/parallel execution here without splitting the database first
+# (export QA_DATABASE_URL per lane; the qa yaml already reads it).
+#
 # plans: specs/qa/tenant/plan.md · specs/qa/id-address-and-filter-values/plan.md
+#        specs/qa/permission-catalog/plan.md
 set -uo pipefail
 
 # The project root, resolved from THIS script's location — never from the caller's
 # working directory, so devops/, migrations/ and the build resolve however it is invoked.
 cd "$(dirname "$0")/.." || exit 1
 
-SUITES=(tenant)
-PLAN="specs/qa/id-address-and-filter-values/plan.md"
+SUITES=(tenant permission)
+PLAN="specs/qa/permission-catalog/plan.md"
 
 REPORT="qa/qa-report.md"
 RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
