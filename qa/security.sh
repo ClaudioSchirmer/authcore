@@ -289,8 +289,27 @@ fi
 
 # ── what this round does NOT prove, printed rather than implied ────────────
 section "3e · coverage this lane does NOT claim"
-skip "the middleware tenant-claim gate (TenantMissingNotification, 403)" \
-     "tenant.required is on, but reaching it needs a token carrying no tenant_id claim, and this service's issuer never mints one — every user row has a NOT NULL tenant_id. Proving it needs the suite-owned-keypair lane the maintainer did not take."
+# The tenant gate is reachable with the technique S7-S10 already use: a token
+# signed by the bench's own key, with a correct iss/aud/exp, differing from a
+# good one in ONE thing — it carries no tenant_id claim. The JWT validation
+# therefore passes and the request reaches the middleware's tenant gate, which is
+# the only non-401 outcome the middleware itself produces.
+#
+# This needs no keypair of its own and invents no credential: like every other
+# forged token here, it exists to be REFUSED.
+NO_TENANT_CLAIMS="$(jq -nc --arg iss "$JWT_ISS" --arg aud "$JWT_AUD" --argjson exp "$FUTURE" \
+   --argjson iat "$NOW" --arg sub '01990000-0004-7000-8000-000000000001' \
+  '{iss:$iss, aud:$aud, sub:$sub, exp:$exp, iat:$iat, permissions:["*:*"]}')"
+NO_TENANT_TOKEN="$(mint_rs256 "$QA_SIGNING_KEY_FILE" "$(rs_header "$KID")" "$NO_TENANT_CLAIMS")"
+req_rawauth "Bearer ${NO_TENANT_TOKEN}" GET /tenants
+assert_status_key "S21 a valid token carrying no tenant_id claim (tenant.required: true)" 403 'TenantMissingNotification'
+
+# The complement, and it is what makes S21 mean something: the SAME token with
+# the claim present is served. Without this pair, a service refusing every token
+# would pass S21 for the wrong reason.
+WITH_TENANT_TOKEN="$(mint_rs256 "$QA_SIGNING_KEY_FILE" "$(rs_header "$KID")" "$(claims "$JWT_ISS" "$JWT_AUD" "$FUTURE")")"
+req_rawauth "Bearer ${WITH_TENANT_TOKEN}" GET /tenants
+assert_status "S21b the same token WITH a tenant_id claim is served" 200
 skip "authz layer 2 — identity-derived BuildRules" \
      "structurally absent on Tenant: BuildRules reads no principal field (internal/domain/tenant.go). Nothing to prove, and asserting one would be inventing a rule."
 skip "authz layer 3 — tenant row scoping and Restrict" \
