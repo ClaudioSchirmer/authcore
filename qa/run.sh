@@ -4,8 +4,10 @@
 #   ./qa/run.sh              every lane, fail-fast on the first RED
 #   ./qa/run.sh --all        every lane, exhaustive (no fail-fast)
 #   ./qa/run.sh tenant       a subset — a convenience on this runner, never a rival script
+#   ./qa/run.sh permission   likewise
 #
-# It executes specs/qa/tenant-contract/plan.md. Adding a lane means adding its
+# It executes specs/qa/tenant-contract/plan.md and specs/qa/permission-contract/plan.md.
+# Adding a lane means adding its
 # name to SUITES below in the same change that creates the file: a qa/*.sh no
 # lane names is a suite nobody runs.
 
@@ -16,7 +18,10 @@ set -uo pipefail
 # directory the run was started from.
 cd "$(dirname "$0")/.." || exit 2
 
-SUITES=(tenant domain security)
+# domain runs LAST on purpose: its final case (P6) archives the wildcard catalog
+# row and revokes the bootstrap admin's only grant, so nothing can authenticate
+# after it. security must therefore complete first.
+SUITES=(tenant permission security domain)
 
 FAIL_FAST=1
 REQUESTED=()
@@ -50,7 +55,7 @@ export BASE="http://localhost:${QA_PORT}"
 mkdir -p "$LOG_DIR"
 
 REPORT=qa/qa-report.md
-PLAN=specs/qa/tenant-contract/plan.md
+PLAN='specs/qa/tenant-contract/plan.md + specs/qa/permission-contract/plan.md'
 COMPOSE=devops/docker-compose.yml
 PGSVC=postgres
 QA_DB=authcore_qa_db

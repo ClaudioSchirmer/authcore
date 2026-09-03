@@ -226,6 +226,50 @@ create_tenant() {
   j '.data.id // empty'
 }
 
+# ── Permission fixtures ────────────────────────────────────────────────────
+# A resource is a SEGMENT: 2–64 lowercase slug runes matching
+# ^[a-z0-9]+(-[a-z0-9]+)*$ — and isPermissionSegment also refuses a run of four
+# identical runes. A PID like 11115 carries exactly such a run, so the naive
+# 'qa-<lane>-<pid>-<n>' would 422 on EVERY insert and the lane would go RED for a
+# fixture reason rather than a service one. That is the same class of bug as the
+# tenant round's D6, where the fixture answered instead of the service — so the
+# tag is collapsed to a maximum run of two before it is ever sent.
+_slug() { printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed 's/\(.\)\1\{2,\}/\1\1/g'; }
+
+RES_SEQ=0
+res() { RES_SEQ=$((RES_SEQ+1)); printf 'qa-%s-%s-%s' "$(_slug "$LANE_NAME")" "$(_slug "${QA_RUN_TAG:-$$}")" "$RES_SEQ"; }
+
+# A body satisfying every value object, so a case testing one rule fails for that
+# rule alone. The default description explains rather than echoes: it must clear
+# both the Description VO (≥15 runes, ≥2 words, ≥5 distinct, a vowel) and the
+# description-does-not-echo-key rule.
+#
+# ${3-...} and not ${3:-...}: an explicitly EMPTY description is a case of its
+# own (the VO's required branch), and :- would quietly replace it with the
+# default — the fixture, not the service, answering.
+#
+# ${1-tenant}/${2-read} and NOT ${1:-tenant}: an explicitly EMPTY resource or
+# action is a case of its own (the framework's required-field branch), and :-
+# would quietly substitute the default — sending a perfectly valid tenant:read
+# and reporting the 409 that follows as if the empty value had been refused.
+permission_body() {
+  jq -nc --arg r "${1-tenant}" --arg a "${2-read}" \
+         --arg d "${3-Read the registry and open a single entry by its identifier.}" \
+    '{resource:$r, action:$a, description:$d}'
+}
+
+# create_permission RESOURCE ACTION [description] → echoes the new id.
+#
+# CALLED IN A COMMAND SUBSTITUTION, so it runs in a SUBSHELL: the id comes back
+# on stdout, but RESP_CODE and RESP_BODY do NOT survive. A case that asserts on
+# the status of the creation must therefore call req POST itself and read the id
+# with j — otherwise it asserts against whatever the PARENT shell last sent,
+# which passes or fails for reasons that have nothing to do with the case.
+create_permission() {
+  req POST /permissions "$(permission_body "$1" "$2" "${3-Read the registry and open a single entry by its identifier.}")"
+  j '.data.id // empty'
+}
+
 # ---------------------------------------------------------------------------
 # Sign-in. Every lane needs a token, and the ONE place it comes from is this
 # service's own documented flow — nothing is invented and nothing is hardcoded
