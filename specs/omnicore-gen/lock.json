@@ -1583,8 +1583,8 @@
     },
     "Permission": {
       "spec": "specs/omnicore-gen/permission.omnicore.yaml",
-      "specHash": "2d4ffd0746199539002d030edb56a00373bd0f5903fe753fadc3b47d83dfc4d6",
-      "framework": "v0.72.0",
+      "specHash": "bc03c82f336a2355267271c6e98fdb30437b60ffc8178184838e1d6d174923eb",
+      "framework": "v0.72.1",
       "files": {
         "bootstrap/permission_feature.go": {
           "class": "owned",
@@ -1680,7 +1680,7 @@
         },
         "internal/web/permission_routes.go": {
           "class": "owned",
-          "hash": "e706452593985cdffdb9ce5f4c783fb29e70f90a1f61e675c439ea322fefe6c2"
+          "hash": "396b863a202dbf538c3f056db6996c3e272b109acaca63c35850d4c96852a993"
         },
         "internal/web/requests/find_permission_by_id.go": {
           "class": "owned",

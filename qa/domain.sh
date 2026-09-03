@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lane: domain — §1b of specs/qa/tenant-contract/plan.md.
+# Lane: domain — §1b of specs/qa/tenant-contract/plan.md (R1-R8)
+#                and §1b of specs/qa/permission-contract/plan.md (P1-P6).
 #
 # The only cases in this suite NOT derived from the framework's docs, and the
 # only ones that can fail for a reason the framework never had an opinion about.
@@ -201,5 +202,160 @@ req GET "/tenants?workspace=hijacked-handle"
 assert_jq "R8 positive · no tenant answers to the hijacked handle" '.data | length' 0
 
 skip "R8b TenantWorkspaceIsImmutableNotification" "declared in the model and UNREACHABLE through REST and GraphQL — patchExcludes removes Workspace from the update DTO, so the belt-and-braces layer sits behind a door no surface can open. Recorded, not silently dropped."
+
+# ════════════════════════════════════════════════════════════════════════════
+# PERMISSION — §1b of specs/qa/permission-contract/plan.md.
+#
+# All four rules the maintainer was asked to rank came back CRITICAL, so the
+# order below is by setup cost, not by importance. P6 is LAST in the file and
+# the lane is LAST in the runner, because it is irreversible within a run.
+# ════════════════════════════════════════════════════════════════════════════
+
+# Segment-safe: a resource is one lowercase slug with no run of four identical
+# runes, which the raw run tag does not guarantee. See _slug in qa/lib.bash.
+PPFX="qa-$(_slug "$LANE_NAME")-$(_slug "${QA_RUN_TAG:-$$}")"
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P1 🔴 CRITICAL · the pair is frozen after creation"
+note "spec.md §7c rule 9, §B Q2 · rules.list: key-immutable"
+note "\"editing it would rewrite the meaning of every existing grant, invisibly\""
+
+R_P1="${PPFX}-p1"
+ID_P1="$(create_permission "$R_P1" read)"
+[ -n "$ID_P1" ] || fail "P1 setup" "a created permission" "no id returned" "$RESP_BODY"
+
+req PATCH "/permissions/${ID_P1}" '{"description":"Amended wording, which is the whole of this operation."}'
+assert_status "P1 positive · the description IS editable" 200
+assert_jq "P1 positive · and the pair did not move" '.data.permission' "${R_P1}:read"
+
+# The negative. Immutability here is STRUCTURAL — neither half is a member of
+# PatchPermissionRequest — so the keys are ignored rather than refused, and a 200
+# is the correct answer. What must hold is that the STORED pair did not move: an
+# assertion on the response alone would pass even if the row had changed.
+req PATCH "/permissions/${ID_P1}" \
+  '{"resource":"hijack","action":"insert","description":"A patch aiming both halves at something else entirely."}'
+assert_status "P1 negative · the pair keys are not members of the body" 200
+req GET "/permissions/${ID_P1}"
+assert_jq "P1 negative · the STORED pair is unchanged" '.data.permission' "${R_P1}:read"
+req GET '/permissions?resource.eq=hijack'
+assert_jq "P1 negative · no permission answers to the hijacked resource" '.data | length' 0
+
+skip "P1b PermissionKeyIsImmutableNotification" "declared in the model and UNREACHABLE through REST and GraphQL — patchExcludes: [Permission] removes both halves from the update DTO, so the belt-and-braces layer sits behind a door no surface can open. Recorded, not silently dropped."
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P2 🔴 CRITICAL · active-only uniqueness, and re-insert as the only way back"
+note "unique.scope: active-only · spec.md §B Q3 + Q5"
+note "the exact INVERSE of tenant.workspace, whose archived remnant keeps blocking"
+
+R_P2="${PPFX}-p2"
+# req POST directly: create_permission runs in a subshell under command
+# substitution, so RESP_CODE would not reach the assertion.
+req POST /permissions "$(permission_body "$R_P2" read)"
+assert_status "P2 setup · the pair is taken" 201
+ID_P2A="$(j '.data.id')"
+
+req POST /permissions "$(permission_body "$R_P2" read)"
+assert_status_key_field "P2 negative · an ACTIVE pair cannot be duplicated" 409 'PermissionAlreadyExistsNotification' 'permission'
+assert_jq "P2 negative · the refused pair is echoed back" '.errors[0].messages[0].value' "${R_P2}:read"
+
+req PATCH "/permissions/${ID_P2A}/archive" ''
+assert_status "P2 positive · archive the holder" 204
+req POST /permissions "$(permission_body "$R_P2" read)"
+assert_status "P2 positive · the archived pair is free again" 201
+ID_P2B="$(j '.data.id')"
+# A NEW row with a NEW id, granted explicitly — never a restore. That difference
+# is the whole reason unarchive does not exist on this aggregate.
+[ -n "$ID_P2B" ] && [ "$ID_P2B" != "$ID_P2A" ] \
+  && pass "P2 positive · it returns as a NEW row, not as a restored one" \
+  || fail "P2 positive · it returns as a NEW row, not as a restored one" \
+          "an id different from ${ID_P2A}" "${ID_P2B:-<none>}" "$RESP_BODY"
+req GET "/permissions?resource.eq=${R_P2}&includeArchived=true"
+assert_jq "P2 positive · the retired row stays as history" '.data | length' 2
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P3 🔴 CRITICAL · the wildcard is a WHOLE half, never a piece of one"
+note "spec.md §7a rule 2, §7b rule 6 · vos/permission_key.go"
+note "the claim matcher honours exactly: exact · resource:* · *:*"
+
+req POST /permissions "$(permission_body "${PPFX}-p3" '*' 'Every action on the p3 fixture resource, as one grantable row.')"
+assert_status "P3 positive · the wildcard as an ENTIRE action half" 201
+
+# Reported against the ACTION, which is the half that has to change: with a
+# wildcard resource, only a wildcard action makes the row matchable.
+req POST /permissions "$(permission_body '*' 'read' 'A wildcard resource paired with one concrete action.')"
+assert_status_key_field "P3 negative · a wildcard resource with a concrete action" 422 'UnmatchablePermissionKeyNotification' 'action'
+
+req POST /permissions "$(permission_body 'user:*' 'read' 'A wildcard used as a segment inside a resource path.')"
+assert_status_key_field "P3 negative · the wildcard inside a path" 422 'InvalidResourceNameNotification' 'resource'
+req POST /permissions "$(permission_body 'ten*' 'read' 'A wildcard mixed into a slug rather than standing alone.')"
+assert_status_key_field "P3 negative · the wildcard mixed into a slug" 422 'InvalidResourceNameNotification' 'resource'
+req POST /permissions "$(permission_body "${PPFX}-p3b" 're*d' 'A wildcard mixed into the action slug.')"
+assert_status_key_field "P3 negative · the same rule on the action half" 422 'InvalidActionNameNotification' 'action'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P4 🔴 CRITICAL · the description explains the permission, never echoes it"
+note "rules.manual: description-does-not-echo-key · spec.md §7c rule 10"
+note "normalized comparison: letters and digits only, case-folded"
+
+R_P4="${PPFX}-p4:profile"
+req POST /permissions "$(permission_body "$R_P4" 'read' 'Open a profile and read the attributes it carries.')"
+assert_status "P4 positive · a description that explains is accepted" 201
+
+# Built from the rendered pair so the two normalize identically by construction —
+# colons and hyphens become spaces, which is exactly what the rule collapses.
+# It clears the Description VO on its own (well past 15 runes, several words,
+# more than five distinct runes, a vowel, no run of four), so a pass here is the
+# echo rule firing and never the length rule.
+R_P4B="${PPFX}-p4b:profile"
+ECHO_DESC="$(printf '%s' "${R_P4B}:read" | tr ':-' '  ')"
+req POST /permissions "$(permission_body "$R_P4B" 'read' "$ECHO_DESC")"
+assert_status_key_field "P4 negative · a description that merely restates the pair" 422 'PermissionDescriptionEchoesKeyNotification' 'description'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P5 · no silent normalization — the value is compared byte for byte"
+note "spec.md §7a · the rendered pair is matched against a token claim verbatim"
+
+R_P5="${PPFX}-p5"
+create_permission "$R_P5" 'rotate-secret' >/dev/null
+req GET "/permissions?resource.eq=${R_P5}"
+assert_jq "P5 positive · the pair reads back byte-identical to what was sent" '.data[0].permission' "${R_P5}:rotate-secret"
+
+req POST /permissions "$(permission_body 'Tenant' 'read' 'An uppercase resource that must be refused rather than folded.')"
+assert_status_key_field "P5 negative · uppercase is refused, never lowercased" 422 'InvalidResourceNameNotification' 'resource'
+req POST /permissions "$(permission_body ' tenant ' 'read' 'A padded resource that must be refused rather than trimmed.')"
+assert_status_key_field "P5 negative · padding is refused, never trimmed" 422 'InvalidResourceNameNotification' 'resource'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "P6 · archiving a catalog row REVOKES it from every later token"
+note "authentication_reader.go:105 reads PermissionArchivedAt through the join;"
+note ":350 drops those rows from the effective set."
+note "IRREVERSIBLE WITHIN THIS RUN — it is the last case of the last lane by design."
+
+# The wildcard row is the only permission the bootstrap admin's master role
+# carries (migration 0012 §3), so it is the only row whose archive is observable
+# on this principal. Its id is a tracked literal in that migration, not something
+# read off an answer.
+WILDCARD_ID='01990000-0000-7000-8000-000000000000'
+
+sign_in "$BOOTSTRAP_EMAIL" "$QA_ADMIN_PASSWORD"
+assert_jq_true "P6 positive · the admin's token carries the wildcard before the archive" \
+  '[.data.user.permissions[]] | index("*:*") != null' \
+  'the permissions claim contains *:*'
+req GET /permissions
+assert_status "P6 positive · and a gated route serves that principal" 200
+
+req PATCH "/permissions/${WILDCARD_ID}/archive" ''
+assert_status "P6 negative · archive the wildcard catalog row" 204
+
+# A NEW token: the claim is computed at sign-in, so an already-issued one would
+# prove nothing about revocation.
+sign_in "$BOOTSTRAP_EMAIL" "$QA_ADMIN_PASSWORD"
+assert_jq_true "P6 negative · the reissued token no longer carries the wildcard" \
+  '[.data.user.permissions[]?] | index("*:*") == null' \
+  'the permissions claim has lost *:*'
+REVOKED_TOKEN="$(j '.data.accessToken')"
+req_astoken "$REVOKED_TOKEN" GET /permissions
+assert_status_key "P6 negative · and the gated route now refuses it" 403 'MissingPermissionNotification'
+
 
 lane_summary

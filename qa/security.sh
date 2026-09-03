@@ -284,6 +284,74 @@ else
     assert_gql_key "S20a the GraphQL read is gated too" 'MissingPermissionNotification'
     gql_astoken "$UNPRIV_TOKEN" 'mutation { createTenant(input: { name: "Refused Over Graph", workspace: "qa-refused-graph", description: "A mutation that must never reach the handler.", status: "active" }) { id } }'
     assert_gql_key "S20b the GraphQL mutation is gated too" 'MissingPermissionNotification'
+
+    # ────────────────────────────────────────────────────────────────────────
+    # §3 of specs/qa/permission-contract/plan.md — the permission routes.
+    #
+    # The 401 family (S1-S10), the public-route split (S11-S15) and the
+    # tenant-claim gate (S21) are properties of the MIDDLEWARE and are proven
+    # once, above. What is genuinely per-entity is the gate itself: a route
+    # gated on REST is not thereby gated on GraphQL, and a route can lose its
+    # gate alone. Hence one row per verb, per surface.
+    # ────────────────────────────────────────────────────────────────────────
+    PERM_ABSENT_ID='00000000-0000-7000-8000-000000000999'
+
+    # SP1 — the "not declared public" direction, asserted on this entity's own
+    # path. Every 401 case above would still pass for a route that was never
+    # gated at all; only this one sees that.
+    req_noauth GET /permissions
+    assert_status_key "SP1 GET /permissions is not a public route" 401 'MissingAuthorizationNotification'
+
+    req_astoken "$UNPRIV_TOKEN" GET /permissions
+    assert_status_key_field "SP2 list without permission:read" 403 'MissingPermissionNotification' 'permission'
+    assert_jq "SP2 the refusal names the permission it wanted" '.errors[0].messages[0].value' 'permission:read'
+
+    req_astoken "$UNPRIV_TOKEN" GET "/permissions/${PERM_ABSENT_ID}"
+    assert_status_key "SP3 by-id without permission:read" 403 'MissingPermissionNotification'
+    assert_jq "SP3 the refusal names permission:read" '.errors[0].messages[0].value' 'permission:read'
+
+    req_astoken "$UNPRIV_TOKEN" POST /permissions '{"resource":"qa-refused","action":"insert","description":"An insert that must never reach the handler."}'
+    assert_status_key "SP4 insert without permission:insert" 403 'MissingPermissionNotification'
+    assert_jq "SP4 the refusal names permission:insert" '.errors[0].messages[0].value' 'permission:insert'
+
+    req_astoken "$UNPRIV_TOKEN" PATCH "/permissions/${PERM_ABSENT_ID}" '{"description":"A patch that must never reach the handler."}'
+    assert_status_key "SP5 patch without permission:update" 403 'MissingPermissionNotification'
+    assert_jq "SP5 the refusal names permission:update" '.errors[0].messages[0].value' 'permission:update'
+
+    req_astoken "$UNPRIV_TOKEN" PATCH "/permissions/${PERM_ABSENT_ID}/archive" ''
+    assert_status_key "SP6 archive without permission:archive" 403 'MissingPermissionNotification'
+    assert_jq "SP6 the refusal names permission:archive" '.errors[0].messages[0].value' 'permission:archive'
+
+    # The complement, per verb. A gate that refuses EVERYONE is also broken, and
+    # only this can tell the two apart. The reads answer 200; the writes are
+    # aimed at an id that addresses nothing, so reaching the HANDLER at all —
+    # a 404, never a 403 — is what proves the gate opened.
+    req_astoken "$ADMIN_TOKEN" GET /permissions
+    assert_status "SP7a list WITH permission:read is served" 200
+    req_astoken "$ADMIN_TOKEN" PATCH "/permissions/${PERM_ABSENT_ID}" '{"description":"A patch that reaches the handler and finds nothing."}'
+    assert_status_key "SP7b patch WITH permission:update reaches the handler" 404 'RecordNotFoundNotification'
+    req_astoken "$ADMIN_TOKEN" PATCH "/permissions/${PERM_ABSENT_ID}/archive" ''
+    assert_status_key "SP7c archive WITH permission:archive reaches the handler" 404 'RecordNotFoundNotification'
+
+    # Per SURFACE — five fields, because GraphQL mounts its own gate per field.
+    gql_astoken "$UNPRIV_TOKEN" '{ permissions(first: 1) { totalCount } }'
+    assert_gql_key "SP8a the GraphQL listing is gated too" 'MissingPermissionNotification'
+    gql_astoken "$UNPRIV_TOKEN" "{ permission(id: \"${PERM_ABSENT_ID}\") { id } }"
+    assert_gql_key "SP8b the GraphQL by-id is gated too" 'MissingPermissionNotification'
+    gql_astoken "$UNPRIV_TOKEN" 'mutation { createPermission(input: { resource: "qa-refused-graph", action: "insert", description: "A mutation that must never reach the handler." }) { id } }'
+    assert_gql_key "SP8c createPermission is gated too" 'MissingPermissionNotification'
+    gql_astoken "$UNPRIV_TOKEN" "mutation { patchPermission(id: \"${PERM_ABSENT_ID}\", input: { description: \"A mutation that must never reach the handler.\" }) { id } }"
+    assert_gql_key "SP8d patchPermission is gated too" 'MissingPermissionNotification'
+    gql_astoken "$UNPRIV_TOKEN" "mutation { archivePermission(id: \"${PERM_ABSENT_ID}\") { success } }"
+    assert_gql_key "SP8e archivePermission is gated too" 'MissingPermissionNotification'
+
+    # The complement on GraphQL, so the surface is not proven only by refusals.
+    # The selection asks for edges as well as totalCount ON PURPOSE: a GraphQL
+    # selection of totalCount ALONE is how this surface spells ?onlyTotal=true,
+    # which then conflicts with first: — a 400 that would say nothing about the
+    # gate this case is here to prove.
+    gql_astoken "$ADMIN_TOKEN" '{ permissions(first: 1) { edges { node { id } } totalCount } }'
+    assert_gql_ok "SP9 the GraphQL listing WITH the permission is served"
   fi
 fi
 
@@ -314,5 +382,7 @@ skip "authz layer 2 — identity-derived BuildRules" \
      "structurally absent on Tenant: BuildRules reads no principal field (internal/domain/tenant.go). Nothing to prove, and asserting one would be inventing a rule."
 skip "authz layer 3 — tenant row scoping and Restrict" \
      "structurally absent: authz.dataAccess is anyone-with-permission and both ToCriteria return the criteria unchanged. Anyone holding tenant:read sees every row, by design (spec.md §B Q4)."
+skip "authz layers 2 and 3 on Permission" \
+     "structurally absent there too, and for a stronger reason: the catalog is GLOBAL by design (spec.md §10) — not partitioned by tenant, so there is no tenant_id to filter on and no owner to check. Both ToCriteria return the criteria unchanged (find_permissions_by_params_query.go:18, find_permission_by_id_query.go:19) and no BuildRules clause reads a principal field. Layer 1 is the whole gate, and SP2-SP9 prove it on both surfaces."
 
 lane_summary
