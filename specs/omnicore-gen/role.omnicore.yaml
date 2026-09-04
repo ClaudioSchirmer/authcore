@@ -718,9 +718,22 @@ read:
       - {field: Key, ops: [eq, ne, in, startswith, istartswith, contains, icontains]}
       - {field: Name, ops: [eq, in, startswith, istartswith, contains, icontains]}
       - {field: Description, ops: [contains, icontains]}
+      # The OWNER's two join fields. A ROOT join's fields are addressable in a criteria —
+      # read-joins.html: "a chain field is an ordinary field of the loaded entity,
+      # filterable, sortable, projectable and exportable exactly like a one-hop one" — so
+      # "the roles of acme-comercio" is answerable without a second call. This is the 1:N
+      # boundary's exact complement: the CHILD's join fields (Resource, Action) stay
+      # load-only, because filtering a root by a field of a 1:N child is a pushdown one
+      # root SELECT cannot express.
+      #
+      # Workspace takes Key's operator family: both are lowercase slug handles a caller
+      # types. Status takes eq/in alone — it is an enum, and contains over a closed set of
+      # three words is a filter that reads as text search and answers as noise.
+      - {field: TenantWorkspace, ops: [eq, in, startswith, istartswith, contains, icontains]}
+      - {field: TenantStatus, ops: [eq, in]}
       - {field: CreatedAt, ops: [gte, lte]}
       - {field: UpdatedAt, ops: [gte, lte]}
-    sort: [Key, Name, TenantID, CreatedAt, UpdatedAt]
+    sort: [Key, Name, TenantID, TenantWorkspace, TenantStatus, CreatedAt, UpdatedAt]
     controls:
       pagination: true
       orderBy: true

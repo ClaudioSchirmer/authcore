@@ -326,6 +326,279 @@ req POST /permissions "$(permission_body ' tenant ' 'read' 'A padded resource th
 assert_status_key_field "P5 negative · padding is refused, never trimmed" 422 'InvalidResourceNameNotification' 'resource'
 
 # ════════════════════════════════════════════════════════════════════════════
+# §1b of specs/qa/role-contract/plan.md — RL1..RL10.
+#
+# These sit BEFORE P6 and that is structural, not cosmetic: P6 archives the *:*
+# catalog row and ends the run's ability to authenticate as an operator. Every
+# row below needs an operator.
+#
+# Four of these families the maintainer named CRITICAL: the escalation pair, the
+# tenant isolation with its Layer-3 read scope, the catalog check, and the
+# suspended-tenant rule. Role is also the first aggregate in this service whose
+# rules read the PRINCIPAL, so most of what follows needs a caller who is NOT a
+# super-admin — provisioned through the service's own flow, never forged.
+# ════════════════════════════════════════════════════════════════════════════
+
+RSCOPE="qa-rl-${QA_RUN_TAG}"
+ADMIN_TOKEN="$TOKEN"
+MASTER_TENANT_ID='01990000-0001-7000-8000-000000000001'
+MASTER_ROLE_ID='01990000-0002-7000-8000-000000000001'
+WILDCARD_ID='01990000-0000-7000-8000-000000000000'
+RL_DESC='A role the domain lane created so exactly one business rule can be judged.'
+
+PID_TENANT_READ="$(permission_id_of tenant read)"
+PID_ROLE_READ="$(permission_id_of role read)"
+PID_PERM_ARCHIVE="$(permission_id_of permission archive)"
+
+# The tenant this lane's own roles live in — kept apart from master, so a
+# cross-tenant case has two real partitions to cross.
+T_D="$(create_tenant "$(_slug "${RSCOPE}-own")" 'Qa Domain Roles' 'The tenant the domain lane keeps its own roles in, so a cross-tenant case has somewhere to cross from.' 'active')"
+
+# The scoped principal: authenticated, NOT a super-admin, bound to a tenant of
+# the suite's own making, holding a chosen bundle — and deliberately WITHOUT
+# permission:archive, which is what RL2's negative case needs.
+provision_scoped_principal "rlp" \
+  role:insert role:update role:archive role:read role:grant tenant:read
+SP_OK=$?
+TOKEN="$ADMIN_TOKEN"
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL1 🔴 CRITICAL · the wildcard is refused for EVERYONE, with no exemption"
+note "spec.md §7 R9b · rules.manual: no-wildcard-grant"
+note "the negative is aimed at the *:* super-admin ON PURPOSE: if any caller were"
+note "exempt it would be them, and migration 0012's own header says this refusal is"
+note "why a migration is the only way a super-admin can come into existence."
+
+RL1_ROLE="$(create_role "$(_slug "${RSCOPE}-w")" "$T_D" '[]')"
+req POST "/roles/${RL1_ROLE}/permissions" "$(jq -nc --arg p "$PID_TENANT_READ" '{permissionID:$p}')"
+assert_status "RL1 positive · the admin grants a concrete catalog permission" 201
+
+req POST "/roles/${RL1_ROLE}/permissions" "$(jq -nc --arg p "$WILDCARD_ID" '{permissionID:$p}')"
+assert_status_key "RL1 negative · the *:* super-admin is refused the wildcard grant" 403 'CannotGrantWildcardPermissionNotification'
+
+# RL1b — the same refusal on the INSERT path, and the reason the order of the two
+# rules is load-bearing. Identity.HasPermission PANICS on any argument containing
+# '*' (application/configuration/identity.go:52), so the wildcard rule is what
+# removes the input that would crash the request into a 500 on exactly the case
+# the escalation rule exists to stop. A 500 here is the regression.
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-w2")" 'Qa Wildcard Insert' "$RL_DESC" "$T_D" \
+  "$(jq -nc --arg a "$WILDCARD_ID" '[$a]')")"
+assert_status_key "RL1b negative · the wildcard is refused on the INSERT path too" 403 'CannotGrantWildcardPermissionNotification'
+if [ "$RESP_CODE" != "500" ]; then
+  pass "RL1b and it is a ${RESP_CODE}, never a 500 — the panic input never reached HasPermission"
+else
+  fail "RL1b the wildcard refusal is never a 500" "403, the rule order having removed the panic input" "HTTP 500" "$RESP_BODY"
+fi
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL2 🔴 CRITICAL · you may only grant what you hold"
+note "spec.md §7 R9a, §B Q3 — \"só pode conceder o que você tem, a não ser que"
+note "você seja um *:*\". The super-admin exemption is FREE, not special-cased:"
+note "HasPermission answers true for any concrete key when the claim set holds *:*."
+
+if [ "$SP_OK" -ne 0 ] || [ -z "$SP_TOKEN" ]; then
+  skip "RL2 / RL3 / RL3b · every rule needing a scoped principal" \
+       "the principal could not be provisioned — ${SP_FAILED:-unknown reason}. These rules are UNPROVEN this run."
+else
+  pass "RL0 a scoped, non-super-admin principal was provisioned through the service's own flow"
+
+  # The role it will act on lives in ITS OWN tenant, so R5 cannot fire first and
+  # answer with a different key than the one under test.
+  RL2_ROLE="$(create_role "$(_slug "${RSCOPE}-esc")" "$SP_TENANT_ID" '[]')"
+
+  req_astoken "$SP_TOKEN" POST "/roles/${RL2_ROLE}/permissions" \
+    "$(jq -nc --arg p "$PID_TENANT_READ" '{permissionID:$p}')"
+  assert_status "RL2 positive · it grants tenant:read, which its own role carries" 201
+
+  req_astoken "$SP_TOKEN" POST "/roles/${RL2_ROLE}/permissions" \
+    "$(jq -nc --arg p "$PID_PERM_ARCHIVE" '{permissionID:$p}')"
+  assert_status_key "RL2 negative · and is refused permission:archive, which it does not hold" 403 'CannotGrantUnheldPermissionNotification'
+
+  # The complement. Without it RL2 would pass just as well for a service that
+  # refuses EVERY grant — the mirror failure of a gate that refuses everyone.
+  req POST "/roles/${RL2_ROLE}/permissions" "$(jq -nc --arg p "$PID_PERM_ARCHIVE" '{permissionID:$p}')"
+  assert_status "RL2b positive · the *:* admin grants the very same permission" 201
+
+  # ══════════════════════════════════════════════════════════════════════════
+  section "RL3 🔴 CRITICAL · tenant isolation binds WRITES"
+  note "spec.md §7 R5, §10 Layer 2, §B Q4 — reads AND writes both"
+
+  req_astoken "$SP_TOKEN" POST /roles "$(role_body "$(_slug "${RSCOPE}-own1")" 'Qa Own Tenant' \
+    'A role the scoped principal creates inside its own tenant, naming no owner at all.' 'OMIT' '[]')"
+  assert_status "RL3 positive · it creates in its OWN tenant, omitting tenantID entirely" 201
+  assert_jq "RL3 positive · and absent really did mean \"mine\"" '.data.tenantID' "$SP_TENANT_ID"
+
+  req_astoken "$SP_TOKEN" POST /roles "$(role_body "$(_slug "${RSCOPE}-frn")" 'Qa Foreign Tenant' \
+    'A role the scoped principal must not be able to create inside somebody else.' "$MASTER_TENANT_ID" '[]')"
+  assert_status_key_field "RL3 negative · naming ANOTHER tenant is refused" 403 'TenantMismatchNotification' 'tenantID'
+
+  # The archive verb carries the same rule: refuseForeignTenant runs under
+  # IfArchive too, and the WRITE side is not filtered by ToCriteria — so the row
+  # loads and the RULE is what refuses.
+  RL3_FOREIGN="$(create_role "$(_slug "${RSCOPE}-fa")" "$T_D" '[]')"
+  req_astoken "$SP_TOKEN" PATCH "/roles/${RL3_FOREIGN}/archive" ''
+  assert_status_key "RL3 negative · archiving another tenant's role is refused" 403 'TenantMismatchNotification'
+
+  # ══════════════════════════════════════════════════════════════════════════
+  section "RL3b 🔴 CRITICAL · and it binds READS — as a 404, never a 403"
+  note "spec.md §10 Layer 3: \"a by-id read of another tenant's role returns 404"
+  note "rather than 403 — it does not exist for this caller, which leaks nothing"
+  note "about who else exists\". A 403 here would confirm the row exists."
+
+  req_astoken "$SP_TOKEN" GET "/roles/${RL2_ROLE}"
+  assert_status "RL3b positive · the principal reads a role of its own tenant" 200
+
+  req_astoken "$SP_TOKEN" GET "/roles/${MASTER_ROLE_ID}"
+  assert_status_key "RL3b negative · the master role answers NOT-FOUND, not FORBIDDEN" 404 'RecordNotFoundNotification'
+
+  req_astoken "$SP_TOKEN" GET '/roles?first=100'
+  assert_jq_true "RL3b negative · and it is absent from every page of the listing" \
+    "[.data[].id] | index(\"${MASTER_ROLE_ID}\") == null" \
+    'the master role is not in the scoped principal listing'
+  assert_jq_true "RL3b negative · every row the principal CAN see is its own tenant's" \
+    "[.data[].tenantID] | unique == [\"${SP_TENANT_ID}\"]" \
+    'the isolation filter selected, it did not merely hide one row'
+
+  # RL3c — the bypass, without which a service that filtered EVERYONE would pass
+  # RL3b for the wrong reason and a platform operator could not support a customer.
+  req GET '/roles?first=100'
+  assert_jq_true "RL3c positive · the *:* admin DOES see the master role" \
+    "[.data[].id] | index(\"${MASTER_ROLE_ID}\") != null" \
+    'the super-admin crosses the row scope'
+  assert_jq_true "RL3c positive · and sees rows from more than one tenant" \
+    '([.data[].tenantID] | unique | length) > 1' \
+    'the admin listing is not silently scoped either'
+fi
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL4 🔴 CRITICAL · a granted permission must EXIST and still be ACTIVE"
+note "spec.md §7 R6 — a retired permission comes back as a NEW row with a NEW id,"
+note "so re-granting the old id is refused rather than silently honoured. This is"
+note "the whole reason the grant stores the id and not the string."
+
+RL4_ROLE="$(create_role "$(_slug "${RSCOPE}-cat")" "$T_D" '[]')"
+req POST "/roles/${RL4_ROLE}/permissions" "$(jq -nc --arg p "$PID_ROLE_READ" '{permissionID:$p}')"
+assert_status "RL4 positive · a live catalog id is granted" 201
+
+req POST "/roles/${RL4_ROLE}/permissions" '{"permissionID":"00000000-0000-7000-8000-0000000004c4"}'
+assert_status_key "RL4 negative · a uuid no catalog row carries" 422 'PermissionNotInCatalogNotification'
+
+# The half that matters. A permission archived a moment ago is still a real row
+# with a real id — and it must stop being grantable.
+RL4_RES="$(_slug "${RSCOPE}-retired")"
+RL4_PID="$(create_permission "$RL4_RES" read 'A catalog entry retired mid-run so a grant against it can be refused.')"
+req PATCH "/permissions/${RL4_PID}/archive" ''
+assert_status "RL4 setup · the catalog entry is retired" 204
+req POST "/roles/${RL4_ROLE}/permissions" "$(jq -nc --arg p "$RL4_PID" '{permissionID:$p}')"
+assert_status_key "RL4 negative · an ARCHIVED catalog id is refused too" 422 'PermissionNotInCatalogNotification'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL5 🔴 CRITICAL · a suspended tenant gets no role — and a TRIAL one does"
+note "spec.md §7 R4, corrected 2026-08-24. \"Unavailable\" is not \"not active\":"
+note "a trial is a live customer being onboarded, and roles are the first thing"
+note "they need. A rule written as Status != active would refuse every trial signup."
+
+T_TRIAL="$(create_tenant "$(_slug "${RSCOPE}-trial")" 'Qa Trial Tenant' 'A tenant still inside its trial period, which is a live customer being onboarded.' 'trial')"
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-tr")" 'Qa Trial Role' "$RL_DESC" "$T_TRIAL" '[]')"
+assert_status "RL5 positive · a TRIAL tenant may be given a role — the plausible-mistake control" 201
+
+T_SUSP="$(create_tenant "$(_slug "${RSCOPE}-susp")" 'Qa Suspended Tenant' 'A tenant that stopped paying and must not be handed anything that grants access.' 'active')"
+req PATCH "/tenants/${T_SUSP}" '{"status":"suspended"}'
+assert_status "RL5 setup · the tenant is suspended" 200
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-su")" 'Qa Suspended Role' "$RL_DESC" "$T_SUSP" '[]')"
+assert_status_key_field "RL5 negative · a SUSPENDED tenant is refused" 422 'RoleTenantDoesNotExistNotification' 'tenantID'
+
+T_ARCH="$(create_tenant "$(_slug "${RSCOPE}-arch")" 'Qa Archived Tenant' 'A tenant archived before anyone tried to mint a role inside it.' 'active')"
+req PATCH "/tenants/${T_ARCH}/archive" ''
+assert_status "RL5 setup · the tenant is archived" 204
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-ar")" 'Qa Archived Role' "$RL_DESC" "$T_ARCH" '[]')"
+assert_status_key_field "RL5 negative · an ARCHIVED tenant is refused" 422 'RoleTenantDoesNotExistNotification' 'tenantID'
+
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-nx")" 'Qa Absent Tenant' "$RL_DESC" '00000000-0000-7000-8000-0000000004c4' '[]')"
+assert_status_key_field "RL5 negative · a tenant id no row carries is refused" 422 'RoleTenantDoesNotExistNotification' 'tenantID'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL6 · the key is immutable, and the refusal is explicit"
+note "spec.md §7 R1 · rules.list: key-immutable — it is what API callers and"
+note "audit lines reference, so moving it rewrites the meaning of both."
+
+RL6_KEY="$(_slug "${RSCOPE}-imm")"
+RL6_ROLE="$(create_role "$RL6_KEY" "$T_D" '[]')"
+req PATCH "/roles/${RL6_ROLE}" '{"name":"Qa Relabelled","description":"An amended wording that leaves the machine handle exactly where it was."}'
+assert_status "RL6 positive · relabelling is allowed" 200
+assert_jq "RL6 positive · and the key did not move" '.data.key' "$RL6_KEY"
+
+req PATCH "/roles/${RL6_ROLE}" "$(jq -nc --arg k "${RL6_KEY}-x" '{key:$k}')"
+assert_status_key_field "RL6 negative · moving the key is refused" 422 'RoleKeyIsImmutableNotification' 'key'
+req GET "/roles/${RL6_ROLE}"
+assert_jq "RL6 negative · and the stored key is untouched" '.data.key' "$RL6_KEY"
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL7 · the tenant is immutable STRUCTURALLY — the door does not exist"
+note "PatchRoleRequest carries key, name and description alone, so"
+note "RoleTenantIsImmutableNotification is UNREACHABLE through REST and GraphQL."
+note "No case asserts it; this case asserts the structure that makes it moot."
+
+req PATCH "/roles/${RL6_ROLE}" "$(jq -nc --arg t "$MASTER_TENANT_ID" '{tenantID:$t}')"
+assert_status "RL7 · a body naming another tenant is accepted and ignored" 200
+req GET "/roles/${RL6_ROLE}"
+assert_jq "RL7 · and the owner is UNCHANGED — the field reached no command" '.data.tenantID' "$T_D"
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL8 · at most 200 permissions in one role"
+note "spec.md §7 R8. Stated plainly: the negative sends 201 invented uuids, so 201"
+note "PermissionNotInCatalogNotification keys ride along with the cap's own. The"
+note "assertion reads the WHOLE envelope, never only the first message. Seeding 201"
+note "real catalog rows was weighed at the gate and declined as not worth ~202 calls."
+
+# EVERY wildcard is excluded, not merely the seeded one. no-wildcard-grant
+# refuses a '*' in EITHER half, and the permission lane's own P3 positive case
+# creates a <resource>:* row — so filtering by the seeded id alone let a lane
+# fixture answer 403 and took this case RED for a reason that had nothing to do
+# with the cap it exists to prove.
+req GET '/permissions?first=100&orderBy=resource'
+RL8_IDS="$(j '[.data[] | select(.permission | contains("*") | not) | .id]')"
+RL8_N="$(printf '%s' "$RL8_IDS" | jq 'length')"
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-bulk")" 'Qa Bulk Role' "$RL_DESC" "$T_D" "$RL8_IDS")"
+assert_status "RL8 positive · a role bundling ${RL8_N} live catalog rows is accepted" 201
+assert_jq "RL8 positive · and every one of them was stored" '.data.permissions | length' "$RL8_N"
+
+RL8_MANY="$(jq -nc '[range(0;201)] | map("0000ffff-0000-7000-8000-" + ("000000000000" + (. | tostring) | .[-12:]))')"
+req POST /roles "$(role_body "$(_slug "${RSCOPE}-cap")" 'Qa Capped Role' "$RL_DESC" "$T_D" "$RL8_MANY")"
+assert_status_key "RL8 negative · 201 entries trips the cap" 422 'TooManyPermissionsInRoleNotification'
+assert_jq "RL8 negative · and the refusal names the ceiling it enforced" \
+  '[.errors[]?.messages[]? | select(.notificationKey=="TooManyPermissionsInRoleNotification") | .value] | first' '201'
+
+# ════════════════════════════════════════════════════════════════════════════
+section "RL9 🔴 CRITICAL · the catalog rules judge the entries a write ADDS"
+note "spec.md §7 \"What these three rules judge\" · GetAddedItemsOf, not"
+note "GetCurrentItemsOf. A rule re-judging STORED entries would answer 422 on a"
+note "request whose only change is a label — and a caller who lost a permission"
+note "could no longer even REVOKE the others, since a revocation is an update."
+
+RL9_RES="$(_slug "${RSCOPE}-later")"
+RL9_PID="$(create_permission "$RL9_RES" read 'A catalog entry granted first and retired afterwards, to prove stored grants are not re-judged.')"
+RL9_ROLE="$(create_role "$(_slug "${RSCOPE}-add")" "$T_D" "$(jq -nc --arg a "$RL9_PID" '[$a]')")"
+req PATCH "/permissions/${RL9_PID}/archive" ''
+assert_status "RL9 setup · the platform retires a permission the role already grants" 204
+
+req PATCH "/roles/${RL9_ROLE}" '{"name":"Qa Renamed After Retirement"}'
+assert_status "RL9 positive · renaming that role still answers 200" 200
+assert_jq "RL9 positive · and the rename actually applied" '.data.name' 'Qa Renamed After Retirement'
+
+# RL10 — a REVOKE asks nothing, because it adds nothing. Revocation is the tool
+# for a grant that stopped being acceptable, so it has to stay reachable exactly
+# when it is needed.
+RL10_PID="$(permission_id_of user read)"
+req POST "/roles/${RL9_ROLE}/permissions" "$(jq -nc --arg p "$RL10_PID" '{permissionID:$p}')"
+assert_status "RL10 setup · a second, live grant is added" 201
+RL10_CHILD="$(j '.data.rolePermission.id')"
+req PATCH "/roles/${RL9_ROLE}/permissions/${RL10_CHILD}/archive" '{}'
+assert_status "RL10 positive · revoking works while a STORED grant points at a retired permission" 204
+
+TOKEN="$ADMIN_TOKEN"
+
+# ════════════════════════════════════════════════════════════════════════════
 section "P6 · archiving a catalog row REVOKES it from every later token"
 note "authentication_reader.go:105 reads PermissionArchivedAt through the join;"
 note ":350 drops those rows from the effective set."
