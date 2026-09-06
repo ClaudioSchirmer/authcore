@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-03
-// checksum:   sha256:be13f340faf9b79785f9c5af2e9da16c411c9995062f6f4171d9c569abd4d492
+// generated:  2026-09-06
+// checksum:   sha256:8f1519b46b3270d4031d75bfd1bf233103310497bb74ffbc651671560f41c7d7
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,10 +49,7 @@ func permissionRejectedFields(err error) []string {
 	var out []string
 	for _, ctx := range carrier.NotificationContexts() {
 		for _, msg := range ctx.Messages() {
-			name := msg.FieldName
-			if msg.Override != "" {
-				name = msg.Override
-			}
+			name := msg.Override
 			for _, seg := range msg.Path {
 				if seg.Name != "" {
 					name = seg.Name

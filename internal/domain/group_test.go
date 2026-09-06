@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:19dd8611c5c9e1a0536b61e1c958a0b246267f06d176d0f2c9a531cfe390dfb6
+// generated:  2026-09-06
+// checksum:   sha256:2418abec505a1ad87488fc665de190afdf8824135b8de5b85018d29f3dc58073
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,10 +50,7 @@ func groupRejectedFields(err error) []string {
 	var out []string
 	for _, ctx := range carrier.NotificationContexts() {
 		for _, msg := range ctx.Messages() {
-			name := msg.FieldName
-			if msg.Override != "" {
-				name = msg.Override
-			}
+			name := msg.Override
 			for _, seg := range msg.Path {
 				if seg.Name != "" {
 					name = seg.Name

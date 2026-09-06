@@ -184,7 +184,7 @@ func (e *User) refusePasswordEchoingIdentity(r *domain.Rules) {
 		// the offending input so a caller can see what was refused; here that
 		// would put the plaintext in the 422 payload and in any log rendering
 		// one.
-		r.AddNotification("Password", PasswordEchoesIdentityNotification{})
+		r.AddNotification(&e.Password, PasswordEchoesIdentityNotification{}, false)
 	}
 }
 
@@ -205,7 +205,7 @@ func (e *User) refuseUnavailableTenant(service UserService, r *domain.Rules) {
 		return
 	}
 	if service.TenantIsUnavailable(e.TenantID) {
-		r.AddNotification("TenantID", UserTenantDoesNotExistNotification{}, e.TenantID.String())
+		r.AddNotification(&e.TenantID, UserTenantDoesNotExistNotification{}, true)
 	}
 }
 
@@ -294,7 +294,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// ordinary path they are the same value, but a *:* super-admin crosses
 		// that scope, and when they do "this tenant" must mean the user's.
 		if unavailable[joined.GroupID] {
-			r.AddNotification("Groups", GroupNotAvailableInTenantNotification{}, joined.GroupID.String())
+			r.AddNotificationNamed("Groups", GroupNotAvailableInTenantNotification{}, joined.GroupID.String())
 			// Nothing below can say anything true about a group that is not
 			// there, and the wildcard probe already answers "yes" for an
 			// unknown id — reporting all three for one bad id would be noise.
@@ -311,7 +311,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// the platform's own superadmin user cannot be created through this
 		// API. It is seeded by migration beside the reserved platform tenant.
 		if grantsWildcard[joined.GroupID] {
-			r.AddNotification("Groups", CannotJoinWildcardGroupNotification{}, joined.GroupID.String())
+			r.AddNotificationNamed("Groups", CannotJoinWildcardGroupNotification{}, joined.GroupID.String())
 			continue
 		}
 
@@ -321,7 +321,7 @@ func (e *User) refuseUnjoinableGroups(service UserService, r *domain.Rules) {
 		// A *:* superadmin passes by construction — HasPermission answers true
 		// for any concrete permission when the claim set contains it.
 		if escalates[joined.GroupID] {
-			r.AddNotification("Groups", CannotJoinGroupWithUnheldPermissionsNotification{}, joined.GroupID.String())
+			r.AddNotificationNamed("Groups", CannotJoinGroupWithUnheldPermissionsNotification{}, joined.GroupID.String())
 		}
 	}
 }
@@ -366,19 +366,19 @@ func (e *User) refuseUngrantableRoles(service UserService, r *domain.Rules) {
 	for _, granted := range judged {
 		// ── role-available-in-tenant ──
 		if unavailable[granted.RoleID] {
-			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
 			continue
 		}
 
 		// ── role-wildcard-refused ──
 		if grantsWildcard[granted.RoleID] {
-			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
 			continue
 		}
 
 		// ── role-no-escalation ──
 		if escalates[granted.RoleID] {
-			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
 		}
 	}
 }
@@ -471,7 +471,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// ordinary path they are the same value, but a *:* super-admin crosses
 		// that scope, and when they do "this tenant" must mean the user's.
 		if unavailable[held.ClaimID] {
-			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
+			r.AddNotificationNamed("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
 			// Nothing below can say anything true about a definition that is
 			// not there, and both probes answer "the problem is present" for an
 			// unknown id — reporting all three for one bad id would be noise.
@@ -484,7 +484,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// `user`, `client` or `both`. This is what finally makes that column
 		// mean something rather than merely state it.
 		if notForUsers[held.ClaimID] {
-			r.AddNotification("Claims", ClaimDoesNotApplyToUserNotification{}, held.ClaimID.String())
+			r.AddNotificationNamed("Claims", ClaimDoesNotApplyToUserNotification{}, held.ClaimID.String())
 			continue
 		}
 
@@ -497,7 +497,7 @@ func (e *User) refuseUnsettableClaims(service UserService, r *domain.Rules) {
 		// which entry they sent, and what they need told back is the string
 		// that did not parse.
 		if valueMismatched[held.ClaimID] {
-			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
+			r.AddNotificationNamed("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
 		}
 	}
 }

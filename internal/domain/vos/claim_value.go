@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e5f8588df8eb732cbeacb466269020c3087c0a3cb6786dc1eb69ace96c7c7c9f
+// generated:  2026-09-06
+// checksum:   sha256:b98203cc527d6d6d41e798b6e03dbf91adde5a03f91b0b3554e1ba346a9f7400
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,11 +49,11 @@ func (v ClaimValue) Value() string { return string(v) }
 // at once.
 func (v ClaimValue) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	if v == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 	if len(v) < 1 || len(v) > 256 {
-		ctx.AddNotification(fieldName, InvalidClaimValueNotification{}, v)
+		ctx.AddNotificationNamed(fieldName, InvalidClaimValueNotification{}, v)
 		return false
 	}
 	return true

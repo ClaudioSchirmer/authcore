@@ -99,7 +99,7 @@ func (v PersonName) IsValid(fieldName string, ctx *domain.NotificationContext) b
 // why the aggregate declares no `required` rule on top of this type.
 func validateNameHalf(s, part string, ctx *domain.NotificationContext) bool {
 	if s == "" {
-		ctx.AddNotification(part, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(part, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -117,7 +117,7 @@ func validateNameHalf(s, part string, ctx *domain.NotificationContext) bool {
 		isTrimmedAndSingleSpaced(s)
 
 	if !valid {
-		ctx.AddNotification(part, InvalidPersonNameNotification{}, s)
+		ctx.AddNotificationNamed(part, InvalidPersonNameNotification{}, s)
 		return false
 	}
 	return true

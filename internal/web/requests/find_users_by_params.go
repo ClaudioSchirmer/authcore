@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:2a4c1635f439ebe8d31b550a6705286698c80fbfe02228e4edd1767eea62832f
+// generated:  2026-09-06
+// checksum:   sha256:085b013c417d5ea5046587442fdb30d6a7ae6c99d61e0f6a2958400ab1dd85d5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -45,19 +45,19 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindUsersRequest struct {
-	TenantID           *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc"`
-	GivenName          *string    `query:"givenName" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	FamilyName         *string    `query:"familyName" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	Email              *string    `query:"email" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	Status             *string    `query:"status" filter:"eq,in" sort:"asc,desc"`
-	MustChangePassword *bool      `query:"mustChangePassword" filter:"eq"`
-	PasswordChangedAt  *time.Time `query:"passwordChangedAt" filter:"gte,lte" sort:"asc,desc"`
-	EmailVerifiedAt    *time.Time `query:"emailVerifiedAt" filter:"eq,gte,lte" sort:"asc,desc"`
-	TenantWorkspace    *string    `query:"tenantWorkspace" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	TenantStatus       *string    `query:"tenantStatus" filter:"eq,in" sort:"asc,desc"`
-	CreatedAt          *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc"`
-	UpdatedAt          *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc"`
-	ID                 *string    `query:"id" filter:"eq,in" sort:"asc,desc"`
+	TenantID           *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc" description:"The tenant this user belongs to. Immutable — a user never moves between tenants."`
+	GivenName          *string    `query:"givenName" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The person's given name."`
+	FamilyName         *string    `query:"familyName" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The person's family name."`
+	Email              *string    `query:"email" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The address this person signs in with. Unique across the whole platform over active rows, and immutable after creation."`
+	Status             *string    `query:"status" filter:"eq,in" sort:"asc,desc" description:"The account's state — active or suspended. Orthogonal to archiving."`
+	MustChangePassword *bool      `query:"mustChangePassword" filter:"eq" description:"Whether the next sign-in must rotate the password."`
+	PasswordChangedAt  *time.Time `query:"passwordChangedAt" filter:"gte,lte" sort:"asc,desc" description:"When the credential was last set — always, since a password is required at creation."`
+	EmailVerifiedAt    *time.Time `query:"emailVerifiedAt" filter:"eq,gte,lte" sort:"asc,desc" description:"When the address was proven reachable; NULL until a verification flow exists."`
+	TenantWorkspace    *string    `query:"tenantWorkspace" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The owning tenant's immutable handle. Read-only, filled on every load."`
+	TenantStatus       *string    `query:"tenantStatus" filter:"eq,in" sort:"asc,desc" description:"The owning tenant's commercial lifecycle. Read-only, filled on every load."`
+	CreatedAt          *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was inserted."`
+	UpdatedAt          *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was last written."`
+	ID                 *string    `query:"id" filter:"eq,in" sort:"asc,desc" description:"The row's identity, minted by the framework."`
 	First              *int64     `query:"first"`
 	Last               *int64     `query:"last"`
 	After              *string    `query:"after"`

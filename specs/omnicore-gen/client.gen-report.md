@@ -354,7 +354,12 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Client service port (9 fact(s)) | `internal/domain/client_service.go` |
+| the ClientAllowedCIDR child value object | `internal/domain/aggregatevos/client_allowed_cidr.go` |
+| the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
+| the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
+| the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
+| tests for Client's rules | `internal/domain/client_test.go` |
+| the listing request and response | `internal/web/requests/find_clients_by_params.go` |
 
 **Left untouched** (yours, by design):
 
@@ -363,11 +368,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-89 file(s) were already up to date.
-
-**No longer generated** — the spec changed and these are left over:
-
-- `internal/domain/client_claim_value_does_not_match_value_type_entry.go`
+84 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -383,9 +384,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.69.0)
+Verdict: **exact** (project pins v0.73.0)
 
-framework v0.69.0 meets the required v0.69.0
+framework v0.73.0 meets the required v0.73.0
 
 Verify what was generated:
 

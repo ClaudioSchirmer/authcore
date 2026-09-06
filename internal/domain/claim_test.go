@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:956928415f38937643b5cf0104dcdea2ca65f15d1aa4794e2562ace7bdd22ebd
+// generated:  2026-09-06
+// checksum:   sha256:d1b1b12bd2b1d8ef9ac88dfadc3e15655f9ae128b57026d5c7307eddf0c78ef2
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,10 +49,7 @@ func claimRejectedFields(err error) []string {
 	var out []string
 	for _, ctx := range carrier.NotificationContexts() {
 		for _, msg := range ctx.Messages() {
-			name := msg.FieldName
-			if msg.Override != "" {
-				name = msg.Override
-			}
+			name := msg.Override
 			for _, seg := range msg.Path {
 				if seg.Name != "" {
 					name = seg.Name

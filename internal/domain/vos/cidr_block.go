@@ -60,20 +60,20 @@ func (v CIDRBlock) Value() string { return string(v) }
 func (v CIDRBlock) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
 	prefix, err := netip.ParsePrefix(s)
 	if err != nil {
-		ctx.AddNotification(fieldName, InvalidCIDRBlockNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidCIDRBlockNotification{}, s)
 		return false
 	}
 
 	masked := prefix.Masked()
 	for _, universal := range universalPrefixes {
 		if masked == universal {
-			ctx.AddNotification(fieldName, UniversalCIDRNotAllowedNotification{}, s)
+			ctx.AddNotificationNamed(fieldName, UniversalCIDRNotAllowedNotification{}, s)
 			return false
 		}
 	}
@@ -94,7 +94,7 @@ func (v CIDRBlock) IsValid(fieldName string, ctx *domain.NotificationContext) bo
 	// The corrected spelling rides in the notification payload, so the answer is
 	// the fix rather than a complaint about the input.
 	if masked.String() != s {
-		ctx.AddNotification(fieldName, CIDRHasHostBitsSetNotification{}, masked.String())
+		ctx.AddNotificationNamed(fieldName, CIDRHasHostBitsSetNotification{}, masked.String())
 		return false
 	}
 

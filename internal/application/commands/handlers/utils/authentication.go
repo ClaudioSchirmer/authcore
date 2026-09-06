@@ -92,7 +92,7 @@ const (
 // the credential was wrong.
 func Refusal(n domain.Notification) error {
 	return exception.NewApplicationErrorWith("Authentication", domain.NotificationMessage{
-		FieldName:    "credentials",
+		Override:     "credentials",
 		Notification: n,
 	})
 }

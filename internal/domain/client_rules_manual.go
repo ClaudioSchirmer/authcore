@@ -197,9 +197,9 @@ func (e *Client) rotateSecretRules(service ClientService, r *domain.Rules) {
 	// Asked FIRST, because everything below it writes. A window the caller got
 	// wrong must not cost them their working credential.
 	if e.GracePeriodSeconds < 0 || e.GracePeriodSeconds > ClientSecretGraceMaxSeconds {
-		r.AddNotification("GracePeriodSeconds", InvalidGracePeriodNotification{
+		r.AddNotification(&e.GracePeriodSeconds, InvalidGracePeriodNotification{
 			Max: strconv.Itoa(ClientSecretGraceMaxSeconds),
-		}, e.GracePeriodSeconds)
+		}, true)
 		return
 	}
 
@@ -208,7 +208,7 @@ func (e *Client) rotateSecretRules(service ClientService, r *domain.Rules) {
 	// a fresh secret is the opposite of what that switch meant. Reactivate it
 	// first, which is an ordinary PATCH and an ordinary permission.
 	if e.Status != vos.ClientStatusActive {
-		r.AddNotification("Status", ClientMustBeActiveToRotateNotification{}, e.Status.Value())
+		r.AddNotification(&e.Status, ClientMustBeActiveToRotateNotification{}, true)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (e *Client) refuseUnavailableTenant(service ClientService, r *domain.Rules)
 		return
 	}
 	if service.TenantIsUnavailable(e.TenantID) {
-		r.AddNotification("TenantID", ClientTenantDoesNotExistNotification{}, e.TenantID.String())
+		r.AddNotification(&e.TenantID, ClientTenantDoesNotExistNotification{}, true)
 	}
 }
 
@@ -310,7 +310,7 @@ func (e *Client) refuseRotatingAnotherClientsSecret(r *domain.Rules) {
 		rowID = id.Value()
 	}
 	if e.RequestingClientID == "" || e.RequestingClientID != rowID {
-		r.AddNotification("ID", ClientMayOnlyRotateItsOwnSecretNotification{})
+		r.AddNotificationNamed("ID", ClientMayOnlyRotateItsOwnSecretNotification{})
 	}
 }
 
@@ -397,7 +397,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// super-admin crosses that scope, and when they do "this tenant" must
 		// mean the client's.
 		if unavailable[granted.RoleID] {
-			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", RoleNotAvailableInTenantNotification{}, granted.RoleID.String())
 			continue
 		}
 
@@ -411,7 +411,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// entity could mint: it never expires, nobody is watching it, and it
 		// outlives the person who created it.
 		if grantsWildcard[granted.RoleID] {
-			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantWildcardRoleNotification{}, granted.RoleID.String())
 			continue
 		}
 
@@ -421,7 +421,7 @@ func (e *Client) refuseUngrantableRoles(service ClientService, r *domain.Rules) 
 		// answers true for any concrete permission when the claim set contains
 		// the wildcard.
 		if escalates[granted.RoleID] {
-			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, granted.RoleID.String())
 		}
 	}
 }
@@ -522,7 +522,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// for all three: a distinct "belongs to another tenant" reply is an
 		// existence oracle over a competitor's claim vocabulary.
 		if unavailable[held.ClaimID] {
-			r.AddNotification("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
+			r.AddNotificationNamed("Claims", ClaimNotAvailableInTenantNotification{}, held.ClaimID.String())
 			continue
 		}
 
@@ -531,7 +531,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// on User refuses appliesTo: client. The pair is what makes that column
 		// mean something instead of merely stating it.
 		if notForClients[held.ClaimID] {
-			r.AddNotification("Claims", ClaimDoesNotApplyToClientNotification{}, held.ClaimID.String())
+			r.AddNotificationNamed("Claims", ClaimDoesNotApplyToClientNotification{}, held.ClaimID.String())
 			continue
 		}
 
@@ -541,7 +541,7 @@ func (e *Client) refuseUnsettableClaims(service ClientService, r *domain.Rules) 
 		// which entry they sent, and what they need told back is the string
 		// that did not parse.
 		if valueMismatched[held.ClaimID] {
-			r.AddNotification("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
+			r.AddNotificationNamed("Claims", ClaimValueDoesNotMatchValueTypeNotification{}, held.Value.Value())
 		}
 	}
 }

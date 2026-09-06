@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:ed12b9b24df6ee5c6a034b77a4b6a40936f1acf91be71a70fb6936778baa083d
+// generated:  2026-09-06
+// checksum:   sha256:a5403e146df6a4b9ca8c2c60b2c957c8ea45854ff3904f4d9962abd8f08f77b7
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -55,15 +55,15 @@ func (v Email) Value() string { return string(v) }
 // at once.
 func (v Email) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	if v == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 	if len(v) > 254 {
-		ctx.AddNotification(fieldName, InvalidEmailNotification{}, v)
+		ctx.AddNotificationNamed(fieldName, InvalidEmailNotification{}, v)
 		return false
 	}
 	if !emailPattern.MatchString(string(v)) {
-		ctx.AddNotification(fieldName, InvalidEmailNotification{}, v)
+		ctx.AddNotificationNamed(fieldName, InvalidEmailNotification{}, v)
 		return false
 	}
 	return true

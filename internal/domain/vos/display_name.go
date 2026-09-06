@@ -46,7 +46,7 @@ func (v DisplayName) Value() string { return string(v) }
 func (v DisplayName) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -70,7 +70,7 @@ func (v DisplayName) IsValid(fieldName string, ctx *domain.NotificationContext) 
 		isTrimmedAndSingleSpaced(s)
 
 	if !valid {
-		ctx.AddNotification(fieldName, InvalidDisplayNameNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidDisplayNameNotification{}, s)
 		return false
 	}
 	return true

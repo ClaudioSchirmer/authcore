@@ -85,12 +85,13 @@ func TestADuplicateInsideTheRolesCollectionIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("a group conferring the same role twice was accepted")
 	}
-	// NOTE the field name: the generated childDuplicate rule blames "GroupRole"
-	// — the ENTRY TYPE — where every other refusal about this collection blames
-	// "Roles", the collection. Both reach the caller; they are simply two
-	// spellings for one place, and this pins which one the collection path uses.
-	if !groupBlames(err, "GroupRole") {
-		t.Errorf("the refusal blamed %v, want GroupRole", groupRejectedFields(err))
+	// NOTE the field name: the childDuplicate rule blames "Roles" — the
+	// DECLARED COLLECTION — which is what every other refusal about this
+	// collection already blamed. Framework v0.73.0 ended the old split where
+	// this one path spelled the same place as the entry TYPE ("GroupRole");
+	// aggregate_root.go now builds the segment from CollectionName().
+	if !groupBlames(err, "Roles") {
+		t.Errorf("the refusal blamed %v, want Roles", groupRejectedFields(err))
 	}
 }
 

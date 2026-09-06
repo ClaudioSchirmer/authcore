@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:38e57eeed7bf40e100380f0843d1e7185aba2bb560e403f2487213eb98431e46
+// generated:  2026-09-06
+// checksum:   sha256:a0efce5e8055aff513feb1ff6415c08fda856ae44f55755e606cee3ffd827861
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,10 +50,7 @@ func roleRejectedFields(err error) []string {
 	var out []string
 	for _, ctx := range carrier.NotificationContexts() {
 		for _, msg := range ctx.Messages() {
-			name := msg.FieldName
-			if msg.Override != "" {
-				name = msg.Override
-			}
+			name := msg.Override
 			for _, seg := range msg.Path {
 				if seg.Name != "" {
 					name = seg.Name

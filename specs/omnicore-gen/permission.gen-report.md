@@ -134,7 +134,8 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the 5 permission endpoints | `internal/web/permission_routes.go` |
+| the Permission aggregate root, its modes and its rules | `internal/domain/permission.go` |
+| tests for Permission's rules | `internal/domain/permission_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -143,7 +144,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-29 file(s) were already up to date.
+28 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -163,9 +164,9 @@ Warnings raised during generation:
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.72.1)
+Verdict: **exact** (project pins v0.73.0)
 
-framework v0.72.1 meets the required v0.72.1
+framework v0.73.0 meets the required v0.73.0
 
 Verify what was generated:
 

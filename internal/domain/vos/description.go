@@ -43,7 +43,7 @@ func (v Description) Value() string { return string(v) }
 func (v Description) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -56,7 +56,7 @@ func (v Description) IsValid(fieldName string, ctx *domain.NotificationContext) 
 		hasVowel(s)
 
 	if !valid {
-		ctx.AddNotification(fieldName, InvalidDescriptionNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidDescriptionNotification{}, s)
 		return false
 	}
 	return true

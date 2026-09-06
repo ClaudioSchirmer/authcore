@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:ecb2a180d5ccc2b9b8aa5ba263b86d8d7cad8f54714a610ef726f7b09ec9b55a
+// generated:  2026-09-06
+// checksum:   sha256:b3f0b0782e66057536fee2a1d5451a6c6098229b4ebcf0bc4131d58019352ef3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -154,7 +154,7 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot())
 			if len(items) > 50 {
-				r.AddNotification("Roles", TooManyRolesInGroupNotification{Max: "50"}, len(items))
+				r.AddNotificationNamed("Roles", TooManyRolesInGroupNotification{Max: "50"}, len(items))
 			}
 		}
 		// No duplicate role within one group. The business identity is the
@@ -166,7 +166,7 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 			for i := range items {
 				for j := i + 1; j < len(items); j++ {
 					if items[i].IsSameBusinessIdentity(items[j]) {
-						r.AddNotification("Roles", GroupAlreadyGrantsRoleNotification{}, items[i].RoleID)
+						r.AddNotificationNamed("Roles", GroupAlreadyGrantsRoleNotification{}, items[i].RoleID)
 						break
 					}
 				}
@@ -183,7 +183,7 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 				selfID = *id
 			}
 			if service.(GroupService).GroupKeyTaken(e.TenantID, e.Key.Value(), selfID) {
-				r.AddNotification("Key", GroupKeyAlreadyExistsNotification{}, e.Key)
+				r.AddNotification(&e.Key, GroupKeyAlreadyExistsNotification{}, true)
 			}
 		}
 	})
@@ -195,13 +195,13 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 		// stay editable.
 		if old := domain.Old(e); old != nil {
 			if old.Key != e.Key {
-				r.AddNotification("Key", GroupKeyIsImmutableNotification{}, e.Key)
+				r.AddNotification(&e.Key, GroupKeyIsImmutableNotification{}, true)
 			}
 		}
 		// A group never moves between tenants.
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", GroupTenantIsImmutableNotification{}, e.TenantID)
+				r.AddNotification(&e.TenantID, GroupTenantIsImmutableNotification{}, true)
 			}
 		}
 	})
@@ -229,7 +229,7 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 // who has to be able to repair a row that is not theirs.
 func (e *Group) refuseForeignTenant(r *domain.Rules) {
 	if e.RequestingIdentityPresent && !e.RequestingMayCrossScope && e.TenantID.Value() != e.RequestingTenant {
-		r.AddNotification("TenantID", notifications.TenantMismatchNotification{})
+		r.AddNotification(&e.TenantID, notifications.TenantMismatchNotification{}, false)
 	}
 }
 
@@ -244,7 +244,7 @@ func (e *Group) AddGroupRole(item aggregatevos.GroupRole) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("Roles", GroupAlreadyGrantsRoleNotification{}, item.RoleID)
+			e.AddNotificationNamed("Roles", GroupAlreadyGrantsRoleNotification{}, item.RoleID)
 			return
 		}
 	}
@@ -254,7 +254,8 @@ func (e *Group) AddGroupRole(item aggregatevos.GroupRole) {
 // RemoveGroupRoleByID takes ONE entry out of the collection.
 //
 // Same not-found posture as the change: the caller named an entry, so a
-// missing one is an answer rather than a no-op.
+// missing one is an answer rather than a no-op — and addressed to the
+// collection's plural for the same reason.
 func (e *Group) RemoveGroupRoleByID(id string) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -262,5 +263,5 @@ func (e *Group) RemoveGroupRoleByID(id string) {
 			return
 		}
 	}
-	e.AddNotification("GroupRole", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("Roles", domain.RecordNotFoundNotification{}, id)
 }

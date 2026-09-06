@@ -77,7 +77,7 @@ func (v Password) Value() string { return string(v) }
 func (v Password) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -96,7 +96,7 @@ func (v Password) IsValid(fieldName string, ctx *domain.NotificationContext) boo
 		// what was rejected; here that would put the plaintext into the
 		// notification payload, the response body and any log that renders
 		// one. The caller already knows what they typed.
-		ctx.AddNotification(fieldName, WeakPasswordNotification{})
+		ctx.AddNotificationNamed(fieldName, WeakPasswordNotification{})
 		return false
 	}
 	return true

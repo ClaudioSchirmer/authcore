@@ -56,7 +56,7 @@ func (e *Permission) customRules(actionName string, service domain.Service, r *d
 		// thing twice. (Tenant's own description rule reads exactly this way.)
 		description := normalizeForEcho(e.Description.Value())
 		if description != "" && description == normalizeForEcho(e.Permission.String()) {
-			r.AddNotification("Description", PermissionDescriptionEchoesKeyNotification{}, e.Description.Value())
+			r.AddNotification(&e.Description, PermissionDescriptionEchoesKeyNotification{}, true)
 		}
 	})
 }

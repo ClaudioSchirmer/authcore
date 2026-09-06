@@ -43,7 +43,7 @@ func (e *Tenant) customRules(actionName string, service domain.Service, r *domai
 		if description != "" &&
 			(description == normalizeForComparison(e.Name.Value()) ||
 				description == normalizeForComparison(e.Workspace.Value())) {
-			r.AddNotification("Description", TenantDescriptionMustDifferNotification{}, e.Description)
+			r.AddNotification(&e.Description, TenantDescriptionMustDifferNotification{}, true)
 		}
 	})
 

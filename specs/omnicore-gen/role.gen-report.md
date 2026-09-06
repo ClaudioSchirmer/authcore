@@ -225,7 +225,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the listing request and response | `internal/web/requests/find_roles_by_params.go` |
+| the RolePermission child value object | `internal/domain/aggregatevos/role_permission.go` |
+| the Role aggregate root, its modes and its rules | `internal/domain/role.go` |
+| tests for Role's rules | `internal/domain/role_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -235,7 +237,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-47 file(s) were already up to date.
+45 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -251,9 +253,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.72.1)
+Verdict: **exact** (project pins v0.73.0)
 
-framework v0.72.1 meets the required v0.72.1
+framework v0.73.0 meets the required v0.73.0
 
 Verify what was generated:
 

@@ -161,9 +161,9 @@ func assertClientCredentialRefusal(t *testing.T, err error) {
 	if _, ok := msgs[0].Notification.(InvalidClientCredentialsNotification); !ok {
 		t.Errorf("notification = %T, want InvalidClientCredentialsNotification", msgs[0].Notification)
 	}
-	if msgs[0].FieldName != "credentials" {
+	if msgs[0].Override != "credentials" {
 		t.Errorf("field = %q, want %q — a field name that says which half was wrong is an oracle",
-			msgs[0].FieldName, "credentials")
+			msgs[0].Override, "credentials")
 	}
 }
 

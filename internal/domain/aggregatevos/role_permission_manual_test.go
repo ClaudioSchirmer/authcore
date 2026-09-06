@@ -64,9 +64,10 @@ func (otherAggregateValueObject) BuildRules(string, domain.Service, *domain.Rule
 // addition a deliberate act.
 func TestTheEntryDeclaresNoRuleOfItsOwn(t *testing.T) {
 	ctx := domain.NewNotificationContext("RolePermission")
-	r := domain.NewRules(domain.ModeInsert, ctx, nil)
+	entry := &RolePermission{}
+	r := domain.NewRulesFor(domain.ModeInsert, ctx, entry)
 
-	RolePermission{}.BuildRules("GetInsertable", nil, r)
+	entry.BuildRules("GetInsertable", nil, r)
 
 	if ctx.HasErrors() {
 		t.Error("the grant entry raised a notification of its own — the root's rules are where a grant is judged")

@@ -308,9 +308,9 @@ func assertCredentialRefusal(t *testing.T, err error) {
 	if _, ok := msgs[0].Notification.(InvalidCredentialsNotification); !ok {
 		t.Errorf("notification = %T, want InvalidCredentialsNotification", msgs[0].Notification)
 	}
-	if msgs[0].FieldName != "credentials" {
+	if msgs[0].Override != "credentials" {
 		t.Errorf("field = %q, want %q — a field name that says which half was wrong is an oracle",
-			msgs[0].FieldName, "credentials")
+			msgs[0].Override, "credentials")
 	}
 }
 
@@ -879,8 +879,8 @@ func TestIssueToken_LockedAnswersWithTheRemainingMinutes(t *testing.T) {
 	}
 	// Same neutral field name as the generic 401, so the two refusals are
 	// indistinguishable in shape as well as in origin.
-	if msg.FieldName != "credentials" {
-		t.Errorf("field = %q, want credentials", msg.FieldName)
+	if msg.Override != "credentials" {
+		t.Errorf("field = %q, want credentials", msg.Override)
 	}
 }
 

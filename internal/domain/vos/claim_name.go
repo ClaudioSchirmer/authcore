@@ -91,13 +91,13 @@ func (v ClaimName) Value() string { return string(v) }
 func (v ClaimName) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
 	length := runeLen(s)
 	if length < claimNameMinRunes || length > claimNameMaxRunes || !v.hasReservedPrefix() {
-		ctx.AddNotification(fieldName, InvalidClaimNameNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidClaimNameNotification{}, s)
 		return false
 	}
 
@@ -115,7 +115,7 @@ func (v ClaimName) IsValid(fieldName string, ctx *domain.NotificationContext) bo
 		!hasRunOfIdenticalRunes(remainder, claimNameMaxIdenticalRun)
 
 	if !wellFormed {
-		ctx.AddNotification(fieldName, InvalidClaimNameNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidClaimNameNotification{}, s)
 		return false
 	}
 	return true
