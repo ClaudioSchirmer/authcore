@@ -205,10 +205,10 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
-| the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
-| tests for Group's rules | `internal/domain/group_test.go` |
-| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
+| the patch command and result | `internal/application/commands/patch_group_command.go` |
+| tests for patch_group_command.go | `internal/application/commands/patch_group_command_test.go` |
+| the patch request and response | `internal/web/requests/patch_group.go` |
+| the wire mapper tests for patch_group.go | `internal/web/requests/patch_group_test.go` |
 
 **Left untouched** (yours, by design):
 

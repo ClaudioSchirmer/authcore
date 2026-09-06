@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:965200a8044cd20da0610580edc6c9cd28c37905816ec794506c9dd9a2bdf48a
+// generated:  2026-09-06
+// checksum:   sha256:948c78267d2d0c32aa6cf9aa8628c5194e3c261c1b9577c0fc07c1ec6a636ce9
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -39,7 +39,6 @@ import (
 // and the value the caller sent is not in the row.
 func TestPatchGroupRequest_CarriesEveryField(t *testing.T) {
 	r := PatchGroupRequest{
-		Key:  func() *string { v := string("engineering"); return &v }(),
 		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")

@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:61b7dbbee7f11694b3f54ab0ed7d22c2b379b96cb9b3c768092ad1e3e0cd0b06
+// generated:  2026-09-06
+// checksum:   sha256:10ec5ed7e85d4898461dfefcd0378a3602dd14cd5ee8c5c413551cc6698445ff
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -52,13 +52,13 @@ func TestPatchGroupLeavesAbsentFieldsAlone(t *testing.T) {
 		},
 	})
 	e := &appdomain.Group{}
-	orig := vos.GroupKey("engineering")
-	e.Key = orig
+	orig := vos.DisplayName("Engineering")
+	e.Name = orig
 	c := &PatchGroupCommand{} // nothing sent
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
 	}
-	if e.Key != orig {
+	if e.Name != orig {
 		t.Error("an absent field was overwritten")
 	}
 }
@@ -79,7 +79,6 @@ func TestPatchGroupAppliesWhatItCarries(t *testing.T) {
 	})
 	e := &appdomain.Group{}
 	c := &PatchGroupCommand{
-		Key:  func() *string { v := string("engineering"); return &v }(),
 		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")
@@ -88,9 +87,6 @@ func TestPatchGroupAppliesWhatItCarries(t *testing.T) {
 	}
 	if err := c.ApplyPartiallyTo(ctx, e); err != nil {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
-	}
-	if e.Key.Value() != "engineering" {
-		t.Errorf("Key was sent and not applied")
 	}
 	if e.Name.Value() != "Engineering" {
 		t.Errorf("Name was sent and not applied")
@@ -109,7 +105,6 @@ func TestPatchGroupCommandResultCarriesWhatWasApplied(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	e := &appdomain.Group{}
 	c := &PatchGroupCommand{
-		Key:  func() *string { v := string("engineering"); return &v }(),
 		Name: func() *string { v := string("Engineering"); return &v }(),
 		Description: func() *string {
 			v := string("Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights.")
@@ -123,9 +118,6 @@ func TestPatchGroupCommandResultCarriesWhatWasApplied(t *testing.T) {
 	res, err := c.FromEntity(ctx, e)
 	if err != nil {
 		t.Fatalf("FromEntity: %v", err)
-	}
-	if res.Key != "engineering" {
-		t.Errorf("Key was applied and did not reach the result")
 	}
 	if res.Name != "Engineering" {
 		t.Errorf("Name was applied and did not reach the result")

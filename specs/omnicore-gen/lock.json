@@ -1188,7 +1188,7 @@
     },
     "Group": {
       "spec": "specs/omnicore-gen/group.omnicore.yaml",
-      "specHash": "651351ea4a6ef7f24376b2d233bd24a02cbcca08fec19f9e4ae9b8873f641da6",
+      "specHash": "f0cf3849600e1c503ef31587d3f58d321eb62b6507b663f854ebce7b0969f9b0",
       "framework": "v0.73.0",
       "files": {
         "bootstrap/group_feature.go": {
@@ -1233,11 +1233,11 @@
         },
         "internal/application/commands/patch_group_command.go": {
           "class": "owned",
-          "hash": "495c71f4b1fb1421523ecd8032883eef84181c59cebb0dd5eeb2bb991bc78ed5"
+          "hash": "2626949cbffc49b534d9ce03e43637a283b8f253b2dd222add68f16b125f33fb"
         },
         "internal/application/commands/patch_group_command_test.go": {
           "class": "owned",
-          "hash": "63494dcb2d90fba4e7515dcbb9a72fb5bb755f60279457aa57834da0a9878bf1"
+          "hash": "cb43a858b87bff0dad8817287814756af725ab67852f8fce38c0eb1dcbd7f520"
         },
         "internal/application/commands/utils/group_group_role_projection.go": {
           "class": "owned",
@@ -1385,11 +1385,11 @@
         },
         "internal/web/requests/patch_group.go": {
           "class": "owned",
-          "hash": "aa77c311782cd289f792ebbd5c118af704691de22d2e9691b36b8b96228b1109"
+          "hash": "91e5e72668e71b41dbce539889a962895813a32007b1b9ab22ffd926e61082b9"
         },
         "internal/web/requests/patch_group_test.go": {
           "class": "owned",
-          "hash": "2a95c9c8a42fd718d49b1b0b969e631fe56d75226d9c0ba937285bfb15537da1"
+          "hash": "7907513ea0dd934a3a836c8d5c7b4d1b91098a3170fcbecfe98b2f0615599d11"
         }
       },
       "ordinals": {
