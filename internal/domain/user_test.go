@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a554b2a71594d85055bd7a4931049beb5475b20788de0a4affd941335a13d406
+// generated:  2026-09-06
+// checksum:   sha256:bcdec5e44c5288e5ddc1f3d410617678012705137952869796f97b69bd897f06
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,10 +50,7 @@ func userRejectedFields(err error) []string {
 	var out []string
 	for _, ctx := range carrier.NotificationContexts() {
 		for _, msg := range ctx.Messages() {
-			name := msg.FieldName
-			if msg.Override != "" {
-				name = msg.Override
-			}
+			name := msg.Override
 			for _, seg := range msg.Path {
 				if seg.Name != "" {
 					name = seg.Name

@@ -105,7 +105,7 @@ func (e *User) changePasswordRules(service UserService, r *domain.Rules) {
 	// the middleware is only bypassable with auth.mode disabled and the
 	// framework refuses that mode outside APP_PROFILE=dev.
 	if e.RequestingIdentityPresent && !e.rowIsTheCaller() {
-		r.AddNotification("ID", PasswordChangeRequiresSelfNotification{})
+		r.AddNotificationNamed("ID", PasswordChangeRequiresSelfNotification{})
 		return
 	}
 
@@ -123,7 +123,7 @@ func (e *User) changePasswordRules(service UserService, r *domain.Rules) {
 	// case does.
 	if e.CurrentPassword == "" ||
 		(service != nil && !service.PasswordIsUnchanged(e.CurrentPassword, e.PasswordHash)) {
-		r.AddNotification("CurrentPassword", InvalidCurrentPasswordNotification{})
+		r.AddNotification(&e.CurrentPassword, InvalidCurrentPasswordNotification{}, false)
 		return
 	}
 
@@ -137,7 +137,7 @@ func (e *User) changePasswordRules(service UserService, r *domain.Rules) {
 	// row carries exactly one hash, so this can only see the CURRENT password.
 	// Real reuse prevention needs a history table this model does not have.
 	if e.Password.Value() == e.CurrentPassword {
-		r.AddNotification("Password", PasswordUnchangedNotification{})
+		r.AddNotification(&e.Password, PasswordUnchangedNotification{}, false)
 		return
 	}
 
@@ -158,7 +158,7 @@ func (e *User) resetPasswordRules(service UserService, r *domain.Rules) {
 	//
 	// Stands down with no identity, for the reason given above.
 	if e.RequestingIdentityPresent && e.rowIsTheCaller() {
-		r.AddNotification("ID", PasswordResetRequiresAnotherUserNotification{})
+		r.AddNotificationNamed("ID", PasswordResetRequiresAnotherUserNotification{})
 		return
 	}
 
@@ -172,7 +172,7 @@ func (e *User) resetPasswordRules(service UserService, r *domain.Rules) {
 	// costs a full verification: this operation never learns the current
 	// password, so the stored hash is the only thing to ask.
 	if service != nil && service.PasswordIsUnchanged(e.Password.Value(), e.PasswordHash) {
-		r.AddNotification("Password", PasswordUnchangedNotification{})
+		r.AddNotification(&e.Password, PasswordUnchangedNotification{}, false)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (e *User) credentialValueRules(r *domain.Rules) {
 	// declarative rule is scoped to a verb and these operations share ModeUpdate
 	// with the ordinary patch.
 	if e.PasswordConfirmation != e.Password.Value() {
-		r.AddNotification("PasswordConfirmation", PasswordConfirmationMismatchNotification{})
+		r.AddNotification(&e.PasswordConfirmation, PasswordConfirmationMismatchNotification{}, false)
 	}
 
 	// ── the context rule ──

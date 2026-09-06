@@ -188,7 +188,9 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
+| the Claim aggregate root, its modes and its rules | `internal/domain/claim.go` |
+| tests for Claim's rules | `internal/domain/claim_test.go` |
+| the listing request and response | `internal/web/requests/find_claims_by_params.go` |
 
 **Left untouched** (yours, by design):
 
@@ -197,11 +199,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-33 file(s) were already up to date.
-
-**No longer generated** — the spec changed and these are left over:
-
-- `internal/domain/claim_active_claims_by_applies_to_group.go`
+31 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -217,9 +215,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.69.0)
+Verdict: **exact** (project pins v0.73.0)
 
-framework v0.69.0 meets the required v0.69.0
+framework v0.73.0 meets the required v0.73.0
 
 Verify what was generated:
 

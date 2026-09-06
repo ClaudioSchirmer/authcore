@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:4862fab623c6b509964415d434eff25f0a0737059c6df636014a79265d332625
+// generated:  2026-09-06
+// checksum:   sha256:4fcf605aeb815b4153988c9b2117d341912943c6cffa4ede212d4c4ea852b9a1
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -74,6 +74,6 @@ func (c RolePermission) IsSameBusinessIdentity(other domain.AggregateValueObject
 //
 // It runs scoped to this entry, so a notification it raises reaches the caller
 // addressed to the exact position in the collection rather than to the root.
-func (c RolePermission) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
+func (c *RolePermission) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
 	// No rule beyond what the value objects validate on their own.
 }

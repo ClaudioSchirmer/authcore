@@ -85,7 +85,7 @@ func (v TenantWorkspace) IsReserved() bool {
 func (v TenantWorkspace) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -99,12 +99,12 @@ func (v TenantWorkspace) IsValid(fieldName string, ctx *domain.NotificationConte
 		!hasRunOfIdenticalRunes(s, tenantWorkspaceMaxIdenticalRun)
 
 	if !wellFormed {
-		ctx.AddNotification(fieldName, InvalidTenantWorkspaceNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidTenantWorkspaceNotification{}, s)
 		valid = false
 	}
 
 	if v.IsReserved() {
-		ctx.AddNotification(fieldName, ReservedTenantWorkspaceNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, ReservedTenantWorkspaceNotification{}, s)
 		valid = false
 	}
 

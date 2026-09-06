@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:1e40694db2eb9456a01bcca0bd9705b086412041aad4b1dbe5186ac48267400a
+// generated:  2026-09-06
+// checksum:   sha256:c348dc4ff2962fb5606bf0bff7e712c39ad01568ea73858cafe62335742c865d
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -130,7 +130,7 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 		// Skipped when the value is absent: this rule says what a value must look like, not that there must be one.
 		if e.DefaultValue != nil {
 			if e.DefaultValue != nil && (len(*e.DefaultValue) > 256) {
-				r.AddNotification("DefaultValue", DefaultValueTooLongNotification{Max: "256"}, e.DefaultValue)
+				r.AddNotification(&e.DefaultValue, DefaultValueTooLongNotification{Max: "256"}, true)
 			}
 		}
 		// The database unique index is the backstop for the race between this
@@ -144,7 +144,7 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 				selfID = *id
 			}
 			if service.(ClaimService).ClaimNameTaken(e.TenantID, e.Name.Value(), selfID) {
-				r.AddNotification("Name", ClaimNameAlreadyExistsNotification{}, e.Name)
+				r.AddNotification(&e.Name, ClaimNameAlreadyExistsNotification{}, true)
 			}
 		}
 	})
@@ -156,13 +156,13 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 		// DefaultValue and Description stay editable.
 		if old := domain.Old(e); old != nil {
 			if old.Name != e.Name {
-				r.AddNotification("Name", ClaimNameIsImmutableNotification{}, e.Name)
+				r.AddNotification(&e.Name, ClaimNameIsImmutableNotification{}, true)
 			}
 		}
 		// A claim definition never moves between tenants.
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", ClaimTenantIsImmutableNotification{}, e.TenantID)
+				r.AddNotification(&e.TenantID, ClaimTenantIsImmutableNotification{}, true)
 			}
 		}
 		// Flipping the declared type retro-invalidates every value already
@@ -171,7 +171,7 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 		// aggregate that does not exist yet.
 		if old := domain.Old(e); old != nil {
 			if old.ValueType != e.ValueType {
-				r.AddNotification("ValueType", ClaimValueTypeIsImmutableNotification{}, e.ValueType)
+				r.AddNotification(&e.ValueType, ClaimValueTypeIsImmutableNotification{}, true)
 			}
 		}
 	})
@@ -199,6 +199,6 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 // who has to be able to repair a row that is not theirs.
 func (e *Claim) refuseForeignTenant(r *domain.Rules) {
 	if e.RequestingIdentityPresent && !e.RequestingMayCrossScope && e.TenantID.Value() != e.RequestingTenant {
-		r.AddNotification("TenantID", notifications.TenantMismatchNotification{})
+		r.AddNotification(&e.TenantID, notifications.TenantMismatchNotification{}, false)
 	}
 }

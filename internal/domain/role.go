@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:5e52be778343c5baeeaba22ccfb52a306884fe2c81250484cc72ad742f06812b
+// generated:  2026-09-06
+// checksum:   sha256:c19aef11c8a4a71c90b1dc9e1c5c04405235ea807667430110bd1eeb249802de
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -148,7 +148,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot())
 			if len(items) > 200 {
-				r.AddNotification("Permissions", TooManyPermissionsInRoleNotification{Max: "200"}, len(items))
+				r.AddNotificationNamed("Permissions", TooManyPermissionsInRoleNotification{Max: "200"}, len(items))
 			}
 		}
 		// No duplicate permission within one role. The business identity is
@@ -160,7 +160,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 			for i := range items {
 				for j := i + 1; j < len(items); j++ {
 					if items[i].IsSameBusinessIdentity(items[j]) {
-						r.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{}, items[i].PermissionID)
+						r.AddNotificationNamed("Permissions", RoleAlreadyGrantsPermissionNotification{}, items[i].PermissionID)
 						break
 					}
 				}
@@ -177,7 +177,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 				selfID = *id
 			}
 			if service.(RoleService).RoleKeyTaken(e.TenantID, e.Key.Value(), selfID) {
-				r.AddNotification("Key", RoleKeyAlreadyExistsNotification{}, e.Key)
+				r.AddNotification(&e.Key, RoleKeyAlreadyExistsNotification{}, true)
 			}
 		}
 	})
@@ -188,13 +188,13 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 		// retroactively and invisibly. Name and description stay editable.
 		if old := domain.Old(e); old != nil {
 			if old.Key != e.Key {
-				r.AddNotification("Key", RoleKeyIsImmutableNotification{}, e.Key)
+				r.AddNotification(&e.Key, RoleKeyIsImmutableNotification{}, true)
 			}
 		}
 		// A role never moves between tenants.
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", RoleTenantIsImmutableNotification{}, e.TenantID)
+				r.AddNotification(&e.TenantID, RoleTenantIsImmutableNotification{}, true)
 			}
 		}
 	})
@@ -222,7 +222,7 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 // who has to be able to repair a row that is not theirs.
 func (e *Role) refuseForeignTenant(r *domain.Rules) {
 	if e.RequestingIdentityPresent && !e.RequestingMayCrossScope && e.TenantID.Value() != e.RequestingTenant {
-		r.AddNotification("TenantID", notifications.TenantMismatchNotification{})
+		r.AddNotification(&e.TenantID, notifications.TenantMismatchNotification{}, false)
 	}
 }
 
@@ -237,7 +237,7 @@ func (e *Role) AddRolePermission(item aggregatevos.RolePermission) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("Permissions", RoleAlreadyGrantsPermissionNotification{}, item.PermissionID)
+			e.AddNotificationNamed("Permissions", RoleAlreadyGrantsPermissionNotification{}, item.PermissionID)
 			return
 		}
 	}
@@ -247,7 +247,8 @@ func (e *Role) AddRolePermission(item aggregatevos.RolePermission) {
 // RemoveRolePermissionByID takes ONE entry out of the collection.
 //
 // Same not-found posture as the change: the caller named an entry, so a
-// missing one is an answer rather than a no-op.
+// missing one is an answer rather than a no-op — and addressed to the
+// collection's plural for the same reason.
 func (e *Role) RemoveRolePermissionByID(id string) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -255,5 +256,5 @@ func (e *Role) RemoveRolePermissionByID(id string) {
 			return
 		}
 	}
-	e.AddNotification("RolePermission", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("Permissions", domain.RecordNotFoundNotification{}, id)
 }

@@ -52,7 +52,7 @@ func (e *Role) customRules(actionName string, service domain.Service, r *domain.
 		// below would take the bad value, bind it to a UUID column and panic
 		// into a 500. That is the bug this entity actually shipped once.
 		if roleService.TenantIsUnavailable(e.TenantID) {
-			r.AddNotification("TenantID", RoleTenantDoesNotExistNotification{}, e.TenantID.String())
+			r.AddNotification(&e.TenantID, RoleTenantDoesNotExistNotification{}, true)
 		}
 	})
 
@@ -161,7 +161,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// be active. A retired permission comes back as a NEW row with a NEW id,
 		// so re-granting the old id is refused rather than silently honoured.
 		if notInCatalog[grant.PermissionID] {
-			r.AddNotification("Permissions", PermissionNotInCatalogNotification{}, grant.PermissionID.String())
+			r.AddNotificationNamed("Permissions", PermissionNotInCatalogNotification{}, grant.PermissionID.String())
 			// Nothing below can say anything true about a permission that is
 			// not there, and the wildcard probe already answers "yes" for an
 			// unknown id — reporting all three for one bad id would be noise.
@@ -178,7 +178,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// 500 — on exactly the case the escalation rule exists to stop. The
 		// service guards the wildcard a second time for the same reason.
 		if isWildcard[grant.PermissionID] {
-			r.AddNotification("Permissions", CannotGrantWildcardPermissionNotification{}, grant.PermissionID.String())
+			r.AddNotificationNamed("Permissions", CannotGrantWildcardPermissionNotification{}, grant.PermissionID.String())
 			continue
 		}
 
@@ -192,7 +192,7 @@ func (e *Role) refuseUngrantablePermissions(service RoleService, r *domain.Rules
 		// set contains *:*, so "you may only grant what you hold, unless you are
 		// a superadmin" is one question and not two.
 		if callerLacks[grant.PermissionID] {
-			r.AddNotification("Permissions", CannotGrantUnheldPermissionNotification{}, grant.PermissionID.String())
+			r.AddNotificationNamed("Permissions", CannotGrantUnheldPermissionNotification{}, grant.PermissionID.String())
 		}
 	}
 }

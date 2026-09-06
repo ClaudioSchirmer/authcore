@@ -177,7 +177,9 @@ This file still answers for questions the spec has stopped declaring. The genera
 
 ### `internal/application/queries/utils/user_computed_manual.go`
 
-The spec declared these read fields as DERIVED — no column holds them, so the framework fetches their sources and hands them to you. The file was just created, with one stub per FIELD taking the sources it declared; the bodies are yours, and regeneration will never touch them.
+This file already exists and is YOURS — the generator did not open it and cannot tell whether these are filled. It lists them so you can check the file still covers what the spec declares, which is where a field added to the spec later goes unnoticed.
+
+**If this file predates the one-function-per-field shape, the build will not find these.** The derivations used to be one function per READ SHAPE, each handed a whole Result, which meant writing the same derivation twice and keeping the two in step by hand. Each is now one exported function taking the sources it declared — the generator unwraps whatever the shape holds and calls it, and the WRITE responses call the same one. Move each body into the signature below and delete the old per-shape functions.
 
 **`FullName` (string)** ← `GivenName`, `FamilyName`
 
@@ -413,26 +415,24 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the insert command and result | `internal/application/commands/insert_user_command.go` |
-| the patch command and result | `internal/application/commands/patch_user_command.go` |
-| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
-| the derivations for 1 computed read field(s) | `internal/application/queries/utils/user_computed_manual.go` |
-| the User service port (13 fact(s)) | `internal/domain/user_service.go` |
+| the UserClaim child value object | `internal/domain/aggregatevos/user_claim.go` |
+| the UserGroup child value object | `internal/domain/aggregatevos/user_group.go` |
+| the UserRole child value object | `internal/domain/aggregatevos/user_role.go` |
+| the User aggregate root, its modes and its rules | `internal/domain/user.go` |
+| tests for User's rules | `internal/domain/user_test.go` |
+| the ClaimValue value object | `internal/domain/vos/claim_value.go` |
+| the Email value object | `internal/domain/vos/email.go` |
+| the listing request and response | `internal/web/requests/find_users_by_params.go` |
 
 **Left untouched** (yours, by design):
 
+- `internal/application/queries/utils/user_computed_manual.go` — hand-written rules live here, by design
 - `internal/domain/user_rules_manual.go` — hand-written rules live here, by design
 - `internal/infra/user_service_manual.go` — hand-written rules live here, by design
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-89 file(s) were already up to date.
-
-**No longer generated** — the spec changed and these are left over:
-
-- `internal/application/queries/user_computed_manual.go`
-- `internal/domain/user_claim_value_does_not_match_value_type_entry.go`
+86 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -448,9 +448,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.69.0)
+Verdict: **exact** (project pins v0.73.0)
 
-framework v0.69.0 meets the required v0.69.0
+framework v0.73.0 meets the required v0.73.0
 
 Verify what was generated:
 

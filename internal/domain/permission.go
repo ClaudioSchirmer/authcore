@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-03
-// checksum:   sha256:3bd7fbc0720cb2bcfd260de89de1c9fc57d5aacfb5298465bf81c74f973eae5d
+// generated:  2026-09-06
+// checksum:   sha256:99eac26a956071e03f95382dcd94ab1a5b6fc54b9443929fce6197d559ee3088
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -87,7 +87,7 @@ func (e *Permission) BuildRules(actionName string, service domain.Service, r *do
 		// wording after they read it.
 		if old := domain.Old(e); old != nil {
 			if old.Permission != e.Permission {
-				r.AddNotification("Permission", PermissionKeyIsImmutableNotification{}, e.Permission)
+				r.AddNotification(&e.Permission, PermissionKeyIsImmutableNotification{}, true)
 			}
 		}
 	})
@@ -104,7 +104,7 @@ func (e *Permission) BuildRules(actionName string, service domain.Service, r *do
 				selfID = *id
 			}
 			if service.(PermissionService).PermissionKeyTaken(e.Permission.Resource, e.Permission.Action, selfID) {
-				r.AddNotification("Permission", PermissionAlreadyExistsNotification{}, e.Permission)
+				r.AddNotification(&e.Permission, PermissionAlreadyExistsNotification{}, true)
 			}
 		}
 	})

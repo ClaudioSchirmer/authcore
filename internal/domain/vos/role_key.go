@@ -53,7 +53,7 @@ func (v RoleKey) Value() string { return string(v) }
 func (v RoleKey) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -65,7 +65,7 @@ func (v RoleKey) IsValid(fieldName string, ctx *domain.NotificationContext) bool
 		!hasRunOfIdenticalRunes(s, roleKeyMaxIdenticalRun)
 
 	if !wellFormed {
-		ctx.AddNotification(fieldName, InvalidRoleKeyNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidRoleKeyNotification{}, s)
 		return false
 	}
 

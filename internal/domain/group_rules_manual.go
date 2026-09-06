@@ -59,7 +59,7 @@ func (e *Group) customRules(actionName string, service domain.Service, r *domain
 		// into a 500. That is the bug Role actually shipped once, and the whole
 		// reason G0 exists.
 		if groupService.TenantIsUnavailable(e.TenantID) {
-			r.AddNotification("TenantID", GroupTenantDoesNotExistNotification{}, e.TenantID.String())
+			r.AddNotification(&e.TenantID, GroupTenantDoesNotExistNotification{}, true)
 		}
 	})
 
@@ -183,7 +183,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// refused anything else — but a *:* super-admin crosses that scope, and
 		// when they do, "this tenant" must mean the group's.
 		if unavailable[attached.RoleID] {
-			r.AddNotification("Roles", RoleNotAvailableInTenantNotification{}, attached.RoleID.String())
+			r.AddNotificationNamed("Roles", RoleNotAvailableInTenantNotification{}, attached.RoleID.String())
 			// Nothing below can say anything true about a role that is not
 			// there, and the wildcard probe already answers "yes" for an
 			// unknown id — reporting all three for one bad id would be noise.
@@ -210,7 +210,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// the one carrying the *:* role — cannot be created through this API,
 		// and is seeded by migration beside the reserved platform tenant.
 		if grantsWildcard[attached.RoleID] {
-			r.AddNotification("Roles", CannotGrantWildcardRoleNotification{}, attached.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantWildcardRoleNotification{}, attached.RoleID.String())
 			continue
 		}
 
@@ -228,7 +228,7 @@ func (e *Group) refuseUnattachableRoles(service GroupService, r *domain.Rules) {
 		// set contains *:*, so "you may only confer what you hold, unless you
 		// are a superadmin" is one question and not two.
 		if escalates[attached.RoleID] {
-			r.AddNotification("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, attached.RoleID.String())
+			r.AddNotificationNamed("Roles", CannotGrantRoleWithUnheldPermissionsNotification{}, attached.RoleID.String())
 		}
 	}
 }

@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:699726cc0dc840036be7793e16f31d702479a8e38d40eaefeaebff8ad4b0da17
+// generated:  2026-09-06
+// checksum:   sha256:d3b341df7718fc3529499d3494d54b8ed2e1d1cab7b9550749d60a27fb47971a
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -86,7 +86,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 		// it breaks all three.
 		if old := domain.Old(e); old != nil {
 			if old.Workspace != e.Workspace {
-				r.AddNotification("Workspace", TenantWorkspaceIsImmutableNotification{}, e.Workspace)
+				r.AddNotification(&e.Workspace, TenantWorkspaceIsImmutableNotification{}, true)
 			}
 		}
 		// A trial is a beginning — no tenant returns to it.
@@ -107,7 +107,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 					}
 				}
 				if !ok {
-					r.AddNotification("Status", InvalidTenantStatusTransitionNotification{}, e.Status)
+					r.AddNotification(&e.Status, InvalidTenantStatusTransitionNotification{}, true)
 				}
 			}
 		}
@@ -125,7 +125,7 @@ func (e *Tenant) BuildRules(actionName string, service domain.Service, r *domain
 				selfID = *id
 			}
 			if service.(TenantService).WorkspaceTaken(e.Workspace.Value(), selfID) {
-				r.AddNotification("Workspace", TenantWorkspaceAlreadyExistsNotification{}, e.Workspace)
+				r.AddNotification(&e.Workspace, TenantWorkspaceAlreadyExistsNotification{}, true)
 			}
 		}
 	})

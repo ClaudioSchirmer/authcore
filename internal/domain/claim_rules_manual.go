@@ -53,7 +53,7 @@ func (e *Claim) customRules(actionName string, service domain.Service, r *domain
 		// entity on every LOAD — but an insert has no row to load, so the field
 		// is blank exactly where this rule fires.
 		if service.(ClaimService).TenantIsUnavailable(e.TenantID) {
-			r.AddNotification("TenantID", ClaimTenantDoesNotExistNotification{})
+			r.AddNotification(&e.TenantID, ClaimTenantDoesNotExistNotification{}, false)
 		}
 	})
 
@@ -77,7 +77,7 @@ func (e *Claim) customRules(actionName string, service domain.Service, r *domain
 			return
 		}
 		if !ClaimValueMatchesValueType(e.ValueType, *e.DefaultValue) {
-			r.AddNotification("DefaultValue", DefaultValueDoesNotMatchValueTypeNotification{}, *e.DefaultValue)
+			r.AddNotification(&e.DefaultValue, DefaultValueDoesNotMatchValueTypeNotification{}, true)
 		}
 	})
 }
@@ -215,11 +215,11 @@ func (e *Claim) refuseCatalogBudgetExceeded(service ClaimService, r *domain.Rule
 	max := strconv.Itoa(claimsPerTenantCap)
 
 	if addsUsers && users >= claimsPerTenantCap {
-		r.AddNotification("AppliesTo", TooManyUserClaimsInTenantNotification{Max: max}, e.AppliesTo)
+		r.AddNotification(&e.AppliesTo, TooManyUserClaimsInTenantNotification{Max: max}, true)
 	}
 
 	if addsClients && clients >= claimsPerTenantCap {
-		r.AddNotification("AppliesTo", TooManyClientClaimsInTenantNotification{Max: max}, e.AppliesTo)
+		r.AddNotification(&e.AppliesTo, TooManyClientClaimsInTenantNotification{Max: max}, true)
 	}
 }
 
@@ -357,7 +357,7 @@ func (e *Claim) refuseNarrowingAppliesToWithHeldValues(service ClaimService, r *
 	// entity treats an id it cannot use.
 	id := e.GetID()
 	if id == nil {
-		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+		r.AddNotification(&e.AppliesTo, ClaimAppliesToCannotExcludeHeldValuesNotification{}, true)
 		return
 	}
 
@@ -367,11 +367,11 @@ func (e *Claim) refuseNarrowingAppliesToWithHeldValues(service ClaimService, r *
 	// widening that queries two tables is a correctness bug no assertion about
 	// the answer would catch.
 	if dropsUsers && service.ClaimIsHeldByAUser(*id) {
-		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+		r.AddNotification(&e.AppliesTo, ClaimAppliesToCannotExcludeHeldValuesNotification{}, true)
 		return
 	}
 	if dropsClients && service.ClaimIsHeldByAClient(*id) {
-		r.AddNotification("AppliesTo", ClaimAppliesToCannotExcludeHeldValuesNotification{}, e.AppliesTo)
+		r.AddNotification(&e.AppliesTo, ClaimAppliesToCannotExcludeHeldValuesNotification{}, true)
 	}
 }
 

@@ -107,7 +107,7 @@ func (v PermissionKey) IsValid(fieldName string, ctx *domain.NotificationContext
 	// match no route ever while the catalog row reads like a sweeping grant.
 	// It is reported against the action, which is the half that has to change.
 	if v.Resource == PermissionWildcard && v.Action != PermissionWildcard {
-		ctx.AddNotification("Action", UnmatchablePermissionKeyNotification{}, v.String())
+		ctx.AddNotificationNamed("Action", UnmatchablePermissionKeyNotification{}, v.String())
 		return false
 	}
 	return true
@@ -120,21 +120,21 @@ func (v PermissionKey) IsValid(fieldName string, ctx *domain.NotificationContext
 // path.
 func (v PermissionKey) validateResource(ctx *domain.NotificationContext) bool {
 	if v.Resource == "" {
-		ctx.AddNotification("Resource", domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed("Resource", domain.RequiredFieldNotification{})
 		return false
 	}
 	if v.Resource == PermissionWildcard {
 		return true
 	}
 	if runeLen(v.Resource) > permissionPartMaxRunes {
-		ctx.AddNotification("Resource", InvalidResourceNameNotification{}, v.Resource)
+		ctx.AddNotificationNamed("Resource", InvalidResourceNameNotification{}, v.Resource)
 		return false
 	}
 	// Split rather than a single pattern: an empty segment (a leading,
 	// trailing or doubled colon) then fails the segment rule by itself.
 	for _, segment := range strings.Split(v.Resource, permissionKeySeparator) {
 		if !isPermissionSegment(segment) {
-			ctx.AddNotification("Resource", InvalidResourceNameNotification{}, v.Resource)
+			ctx.AddNotificationNamed("Resource", InvalidResourceNameNotification{}, v.Resource)
 			return false
 		}
 	}
@@ -145,14 +145,14 @@ func (v PermissionKey) validateResource(ctx *domain.NotificationContext) bool {
 // no-colon rule is what keeps the rendering unambiguous — see String().
 func (v PermissionKey) validateAction(ctx *domain.NotificationContext) bool {
 	if v.Action == "" {
-		ctx.AddNotification("Action", domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed("Action", domain.RequiredFieldNotification{})
 		return false
 	}
 	if v.Action == PermissionWildcard {
 		return true
 	}
 	if !isPermissionSegment(v.Action) {
-		ctx.AddNotification("Action", InvalidActionNameNotification{}, v.Action)
+		ctx.AddNotificationNamed("Action", InvalidActionNameNotification{}, v.Action)
 		return false
 	}
 	return true

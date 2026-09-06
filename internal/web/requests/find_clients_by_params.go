@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:e84f0c5aeb867639366e2431393d901dd84139572a7915aaf64a3791692cccff
+// generated:  2026-09-06
+// checksum:   sha256:487653374e72f51f057bd49da902b148dc8edca2b21453e500d702532678d5d9
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,15 +46,15 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindClientsRequest struct {
-	TenantID        *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc"`
-	Name            *string    `query:"name" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	Description     *string    `query:"description" filter:"contains,icontains"`
-	Status          *string    `query:"status" filter:"eq,in" sort:"asc,desc"`
-	SecretChangedAt *time.Time `query:"secretChangedAt" filter:"gte,lte" sort:"asc,desc"`
-	TenantWorkspace *string    `query:"tenantWorkspace" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc"`
-	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc"`
-	ID              *string    `query:"id" filter:"eq,in" sort:"asc,desc"`
+	TenantID        *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc" description:"The tenant this client belongs to. Immutable — a client never moves between tenants."`
+	Name            *string    `query:"name" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The human label this integration is found by. Unique within the tenant over active rows."`
+	Description     *string    `query:"description" filter:"contains,icontains" description:"What this integration is for, in the tenant's own words."`
+	Status          *string    `query:"status" filter:"eq,in" sort:"asc,desc" description:"The account's state — active or suspended. Orthogonal to archiving."`
+	SecretChangedAt *time.Time `query:"secretChangedAt" filter:"gte,lte" sort:"asc,desc" description:"When the credential was last minted."`
+	TenantWorkspace *string    `query:"tenantWorkspace" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The owning tenant's immutable handle. Read-only, filled on every load."`
+	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was inserted."`
+	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was last written."`
+	ID              *string    `query:"id" filter:"eq,in" sort:"asc,desc" description:"The row's identity, minted by the framework."`
 	First           *int64     `query:"first"`
 	Last            *int64     `query:"last"`
 	After           *string    `query:"after"`

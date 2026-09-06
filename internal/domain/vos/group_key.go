@@ -61,7 +61,7 @@ func (v GroupKey) Value() string { return string(v) }
 func (v GroupKey) IsValid(fieldName string, ctx *domain.NotificationContext) bool {
 	s := string(v)
 	if s == "" {
-		ctx.AddNotification(fieldName, domain.RequiredFieldNotification{})
+		ctx.AddNotificationNamed(fieldName, domain.RequiredFieldNotification{})
 		return false
 	}
 
@@ -73,7 +73,7 @@ func (v GroupKey) IsValid(fieldName string, ctx *domain.NotificationContext) boo
 		!hasRunOfIdenticalRunes(s, groupKeyMaxIdenticalRun)
 
 	if !wellFormed {
-		ctx.AddNotification(fieldName, InvalidGroupKeyNotification{}, s)
+		ctx.AddNotificationNamed(fieldName, InvalidGroupKeyNotification{}, s)
 		return false
 	}
 

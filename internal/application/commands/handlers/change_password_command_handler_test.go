@@ -289,8 +289,8 @@ func TestASuperAdminCrossesTheRowScope(t *testing.T) {
 // Asserting on the TYPE and not on the field is what tells a failing test which
 // rule actually refused: "an error came back" is satisfied by every rule in the
 // aggregate, and several of them blame the same field. The field itself travels
-// in Path rather than in FieldName for a rule that names it positionally, which
-// is what these rules do.
+// in Path rather than in Override for a rule that names it by field reference,
+// which is what these rules do.
 func credentialRefusals(err error) []string {
 	var carrier domain.NotificationCarrier
 	if !errors.As(err, &carrier) {

@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a85e5581675347b18f0399452e2d4be894c933b9d34c4efc029a3aec5853ce66
+// generated:  2026-09-06
+// checksum:   sha256:7c7093b61ba732c094ee55e9dca2a7bf77162d24880f0c447def78a5c1038905
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -172,7 +172,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.ClientRole](e.GetAggregateRoot())
 			if len(items) > 50 {
-				r.AddNotification("Roles", TooManyRolesForClientNotification{Max: "50"}, len(items))
+				r.AddNotificationNamed("Roles", TooManyRolesForClientNotification{Max: "50"}, len(items))
 			}
 		}
 		// at most 20 allowed ranges on one client, counted over the whole
@@ -180,7 +180,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](e.GetAggregateRoot())
 			if len(items) > 20 {
-				r.AddNotification("AllowedCIDRs", TooManyAllowedCIDRsForClientNotification{Max: "20"}, len(items))
+				r.AddNotificationNamed("AllowedCIDRs", TooManyAllowedCIDRsForClientNotification{Max: "20"}, len(items))
 			}
 		}
 		// at most 20 claim values on one client, counted over the whole
@@ -188,7 +188,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot())
 			if len(items) > 20 {
-				r.AddNotification("Claims", TooManyClaimsForClientNotification{Max: "20"}, len(items))
+				r.AddNotificationNamed("Claims", TooManyClaimsForClientNotification{Max: "20"}, len(items))
 			}
 		}
 		// The database unique index is the backstop for the race between this
@@ -202,7 +202,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 				selfID = *id
 			}
 			if service.(ClientService).NameTaken(e.TenantID, e.Name.Value(), selfID) {
-				r.AddNotification("Name", ClientNameAlreadyExistsNotification{}, e.Name)
+				r.AddNotification(&e.Name, ClientNameAlreadyExistsNotification{}, true)
 			}
 		}
 	})
@@ -210,7 +210,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 	r.IfUpdate(func() {
 		if old := domain.Old(e); old != nil {
 			if old.TenantID != e.TenantID {
-				r.AddNotification("TenantID", ClientTenantIsImmutableNotification{}, e.TenantID)
+				r.AddNotification(&e.TenantID, ClientTenantIsImmutableNotification{}, true)
 			}
 		}
 		// The two states move into each other and nowhere else; staying put is
@@ -231,7 +231,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 					}
 				}
 				if !ok {
-					r.AddNotification("Status", InvalidClientStatusTransitionNotification{}, e.Status)
+					r.AddNotification(&e.Status, InvalidClientStatusTransitionNotification{}, true)
 				}
 			}
 		}
@@ -278,7 +278,7 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 // who has to be able to repair a row that is not theirs.
 func (e *Client) refuseForeignTenant(r *domain.Rules) {
 	if e.RequestingIdentityPresent && !e.RequestingMayCrossScope && e.TenantID.Value() != e.RequestingTenant {
-		r.AddNotification("TenantID", notifications.TenantMismatchNotification{})
+		r.AddNotification(&e.TenantID, notifications.TenantMismatchNotification{}, false)
 	}
 }
 
@@ -293,7 +293,7 @@ func (e *Client) AddClientRole(item aggregatevos.ClientRole) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.ClientRole](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("Roles", ClientAlreadyGrantsRoleNotification{}, item.RoleID)
+			e.AddNotificationNamed("Roles", ClientAlreadyGrantsRoleNotification{}, item.RoleID)
 			return
 		}
 	}
@@ -303,7 +303,8 @@ func (e *Client) AddClientRole(item aggregatevos.ClientRole) {
 // RemoveClientRoleByID takes ONE entry out of the collection.
 //
 // Same not-found posture as the change: the caller named an entry, so a
-// missing one is an answer rather than a no-op.
+// missing one is an answer rather than a no-op — and addressed to the
+// collection's plural for the same reason.
 func (e *Client) RemoveClientRoleByID(id string) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientRole](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -311,7 +312,7 @@ func (e *Client) RemoveClientRoleByID(id string) {
 			return
 		}
 	}
-	e.AddNotification("ClientRole", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("Roles", domain.RecordNotFoundNotification{}, id)
 }
 
 // AddClientAllowedCIDR adds one entry to the allowedCIDRs collection.
@@ -325,7 +326,7 @@ func (e *Client) AddClientAllowedCIDR(item aggregatevos.ClientAllowedCIDR) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("AllowedCIDRs", ClientAlreadyAllowsCIDRNotification{}, item.CIDR.Value())
+			e.AddNotificationNamed("AllowedCIDRs", ClientAlreadyAllowsCIDRNotification{}, item.CIDR.Value())
 			return
 		}
 	}
@@ -335,7 +336,8 @@ func (e *Client) AddClientAllowedCIDR(item aggregatevos.ClientAllowedCIDR) {
 // RemoveClientAllowedCIDRByID takes ONE entry out of the collection.
 //
 // Same not-found posture as the change: the caller named an entry, so a
-// missing one is an answer rather than a no-op.
+// missing one is an answer rather than a no-op — and addressed to the
+// collection's plural for the same reason.
 func (e *Client) RemoveClientAllowedCIDRByID(id string) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientAllowedCIDR](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -343,7 +345,7 @@ func (e *Client) RemoveClientAllowedCIDRByID(id string) {
 			return
 		}
 	}
-	e.AddNotification("ClientAllowedCIDR", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("AllowedCIDRs", domain.RecordNotFoundNotification{}, id)
 }
 
 // AddClientClaim adds one entry to the claims collection.
@@ -357,7 +359,7 @@ func (e *Client) AddClientClaim(item aggregatevos.ClientClaim) {
 	// the collision is an answer, not a silent merge.
 	for _, existing := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
 		if existing.IsSameBusinessIdentity(item) {
-			e.AddNotification("Claims", ClientAlreadyHoldsClaimNotification{}, item.ClaimID)
+			e.AddNotificationNamed("Claims", ClientAlreadyHoldsClaimNotification{}, item.ClaimID)
 			return
 		}
 	}
@@ -372,6 +374,12 @@ func (e *Client) AddClientClaim(item aggregatevos.ClientClaim) {
 //
 // An id that is not in the collection is NOT silently ignored — it answers
 // not-found, because the caller addressed a specific entry.
+//
+// It is addressed to the COLLECTION, like every other refusal about this
+// collection: the plural is the one name the framework uses for it — the
+// document segment, the read DTO's field and the notification path — and
+// naming the entry's type here instead would answer one caller with two
+// different tokens for one collection.
 func (e *Client) ChangeClientClaimByID(id string, replacement aggregatevos.ClientClaim) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -380,13 +388,14 @@ func (e *Client) ChangeClientClaimByID(id string, replacement aggregatevos.Clien
 			return
 		}
 	}
-	e.AddNotification("ClientClaim", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("Claims", domain.RecordNotFoundNotification{}, id)
 }
 
 // RemoveClientClaimByID takes ONE entry out of the collection.
 //
 // Same not-found posture as the change: the caller named an entry, so a
-// missing one is an answer rather than a no-op.
+// missing one is an answer rather than a no-op — and addressed to the
+// collection's plural for the same reason.
 func (e *Client) RemoveClientClaimByID(id string) {
 	for _, current := range domain.GetCurrentItemsOf[aggregatevos.ClientClaim](e.GetAggregateRoot()) {
 		if current.GetID().Value() == id {
@@ -394,5 +403,5 @@ func (e *Client) RemoveClientClaimByID(id string) {
 			return
 		}
 	}
-	e.AddNotification("ClientClaim", domain.RecordNotFoundNotification{}, id)
+	e.AddNotificationNamed("Claims", domain.RecordNotFoundNotification{}, id)
 }

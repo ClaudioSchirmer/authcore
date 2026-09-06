@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:01eaa07511f092fee9bb22887165f72a8e34275f8a857f16407eef0029eff8e1
+// generated:  2026-09-06
+// checksum:   sha256:bec3aaf613727e3222de84a4d67818c901537c5d5e84cff02a8de2126b94b499
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -74,6 +74,6 @@ func (c UserGroup) IsSameBusinessIdentity(other domain.AggregateValueObject) boo
 //
 // It runs scoped to this entry, so a notification it raises reaches the caller
 // addressed to the exact position in the collection rather than to the root.
-func (c UserGroup) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
+func (c *UserGroup) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
 	// No rule beyond what the value objects validate on their own.
 }

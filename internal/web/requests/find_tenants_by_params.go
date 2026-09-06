@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e8d5552d525013a8527694bc121eaa6f34ddb3deff0e51540865ad23afaddd1e
+// generated:  2026-09-06
+// checksum:   sha256:67e3dcc6e1d12d37e3ab249394ec366a6cfcfe546aae4c09416878f612cf867e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -45,12 +45,12 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindTenantsRequest struct {
-	Name            *string    `query:"name" filter:"eq,in,startswith,contains,istartswith,icontains" sort:"asc,desc"`
-	Workspace       *string    `query:"workspace" filter:"eq,in,startswith,istartswith" sort:"asc,desc"`
-	Description     *string    `query:"description" filter:"contains,icontains"`
-	Status          *string    `query:"status" filter:"eq,in"`
-	CreatedAt       *time.Time `query:"createdAt" filter:"eq,gte,lte,gt,lt" sort:"asc,desc"`
-	UpdatedAt       *time.Time `query:"updatedAt" filter:"eq,gte,lte,gt,lt"`
+	Name            *string    `query:"name" filter:"eq,in,startswith,contains,istartswith,icontains" sort:"asc,desc" description:"Human-readable display name of the tenant organization, as operators and end users see it. Not unique — two genuinely different customers may share a name."`
+	Workspace       *string    `query:"workspace" filter:"eq,in,startswith,istartswith" sort:"asc,desc" description:"Immutable handle of the tenant; reaches URLs, logs and external configuration, and is what URLs, logs and external configuration carry. Never reused, archived rows included."`
+	Description     *string    `query:"description" filter:"contains,icontains" description:"What this tenant is, in the platform operators' own words."`
+	Status          *string    `query:"status" filter:"eq,in" description:"Commercial lifecycle of the tenant. Orthogonal to archiving — a suspended tenant is still listed and still authenticates for billing."`
+	CreatedAt       *time.Time `query:"createdAt" filter:"eq,gte,lte,gt,lt" sort:"asc,desc" description:"Stamped by the framework: when the row was inserted."`
+	UpdatedAt       *time.Time `query:"updatedAt" filter:"eq,gte,lte,gt,lt" description:"Stamped by the framework: when the row was last written."`
 	First           *int64     `query:"first"`
 	Last            *int64     `query:"last"`
 	After           *string    `query:"after"`
