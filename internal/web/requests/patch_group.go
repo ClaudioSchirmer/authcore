@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:3d8823fd377722e5df1f5c1d2bc909892dd5d63c9ad00a786e146cfaca4e8291
+// generated:  2026-09-06
+// checksum:   sha256:8a1544fb387c839d72747ae60c47500f08fd8c40d7f0c8885faea562a1be7795
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -42,7 +42,6 @@ import (
 type PatchGroupRequest struct {
 	fwrequests.Auto
 
-	Key         *string `json:"key,omitempty" example:"engineering"`
 	Name        *string `json:"name,omitempty" example:"Engineering"`
 	Description *string `json:"description,omitempty" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
 }

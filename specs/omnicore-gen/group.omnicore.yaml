@@ -516,6 +516,23 @@ modes: [display, insert, update, archive]
 
 update:
   shape: patch
+  # STRUCTURAL immutability, the belt-and-braces Tenant puts on its workspace handle and
+  # Permission on its pair: the key is not a member of the partial body at all, so there is
+  # no value to accept, no value to write onto the entity, and nothing in the OpenAPI
+  # request schema claiming the caller may edit it.
+  #
+  # Closes the asymmetry ACCESS_MATRIX.md recorded here on 2026-08-28 and left open: the
+  # PATCH contract advertised one field the domain then always refused, so every caller who
+  # read the schema and sent it earned a 422 for using the API as documented. The 2026-08-28
+  # pass made `tenantID` server-assigned and deliberately left `key` alone as a separate
+  # decision; this is that decision, taken 2026-09-06.
+  #
+  # Rule `key-immutable` below STAYS. It is now a backstop on a path a request cannot reach
+  # rather than a refusal callers meet — the same standing WorkspaceIsImmutable has on
+  # Tenant — and it is what still answers if the field ever rejoins the body.
+  #
+  # The identical decision remains OPEN on Role (`role_key`), untouched by this pass.
+  patchExcludes: [Key]
 
 delete:
   root: soft

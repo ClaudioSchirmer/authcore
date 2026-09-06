@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:5cbbe6342ad7260f8180dfa26f711c625b4c2a74596971cd52d490cd06c9e3cc
+// generated:  2026-09-06
+// checksum:   sha256:f2b8d28fb12b87ac448eba50e024d8add92b22898fc74f9a9fabefaac01011a5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,6 @@ import (
 // value.
 type PatchGroupCommand struct {
 	pipeline.CommandWithBodyIDBase
-	Key         *string
 	Name        *string
 	Description *string
 }
@@ -57,9 +56,6 @@ type PatchGroupCommand struct {
 // Note the consequence: this verb can never set a value back to null, because
 // an absent field and an explicit null are indistinguishable here.
 func (c *PatchGroupCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *appdomain.Group) error {
-	if c.Key != nil {
-		e.Key = vos.GroupKey(*c.Key)
-	}
 	if c.Name != nil {
 		e.Name = vos.DisplayName(*c.Name)
 	}
