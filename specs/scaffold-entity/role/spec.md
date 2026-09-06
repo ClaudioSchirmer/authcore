@@ -252,12 +252,13 @@ the id plus the pair plus the counterpart's archive stamp, fetched across the FK
 time. Four consequences:
 
 - **The read returns the permission itself, not just a UUID.** `GET /roles/:id` answers
-  `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…", "resource": "tenant",
-  "action": "read", "archivedAt": null }]`. A client renders `tenant:read` by joining the
-  two halves it was handed, with no second call to `GET /permissions` — and a non-null
-  `archivedAt` is how the same answer says *this grant points at a permission that has
-  been retired*, which is the one thing an access review most needs to see and the one
-  thing a stored id alone could never tell it.
+  `"permissions": [{ "id": "…", "permissionID": "9f14b0a2-…", "permission": "tenant:read" }]`.
+  A client renders `tenant:read` from one token, with no second call to `GET /permissions`
+  and no concatenation of its own. *(Corrected 2026-09-03: this bullet showed `resource`,
+  `action` and `archivedAt` as wire fields. Both later amendments in this same list overrule
+  it — `resource` and `action` are `hidden` and reach no response body, and `ArchivedAt` was
+  removed from the child entirely. The example above is now what the service actually
+  answers, verified against `internal/web/requests/dtos/role_permission.go`.)*
 - **Nothing about the write side moves.** A join field is not part of the `TableSchema`,
   so it never enters an INSERT or an UPDATE (`read-joins.html`, "What a read join is
   not"). The grant is still one column, and the invariant §A protects — a retired
@@ -316,8 +317,11 @@ Four properties that are the framework's, not this model's, and that every layer
    it safe.
 2. **Load-only: not filterable, not sortable.** A child join field is served on every loaded
    entry and is **not** addressable in a criteria — the same 1:N boundary every child field
-   already has. `?filter[permissions.resource][eq]=tenant` is a typed 400. See §9 for what
-   that costs.
+   already has. `?permissions.resource.eq=tenant` is a typed 400
+   (`SchemaViolationNotification`). See §9 for what that costs. *(Syntax corrected
+   2026-09-03: the framework parses `?<field>.<op>=<value>`; the bracket form
+   `?filter[field][op]=` appears in no section of the pin's docs and never existed — the same
+   correction `../permission/spec.md` took at its own QA gate.)*
 3. **Not gated on the catalog's archived state — and it reports that state instead of
    hiding it.** An archived permission keeps supplying its `resource` and `action`, and the
    inner join keeps matching it. That is the wanted behaviour here: a grant pointing at a
@@ -337,18 +341,25 @@ Four properties that are the framework's, not this model's, and that every layer
    reads `nil`, which is indistinguishable from "the target is live". §7 depends on this and
    states it again where it bites.
 
-**No traversal to `Tenant` is declared, and the reason is a trap worth naming.** A join's
-predicate is always `fk = target.id`. `roles.tenant_id` does not point at `tenants.id` — it
-pointed at `tenants.tenant_id`, a derived key that no longer exists (§1) — **a traversal
-into Tenant IS expressible now**, and §7 R4 notes what it would and would not answer. The
-paragraph below is kept as the record of why it was refused while that key existed. A
-declaration reaching Tenant
-would therefore be *accepted* (the column is an id) and would render
-`roles.tenant_id = tenants.id`, which matches nothing: a `left` join would fill every field
-with NULL and an `inner` one would drop every role from every read, `FindByID` included.
-**Do not declare it.** The tenant's `workspace` and `name` are not reachable from this
-aggregate, and the honest fix, if they are ever wanted on a role listing, is a second
-foreign key onto `tenants.id` — never a join over the existing one.
+**The traversal to `Tenant` IS declared** — `inner`, on `tenant_id`, carrying
+`TenantWorkspace` and `TenantStatus` (the two rows §2's table adds above). *(This heading
+said "No traversal to `Tenant` is declared" until 2026-09-03; it was already contradicted by
+§2's own field table, added 2026-08-24. The correction is recorded rather than made silently,
+because the paragraph below is the reason it was refused for months and that reason is worth
+keeping.)*
+
+A join's predicate is always `fk = target.id`. **While the derived key existed**,
+`roles.tenant_id` pointed at `tenants.tenant_id` and not at `tenants.id`, so a declaration
+reaching Tenant would have been *accepted* (the column is an id) and would have rendered
+`roles.tenant_id = tenants.id`, which matched nothing: a `left` join would have filled every
+field with NULL and an `inner` one would have dropped every role from every read,
+`FindByID` included. That was the trap, and "do not declare it" was the right instruction for
+as long as it held.
+
+**It stopped holding when the derived key was removed** (§1, 2026-08-24). The foreign key
+now targets `tenants.id`, the predicate matches, and `inner` is correct because `tenant_id`
+is `NOT NULL` and FK-backed. The second foreign key this paragraph once proposed as "the
+honest fix" is therefore unnecessary and was never added.
 
 Notes on the decisions embedded above:
 
@@ -732,9 +743,15 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
   not because the view asked for it. One consequence worth stating: the view is not the source of truth for the
   reads — the loader is — so a service reading through `repo.Loader` sees exactly what the
   endpoint sees.
-- **`?fields=` reaches the joined values under `permissions.resource`,
-  `permissions.action` and `permissions.archivedAt`** — a child join's fields are addressed
-  as `<segment>.<field>`, the same shape as any leaf inside a collection. A path this read model does not have is a
+- **`?fields=` reaches the collection under `permissions.permissionID` and
+  `permissions.permission`** — an entry's fields are addressed as `<segment>.<field>`, the
+  same shape as any leaf inside a collection, and those two are what the entry SERVES.
+  `permissions.resource` and `permissions.action` are **not** selectable: they are `hidden`,
+  so they feed the derivation and are not Response fields, exactly as `resource`/`action` are
+  on `Permission`'s own endpoint. Asking for one is a 400 like any unknown path.
+  *(Corrected 2026-09-03: this bullet named `permissions.resource`, `permissions.action` and
+  `permissions.archivedAt`. The first two became `hidden` on 2026-08-24 and the third was
+  removed from the child on the same day — the list was never updated.)* A path this read model does not have is a
   **400** (`SchemaViolationNotification`, `SemanticSchema`) naming the offending Go path —
   never a silent `200 {}`. Note the cost profile: this backing composes the aggregate as
   declared and prunes afterwards, so a narrow `?fields=` shapes the answer without buying
@@ -748,9 +765,14 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
   it is not discovered during an access review.
 - **The one real cost, stated up front:** a caller **cannot filter or sort by a granted
   permission**. The read join renders it, it does not make it addressable —
-  `?filter[permissions.resource][eq]=tenant` and `?orderBy=permissions.action` are both a
-  typed 400 (`UnsupportedCapabilityNotification`). This is the 1:N boundary, not the
-  backing: a filter on a child field is a pushdown a single root `SELECT` cannot express.
+  `?permissions.resource.eq=tenant` and `?orderBy=permissions.action` are both a typed
+  **400 `SchemaViolationNotification`**. This is the 1:N boundary, not the backing: a filter
+  on a child field is a pushdown a single root `SELECT` cannot express. *(Corrected
+  2026-09-03 on both halves. The syntax was the bracket form, which never existed. And the
+  key was `UnsupportedCapabilityNotification`, which is what a DECLARED capability raises
+  when the engine cannot serve it — the listing DTO declares nothing under `permissions.*`,
+  so the schema gate answers first and no engine is ever consulted. The distinction matters:
+  a suite asserting the wrong key would go red against a correct service.)*
   **"Which roles grant `tenant:read`?" is still not answerable from this listing** — what
   changed is that once you have the roles, you can see what each one grants without a second
   call. The reverse question becomes answerable the day the service gains Mongo
@@ -764,6 +786,27 @@ and R2, and `Permissions` moves through the §3 child ops rather than through th
 | `key` | `eq,ne,in,startswith,istartswith,contains,icontains` | `asc,desc` |
 | `name` | `eq,in,startswith,istartswith,contains,icontains` | `asc,desc` |
 | `description` | `contains,icontains` | — |
+| `tenantWorkspace` | `eq,in,startswith,istartswith,contains,icontains` | `asc,desc` |
+| `tenantStatus` | `eq,in` | `asc,desc` |
+| `createdAt` / `updatedAt` | `gte,lte` | `asc,desc` |
+
+*(The last three rows added 2026-09-03, at the `role-contract` QA gate. §2 has said since
+2026-08-24 that the OWNER's two join fields are "filterable and sortable" — the property a
+ROOT join has and a child's does not (`read-joins.html`: a join field is *"an ordinary field
+of the loaded entity, filterable, sortable, projectable and exportable"*) — but this table
+and `read.byParams` of the yaml never declared them, so `?tenantWorkspace.eq=acme` was a
+typed 400 and the promise in §2 was prose alone. The maintainer's call at the gate was to
+CLOSE the gap rather than record it: the two fields were added to `read.byParams.filters`
+and to `sort`, the entity regenerated, and the QA round asserts them. `tenantWorkspace`
+takes `key`'s operator family — both are lowercase slug handles a caller types — and
+`tenantStatus` takes `eq,in` alone, because `contains` over a closed set of three words
+reads as text search and answers as noise. The temporal pair was always declared in the yaml
+and simply missing from this table.)*
+
+**The complement stays true and is the point of the contrast:** the CHILD's join fields
+(`Resource`, `Action`) remain load-only and are addressable in no criteria. Filtering a root
+by a field of a 1:N child is a pushdown one root `SELECT` cannot express, which is the 1:N
+boundary and not the backing.
 
 ## 10. Authorization                          [required]
 

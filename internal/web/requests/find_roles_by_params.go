@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:478136948a2186d8ff7dcf502f9dcd54e4c99043015d80ea1201e596937d8f2d
+// generated:  2026-09-03
+// checksum:   sha256:268e7923d9c096c61dd2322de94bf9dc678d68eb8ba309a6060a57f6dfe4d970
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -45,12 +45,14 @@ import (
 // optional query parameter mandatory and Swagger would refuse the call without
 // it.
 type FindRolesRequest struct {
-	TenantID        *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc"`
-	Key             *string    `query:"key" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	Name            *string    `query:"name" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc"`
-	Description     *string    `query:"description" filter:"contains,icontains"`
-	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc"`
-	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc"`
+	TenantID        *domain.ID `query:"tenantID" filter:"eq,in" sort:"asc,desc" description:"The tenant that owns this role. Immutable after creation — a role never moves between tenants."`
+	Key             *string    `query:"key" filter:"eq,ne,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"Stable machine handle of the role, unique within its tenant and immutable. What an API caller and an audit line reference; never the display name."`
+	Name            *string    `query:"name" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"Human-readable name of the role as operators and end users see it. Not unique — two tenants, or two roles, may share a label."`
+	Description     *string    `query:"description" filter:"contains,icontains" description:"What holding this role actually lets a user do, in the tenant's own words."`
+	TenantWorkspace *string    `query:"tenantWorkspace" filter:"eq,in,startswith,istartswith,contains,icontains" sort:"asc,desc" description:"The owning tenant's immutable handle — what URLs, logs and support conversations say. Read-only, filled on every load, never written through this aggregate."`
+	TenantStatus    *string    `query:"tenantStatus" filter:"eq,in" sort:"asc,desc" description:"The owning tenant's commercial lifecycle — trial, active or suspended. Read-only, filled on every load, never written through this aggregate."`
+	CreatedAt       *time.Time `query:"createdAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was inserted."`
+	UpdatedAt       *time.Time `query:"updatedAt" filter:"gte,lte" sort:"asc,desc" description:"Stamped by the framework: when the row was last written."`
 	First           *int64     `query:"first"`
 	Last            *int64     `query:"last"`
 	After           *string    `query:"after"`

@@ -1839,8 +1839,8 @@
     },
     "Role": {
       "spec": "specs/omnicore-gen/role.omnicore.yaml",
-      "specHash": "5084e00f0fb4c4dc84d7e46a8c6478a51911e2339e1cb7e8c59d2f3ac8b36009",
-      "framework": "v0.69.0",
+      "specHash": "0570ea8202c41c33c441e6f681725d21eb889b080df98a159c1a041a74d6c9a2",
+      "framework": "v0.72.1",
       "files": {
         "bootstrap/role_feature.go": {
           "class": "owned",
@@ -2020,7 +2020,7 @@
         },
         "internal/web/requests/find_roles_by_params.go": {
           "class": "owned",
-          "hash": "3db2958abfbabde220c8a64bfe4c1fcb282a5d14266852081ee377266bae318a"
+          "hash": "870ee6f7062835b9baafe9e410b1f7150e84920c329ff35f35672d6d20044d50"
         },
         "internal/web/requests/find_roles_by_params_test.go": {
           "class": "owned",

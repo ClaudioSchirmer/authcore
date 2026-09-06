@@ -270,6 +270,146 @@ create_permission() {
   j '.data.id // empty'
 }
 
+# ── Role fixtures ──────────────────────────────────────────────────────────
+# vos.RoleKey is the same shape as a permission SEGMENT — 2-64 runes matching
+# ^[a-z0-9]+(-[a-z0-9]+)*$, at least two distinct runes, and no run of four
+# identical ones — so the run tag goes through the same _slug that the permission
+# fixtures use. A PID like 11115 carries a 4-run and would 422 every insert,
+# taking the lane RED for a fixture reason rather than a service one.
+RK_SEQ=0
+rk() { RK_SEQ=$((RK_SEQ+1)); printf 'qa-%s-%s-%s' "$(_slug "$LANE_NAME")" "$(_slug "${QA_RUN_TAG:-$$}")" "$RK_SEQ"; }
+
+# role_body KEY [name] [description] [tenantID|OMIT] [permission-ids as a JSON array]
+#
+# tenantID defaults to the sentinel OMIT, which leaves the key OUT of the body
+# entirely — that is the ordinary shape, because the field is assignedFrom the
+# identity claim and absent means "mine". Passing "" is a CASE of its own (the
+# guard barrier), so the sentinel is what keeps "omitted" and "explicitly empty"
+# apart. ${4-OMIT} and never ${4:-OMIT}, the same distinction the tenant round's
+# D6 and the permission round's D1 both earned.
+role_body() {
+  jq -nc --arg k "${1-billing-manager}" \
+         --arg n "${2-Billing Manager}" \
+         --arg d "${3-Grants read access to the tenant registry and the permission catalog, without any write verb.}" \
+         --arg t "${4-OMIT}" \
+         --argjson p "${5-[]}" \
+    '{key:$k, name:$n, description:$d, permissions: ($p | map({permissionID: .}))}
+     + (if $t == "OMIT" then {} else {tenantID:$t} end)'
+}
+
+# permission_id_of RESOURCE ACTION → echoes the catalog id of that pair.
+#
+# The suite never hardcodes a catalog id twice: migration 0012 fixes them as
+# literals, and a case that needs one ADDRESSES it by the pair the same migration
+# declares. An id is an address, never an expectation — no assertion is derived
+# from what this returns.
+permission_id_of() {
+  req GET "/permissions?resource.eq=$1&action.eq=$2&first=1"
+  j '.data[0].id // empty'
+}
+
+# create_role KEY [tenantID|OMIT] [permission-ids as a JSON array] → echoes the id.
+#
+# SAME SUBSHELL TRAP as create_permission: called in a command substitution this
+# runs in a subshell, so RESP_CODE and RESP_BODY do NOT survive. A case whose
+# assertion IS the status must call req POST itself.
+create_role() {
+  req POST /roles "$(role_body "$1" "Qa Role Fixture" \
+      'A role the suite created so one rule can be exercised and nothing else.' \
+      "${2-OMIT}" "${3-[]}")"
+  j '.data.id // empty'
+}
+
+# ---------------------------------------------------------------------------
+# provision_scoped_principal LABEL PERMISSION-LITERAL...
+#
+# The fixture §1b and §3 of specs/qa/role-contract/plan.md are built on: a caller
+# who is authenticated, is NOT a super-admin, is bound to a tenant of the suite's
+# own making, and holds exactly the bundle a case needs.
+#
+# Four calls through the service's OWN documented flow. Nothing is invented, no
+# token is forged, no credential of the maintainer's is used:
+#   1. POST /tenants          — the principal needs somewhere to be
+#   2. POST /roles            — the bundle, granted by the *:* admin, who bypasses
+#                               the no-escalation rule by construction
+#   3. POST /users            — the account holding that role
+#   4. sign in, ROTATE, sign in again
+#
+# STEP 4 IS NOT OPTIONAL. user_rules_manual.go:125 sets MustChangePassword = true
+# on every API-created user, so the FIRST token is restricted to
+# `user:change-password` alone. A suite that skipped the rotation would be testing
+# the restricted session and reading its 403s as the role gate — a lane that goes
+# green for a reason that has nothing to do with what it claims to prove.
+#
+# NOT command-substituted: it SETS globals, because a subshell would lose them.
+# Answers 0 on success and leaves SP_TOKEN empty on failure, so a caller can skip
+# loudly instead of asserting against nothing.
+# ---------------------------------------------------------------------------
+SP_TOKEN=''; SP_TENANT_ID=''; SP_ROLE_ID=''; SP_USER_ID=''; SP_EMAIL=''; SP_FAILED=''
+SP_PASSWORD='Zx7#Kq2m!Wt9v'
+
+provision_scoped_principal() {
+  local label="$1"; shift
+  local admin="$TOKEN" tag="${QA_RUN_TAG:-$$}"
+  SP_TOKEN=''; SP_TENANT_ID=''; SP_ROLE_ID=''; SP_USER_ID=''; SP_EMAIL=''; SP_FAILED=''
+
+  _sp_abort() { SP_FAILED="$1 (HTTP $RESP_CODE) $(printf '%s' "$RESP_BODY" | head -c 400)"; TOKEN="$admin"; return 1; }
+
+  TOKEN="$admin"
+
+  # 1. the tenant
+  req POST /tenants "$(tenant_body "Qa Scope $(_slug "$label")" "$(_slug "qa-${label}-${tag}")" \
+      'A tenant the suite owns, so a scoped principal has a partition of its own to be isolated in.' 'active')"
+  [ "$RESP_CODE" = "201" ] || { _sp_abort "could not create the scoped tenant"; return 1; }
+  SP_TENANT_ID="$(j '.data.id')"
+
+  # 2. the bundle — every literal resolved to its catalog id by its own pair
+  local ids='[]' lit res act pid
+  for lit in "$@"; do
+    res="${lit%%:*}"; act="${lit##*:}"
+    pid="$(permission_id_of "$res" "$act")"
+    [ -n "$pid" ] || { SP_FAILED="no catalog row for ${lit}"; TOKEN="$admin"; return 1; }
+    ids="$(printf '%s' "$ids" | jq -c --arg p "$pid" '. + [$p]')"
+  done
+
+  req POST /roles "$(role_body "$(_slug "qa-${label}-r-${tag}")" "Qa Scoped $(_slug "$label")" \
+      'The bundle a scoped principal holds while the suite proves what it may and may not do.' \
+      "$SP_TENANT_ID" "$ids")"
+  [ "$RESP_CODE" = "201" ] || { _sp_abort "could not create the scoped role"; return 1; }
+  SP_ROLE_ID="$(j '.data.id')"
+
+  # 3. the account. The password must echo neither the name nor the e-mail —
+  # PasswordEchoesIdentityNotification is a User rule this fixture is not here to
+  # test, so it simply satisfies it.
+  SP_EMAIL="qa-$(_slug "$label")-${tag}@authcore.local"
+  req POST /users "$(jq -nc --arg gn 'Qa' --arg fn 'Scoped' --arg e "$SP_EMAIL" \
+      --arg p "$SP_PASSWORD" --arg t "$SP_TENANT_ID" --arg r "$SP_ROLE_ID" \
+      '{givenName:$gn, familyName:$fn, email:$e, status:"active", password:$p,
+        passwordConfirmation:$p, tenantID:$t, groups:[], roles:[{roleID:$r}], claims:[]}')"
+  [ "$RESP_CODE" = "201" ] || { _sp_abort "could not create the scoped user"; return 1; }
+  SP_USER_ID="$(j '.data.id')"
+
+  # 4. sign in, rotate, sign in again
+  sign_in "$SP_EMAIL" "$SP_PASSWORD"
+  [ "$RESP_CODE" = "200" ] || { _sp_abort "the scoped principal could not sign in"; return 1; }
+  local first_token; first_token="$(j '.data.accessToken')"
+  if [ "$(j '.data.user.mustChangePassword')" = "true" ]; then
+    local rotated="${SP_PASSWORD}-2"
+    req_astoken "$first_token" PATCH "/users/${SP_USER_ID}/password" \
+      "$(jq -nc --arg c "$SP_PASSWORD" --arg p "$rotated" \
+         '{currentPassword:$c, password:$p, passwordConfirmation:$p}')"
+    case "$RESP_CODE" in 200|204) SP_PASSWORD="$rotated" ;;
+      *) _sp_abort "the scoped principal's password rotation failed"; return 1 ;;
+    esac
+    sign_in "$SP_EMAIL" "$SP_PASSWORD"
+    [ "$RESP_CODE" = "200" ] || { _sp_abort "the scoped principal could not sign in after rotating"; return 1; }
+  fi
+  SP_TOKEN="$(j '.data.accessToken')"
+  TOKEN="$admin"
+  [ -n "$SP_TOKEN" ] && [ "$SP_TOKEN" != "null" ] || { SP_FAILED="the scoped principal received no access token"; return 1; }
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # Sign-in. Every lane needs a token, and the ONE place it comes from is this
 # service's own documented flow — nothing is invented and nothing is hardcoded
