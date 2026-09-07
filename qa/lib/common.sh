@@ -411,3 +411,107 @@ jwt_claim() {
 }
 
 now_epoch() { date +%s; }
+
+# ── the seeded identities, from migrations/postgres/0012_bootstrap_seed_manual.up.sql ─────
+#
+# Literals rather than lookups, and that is the point: they come from a TRACKED migration, so
+# a case that asserts against them asserts against the repository and never against whatever
+# the running service happens to hold. Nothing in this suite may archive any of the three.
+QA_MASTER_TENANT_ID="01990000-0001-7000-8000-000000000001"
+QA_MASTER_ROLE_ID="01990000-0002-7000-8000-000000000001"
+QA_WILDCARD_PERMISSION_ID="01990000-0000-7000-8000-000000000000"
+
+# ── Role fixtures ────────────────────────────────────────────────────────────────────────
+#
+# vos.RoleKey refuses anything outside ^[a-z0-9]+(-[a-z0-9]+)*$ and any run of 4 identical
+# runes, so the run tag goes through qa_slug_runid — the same collapse the permission
+# fixtures use. A key built straight from QA_RUN_ID would 422 on the runs whose timestamp or
+# pid happens to carry `0000`, and a fixture that fails on some runs and not on others is
+# worse than one that never works.
+
+# role_key [PREFIX] → a key unique to this run AND to this call.
+#
+# File-backed counter, for the same reason ws() and pair_resource() use one: this is almost
+# always called inside $( ), so an in-memory counter would increment a copy the parent never
+# sees and every call in a loop would hand back the same key — which, on a handle that is
+# unique per tenant, turns a fixture into a 409.
+role_key() {
+  local f="${QA_RUN_DIR:-/tmp}/.role-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'qa-%s-%s-%d' "${1:-r}" "$(qa_slug_runid)" "$n"
+}
+
+# permission_id_of RESOURCE ACTION → the catalog row's id, resolved by its PAIR.
+#
+# No UUID literal is written twice in this suite: a grant names the permission it means, and
+# the catalog says which row that is. It reads through the endpoint under test in another
+# lane, which is fine — this is a FIXTURE lookup, never an expectation.
+permission_id_of() {
+  api GET "/permissions?resource.eq=$1&action.eq=$2&first=1"
+  printf '%s' "$HTTP_BODY" | jq -r '.data[0].id // empty'
+}
+
+# role_body KEY NAME DESCRIPTION TENANT_ID_OR_EMPTY [PERMISSION_ID ...]
+#
+# Exactly four positional arguments, then the grants. An EMPTY tenant omits the key entirely
+# rather than sending "" — absent means "mine", and an empty string would be a malformed id
+# the guard barrier refuses.
+role_body() {
+  local key="$1" name="$2" desc="$3" tenant="$4"
+  shift 4
+  local perms
+  perms=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map(select(length > 0) | {permissionID: .})')
+  jq -nc --arg k "$key" --arg n "$name" --arg d "$desc" --arg t "$tenant" --argjson p "$perms" \
+    '{key:$k, name:$n, description:$d, permissions:$p}
+     + (if $t == "" then {} else {tenantID:$t} end)'
+}
+
+# new_role KEY TENANT_ID_OR_EMPTY [PERMISSION_ID ...] → echoes the created role's id.
+# Fixture creation, not a case: it asserts nothing and aborts the lane loudly if refused.
+new_role() {
+  local key="$1" tenant="$2"
+  shift 2
+  local desc="Fixture role created by the QA suite for run $(qa_slug_runid), bundling catalog permissions."
+  api POST /roles "$(role_body "$key" "QA Fixture Role" "$desc" "$tenant" "$@")"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /roles answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.id'
+}
+
+# grant_permission ROLE_ID PERMISSION_ID [TOKEN] → echoes the child id the server minted.
+grant_permission() {
+  api POST "/roles/$1/permissions" "$(jq -nc --arg p "$2" '{permissionID:$p}')" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /roles/%s/permissions answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.rolePermission.id'
+}
+
+# assert_rfc3339 JQ_PATH — a timestamp asserted by its GRAMMAR, never through jq's
+# fromdateiso8601.
+#
+# That builtin accepts only a Z-suffixed instant with no fractional part, while this service
+# stamps from Postgres (relational.clock: db) and answers 2026-09-07T23:31:06.322534-04:00 —
+# valid RFC3339 the builtin refuses. Asserting through it would pin a NARROWER format than the
+# contract and go red against a correct service.
+assert_rfc3339() {
+  local path="$1" got
+  got=$(printf '%s' "$HTTP_BODY" | jq -r "$path" 2>/dev/null)
+  if printf '%s' "$got" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'; then
+    pass_
+  else
+    fail_ "$path = '$got' (not RFC3339)"
+  fi
+}
+
+# assert_status_not STATUS — for the routing rows whose contract is "anything but this".
+# A plain shell comparison: a non-JSON body must not be piped through jq, which would fail
+# the case for the parser rather than for the contract.
+assert_status_not() {
+  if [ "$HTTP_STATUS" != "$1" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
+}

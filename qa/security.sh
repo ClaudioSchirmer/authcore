@@ -501,4 +501,232 @@ if kill -0 "$KEY_PID" 2>/dev/null; then
 fi
 wait "$KEY_PID" 2>/dev/null
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S5 — Role. specs/qa/role-contract/plan.md §3.
+#
+#   The 401 family, the framework's appended public surfaces, the introspection bypass and the
+#   middleware tenant gate are INHERITED from S3 and not repeated: they are properties of the
+#   middleware, which does not know which route it is guarding.
+#
+#   WHAT IS NEW HERE, and why this block is longer than S4's. Role is the FIRST aggregate this
+#   service owns by tenant, so authorization layers 2 and 3 stop being N/A:
+#     · layer 1 — seven routes, five literals, two surfaces, plus the role:update / role:grant
+#       split that only principal F can see;
+#     · layer 2 — refuseForeignTenant, which runs under IfArchive as well as IfInsertOrUpdate,
+#       and the no-escalation rule beside it;
+#     · layer 3 — ToCriteria's forced Filter["TenantID"], where a leak answers 200.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S5_DEAD="00000000-0000-4000-8000-00000000dead"
+S5_PERM_TENANT_READ="01990000-0000-7000-8000-00000000001e"
+
+# ── S5.1 the public-route split, direction 2, for the seven routes this round added ───────
+#
+# Direction 1 is inherited (S3b.1-S3b.3). This is the direction that catches a publicRoutes
+# entry widened past its intent, and it is cheap: no token, one assertion.
+
+case_ "S5.1a GET /roles tokenless" "401 MissingAuthorizationNotification"
+api GET "/roles" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1b GET /roles/{id} tokenless" "401"
+api GET "/roles/$S5_DEAD" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1c POST /roles tokenless" "401 — refused before the body is ever validated"
+api POST "/roles" '{"key":"qa-tokenless","name":"X","description":"Y"}' -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1d PATCH /roles/{id} tokenless" "401"
+api PATCH "/roles/$S5_DEAD" '{"name":"X"}' -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1e PATCH /roles/{id}/archive tokenless" "401"
+api PATCH "/roles/$S5_DEAD/archive" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1f POST /roles/{id}/permissions tokenless" "401 — the collection verbs are not a back door"
+api POST "/roles/$S5_DEAD/permissions" '{"permissionID":"'"$S5_PERM_TENANT_READ"'"}' -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1g PATCH /roles/{id}/permissions/{childId}/archive tokenless" "401"
+api PATCH "/roles/$S5_DEAD/permissions/$S5_DEAD/archive" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1h the GraphQL connection tokenless" "401 — the bearer is checked before the document is parsed, so this is the REST envelope and not a GraphQL error"
+gql "query { roles(first: 1) { totalCount } }" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S5.1i a GraphQL role MUTATION tokenless" "401 — same"
+gql "mutation { archiveRole(id: \"$S5_DEAD\") { success } }" "" -
+assert_rest 401 MissingAuthorizationNotification
+
+# ── S5.2 layer 1: a principal holding SOMETHING ELSE ──────────────────────────────────────
+#
+# Principal B holds tenant:read and nothing else. Holding A permission is not holding THIS one,
+# and the value the envelope hands back is what tells a caller which grant they are missing.
+
+s5_denied() { # s5_denied CASE METHOD PATH BODY EXPECTED_LITERAL
+  case_ "$1" "403 MissingPermissionNotification, value '$5'"
+  api "$2" "$3" "$4" "$QA_TOKEN_LIMITED"
+  local hit
+  hit=$(printf '%s' "$HTTP_BODY" | jq -r --arg v "$5" \
+    '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .field=="permission" and .value==$v)] | length' 2>/dev/null)
+  if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on '$5'"; fi
+}
+
+s5_denied "S5.2a principal B on the role LISTING"   GET   "/roles"                              ""                                                    "role:read"
+s5_denied "S5.2b principal B on the by-id read"     GET   "/roles/$S5_DEAD"                     ""                                                    "role:read"
+s5_denied "S5.2c principal B on insert"             POST  "/roles"                              '{"key":"qa-denied","name":"X","description":"Y"}'    "role:insert"
+s5_denied "S5.2d principal B on patch"              PATCH "/roles/$S5_DEAD"                     '{"name":"X"}'                                        "role:update"
+s5_denied "S5.2e principal B on archive"            PATCH "/roles/$S5_DEAD/archive"             ""                                                    "role:archive"
+s5_denied "S5.2f principal B on GRANT"              POST  "/roles/$S5_DEAD/permissions"         '{"permissionID":"'"$S5_PERM_TENANT_READ"'"}'         "role:grant"
+s5_denied "S5.2g principal B on REVOKE"             PATCH "/roles/$S5_DEAD/permissions/$S5_DEAD/archive" ""                                           "role:grant"
+
+# ── S5.3 the complement: a gate that refuses everyone is also broken ──────────────────────
+#
+# For the writes the target id addresses nothing ON PURPOSE: reaching the HANDLER — a 404, never
+# a 403 — is what proves the gate opened rather than that the write happened to be valid.
+
+case_ "S5.3a the admin reads the listing" "200 — the wildcard grant satisfies every check"
+api GET "/roles?first=1"
+assert_status 200
+
+case_ "S5.3b the admin reads by id" "200 on the seeded master role"
+api GET "/roles/$QA_MASTER_ROLE_ID"
+assert_status 200
+
+case_ "S5.3c the admin inserts" "201"
+api POST /roles "$(role_body "$(role_key s5)" "QA Gate Complement" "A role created only to prove the insert gate opens for a caller who holds the literal." "")"
+assert_status 201
+S5_ROLE=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+
+case_ "S5.3d the admin patches" "200"
+api PATCH "/roles/$S5_ROLE" '{"name":"QA Gate Complement, relabelled"}'
+assert_status 200
+
+case_ "S5.3e the admin GRANTS" "201 — role:grant is satisfied by the wildcard like every other literal"
+api POST "/roles/$S5_ROLE/permissions" '{"permissionID":"'"$S5_PERM_TENANT_READ"'"}'
+assert_status 201
+S5_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.rolePermission.id')
+
+case_ "S5.3f the admin REVOKES" "204"
+api PATCH "/roles/$S5_ROLE/permissions/$S5_CHILD/archive"
+assert_empty_body 204
+
+case_ "S5.3g the admin archives" "204"
+api PATCH "/roles/$S5_ROLE/archive"
+assert_empty_body 204
+
+case_ "S5.3h a write the admin aims at nothing reaches the HANDLER" "404, never 403 — the gate opened and the loader is what refused"
+api PATCH "/roles/$S5_DEAD/archive"
+assert_rest 404 RecordNotFoundNotification
+
+# ── S5.4 principal F: the role:update / role:grant split, decided 2026-08-28 ──────────────
+#
+# "May relabel the role" and "may change what the role can do" are different jobs, and the
+# second is the privilege-escalation surface. F is the ONLY caller for which the two answers
+# differ: A passes all seven either way and B is refused all seven either way.
+
+if [ -z "${QA_TOKEN_NOGRANT:-}" ]; then
+  case_ "S5.4 principal F — role:update WITHOUT role:grant" "the verb split of 2026-08-28"
+  skip_ "principal F could not be provisioned by qa/run.sh. Without it the split is unprovable: principal A holds every literal and principal B holds none, so neither can tell role:update apart from role:grant"
+else
+  S5_F_ROLE=$(new_role "$(role_key s5f)" "${QA_TENANT_SCOPED:-}" "$S5_PERM_TENANT_READ") || exit 1
+
+  case_ "S5.4a principal F reads the listing" "200 — role:read is in its bundle"
+  api GET "/roles?first=1" "" "$QA_TOKEN_NOGRANT"
+  assert_status 200
+
+  case_ "S5.4b principal F reads by id" "200 — the row is in its own tenant, so neither the gate nor the scope refuses"
+  api GET "/roles/$S5_F_ROLE" "" "$QA_TOKEN_NOGRANT"
+  assert_status 200
+
+  case_ "S5.4c principal F RELABELS the role" "200 — role:update is exactly what it holds"
+  api PATCH "/roles/$S5_F_ROLE" '{"name":"QA Split Role, relabelled by a caller who may not grant"}' "$QA_TOKEN_NOGRANT"
+  assert_status 200
+
+  case_ "S5.4d THE SPLIT: principal F on GRANT" "403 MissingPermissionNotification, value 'role:grant' — it may rename the role and not change what the role can do"
+  api POST "/roles/$S5_F_ROLE/permissions" '{"permissionID":"'"$S5_PERM_TENANT_READ"'"}' "$QA_TOKEN_NOGRANT"
+  hit=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .value=="role:grant")] | length' 2>/dev/null)
+  if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on 'role:grant'"; fi
+
+  case_ "S5.4e and on REVOKE" "403, same literal — ONE verb covers both directions, because splitting grant from revoke would move the asymmetry rather than remove it"
+  api GET "/roles/$S5_F_ROLE" "" "$QA_TOKEN_NOGRANT"
+  S5_F_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.permissions[0].id')
+  api PATCH "/roles/$S5_F_ROLE/permissions/$S5_F_CHILD/archive" "" "$QA_TOKEN_NOGRANT"
+  hit=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .value=="role:grant")] | length' 2>/dev/null)
+  if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on 'role:grant'"; fi
+
+  case_ "S5.4f and the grant it was refused is still there" "1 entry — the refusal refused, it did not half-apply"
+  api GET "/roles/$S5_F_ROLE"
+  assert_json_at 200 '.data.permissions | length' "1"
+fi
+
+# ── S5.5 the same gate on GRAPHQL: a route gated on REST is not thereby gated here ────────
+
+s5_gql_denied() { # s5_gql_denied CASE QUERY VARS EXPECTED_LITERAL
+  case_ "$1" "MissingPermissionNotification in errors[].extensions, value '$4'"
+  gql "$2" "$3" "$QA_TOKEN_LIMITED"
+  local hit
+  hit=$(printf '%s' "$HTTP_BODY" | jq -r --arg v "$4" \
+    '[.errors[]?.extensions? | select(.notificationKey=="MissingPermissionNotification" and .value==$v)] | length' 2>/dev/null)
+  if [ "$HTTP_STATUS" = "200" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, extensions $(printf '%s' "$HTTP_BODY" | jq -c '[.errors[]?.extensions]' 2>/dev/null)"; fi
+}
+
+s5_gql_denied "S5.5a principal B on the roles connection" "query { roles(first: 1) { totalCount } }" "" "role:read"
+s5_gql_denied "S5.5b principal B on role(id:)"            "query { role(id: \"$S5_DEAD\") { id } }" "" "role:read"
+s5_gql_denied "S5.5c principal B on createRole"           "mutation(\$i: CreateRoleInput!) { createRole(input: \$i) { id } }" '{"i":{"key":"qa-denied-gql","name":"X","description":"Y","permissions":[]}}' "role:insert"
+s5_gql_denied "S5.5d principal B on patchRole"            "mutation(\$i: PatchRoleInput!) { patchRole(id: \"$S5_DEAD\", input: \$i) { id } }" '{"i":{"name":"X"}}' "role:update"
+s5_gql_denied "S5.5e principal B on archiveRole"          "mutation { archiveRole(id: \"$S5_DEAD\") { success } }" "" "role:archive"
+s5_gql_denied "S5.5f principal B on addRolePermission"    "mutation(\$i: AddRolePermissionInput!) { addRolePermission(id: \"$S5_DEAD\", input: \$i) { roleId } }" '{"i":{"permissionID":"'"$S5_PERM_TENANT_READ"'"}}' "role:grant"
+s5_gql_denied "S5.5g principal B on archiveRolePermission" "mutation(\$i: ArchiveRolePermissionInput!) { archiveRolePermission(id: \"$S5_DEAD\", input: \$i) { success } }" '{"i":{"rolePermissionId":"'"$S5_DEAD"'"}}' "role:grant"
+
+case_ "S5.5h THE COMPLEMENT on this surface" "the admin's connection resolves — a gate that refuses everyone is also broken, per surface"
+# edges is selected alongside totalCount on purpose: selecting the count ALONE is this surface's
+# only-total mode, and first: beside it is the same conflict the REST matrix refuses.
+gql "query { roles(first: 1) { totalCount edges { node { id } } } }"
+assert_gql_ok '(.data.roles.totalCount >= 1)' "true"
+
+# ── S5.6 layer 2 and layer 3: the seams that only exist because Role is owned by a tenant ─
+
+if [ -z "${QA_TOKEN_SCOPED:-}" ]; then
+  case_ "S5.6 layers 2 and 3 on Role" "refuseForeignTenant on the write side, and ToCriteria's forced filter on the read side"
+  skip_ "principal E could not be provisioned by qa/run.sh. Both layers need a caller who is authenticated and is NOT a super-admin: a *:* holder crosses the row scope BY DESIGN, so running these as the admin would assert the bypass and call it the boundary"
+else
+  case_ "S5.6a LAYER 2: the scoped principal writes into ANOTHER tenant" "403 TenantMismatchNotification — the claim decides what a caller MAY write, and the write side is not narrowed by a filter the way a read is"
+  api POST /roles "$(jq -nc --arg k "$(role_key s5x)" --arg t "$QA_MASTER_TENANT_ID" \
+    '{key:$k, name:"QA Foreign Write", description:"A write aimed at a partition the caller has no claim to, which the row-scope rule refuses.", tenantID:$t, permissions:[]}')" "$QA_TOKEN_SCOPED"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "S5.6b THE BYPASS: the same body sent by the admin" "201 — *:* crosses the row scope, which is what lets a platform operator support a customer"
+  api POST /roles "$(jq -nc --arg k "$(role_key s5y)" --arg t "$QA_MASTER_TENANT_ID" \
+    '{key:$k, name:"QA Operator Write", description:"The same write, from the caller the bypass exists for, landing in the master partition.", tenantID:$t, permissions:[]}')"
+  assert_status 201
+
+  case_ "S5.6c LAYER 3: the listing narrows to the caller's own tenant" "every row carries the caller's own tenantID — a leak here answers 200, which is why it needs its own case"
+  api GET "/roles?first=100" "" "$QA_TOKEN_SCOPED"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S5.6d THE LEAK ITSELF: a by-id read of another tenant's role" "404 RecordNotFoundNotification — NOT 403: a 403 would confirm the row exists to a caller who may not see it"
+  api GET "/roles/$QA_MASTER_ROLE_ID" "" "$QA_TOKEN_SCOPED"
+  assert_rest 404 RecordNotFoundNotification
+
+  case_ "S5.6e THE COMPLEMENT: the admin crosses the same scope" "200 on the very id the scoped principal was refused — a scope that refuses everyone is also broken"
+  api GET "/roles/$QA_MASTER_ROLE_ID"
+  assert_status 200
+
+  case_ "S5.6f and the scope holds on GRAPHQL too" "every edge carries the caller's own tenantID — ToCriteria is shared, but a surface that skipped it would look exactly like a passing REST case"
+  gql "query { roles(first: 100) { edges { node { tenantID } } } }" "" "$QA_TOKEN_SCOPED"
+  assert_gql_ok '[.data.roles.edges[].node.tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S5.6g the admin's GraphQL connection is NOT narrowed" "more than one distinct tenant — the bypass reaches this surface as well"
+  gql "query { roles(first: 100) { edges { node { tenantID } } } }"
+  assert_gql_ok '([.data.roles.edges[].node.tenantID] | unique | length) > 1' "true"
+fi
+
+case_ "S5.7 field-level read authz on Role" "recorded as a DECISION, and deliberately not exercised"
+skip_ "spec.md §9 declares no ReadCriteria.Restrict: 'Every field a caller may see the row at all for, they may see entirely. Row-level isolation does the work here.' There is no column to find absent for one caller and present for another, no tabular export whose header could be pruned, and no __typename edge to assert — that edge exists only where a restricted field is in the selection. Asserting one would be inventing a rule"
+
 qa_finish

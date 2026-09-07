@@ -569,4 +569,302 @@ case_ "P10c and the reach that pair gates still works" "200 — the principal lo
 api GET "/tenants?first=1" "" "$REV_TOKEN2"
 assert_status 200
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ROWS RL1-RL11 — specs/qa/role-contract/plan.md §1b
+#
+# The business rules of the Role aggregate: the ones the FRAMEWORK never had an opinion about.
+# Eight of the eleven were called critical at the gate, and every one of them needs a caller
+# who is NOT a super-admin — which is why principal E exists and why this block skips loudly
+# rather than silently when it could not be built.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+RL_D="A role description long enough to satisfy the shared anti-junk floor this service applies."
+RL_TEN=$(new_tenant active "$(ws rldom)") || exit 1
+RL_P_TENANT_READ=$(permission_id_of tenant read)
+RL_P_PERM_ARCHIVE=$(permission_id_of permission archive)
+RL_P_ROLE_READ=$(permission_id_of role read)
+
+# ── RL1 / RL1b — no wildcard grant, and NO CALLER IS EXEMPT ───────────────────────────────
+#
+# The negative is aimed at the STRONGEST possible caller. If anyone were exempt it would be the
+# *:* super-admin, and the seed migration's own header says this refusal is exactly why a
+# migration is the only way a super-admin can come into existence.
+
+RL_ID1=$(new_role "$(role_key rl1)" "$RL_TEN" "$RL_P_TENANT_READ") || exit 1
+
+case_ "RL1+ the admin grants a CONCRETE catalog permission" "201 — the rule is about wildcards, not about grants"
+api POST "/roles/$RL_ID1/permissions" "$(jq -nc --arg p "$RL_P_ROLE_READ" '{permissionID:$p}')"
+assert_status 201
+
+case_ "RL1- the *:* SUPER-ADMIN grants the seeded *:* row" "403 CannotGrantWildcardPermissionNotification — no caller is exempt, and this is where an exemption would hide"
+api POST "/roles/$RL_ID1/permissions" "$(jq -nc --arg p "$QA_WILDCARD_PERMISSION_ID" '{permissionID:$p}')"
+assert_rest 403 CannotGrantWildcardPermissionNotification
+
+case_ "RL1b the wildcard rule runs BEFORE the escalation rule" "403 and never 500 — Identity.HasPermission PANICS on any argument containing '*', so a service that reordered the two would crash the request on exactly the case the pair exists to stop"
+if [ "$HTTP_STATUS" = "403" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
+
+case_ "RL1- and nothing was written under the refused grant" "0 role_permissions rows pointing at the wildcard from this role — a refusal that still inserted would be worse than one that did not refuse"
+GOT=$(sql "SELECT count(*) FROM role_permissions WHERE role_id = '$RL_ID1' AND permission_id = '$QA_WILDCARD_PERMISSION_ID';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else fail_ "role_permissions rows = '$GOT'"; fi
+
+case_ "RL2b the super-admin exemption is FREE, not special-cased" "201 — HasPermission answers true for ANY concrete permission when the claim set holds *:*, so 'you may only grant what you hold, unless you are a super-admin' is one question and not two"
+api POST "/roles/$RL_ID1/permissions" "$(jq -nc --arg p "$RL_P_PERM_ARCHIVE" '{permissionID:$p}')"
+assert_status 201
+
+# ── RL2 / RL3 / RL3b / RL3c — the scoped principal's whole block ──────────────────────────
+
+if [ -z "${QA_TOKEN_SCOPED:-}" ]; then
+  case_ "RL2 / RL3 / RL3b / RL3c — the scoped principal's rows" "the no-escalation rule, the write-side row scope and the read-side one"
+  skip_ "principal E could not be provisioned by qa/run.sh, so no non-super-admin caller exists. Every negative in these four rows needs one: a super-admin passes the escalation rule by construction and crosses the row scope by design, so running them as the admin would prove the opposite of what they are for"
+else
+  RL_ID_OWN=""
+
+  case_ "RL3+ the scoped principal creates a role OMITTING tenantID" "201 in its OWN tenant — absent means 'mine', which is what assignedFrom: identity-claim buys"
+  api POST /roles "$(jq -nc --arg k "$(role_key rl3)" --arg d "$RL_D" --arg p "$RL_P_TENANT_READ" \
+    '{key:$k, name:"QA Scoped Role", description:$d, permissions:[{permissionID:$p}]}')" "$QA_TOKEN_SCOPED"
+  assert_status 201
+  RL_ID_OWN=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+  case_ "RL3+ and the owner it landed under is the caller's own claim" "the scoped tenant — not a value the body carried"
+  assert_json '.data.tenantID' "$QA_TENANT_SCOPED"
+
+  case_ "RL3- the same principal names the MASTER tenant" "403 TenantMismatchNotification — the claim decides what a caller MAY write, and refuseForeignTenant is what answers"
+  api POST /roles "$(jq -nc --arg k "$(role_key rl3x)" --arg d "$RL_D" --arg t "$QA_MASTER_TENANT_ID" \
+    '{key:$k, name:"QA Foreign Role", description:$d, tenantID:$t, permissions:[]}')" "$QA_TOKEN_SCOPED"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "RL3- the refusal names the owner field" "field 'tenantID'"
+  assert_rest_field 403 TenantMismatchNotification tenantID
+
+  case_ "RL3- ARCHIVING another tenant's role is refused too" "403 TenantMismatchNotification — refuseForeignTenant runs under IfArchive as well, and the write side is NOT filtered by ToCriteria, so the row loads and the RULE is what refuses"
+  api PATCH "/roles/$RL_ID1/archive" "" "$QA_TOKEN_SCOPED"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "RL3- and that role is still active" "200 as the admin — the refusal refused, it did not half-apply"
+  api GET "/roles/$RL_ID1"
+  assert_status 200
+
+  case_ "RL3b- a by-id read of another tenant's role answers NOT FOUND" "404 RecordNotFoundNotification — NOT 403: the row does not exist for this caller, which leaks nothing about who else exists"
+  api GET "/roles/$QA_MASTER_ROLE_ID" "" "$QA_TOKEN_SCOPED"
+  assert_rest 404 RecordNotFoundNotification
+
+  case_ "RL3b- and the master role appears in NO page of its listing" "absent by ID, not by count — a leak here answers 200, which is exactly why it needs its own case"
+  api GET "/roles?first=100" "" "$QA_TOKEN_SCOPED"
+  assert_json_at 200 '[.data[].id] | index("'"$QA_MASTER_ROLE_ID"'") == null' "true"
+
+  case_ "RL3b+ while its OWN role is reachable" "200 — the scope narrows what is reached, it does not refuse"
+  if [ -n "$RL_ID_OWN" ]; then
+    api GET "/roles/$RL_ID_OWN" "" "$QA_TOKEN_SCOPED"
+    assert_status 200
+  else
+    fail_ "the scoped principal's own role was never created"
+  fi
+
+  case_ "RL3c the *:* holder CROSSES the row scope" "the master role IS in the admin's listing — a service that filtered everyone would pass RL3b for the wrong reason and make platform support impossible"
+  api GET "/roles?first=100"
+  assert_json_at 200 '[.data[].id] | index("'"$QA_MASTER_ROLE_ID"'") != null' "true"
+
+  case_ "RL2+ the scoped principal grants a permission IT HOLDS" "201 — tenant:read is in its own bundle"
+  api POST "/roles/$RL_ID_OWN/permissions" "$(jq -nc --arg p "$RL_P_ROLE_READ" '{permissionID:$p}')" "$QA_TOKEN_SCOPED"
+  assert_status 201
+
+  case_ "RL2- the same principal grants one it does NOT hold" "403 CannotGrantUnheldPermissionNotification — any principal who may touch a role could otherwise grant themselves the whole catalog"
+  api POST "/roles/$RL_ID_OWN/permissions" "$(jq -nc --arg p "$RL_P_PERM_ARCHIVE" '{permissionID:$p}')" "$QA_TOKEN_SCOPED"
+  assert_rest 403 CannotGrantUnheldPermissionNotification
+
+  case_ "RL2- the refusal names the collection and the offending id" "field 'permissions', value the permission id — so a caller granting ten knows WHICH one was refused"
+  assert_json '[.errors[].messages[] | select(.notificationKey=="CannotGrantUnheldPermissionNotification") | .value] | join(",")' "$RL_P_PERM_ARCHIVE"
+
+  case_ "RL2- and the grant was not written" "0 rows — the whole write rolled back"
+  GOT=$(sql "SELECT count(*) FROM role_permissions WHERE role_id = '$RL_ID_OWN' AND permission_id = '$RL_P_PERM_ARCHIVE';" | tr -d '[:space:]')
+  if [ "$GOT" = "0" ]; then pass_; else fail_ "role_permissions rows = '$GOT'"; fi
+fi
+
+# ── RL4 — the granted permission must be in the catalog AND still active ──────────────────
+
+RL_ID4=$(new_role "$(role_key rl4)" "$RL_TEN") || exit 1
+
+case_ "RL4+ granting a LIVE catalog id" "201"
+api POST "/roles/$RL_ID4/permissions" "$(jq -nc --arg p "$RL_P_TENANT_READ" '{permissionID:$p}')"
+assert_status 201
+
+case_ "RL4- granting an id no catalog row carries" "422 PermissionNotInCatalogNotification — you cannot invent a permission inside a role"
+api POST "/roles/$RL_ID4/permissions" '{"permissionID":"00000000-0000-4000-8000-00000000c0de"}'
+assert_rest 422 PermissionNotInCatalogNotification
+
+RL_R4=$(pair_resource rl4)
+RL_P4=$(new_permission "$RL_R4" read "A catalog entry retired before it is granted, so the in-catalog rule can be told from a mere existence check.") || exit 1
+api PATCH "/permissions/$RL_P4/archive"
+
+case_ "RL4- granting the id of a permission ARCHIVED a moment ago" "422 PermissionNotInCatalogNotification — the half that matters: a retired permission comes back as a NEW row with a NEW id, so re-granting the old id is refused rather than silently honoured, and THIS is why the grant stores the id and not the string"
+api POST "/roles/$RL_ID4/permissions" "$(jq -nc --arg p "$RL_P4" '{permissionID:$p}')"
+assert_rest 422 PermissionNotInCatalogNotification
+
+# ── RL5 — the owner tenant must be usable, and a TRIAL one is ─────────────────────────────
+#
+# The trial case is the plausible-mistake control. A rule written as `Status != active` would
+# refuse every trial signup, and only this case sees it.
+
+RL_TRIAL=$(new_tenant trial "$(ws rltrial)") || exit 1
+case_ "RL5+ a role inside a TRIAL tenant" "201 — 'unavailable' is not 'not active': a trial is a live customer being onboarded, and roles are the first thing they need"
+api POST /roles "$(role_body "$(role_key rl5t)" "QA Trial Role" "$RL_D" "$RL_TRIAL")"
+assert_status 201
+
+RL_SUSP=$(new_tenant active "$(ws rlsusp)") || exit 1
+api PATCH "/tenants/$RL_SUSP" '{"status":"suspended"}'
+case_ "RL5- a role inside a SUSPENDED tenant" "422 RoleTenantDoesNotExistNotification — a role is the unit that grants access, so minting one inside a suspended customer hands out exactly what the commercial state says to withhold"
+api POST /roles "$(role_body "$(role_key rl5s)" "QA Suspended Role" "$RL_D" "$RL_SUSP")"
+assert_rest 422 RoleTenantDoesNotExistNotification
+
+RL_ARCH=$(new_tenant active "$(ws rlarch)") || exit 1
+api PATCH "/tenants/$RL_ARCH/archive"
+case_ "RL5- a role inside an ARCHIVED tenant" "422 RoleTenantDoesNotExistNotification"
+api POST /roles "$(role_body "$(role_key rl5a)" "QA Archived Owner Role" "$RL_D" "$RL_ARCH")"
+assert_rest 422 RoleTenantDoesNotExistNotification
+
+case_ "RL5- a role naming a tenant id no row carries" "422 RoleTenantDoesNotExistNotification — and NOT a 500: the guard barrier already proved the id parses, so the probe answers rather than panics"
+api POST /roles "$(role_body "$(role_key rl5u)" "QA Ghost Owner Role" "$RL_D" "00000000-0000-4000-8000-00000000face")"
+assert_rest 422 RoleTenantDoesNotExistNotification
+
+# ── RL6 / RL7 — what is frozen, and HOW each one is frozen ────────────────────────────────
+
+RL_K6=$(role_key rl6)
+RL_ID6=$(new_role "$RL_K6" "$RL_TEN") || exit 1
+
+case_ "RL6+ everything else about a role is editable" "200 — immutability is about the handle, not about the record"
+api PATCH "/roles/$RL_ID6" '{"name":"QA Immutability Role, relabelled","description":"The wording an operator improved after reading it, which is what this verb is for."}'
+assert_status 200
+
+case_ "RL6+ and the key did not move" "$RL_K6"
+assert_json '.data.key' "$RL_K6"
+
+case_ "RL6- a request that NAMES the key is refused" "422 RoleKeyIsImmutableNotification — the key IS what every API caller and every audit line references, so editing it would rewrite the meaning of every reference retroactively and invisibly"
+api PATCH "/roles/$RL_ID6" '{"key":"qa-seized-handle"}'
+assert_rest 422 RoleKeyIsImmutableNotification
+
+case_ "RL6- the refusal names the key" "field 'key'"
+assert_rest_field 422 RoleKeyIsImmutableNotification key
+
+case_ "RL6- and nothing was written under the seized handle" "0 rows — the assignment never happened, so there is nothing to find"
+GOT=$(sql "SELECT count(*) FROM roles WHERE role_key = 'qa-seized-handle';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else fail_ "roles rows = '$GOT'"; fi
+
+case_ "RL7- a request that names the TENANT changes nothing" "200 and the ORIGINAL owner — the field is structurally absent from PatchRoleRequest, so the lenient handler ignores it and no request can reach it"
+api PATCH "/roles/$RL_ID6" "$(jq -nc --arg t "$QA_MASTER_TENANT_ID" '{tenantID:$t}')"
+assert_json_at 200 '.data.tenantID' "$RL_TEN"
+
+case_ "RL7- the immutability notification is UNREACHABLE from the wire" "recorded, and deliberately not asserted"
+skip_ "RoleTenantIsImmutableNotification is declared and enforced in BuildRules, and no mounted request can provoke it: PatchRoleRequest carries key, name and description alone, on REST and on GraphQL both, so the declarative rule is a belt-and-braces layer behind a structural cut. The suite asserts the EFFECT above and does not assert a notification no request can reach"
+
+# ── RL8 — the 200-permission cap, in the cheap form approved at the gate ──────────────────
+
+case_ "RL8+ a role carrying the whole LIVE catalog, minus every wildcard row" "201 — the cap admits an ordinary bundle without argument"
+api GET "/permissions?first=100"
+RL_ALL=$(printf '%s' "$HTTP_BODY" | jq -c '[.data[] | select((.permission | contains("*")) | not) | {permissionID: .id}]')
+RL_N=$(printf '%s' "$RL_ALL" | jq 'length')
+api POST /roles "$(jq -nc --arg k "$(role_key rl8)" --arg d "$RL_D" --arg t "$RL_TEN" --argjson p "$RL_ALL" \
+  '{key:$k, name:"QA Whole Catalog Role", description:$d, tenantID:$t, permissions:$p}')"
+assert_status 201
+
+case_ "RL8+ and it really carried them all" "$RL_N entries — the fixture excludes every row whose rendered token contains a '*', not only the seeded *:*, because no-wildcard-grant refuses a wildcard in EITHER half"
+assert_json '.data.permissions | length' "$RL_N"
+
+RL_201=$(for i in $(seq 1 201); do printf '00000000-0000-4000-8000-%012d\n' "$i"; done | jq -R . | jq -sc 'map({permissionID: .})')
+case_ "RL8- an insert carrying 201 distinct ids" "422 with TooManyPermissionsInRoleNotification PRESENT in the envelope — 201 PermissionNotInCatalogNotification keys ride with it, because the invented ids are in no catalog, so the assertion reads the WHOLE envelope and never only the first message"
+api POST /roles "$(jq -nc --arg k "$(role_key rl8x)" --arg d "$RL_D" --arg t "$RL_TEN" --argjson p "$RL_201" \
+  '{key:$k, name:"QA Over Cap Role", description:$d, tenantID:$t, permissions:$p}')"
+assert_rest 422 TooManyPermissionsInRoleNotification
+
+case_ "RL8- the cap notification hands back the limit itself" "200 — the cap is sized to this platform rather than to GCP's 3000 or Azure's 2000"
+assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyPermissionsInRoleNotification") | .value] | join(",")' "201"
+
+# ── RL9 / RL10 — the three grant rules judge what a write ADDS, never what is stored ──────
+
+RL_R9=$(pair_resource rl9)
+RL_P9=$(new_permission "$RL_R9" read "A catalog entry granted first and retired afterwards, so a later write can prove it judges only what it adds.") || exit 1
+RL_ID9=$(new_role "$(role_key rl9)" "$RL_TEN" "$RL_P9" "$RL_P_TENANT_READ") || exit 1
+api PATCH "/permissions/$RL_P9/archive"
+
+case_ "RL9+ a role holding a RETIRED permission is still writable" "200 on a PATCH whose only change is a label — re-judging stored entries would answer 422 on a request that grants nothing, making unrelated writes hostages of the past"
+api PATCH "/roles/$RL_ID9" '{"name":"QA Added-Entries Role, relabelled"}'
+assert_status 200
+
+case_ "RL9+ and the retired grant is still there, reporting its state" "the entry survives and permissionArchivedAt is stamped — the rules stood down, the READ did not"
+api GET "/roles/$RL_ID9"
+assert_json_at 200 '[.data.permissions[] | select(.permissionArchivedAt != null)] | length' "1"
+
+api GET "/roles/$RL_ID9"
+RL_CHILD9=$(printf '%s' "$HTTP_BODY" | jq -r '.data.permissions[] | select(.permissionArchivedAt != null) | .id' | head -1)
+case_ "RL10+ a REVOKE asks nothing, because it adds nothing" "204 — revocation is the tool for a grant that stopped being acceptable, and it stays reachable precisely when it is needed"
+api PATCH "/roles/$RL_ID9/permissions/$RL_CHILD9/archive"
+assert_empty_body 204
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ROW RL11 — archiving a ROLE removes the power, on a fixture of the suite's OWN.
+#
+#   "Arquivar um papel retira o poder: a linha user_roles sobrevive apontando para o papel
+#    arquivado, e isso é HISTÓRIA — mas um token reemitido não carrega mais as permissões dele."
+#   source: asked 2026-09-07
+#
+# The Role twin of P9/P10, one level up the graph. P9/P10 archived the CATALOG row; this
+# archives the ROLE that bundles it, which is a different seam entirely: the grant survives in
+# role_permissions AND the membership survives in user_roles, and neither of them authorizes
+# anything any more. The chain uses nothing seeded.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+RL11_EMAIL="qa-rolerevocation-${QA_RUN_ID}@authcore.local"
+RL11_PASS='Qa!RoleRevoke2026'
+RL11_PASS2='Qa!RoleRevoke2026b'
+
+# The role carries tenant:read ALONE, and that is the point: it gates a real route, so the
+# assertion below is about a REACH that was lost and not merely a claim that shrank.
+RL11_ROLE=$(new_role "$(role_key rl11)" "$RL_TEN" "$RL_P_TENANT_READ") || exit 1
+
+api POST /users "$(jq -nc --arg e "$RL11_EMAIL" --arg p "$RL11_PASS" --arg r "$RL11_ROLE" --arg t "$RL_TEN" \
+  '{givenName:"Qa", familyName:"RoleRevocation", email:$e, status:"active", tenantID:$t,
+    password:$p, passwordConfirmation:$p, roles:[{roleID:$r}]}')"
+RL11_USER=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+case_ "RL11a a user can hold the fixture role" "201"
+if [ -n "$RL11_USER" ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no user id"; fi
+
+RL11_BOOT=$(qa_login "$RL11_EMAIL" "$RL11_PASS")
+api PATCH "/users/$RL11_USER/password" \
+  "$(jq -nc --arg cp "$RL11_PASS" --arg np "$RL11_PASS2" '{currentPassword:$cp, password:$np, passwordConfirmation:$np}')" "$RL11_BOOT"
+RL11_TOKEN=$(qa_login "$RL11_EMAIL" "$RL11_PASS2")
+
+case_ "RL11b the token carries the role's permission BEFORE the archive" "tenant:read is among its permissions claim"
+if printf '%s' "$(jwt_claim "$RL11_TOKEN" permissions)" | grep -q "tenant:read"; then pass_; else fail_ "claim: $(jwt_claim "$RL11_TOKEN" permissions)"; fi
+
+case_ "RL11c and it genuinely REACHES the route that permission gates" "200 — the reach is real, not merely claimed"
+api GET "/tenants?first=1" "" "$RL11_TOKEN"
+assert_status 200
+
+case_ "RL11d archiving a role a user still holds is ACCEPTED" "204 — no rule refuses it; the membership is history, not an error"
+api PATCH "/roles/$RL11_ROLE/archive"
+assert_empty_body 204
+
+case_ "RL11e the user_roles row SURVIVES, pointing at the archived role" "1 row — asserted by SQL, since no endpoint exposes the membership from this side"
+GOT=$(sql "SELECT count(*) FROM user_roles WHERE user_id = '$RL11_USER' AND role_id = '$RL11_ROLE';" | tr -d '[:space:]')
+if [ "$GOT" = "1" ]; then pass_; else fail_ "user_roles rows = '$GOT'"; fi
+
+case_ "RL11f and the role_permissions row survives too" "1 row — archiving the bundle does not unpick what it bundled"
+GOT=$(sql "SELECT count(*) FROM role_permissions WHERE role_id = '$RL11_ROLE' AND permission_id = '$RL_P_TENANT_READ';" | tr -d '[:space:]')
+if [ "$GOT" = "1" ]; then pass_; else fail_ "role_permissions rows = '$GOT'"; fi
+
+case_ "RL11g THE POINT: a FRESHLY reissued token no longer carries the permission" "tenant:read is gone from the permissions claim — the membership is history and history authorizes nothing"
+RL11_TOKEN2=$(qa_login "$RL11_EMAIL" "$RL11_PASS2")
+if [ -z "$RL11_TOKEN2" ]; then
+  fail_ "the principal could not sign in again"
+elif printf '%s' "$(jwt_claim "$RL11_TOKEN2" permissions)" | grep -q "tenant:read"; then
+  fail_ "the archived role's permission is still in the claim: $(jwt_claim "$RL11_TOKEN2" permissions)"
+else
+  pass_
+fi
+
+case_ "RL11h and the reach is GONE" "403 — the same call that answered 200 before the archive"
+api GET "/tenants?first=1" "" "$RL11_TOKEN2"
+assert_rest 403 MissingPermissionNotification
+
 qa_finish
