@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:e13ba9b6e083e283c63c9a6a0bd391f6a08610e005dce802fb1137ba5c43d34c
+// generated:  2026-09-07
+// checksum:   sha256:ec25e76a674a5442af4a7dc9c0e02cf13941591ea30685bc413f1b4baf6fc2eb
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,7 +59,7 @@ func TestArchiveRoleCommandApplies(t *testing.T) {
 		t.Fatalf("the mapper failed: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if _, err := c.FromEntity(ctx, e); err != nil {
 		t.Errorf("projecting the result failed: %v", err)

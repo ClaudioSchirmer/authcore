@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:d9185912add25143d517d0bd6e6c3091e7013e67b3ae1c03f5c83c15503c3346
+// generated:  2026-09-07
+// checksum:   sha256:14c2c597f0f40ff460201605c58406275206d804f114d0b1194546d74feadcaa
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -121,7 +121,7 @@ func TestGroupByIDScopeIsForced(t *testing.T) {
 	}
 }
 
-// A super-admin (*:*) reads across the TenantID scope.
+// A super-admin (*:*) reads across every scope Group declares.
 //
 // The identity is a real one and the question is the framework's own
 // HasPermission, so what is under test is the QUESTION the criteria asks —
@@ -139,7 +139,7 @@ func TestGroupBypassCrossesTheReadScope(t *testing.T) {
 		t.Fatalf("the listing criteria failed: %v", err)
 	}
 	if got, ok := out.Filter["TenantID"]; ok {
-		t.Errorf("the bypass holder was scoped to %v anyway — they cannot support a customer", got)
+		t.Errorf("the bypass holder was scoped to %v on TenantID anyway — they cannot support a customer", got)
 	}
 }
 

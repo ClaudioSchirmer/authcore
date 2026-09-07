@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:f2294b37bf5e5fc7e8790257c870714c155ef8c65efb4241808ecff36341d4c8
+// generated:  2026-09-07
+// checksum:   sha256:702280aadf1e0e714d62f667fc786efca9ff0fe36dda4fcfa26fbf014ffc3081
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,7 +49,7 @@ func TestArchiveUserGroupCommand_TakesTheEntryOut(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -67,9 +67,9 @@ func TestArchiveUserGroupCommand_TakesTheEntryOut(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+	if e.RequestingUserID != "caller" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	for _, item := range domain.GetCurrentItemsOf[aggregatevos.UserGroup](e.GetAggregateRoot()) {

@@ -239,6 +239,31 @@ A new pair goes in every dialect this service targets (postgres), numbered after
 
 If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
+### Yours in a shared file, and out of step with the spec
+
+The notification declarations and the seven translation catalogs are shared by every entity of the project. The generator maintains what IT wrote there — it records a hash of each declaration and each message, so a spec that moves takes its own text with it. These did NOT match what it recorded, which means somebody edited them, or they predate that record. Either way they are not the generator's to overwrite, so they were left exactly as they are:
+
+- ClientArchivedAtField — internal/application/translations/deu.go
+- ClientArchivedAtField — internal/application/translations/esp.go
+- ClientArchivedAtField — internal/application/translations/fra.go
+- ClientArchivedAtField — internal/application/translations/ita.go
+- ClientArchivedAtField — internal/application/translations/nld.go
+- ClientArchivedAtField — internal/application/translations/ptbr.go
+- ClientCreatedAtField — internal/application/translations/deu.go
+- ClientCreatedAtField — internal/application/translations/esp.go
+- ClientCreatedAtField — internal/application/translations/fra.go
+- ClientCreatedAtField — internal/application/translations/ita.go
+- ClientCreatedAtField — internal/application/translations/nld.go
+- ClientCreatedAtField — internal/application/translations/ptbr.go
+- ClientUpdatedAtField — internal/application/translations/deu.go
+- ClientUpdatedAtField — internal/application/translations/esp.go
+- ClientUpdatedAtField — internal/application/translations/fra.go
+- ClientUpdatedAtField — internal/application/translations/ita.go
+- ClientUpdatedAtField — internal/application/translations/nld.go
+- ClientUpdatedAtField — internal/application/translations/ptbr.go
+
+A notification DECLARATION on this list can stop the package compiling, and the error will not point here: if the spec gave it a `tvars` entry, the rules emitted for it now write `N{Max: "50"}` and the struct has no such field — add it, and it goes away. A translation on this list is cosmetic by comparison: the end user simply reads the older wording. If your version is the better one, put it in the spec; the two will then agree and it drops off this list.
+
 ### Fields whose copies carry a mask
 
 The real value stays in the COLUMN and in the hydrated entity — the rules read it, the writes store it. What is masked is every copy the framework makes of the row:
@@ -270,11 +295,11 @@ Declared `runtime: true` with an identity `source`. The domain is handed no requ
 
 The claim NAMES behind these are the framework's to resolve, not this code's: the tenant claim is `authorization.tenant.claim` and the permissions claim is `authorization.permissionsClaim`. The generated feed calls the accessor and never spells either name — the generated unit tests build their fixture Identity under the framework's DEFAULTS, which is the only name a test with no yaml can honestly use.
 
-### The tenant is server-assigned, and the insert accepts one anyway
+### TenantID is server-assigned, and the insert accepts one anyway
 
-`TenantID` is declared `assignedFrom: identity-claim` with `bypassMaySet: true`, so it is filled from the caller's identity on every insert and is in no update or patch body. The INSERT body carries it as an OPTIONAL value, for one reason: a super-admin (`*:*`) crosses the row scope, and without a field to name the tenant in they could repair a customer's records and never create one.
+`TenantID` is declared `assignedFrom: identity-claim` with `bypassMaySet: true`, so it is filled from the caller's identity on every insert and is in no update or patch body. The INSERT body carries it as an OPTIONAL value, for one reason: a super-admin (`*:*`) crosses the row scope, and without a field to name the scope in they could repair a customer's records and never create one.
 
-**Check the guard, not the mapper.** The mapper applies whatever was sent, deliberately: what refuses a caller who may not state a tenant is `refuseForeignTenant` in `internal/domain/client.go`, which compares `TenantID` against the caller's own and stands down only for the bypass. Two things follow. A caller who names someone else's tenant gets the same refusal a write into that tenant gets — not a silent 201 filed under their own. And if that guard is ever removed or narrowed, this field becomes a tenant anyone can choose.
+**Check the guard, not the mapper.** The mapper applies whatever was sent, deliberately: what refuses a caller who may not state one is `refuseForeignTenant` in `internal/domain/client.go`, which compares `TenantID` against the caller's own and stands down only for the bypass. Two things follow. A caller who names someone else's scope gets the same refusal a write into that scope gets — not a silent 201 filed under their own. And if that guard is ever removed or narrowed, this field becomes one anyone can choose.
 
 ### Rules that END the validation pass
 
@@ -324,7 +349,8 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Collection `Claims` | `add` → `client:set-claim` (declared); `change` → `client:set-claim` (declared); `remove` → `client:set-claim` (declared) | These routes hang off `/clients/:id/claims`. Gated on its own through `children[].permissions`, not by the root's update. Grant that permission before the routes go live — a holder of the root's update alone now gets a 403 here. Changing ONE entry is PARTIAL (`PATCH`): what the body leaves out is read off the STORED entry, and what `change.patchExcludes` names — `ClaimID` — never reaches the wire, so it cannot move. Removing ONE entry ARCHIVES it (204, no body) and is one-way: there is no per-entry unarchive, so the only way back is a fresh add, with a NEW entry id. |
 | Removal | archive (one-way: no unarchive is mounted) | `DELETE` is a permanent purge and is not mounted. |
 | Unique | `Name` — per TenantID, scope `active-only` (service-precheck+constraint) | an archived row frees it, so the value can be taken again; a duplicate is refused at the database and reported as `ClientNameAlreadyExistsNotification`. |
-| Data access | tenant | Callers are restricted to their tenant's rows. |
+| Data access | scoped | Callers reach only the rows their identity places them in — see the scopes below. |
+| Row scope | `TenantID` = `Identity().TenantID()` — whichever claim `authorization.tenant.claim` names | Enforced on: read, insert, update, archive. Both halves are generated: the read filter in the query, and a guard in BuildRules. |
 | Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 | Read join → Tenant | `InnerJoin` on `tenant_id` | An aggregate with no counterpart is NOT returned, on EVERY read through this repository — FindByID included, which the write handlers load through. Legal only because the foreign key is non-nullable. Nothing here is a write path: the fields are absent from the TableSchema, so no INSERT or UPDATE can carry them and no migration creates them. On the entity and OFF the wire: TenantStatus — read by the rules, in no response body and in no export. |
@@ -354,25 +380,31 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the add command for one client_allowed_cidrs entry | `internal/application/commands/add_client_allowed_cidr_command.go` |
+| tests for add_client_allowed_cidr_command.go | `internal/application/commands/add_client_allowed_cidr_command_test.go` |
+| the add command for one client_claims entry | `internal/application/commands/add_client_claim_command.go` |
+| tests for add_client_claim_command.go | `internal/application/commands/add_client_claim_command_test.go` |
+| the add command for one client_roles entry | `internal/application/commands/add_client_role_command.go` |
+| tests for add_client_role_command.go | `internal/application/commands/add_client_role_command_test.go` |
+| the archive command for one client_allowed_cidrs entry | `internal/application/commands/archive_client_allowed_cidr_command.go` |
+| tests for archive_client_allowed_cidr_command.go | `internal/application/commands/archive_client_allowed_cidr_command_test.go` |
+| the archive command for one client_claims entry | `internal/application/commands/archive_client_claim_command.go` |
+| tests for archive_client_claim_command.go | `internal/application/commands/archive_client_claim_command_test.go` |
+| the archive command and result | `internal/application/commands/archive_client_command.go` |
+| tests for archive_client_command.go | `internal/application/commands/archive_client_command_test.go` |
+| the archive command for one client_roles entry | `internal/application/commands/archive_client_role_command.go` |
+| tests for archive_client_role_command.go | `internal/application/commands/archive_client_role_command_test.go` |
+| the insert command and result | `internal/application/commands/insert_client_command.go` |
+| tests for insert_client_command.go | `internal/application/commands/insert_client_command_test.go` |
+| the patch command for one client_claims entry | `internal/application/commands/patch_client_claim_command.go` |
+| tests for patch_client_claim_command.go | `internal/application/commands/patch_client_claim_command_test.go` |
+| the patch command and result | `internal/application/commands/patch_client_command.go` |
+| tests for patch_client_command.go | `internal/application/commands/patch_client_command_test.go` |
 | the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
-| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
-| the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
+| the read tests for find_clients_by_params_query.go | `internal/application/queries/find_clients_by_params_query_test.go` |
 | the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
-| the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
-| the client_allowed_cidrs child schema | `internal/infra/schemas/client_allowed_cidr_schema.go` |
-| the client_claims child schema | `internal/infra/schemas/client_claim_schema.go` |
-| the client_roles child schema | `internal/infra/schemas/client_role_schema.go` |
-| the clients schema (8 columns) | `internal/infra/schemas/client_schema.go` |
-| the by-id request and response | `internal/web/requests/find_client_by_id.go` |
-| the listing request and response | `internal/web/requests/find_clients_by_params.go` |
+| tests for Client's rules | `internal/domain/client_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -381,7 +413,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-78 file(s) were already up to date.
+65 file(s) were already up to date.
 
 ## What was NOT generated
 

@@ -324,4 +324,21 @@ jwt_hs256() {
   printf '%s.%s' "$signing" "$sig"
 }
 
+# jwt_claim TOKEN CLAIM — READ one claim out of a token the suite already holds.
+#
+# Not a forgery seat: it never signs and never mints. It exists because the row-scope cases
+# need the CALLER's half of the comparison — principal B's own tenant — and every other way
+# to learn it asks the very endpoint under test, which would make the assertion circular.
+# The claim is the same value the service itself scopes by, read from the same token.
+jwt_claim() {
+  local payload="${1#*.}"
+  payload="${payload%%.*}"
+  case $(( ${#payload} % 4 )) in
+    2) payload="$payload==" ;;
+    3) payload="$payload=" ;;
+  esac
+  printf '%s' "$payload" | tr '_-' '/+' | openssl base64 -d -A 2>/dev/null \
+    | jq -r --arg c "$2" '.[$c] // empty'
+}
+
 now_epoch() { date +%s; }

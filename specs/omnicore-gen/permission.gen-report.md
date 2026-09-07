@@ -82,6 +82,31 @@ A new pair goes in every dialect this service targets (postgres), numbered after
 
 If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
+### Yours in a shared file, and out of step with the spec
+
+The notification declarations and the seven translation catalogs are shared by every entity of the project. The generator maintains what IT wrote there — it records a hash of each declaration and each message, so a spec that moves takes its own text with it. These did NOT match what it recorded, which means somebody edited them, or they predate that record. Either way they are not the generator's to overwrite, so they were left exactly as they are:
+
+- PermissionArchivedAtField — internal/application/translations/deu.go
+- PermissionArchivedAtField — internal/application/translations/esp.go
+- PermissionArchivedAtField — internal/application/translations/fra.go
+- PermissionArchivedAtField — internal/application/translations/ita.go
+- PermissionArchivedAtField — internal/application/translations/nld.go
+- PermissionArchivedAtField — internal/application/translations/ptbr.go
+- PermissionCreatedAtField — internal/application/translations/deu.go
+- PermissionCreatedAtField — internal/application/translations/esp.go
+- PermissionCreatedAtField — internal/application/translations/fra.go
+- PermissionCreatedAtField — internal/application/translations/ita.go
+- PermissionCreatedAtField — internal/application/translations/nld.go
+- PermissionCreatedAtField — internal/application/translations/ptbr.go
+- PermissionUpdatedAtField — internal/application/translations/deu.go
+- PermissionUpdatedAtField — internal/application/translations/esp.go
+- PermissionUpdatedAtField — internal/application/translations/fra.go
+- PermissionUpdatedAtField — internal/application/translations/ita.go
+- PermissionUpdatedAtField — internal/application/translations/nld.go
+- PermissionUpdatedAtField — internal/application/translations/ptbr.go
+
+A notification DECLARATION on this list can stop the package compiling, and the error will not point here: if the spec gave it a `tvars` entry, the rules emitted for it now write `N{Max: "50"}` and the struct has no such field — add it, and it goes away. A translation on this list is cosmetic by comparison: the end user simply reads the older wording. If your version is the better one, put it in the spec; the two will then agree and it drops off this list.
+
 ### Fields nobody receives
 
 `Resource`, `Action` — declared `hidden: true`, so stored, filterable and writable, and absent from every response: the by-id read, each row of the listing, the write responses, and the CSV/XLSX exports that render the listing. This is not `read.fieldRestrict`, which returns the field to callers holding a permission; nobody receives these. Check that a client is not expected to read back what it just wrote.
@@ -132,21 +157,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
-| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| the permissions schema (3 columns) | `internal/infra/schemas/permission_schema.go` |
-| the by-id request and response | `internal/web/requests/find_permission_by_id.go` |
-| the listing request and response | `internal/web/requests/find_permissions_by_params.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/utils/permission_computed_manual.go` — hand-written rules live here, by design
@@ -154,7 +164,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-25 file(s) were already up to date.
+30 file(s) were already up to date.
 
 ## What was NOT generated
 

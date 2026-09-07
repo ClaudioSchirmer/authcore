@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:a2917ecb55f0685c81b43d8e30ff78c454695a395c48405e0dcf55f4d542d515
+// generated:  2026-09-07
+// checksum:   sha256:f521c642afacd6573238a1bf9e367892663993daf4ebaa8826801c72b90573bb
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -43,7 +43,7 @@ func TestAddUserRoleCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -55,9 +55,9 @@ func TestAddUserRoleCommand_AppliesAndProjects(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+	if e.RequestingUserID != "caller" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	out, err := cmd.FromEntity(ctx, e)

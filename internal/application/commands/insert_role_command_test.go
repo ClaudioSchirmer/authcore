@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:375064f59f26fa83c96b761a0fc1f010c87e01e57ec44f96e6598cffdd6557a5
+// generated:  2026-09-07
+// checksum:   sha256:e3b190f86cfda7bd008ab57315809c57b432e02dce7cff6f512edc66aa7ccc0b
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -64,7 +64,7 @@ func TestInsertRoleMapsEveryField(t *testing.T) {
 		t.Fatalf("ToEntity: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if e.Key.Value() != "billing-manager" {
 		t.Errorf("Key did not survive the mapper")

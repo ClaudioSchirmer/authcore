@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:2418abec505a1ad87488fc665de190afdf8824135b8de5b85018d29f3dc58073
+// generated:  2026-09-07
+// checksum:   sha256:5d9140ea1a3d9551e850c8c0ce350d647cabdf0a7552aa16825f5d6c43eb908c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -103,7 +103,7 @@ func validGroup() *Group {
 		// that left it false would test those rules standing down rather than
 		// running — which is how a negative case passes while proving nothing.
 		RequestingIdentityPresent: true,
-		// The row is in the caller's own TenantID.
+		// The row is inside the caller's own TenantID.
 		RequestingTenant: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 	}
 }
@@ -135,61 +135,61 @@ func TestGroupDeclaresItsAggregateContract(t *testing.T) {
 	}
 }
 
-// A insert of a row in another tenant is refused.
+// A insert of a row outside the caller's TenantID is refused.
 //
 // The caller holds the insert permission — that is a different question, and
 // it is already answered by the route. This is about WHICH ROW: the read side
 // would never have shown it to them, and without this the write side would let
 // them have it anyway.
-func TestGroup_InsertOutsideTenant_IsRefused(t *testing.T) {
+func TestGroup_InsertOutsideTenantID_IsRefused(t *testing.T) {
 	e := validGroup()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetInsertable(e, &stubGroupService{}, "GetInsertable")
 	if err == nil {
-		t.Fatal("a insert into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a insert outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !groupBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", groupRejectedFields(err))
 	}
 }
 
-// A update of a row in another tenant is refused.
+// A update of a row outside the caller's TenantID is refused.
 //
 // The caller holds the update permission — that is a different question, and
 // it is already answered by the route. This is about WHICH ROW: the read side
 // would never have shown it to them, and without this the write side would let
 // them have it anyway.
-func TestGroup_UpdateOutsideTenant_IsRefused(t *testing.T) {
+func TestGroup_UpdateOutsideTenantID_IsRefused(t *testing.T) {
 	e := validGroup()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetUpdatable(e, func(*Group) error { return nil }, &stubGroupService{}, "GetUpdatable")
 	if err == nil {
-		t.Fatal("a update into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a update outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !groupBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", groupRejectedFields(err))
 	}
 }
 
-// A archive of a row in another tenant is refused.
+// A archive of a row outside the caller's TenantID is refused.
 //
 // The caller holds the archive permission — that is a different question,
 // and it is already answered by the route. This is about WHICH ROW: the read
 // side would never have shown it to them, and without this the write side
 // would let them have it anyway.
-func TestGroup_ArchiveOutsideTenant_IsRefused(t *testing.T) {
+func TestGroup_ArchiveOutsideTenantID_IsRefused(t *testing.T) {
 	e := validGroup()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetArchivable(e, &stubGroupService{}, "GetArchivable")
 	if err == nil {
-		t.Fatal("a archive into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a archive outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !groupBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", groupRejectedFields(err))
 	}
 }
 
-// The *:* bypass crosses the tenant scope.
+// The *:* bypass crosses every scope this entity declares.
 //
 // It is the operator supporting a customer: they have to be able to repair a
 // row that is not theirs. Without a test the key can be declared, read off the
@@ -199,11 +199,11 @@ func TestGroup_BypassCrossesTheScope(t *testing.T) {
 	e.RequestingTenant = "somebody-else"
 	e.RequestingMayCrossScope = true
 	if _, err := domain.GetInsertable(e, &stubGroupService{}, "GetInsertable"); err != nil {
-		t.Fatalf("the bypass holder was refused a row outside their tenant: %v", err)
+		t.Fatalf("the bypass holder was refused a row outside their scope: %v", err)
 	}
 }
 
-// With no identity at all the guard stands down, as authz.noIdentity says.
+// With no identity at all the guards stand down, as authz.noIdentity says.
 //
 // Only a dev bench reaches it — the middleware is bypassable solely with
 // auth.mode disabled, which the framework refuses outside APP_PROFILE=dev —
@@ -225,13 +225,13 @@ func TestGroup_NoIdentityStandsDown(t *testing.T) {
 //
 // It arrives at the domain looking exactly like the anonymous case above —
 // an empty scope — and it is the opposite situation: an authenticated
-// request that simply cannot be placed in any tenant. Standing down for it
+// request that simply cannot be placed in any scope. Standing down for it
 // would let any claimless token write anywhere.
-func TestGroup_IdentityWithoutTheClaim_IsRefused(t *testing.T) {
+func TestGroup_IdentityWithoutTenantID_IsRefused(t *testing.T) {
 	e := validGroup()
 	e.RequestingTenant = ""
 	if _, err := domain.GetInsertable(e, &stubGroupService{}, "GetInsertable"); err == nil {
-		t.Fatal("a token carrying no tenant claim wrote into a tenant that is not theirs")
+		t.Fatal("a token carrying no tenant claim wrote into a row that is not theirs")
 	}
 }
 

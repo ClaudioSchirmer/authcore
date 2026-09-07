@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:3932db18520b9d8c9ed011100238f265543af5abbc7745c30b0ee7130dda32fc
+// generated:  2026-09-07
+// checksum:   sha256:e2f5d3ad96f34b8209c0e25921527e0b117f7aa89fc3c97ceb93af573474ad98
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -58,8 +58,8 @@ func (cmd *ArchiveClientRoleCommand) ApplyTo(ctx *configuration.AppContext, e *a
 		if raw, ok := id.Claims["identity_kind"].(string); ok {
 			e.RequestingIdentityKind = raw
 		}
-		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
+		e.RequestingIdentityPresent = true
 		// The super-admin grant, not asked through HasPermission: that
 		// method panics on a wildcard, since the CLAIM wildcards and the
 		// question does not. The framework gives the wildcard its own

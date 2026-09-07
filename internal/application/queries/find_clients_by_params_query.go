@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:5300d86b394c8dbc0164c89ec8bd06a01a76b9c2c8b5c894cc47eb34f806923c
+// generated:  2026-09-07
+// checksum:   sha256:6af95fc96cb5f3385848b44550e0dbe0ea85d65e2838d65a35523c522c4bdcbd
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,26 +49,28 @@ type FindClientsByParamsQuery struct {
 }
 
 func (q FindClientsByParamsQuery) ToCriteria(ctx *configuration.AppContext) (fwqueries.ReadCriteria, error) {
-	// Callers see only their tenant's rows. Filter is a map keyed by the Go field
-	// path, and the scope is FORCED: a value the caller sent for this field is
-	// overwritten, never merged.
+	// Callers see only the rows their identity reaches. Filter is a map keyed
+	// by the Go field path, and each scope is FORCED: a value the caller sent
+	// for one of these fields is overwritten, never merged.
 	if q.Criteria.Filter == nil {
 		q.Criteria.Filter = map[string]any{}
 	}
 	if id := ctx.Identity(); id != nil {
-		// A super-admin crosses the scope: the operator supporting a customer
+		// A super-admin crosses every scope: the operator supporting a customer
 		// reads across tenants. Not asked through HasPermission — the framework
 		// panics when a wildcard is the QUESTION, so the *:* a super-admin
 		// carries has a question of its own, and this is it.
 		if !id.IsSuperAdmin() {
+			// TenantID reads whichever claim the deployment configured
+			// (authorization.tenant.claim), so nothing here pins its name.
 			q.Criteria.Filter["TenantID"] = id.TenantID()
 		}
 	} else {
 		// No identity at all: the scope stands down, as authz.noIdentity says.
 		// Reachable only on a dev bench — auth.mode disabled is refused outside
 		// APP_PROFILE=dev — and it serves EVERY row, which is the point: a
-		// tenant-scoped entity is otherwise unusable on the machine it is
-		// first tried on, answering every listing empty.
+		// scoped entity is otherwise unusable on the machine it is first tried
+		// on, answering every listing empty.
 	}
 	return q.Criteria, nil
 }

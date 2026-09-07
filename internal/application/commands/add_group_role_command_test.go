@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:f2efe473f9b3c0ce0d46922969029e7d332a1ee521e944e3f577835c7ceedca4
+// generated:  2026-09-07
+// checksum:   sha256:d57ae4e77ea52e7b58b07eab17f08860b9ded2544099632adef101943b9552f3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -54,7 +54,7 @@ func TestAddGroupRoleCommand_AppliesAndProjects(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {

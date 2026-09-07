@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:6bc7db74d8a85d4fce068a6b15f5a80d3c12a168d0e2ee13e50039602e5a56d2
+// generated:  2026-09-07
+// checksum:   sha256:d9ff4d7884c0321740001da5eb962dc5a796631e61edfc419b968b31d6bf1dd6
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -66,7 +66,7 @@ func TestArchiveRolePermissionCommand_TakesTheEntryOut(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	for _, item := range domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot()) {
 		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {

@@ -11,7 +11,7 @@ Pending: Authentication.
 |---|---|
 | **Permission** | What `RequirePermission` demands at the mount. Satisfied exactly, by resource wildcard (`x:*`), or by `*:*` |
 | **Admission** | `JWT + claim` = bearer token AND a `tenant_id` claim, both required to reach the handler. Service-wide gate: 403 without it, no permission bypasses it |
-| **Tenant scope** | What ties the row to the caller's tenant. `filter TenantID` = the read query forces `Filter["TenantID"] = id.TenantID()`. `guard foreign-tenant` = the domain refuses a write whose row is not the caller's (`TenantMismatchNotification`). `none` = nothing does |
+| **Tenant scope** | What ties the row to the caller's tenant. `filter TenantID` = the read query forces `Filter["TenantID"] = id.TenantID()`. `filter ID` = the same, but against the aggregate's OWN id — the shape a registry whose rows ARE the partitions needs, since it owns no `tenant_id` column. `guard foreign-tenant` = the domain refuses a write whose row is not the caller's (`TenantMismatchNotification`). `none` = nothing does |
 | **Self** | What the caller's IDENTITY says about the target ROW, and for WHICH kind of caller. `sub → self` / `sub → not self` = the domain compares the path id against the caller's subject, whoever they are. `kind:client → …` applies **only to a client-subject token**: a user token of the same tenant never meets it and passes on the tenant scope alone. `—` = nothing compares them |
 | **`*:*` crosses** | Whether `IsSuperAdmin()` lifts the tenant scope. It never lifts a **Self** rule — that comparison does not ask |
 | **Rows reached** | What the caller ends up touching |
@@ -32,6 +32,16 @@ Pending: Authentication.
 
 No unarchive mounted. Update carries `Description` only — `resource` and `action` are reachable by no request after creation.
 
+**The catalog is global on purpose, and only the reads are meant to be.** Nothing scopes these
+rows because there is nothing to scope them by — a `resource:action` pair belongs to the
+platform, not to a customer. `permission:read` over it leaks nothing: it is the service's own
+vocabulary, and it is what lets a tenant administrator pick the id a role grant needs
+(`POST /roles/:id/permissions` takes a `permissionID`, and the `in-catalog` rule demands a live
+one). The three writes are contained by grant mechanics rather than by a scope: conferring
+`permission:insert` requires holding it (`no-escalation`, `internal/domain/role_rules_manual.go`),
+and inside a tenant nobody does. Only a `*:*` operator can place one on a tenant's role, which
+is a deliberate act and not a slip.
+
 ---
 
 ## Tenant
@@ -44,10 +54,51 @@ The isolation partition itself. The row id is the `tenant_id` claim.
 | `PATCH /tenants/:id` | `patchTenant` | `tenant:update` | JWT + claim | **none** | — | n/a | **any tenant** |
 | `PATCH /tenants/:id/archive` | `archiveTenant` | `tenant:archive` | JWT + claim | **none** | — | n/a | **any tenant** |
 | `PATCH /tenants/:id/unarchive` | `unarchiveTenant` | `tenant:archive` | JWT + claim | **none** | — | n/a | **any tenant** |
-| `GET /tenants` | `tenants` | `tenant:read` | JWT + claim | **none** | — | n/a | **all tenants** |
-| `GET /tenants/:id` | `tenant` | `tenant:read` | JWT + claim | **none** | — | n/a | **any tenant** |
+| `GET /tenants` | `tenants` | `tenant:read` | JWT + claim | filter `ID` | — | yes | own tenant only |
+| `GET /tenants/:id` | `tenant` | `tenant:read` | JWT + claim | filter `ID` | — | yes | own tenant only; another id → 404 |
 
-Both `ToCriteria` return the criteria unchanged; the four write commands bind no identity. Nothing compares the target row against the caller's `tenant_id` — containment is the distribution of `tenant:read` / `tenant:update` / `tenant:archive` and nothing else.
+Both `ToCriteria` now force `Filter["ID"] = id.TenantID()` unless the caller is `IsSuperAdmin()`; the four write commands still bind no identity. On the reads the target row IS compared against the caller's claim — on the three writes nothing is, and containment there remains the distribution of `tenant:update` / `tenant:archive` alone.
+
+**Why the READ was the half worth fixing first.** The three write permissions reach no tenant by
+any path this API offers: conferring one requires holding it (`no-escalation`,
+`internal/domain/role_rules_manual.go`), and nobody inside a tenant holds `tenant:update` or
+`tenant:archive` — a `*:*` operator putting one on a customer's role is deliberate, not a slip.
+`tenant:read` is the one of the four a tenant legitimately receives, and until 2026-09-07 it
+answered with every other customer's name, workspace, description and commercial status. That was
+the leak, and it was the dangerous kind: not a permission distributed wrongly, but a permission
+distributed rightly reaching rows it was never meant to. It is closed — see below.
+
+**~~Still open on 2026-09-07~~ — CLOSED on 2026-09-07, on the READ half.** The paragraph this
+replaces said the scope could not be spelled: `authz.dataAccess: tenant` required `tenantField` to
+name a field of `fields[]`, and this entity's scope is its own primary key, which the framework
+manages and no spec declares. That was true of the spec language as it then stood, and it was
+reported upstream. **omnicore plugin 0.65.0 retired that pair** — `dataAccess` split into a posture
+(`scoped`) and a mechanism (`authz.scopes[]`), and one of the new scope shapes is `field: ID`,
+added for exactly this case: a registry whose rows ARE the partitions and which therefore owns no
+`tenant_id` column. The declaration now reads:
+
+```yaml
+authz:
+  dataAccess: scoped
+  scopes:
+    - {field: ID, from: tenant, applies: [read]}
+  bypass: "*:*"
+  noIdentity: stand-down
+```
+
+and generates, in both `ToCriteria`, `Filter["ID"] = id.TenantID()` under an `IsSuperAdmin()`
+bypass — `"ID"` being the framework's fixed logical name for the aggregate id. A tenant holding
+`tenant:read` now sees itself and nothing else; a `*:*` operator still sees the registry. Proven
+end to end by `qa/security.sh` S3c.6 / S3c.11 / S3c.12 (+ complements), which until this change
+were two `skip_` cases asserting the opposite.
+
+**The three WRITE rows stay unscoped, and that is a DECISION, not a leftover.** `applies: [read]`
+names the read only. The maintainer chose it on 2026-09-07: the writes are contained by the
+permission distribution described above, which no principal inside a tenant satisfies, and
+`qa/security.sh` S3c.2–S3c.4 prove that refusal at layer 1 — where the containment actually lives.
+Widening the scope to `update` / `archive` / `unarchive` is a one-line spec edit
+(`applies: [read, update, archive, unarchive]`, or dropping `applies` entirely) if the posture
+should ever change.
 
 Archive and unarchive share `tenant:archive` — one permission, both directions. Archive also forces `Status` to `suspended`.
 

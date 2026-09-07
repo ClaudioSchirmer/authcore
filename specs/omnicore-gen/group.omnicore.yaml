@@ -853,8 +853,13 @@ authz:
   # tenant's group answers 404 rather than 403: it does not exist for this caller, which
   # leaks nothing about who else exists. A group listing IS the customer's org chart, so
   # writes-only isolation would be worse here than it would have been on Role.
-  dataAccess: tenant
-  tenantField: TenantID
+  dataAccess: scoped
+  scopes:
+    # The row's half is the tenant_id column this entity owns; the caller's half is the
+    # tenant claim. Migrated from the retired dataAccess: tenant + tenantField pair
+    # (omnicore plugin 0.65.0) — same accessor, same filter, same 403, and since 0.66.0
+    # the same exported carrier and guard names an accessor-fed scope always had.
+    - {field: TenantID, from: tenant}
   # WHO crosses the row scope: the platform operator supporting a customer. A *:* holder
   # reads and repairs rows that are not theirs; a resource wildcard (group:*) does NOT.
   bypass: "*:*"

@@ -433,9 +433,36 @@ surfaces:
 
 authz:
   resource: tenant
-  # A platform registry: tenant:insert is already a platform-level operation, and the
-  # tenant claim the alternatives would filter on is not issued yet.
-  dataAccess: anyone-with-permission
+  # The registry's rows are the partitions themselves, so the row scope here is the row's OWN
+  # identity: `field: ID` compares the aggregate id against the caller's tenant claim, under the
+  # framework's fixed logical name for that id. No `tenant_id` column exists on `tenants` and none
+  # is needed — a tenant does not BELONG to a tenant, it IS one.
+  dataAccess: scoped
+  scopes:
+    # READ ONLY, deliberately. `tenant:read` is the one of the four tenant permissions a customer
+    # legitimately receives, and without this filter it answered with every other customer's name,
+    # workspace, description and commercial status. That is the leak this closes: not a permission
+    # distributed wrongly, but a permission distributed rightly reaching rows it was never meant to.
+    #
+    # The three WRITE verbs stay unscoped BY DECISION (maintainer, 2026-09-07), not by omission.
+    # They are contained by the distribution of tenant:update / tenant:archive: conferring one
+    # requires holding it (no-escalation, internal/domain/role_rules_manual.go), and nobody inside
+    # a tenant holds either. A *:* operator putting one on a customer's role is deliberate.
+    # ACCESS_MATRIX.md keeps those three rows marked so the choice stays visible.
+    #
+    # The insert would be exempt in any case: the framework has just minted the id and it belongs
+    # to nobody yet, so comparing it would refuse every creation the registry serves. Who may
+    # create a row here is authz.permissions.insert.
+    - {field: ID, from: tenant, applies: [read]}
+  # WHO crosses the row scope: the platform operator running the registry. A *:* holder lists and
+  # reads every tenant; a resource wildcard (tenant:*) does NOT.
+  bypass: "*:*"
+  # A POLICY, and two states rather than one — the same one the five scoped aggregates declare.
+  # ctx.Identity() nil happens only under auth.mode: disabled, which the framework's own boot
+  # guard allows ONLY in dev, so a stand-down here cannot reach a deployed environment. Under
+  # jwt the claim is guaranteed present: authorization.tenant.required rejects a token without
+  # it at the middleware, with 403, before any handler can read a row against an empty scope.
+  noIdentity: stand-down
   permissions:
     insert: tenant:insert
     patch: tenant:update

@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:d785660c312a8f5e6b1b96fd05237cb6053287810a65afa96f23969ef70e997d
+// generated:  2026-09-07
+// checksum:   sha256:4d51b637ad8c5602846a199d6ad057694c317a751f0a79f356e66e3ae041ce86
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -66,8 +66,8 @@ type Claim struct {
 
 	// Fed from the caller's identity by the command mapper and read by the
 	// rules below. Never persisted, so it carries no labelKey and no column.
-	RequestingIdentityPresent bool   // Whether the request carried an identity at all
 	RequestingTenant          string // The caller's own tenant, from the request identity
+	RequestingIdentityPresent bool   // Whether the request carried an identity at all
 	RequestingMayCrossScope   bool   // Whether the caller is a super-admin (*:*), which crosses the row scope
 }
 
@@ -102,7 +102,7 @@ func (e *Claim) RequiresService() bool { return true }
 func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
 	// Row scoping, WRITE side. The read filter decides what this caller may
 	// SEE; this decides what they may create, edit and archive. Without it a
-	// caller writes into a tenant that is not theirs and cannot read back what
+	// caller writes into a scope that is not theirs and cannot read back what
 	// they wrote — damage that is invisible from the side that caused it.
 	//
 	// Every WRITE gate, one by one, and no display gate: a read is narrowed
@@ -185,10 +185,11 @@ func (e *Claim) BuildRules(actionName string, service domain.Service, r *domain.
 
 // refuseForeignTenant refuses a write to a row that is not the caller's.
 //
-// RequestingTenant is filled from the request identity by every write
-// command's mapper, including the bodyless ones — an archive is a write to
-// the row like any other, and it loads through the repository, which the read
-// side's filter never touches.
+// It compares the row's TenantID against RequestingTenant, which is filled
+// from the request identity (Identity.TenantID(), whichever claim the
+// deployment configured) by every write command's mapper, including the
+// bodyless ones — an archive is a write to the row like any other, and it
+// loads through the repository, which the read side's filter never touches.
 //
 // With NO IDENTITY AT ALL the check stands down: that is provably a
 // development bench, since the middleware is only bypassable with auth.mode

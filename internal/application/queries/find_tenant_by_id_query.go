@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:b1918c331ffb873d5548a926ec3bf44970b1d57df461f3eb1e34c26195e8c727
+// generated:  2026-09-07
+// checksum:   sha256:4d9240d5fc57f122c0e5f06473828f31cbfb9e89c7ca2c7512e2142eaae148b5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,6 +50,29 @@ type FindTenantByIDQuery struct {
 // the same criteria are ignored there by design.
 func (q FindTenantByIDQuery) ToCriteria(ctx *configuration.AppContext) (fwqueries.ReadCriteria, error) {
 	crit := q.Criteria
+	// Callers see only the rows their identity reaches. Filter is a map keyed
+	// by the Go field path, and each scope is FORCED: a value the caller sent
+	// for one of these fields is overwritten, never merged.
+	if crit.Filter == nil {
+		crit.Filter = map[string]any{}
+	}
+	if id := ctx.Identity(); id != nil {
+		// A super-admin crosses every scope: the operator supporting a customer
+		// reads across tenants. Not asked through HasPermission — the framework
+		// panics when a wildcard is the QUESTION, so the *:* a super-admin
+		// carries has a question of its own, and this is it.
+		if !id.IsSuperAdmin() {
+			// TenantID reads whichever claim the deployment configured
+			// (authorization.tenant.claim), so nothing here pins its name.
+			crit.Filter["ID"] = id.TenantID()
+		}
+	} else {
+		// No identity at all: the scope stands down, as authz.noIdentity says.
+		// Reachable only on a dev bench — auth.mode disabled is refused outside
+		// APP_PROFILE=dev — and it serves EVERY row, which is the point: a
+		// scoped entity is otherwise unusable on the machine it is first tried
+		// on, answering every listing empty.
+	}
 	return crit, nil
 }
 

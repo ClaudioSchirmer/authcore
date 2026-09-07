@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:5da96292eab103c6933d6d644f08ada9bb606fc3b1e062726280d10bf3d03c7e
+// generated:  2026-09-07
+// checksum:   sha256:a91e00b4b611fd974d30e70774b8b1d64f0bed626e680664af433265d2a2feb0
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,7 +49,7 @@ func TestPatchUserClaimCommand_KeepsWhatWasNotSent(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"tenant_id": "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 		},
@@ -68,9 +68,9 @@ func TestPatchUserClaimCommand_KeepsWhatWasNotSent(t *testing.T) {
 		t.Fatalf("ApplyPartiallyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.RequestingUserID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+	if e.RequestingUserID != "caller" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingUserID)
 	}
 	out, err := cmd.FromEntity(ctx, e)

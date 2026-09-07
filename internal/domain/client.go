@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:68b79f0119c12369a43d3cdfdaf8a617bea503f4f8f6e040a2c41fc352d7db8b
+// generated:  2026-09-07
+// checksum:   sha256:001e8326603534ab238c9715c5580667861ee5923350d96838b3d22ec9b00673
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -75,8 +75,8 @@ type Client struct {
 	// rules below. Never persisted, so it carries no labelKey and no column.
 	RequestingClientID        string // The caller's own subject, read off their token — what the row rule compares against this row
 	RequestingIdentityKind    string // Which kind of subject the caller is — user or client. Absent means user, which is what keeps the row rule inert until the client token endpoint mints the claim
-	RequestingIdentityPresent bool   // Whether the request carried an identity at all
 	RequestingTenant          string // The caller's own tenant, from the request identity
+	RequestingIdentityPresent bool   // Whether the request carried an identity at all
 	RequestingMayCrossScope   bool   // Whether the caller is a super-admin (*:*), which crosses the row scope
 
 	// Declared here and filled by NOTHING this generator writes. No write DTO,
@@ -142,7 +142,7 @@ func (e *Client) RequiresService() bool { return true }
 func (e *Client) BuildRules(actionName string, service domain.Service, r *domain.Rules) {
 	// Row scoping, WRITE side. The read filter decides what this caller may
 	// SEE; this decides what they may create, edit and archive. Without it a
-	// caller writes into a tenant that is not theirs and cannot read back what
+	// caller writes into a scope that is not theirs and cannot read back what
 	// they wrote — damage that is invisible from the side that caused it.
 	//
 	// Every WRITE gate, one by one, and no display gate: a read is narrowed
@@ -263,10 +263,11 @@ func (e *Client) BuildRules(actionName string, service domain.Service, r *domain
 
 // refuseForeignTenant refuses a write to a row that is not the caller's.
 //
-// RequestingTenant is filled from the request identity by every write
-// command's mapper, including the bodyless ones — an archive is a write to
-// the row like any other, and it loads through the repository, which the read
-// side's filter never touches.
+// It compares the row's TenantID against RequestingTenant, which is filled
+// from the request identity (Identity.TenantID(), whichever claim the
+// deployment configured) by every write command's mapper, including the
+// bodyless ones — an archive is a write to the row like any other, and it
+// loads through the repository, which the read side's filter never touches.
 //
 // With NO IDENTITY AT ALL the check stands down: that is provably a
 // development bench, since the middleware is only bypassable with auth.mode

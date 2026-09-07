@@ -190,9 +190,14 @@ case_ "S3c.5 THE COMPLEMENT: the same principal on the LISTING it does hold" "20
 api GET "/tenants" "" "$QA_TOKEN_LIMITED"
 assert_status 200
 
-case_ "S3c.6 and on the by-id read" "200"
-api GET "/tenants/$ID_SEC" "" "$QA_TOKEN_LIMITED"
-assert_json_at 200 '.data.workspace' "$WS_SEC"
+# The caller's half of the row scope, read from the token the suite already holds. Learning it
+# from GET /tenants instead would ask the endpoint under test to certify its own answer.
+OWN_TEN=$(jwt_claim "$QA_TOKEN_LIMITED" tenant_id)
+[ -n "$OWN_TEN" ] || { echo "security.sh: principal B's token carries no tenant_id claim" >&2; exit 1; }
+
+case_ "S3c.6 and on the by-id read of ITS OWN tenant" "200 — the row scope narrows what is reached, it does not refuse; the permission it holds still answers"
+api GET "/tenants/$OWN_TEN" "" "$QA_TOKEN_LIMITED"
+assert_json_at 200 '.data.id' "$OWN_TEN"
 
 case_ "S3c.7 the privileged principal writes" "201 — the wildcard grant satisfies every check"
 api POST /tenants "$(tenant_body "Permitted Insert" "$(ws sec)" "A tenant the privileged principal is allowed to create." "active")"
@@ -212,14 +217,42 @@ gql 'query { tenants(first: 1) { totalCount edges { node { id } } } }' '{}' "$QA
 assert_gql_ok '(.data.tenants.totalCount >= 1)' "true"
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
-# 3c layer 2 — identity-derived rules. N/A on this aggregate, BY DECISION.
+# 3c layer 2 — the ROW SCOPE on Tenant. Live since 2026-09-07. These two cases USED TO BE
+# SKIPS asserting the opposite ("there is none to leak — the silence is a decision"); the
+# contract they described changed, so they became executed cases rather than being deleted.
+#
+# The registry's rows ARE the partitions, so the scope hangs off the aggregate's own identity:
+# authz.scopes: [{field: ID, from: tenant, applies: [read]}] forces Filter["ID"] = TenantID()
+# into both reads, under an IsSuperAdmin() bypass. Before it, tenant:read — the one of the four
+# tenant permissions a customer legitimately receives — answered with every other customer's
+# name, workspace, description and commercial status.
+#
+# READ ONLY, by decision (maintainer, 2026-09-07). PATCH/archive/unarchive are NOT row-scoped:
+# they are contained by the distribution of tenant:update / tenant:archive, which no principal
+# inside a tenant holds. S3c.2–S3c.4 above already prove principal B is refused on all three —
+# at layer 1, which is where that containment actually lives. ACCESS_MATRIX.md carries the
+# decision and its date, so the absence here reads as a choice and not as a missing case.
 # ═════════════════════════════════════════════════════════════════════════════════════════
 
-case_ "S3c.11 an identity-derived row or field rule on Tenant" "there is none — and the silence is a decision, not a gap"
-skip_ "authz.dataAccess is 'anyone-with-permission' (spec.md §B Q4: anyone holding the permission sees and edits every row). FindTenantsByParamsQuery.ToCriteria returns the criteria unchanged, BuildRules reads no principal field and no Restrict is declared, so there is no per-row or per-field boundary on this aggregate to assert"
+case_ "S3c.11 the LISTING narrows to the caller's own tenant" "exactly 1 row, and it is $OWN_TEN — not the whole registry"
+api GET "/tenants?first=100" "" "$QA_TOKEN_LIMITED"
+assert_json '[(.data // [] | length), ([.data[]?.id] | unique | join(","))] | join("|")' "1|$OWN_TEN"
 
-case_ "S3c.12 cross-tenant isolation on Tenant" "there is none to leak — same decision"
-skip_ "Tenant is the platform registry every other aggregate is scoped BY; it carries no tenant scope of its own, so a cross-tenant read or write is not a boundary this entity has. The isolation cases belong to the scoped aggregates (user, role, group, client), which are out of this round"
+case_ "S3c.12 THE LEAK ITSELF: a by-id read of ANOTHER tenant" "404 RecordNotFoundNotification — not 403: the row does not exist for this caller, which leaks nothing about who else exists"
+api GET "/tenants/$ID_SEC" "" "$QA_TOKEN_LIMITED"
+assert_rest 404 RecordNotFoundNotification
+
+case_ "S3c.12b THE COMPLEMENT: principal A (*:*) crosses the same scope" "200 on the very id principal B was refused — a scope that refuses everyone is also broken"
+api GET "/tenants/$ID_SEC" ""
+assert_json_at 200 '.data.workspace' "$WS_SEC"
+
+case_ "S3c.12c and its listing still spans the registry" "more than 1 row — the bypass is on the LISTING too, not only the by-id read"
+api GET "/tenants?first=100" ""
+assert_json '(.data // [] | length) > 1' "true"
+
+case_ "S3c.12d the scope holds on GRAPHQL too" "1 edge, the caller's own — ToCriteria is shared, but a surface that skipped it would look exactly like a passing REST case"
+gql 'query { tenants(first: 100) { edges { node { id } } } }' '{}' "$QA_TOKEN_LIMITED"
+assert_gql_ok '[(.data.tenants.edges | length), ([.data.tenants.edges[].node.id] | unique | join(","))] | join("|")' "1|$OWN_TEN"
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
 # 3c layer 3 — the tenant gate. Option (a), approved 2026-09-06: a second, short boot whose

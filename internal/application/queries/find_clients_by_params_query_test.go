@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:d7f87a3cfdde79e83a8fb64053062b80faad6961394c3fb88244c38571d7bedc
+// generated:  2026-09-07
+// checksum:   sha256:44ba9472b493cb8b26854dc1d751a424cb5f3c97ffcd5722da62eae52b15a459
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -121,7 +121,7 @@ func TestClientByIDScopeIsForced(t *testing.T) {
 	}
 }
 
-// A super-admin (*:*) reads across the TenantID scope.
+// A super-admin (*:*) reads across every scope Client declares.
 //
 // The identity is a real one and the question is the framework's own
 // HasPermission, so what is under test is the QUESTION the criteria asks —
@@ -139,7 +139,7 @@ func TestClientBypassCrossesTheReadScope(t *testing.T) {
 		t.Fatalf("the listing criteria failed: %v", err)
 	}
 	if got, ok := out.Filter["TenantID"]; ok {
-		t.Errorf("the bypass holder was scoped to %v anyway — they cannot support a customer", got)
+		t.Errorf("the bypass holder was scoped to %v on TenantID anyway — they cannot support a customer", got)
 	}
 }
 

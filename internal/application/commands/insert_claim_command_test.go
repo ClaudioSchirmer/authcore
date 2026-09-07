@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:01133c8c27d55951ff8c48f9e5fb0a0f038e9437a493224e398197ee6ffcb040
+// generated:  2026-09-07
+// checksum:   sha256:1c6487d710106c25599a35a1cbe1308ebe36a16280cb0348e532d570534cf628
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -61,7 +61,7 @@ func TestInsertClaimMapsEveryField(t *testing.T) {
 		t.Fatalf("ToEntity: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if e.Name.Value() != "x_cost_center" {
 		t.Errorf("Name did not survive the mapper")

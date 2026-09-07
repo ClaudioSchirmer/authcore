@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:8abefcbe2e9e25a521e60ce0f9b9f730478f9267ba64638fbb5497d26f07c1e3
+// generated:  2026-09-07
+// checksum:   sha256:dcda4403b15a3fbabfb38befbd46d550da3dd2c090b5a7cf8b916292160c60ab
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -64,7 +64,7 @@ func TestInsertGroupMapsEveryField(t *testing.T) {
 		t.Fatalf("ToEntity: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if e.Key.Value() != "engineering" {
 		t.Errorf("Key did not survive the mapper")
