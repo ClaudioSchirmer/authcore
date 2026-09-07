@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:01771358609a467cd7671d431a32f23f6e08ef7e9a62f17db6199c76d7f1e209
+// generated:  2026-09-07
+// checksum:   sha256:654f69261a8c0dad1c1b923e117104f6bfdcdf756e21458eee24fb399c99898c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,7 @@ func TestInsertClientMapsEveryField(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"identity_kind": "someone@example.test",
 			"tenant_id":     "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
@@ -74,9 +74,9 @@ func TestInsertClientMapsEveryField(t *testing.T) {
 		t.Fatalf("ToEntity: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.RequestingClientID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+	if e.RequestingClientID != "caller" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingClientID)
 	}
 	if e.Name.Value() != "Billing integration" {

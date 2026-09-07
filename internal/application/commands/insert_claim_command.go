@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:eb1e54c93ee6ebc6bbc09cc05f6aaad4fce0ad049627275d2a34f14019ddb00b
+// generated:  2026-09-07
+// checksum:   sha256:7cf65032c53059419fe0ccb5df73e88c8434f31e5c098cee33632569e3afc430
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -64,19 +64,19 @@ func (c *InsertClaimCommand) ToEntity(ctx *configuration.AppContext) (*appdomain
 		}
 	}
 
-	// …unless the caller stated the tenant themselves. Absent means
-	// "mine", which the line above already wrote. Present, it is applied
-	// HERE and judged in BuildRules: a caller who may not cross the row
-	// scope meets the same refusal a write into a foreign tenant meets,
-	// instead of having the value quietly replaced by their own.
+	// …unless the caller stated the scope themselves. Absent means "mine",
+	// which the line above already wrote. Present, it is applied HERE and
+	// judged in BuildRules: a caller who may not cross the row scope meets
+	// the same refusal a write into a foreign row meets, instead of having
+	// the value quietly replaced by their own.
 	if c.TenantID != nil {
 		e.TenantID = *c.TenantID
 	}
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
-		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
+		e.RequestingIdentityPresent = true
 		// The super-admin grant, not asked through HasPermission: that
 		// method panics on a wildcard, since the CLAIM wildcards and the
 		// question does not. The framework gives the wildcard its own

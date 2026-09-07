@@ -5,7 +5,8 @@
 #   ./qa/run.sh --all            every lane, exhaustive sweep (RED does not stop the run)
 #   ./qa/run.sh tenant domain    a SUBSET, on this same runner — never a rival script
 #
-# Plan:    specs/qa/tenant-contract/plan.md
+# Plans:   specs/qa/tenant-contract/plan.md      (tenant, tenant_graphql, and the R/S3/A blocks)
+#          specs/qa/permission-contract/plan.md  (permission, permission_graphql, and the P/S4/A15+ blocks)
 # Verdict: qa/qa-report.md  (rewritten in full after EVERY lane, so a run killed halfway still
 #          leaves what it had proven)
 # Logs:    qa/.logs/<run-id>/
@@ -16,17 +17,19 @@
 #   · the build tags — `postgres` from relational.dialect, and NO transport tag because the
 #     yaml declares no transport: block;
 #   · the boot on :8099 under the suite's own config, and the drain-respecting shutdown;
-#   · the two principals every lane borrows: the seeded bootstrap admin and a limited user the
-#     suite creates through the API.
+#   · the four principals the lanes borrow: the seeded bootstrap admin (*:*), a tenant:read
+#     user, a permission:read user, and a permission:read user in a SECOND tenant. All but the
+#     first are created through the API, and each exists because the others cannot see what it
+#     sees — qa/security.sh S4 says which is which.
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 # ── the lane list. This array IS the inventory: a .sh under qa/ that no lane names is a suite
 # ── nobody runs, and a lane naming a missing file breaks the run for everyone.
-LANES=(tenant tenant_graphql domain security audit)
+LANES=(tenant tenant_graphql permission permission_graphql domain security audit)
 
-PLAN="specs/qa/tenant-contract/plan.md"
+PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md"
 REPORT="qa/qa-report.md"
 PORT=8099
 QA_BASE="http://localhost:$PORT"
@@ -82,9 +85,9 @@ render_report() {
   # line came to name the wrong suite.
   local lane p f s t verdict
   {
-    printf '# QA report — authcore · tenant-contract\n\n'
+    printf '# QA report — authcore · tenant-contract + permission-contract\n\n'
     printf -- '- **run:** `%s` · %s\n' "$QA_RUN_ID" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
-    printf -- '- **plan:** `%s`\n' "$PLAN"
+    printf -- '- **plans:** %s\n' "$PLANS"
     printf -- '- **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags '"'"'postgres'"'"'` (no transport tag — the yaml declares no `transport:` block)\n'
     printf -- '- **omnicore pin:** `%s`\n' "$(go list -m github.com/ClaudioSchirmer/omnicore 2>/dev/null | awk '{print $2}')"
     printf -- '- **hygiene:** throwaway database `%s`, dropped and recreated before this run\n' "$PG_DB"
@@ -314,10 +317,87 @@ QA_TOKEN_LIMITED=$(login "$LIM_EMAIL" "$LIM_PASS2")
 [ -n "$QA_TOKEN_LIMITED" ] || { echo "run.sh: the limited principal could not sign in after rotating its password" >&2; exit 1; }
 echo "   principal B: $LIM_EMAIL (tenant:read only, password rotated)"
 
+# ── principals C and D, for specs/qa/permission-contract/plan.md §3c ──────────────────────
+#
+# Why two more principals rather than reusing B. A and B answer the SAME on all five
+# permission routes — B is refused by all five, A passes all five — so neither can see the
+# failure where every route was gated on one literal. C (permission:read only) is the one
+# caller for which the five answers differ. D is C in a DIFFERENT tenant, and it exists to
+# assert the design decision that Permission is the one aggregate of the seven that is NOT
+# tenant-scoped: it must see exactly the catalog C sees.
+#
+# Both are built with principal A's token, which crosses the tenant scope because it holds
+# *:* — InsertRoleRequest and InsertUserRequest each carry an optional tenantID that defaults
+# to the caller's claim, so setting it explicitly is what puts D somewhere else.
+#
+# A failure to build either is NOT fatal to the run: the lane skips its block loudly and the
+# report prints it in the SKIP column, which is the honest outcome. A run that aborted here
+# would take the six lanes that need nothing from these principals down with it.
+PERM_READ_PERMISSION="01990000-0000-7000-8000-000000000015"
+
+make_reader() { # make_reader LABEL TENANT_ID_OR_EMPTY → accessToken on stdout
+  local label="$1" tenant="$2"
+  local email="qa-$label-$QA_RUN_ID@authcore.local" p1='Qa!Reader2026' p2='Qa!Reader2026b'
+  local role_json role_id user_json user_id boot
+
+  role_json=$(curl -s -X POST "$QA_BASE/roles" \
+    -H "Authorization: Bearer $QA_TOKEN_ADMIN" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg k "qa-$label-$QA_RUN_ID" --arg p "$PERM_READ_PERMISSION" --arg t "$tenant" \
+          '{key:$k, name:"QA Catalog Reader",
+            description:"Grants read access to the platform permission catalog and nothing else, for the QA suite.",
+            permissions:[{permissionID:$p}]} + (if $t == "" then {} else {tenantID:$t} end)')")
+  role_id=$(printf '%s' "$role_json" | jq -r '.data.id // empty')
+  [ -n "$role_id" ] || { echo "run.sh: could not create the $label role: $role_json" >&2; return 1; }
+
+  user_json=$(curl -s -X POST "$QA_BASE/users" \
+    -H "Authorization: Bearer $QA_TOKEN_ADMIN" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg e "$email" --arg p "$p1" --arg r "$role_id" --arg t "$tenant" \
+          '{givenName:"Qa", familyName:"Catalog", email:$e, status:"active",
+            password:$p, passwordConfirmation:$p, roles:[{roleID:$r}]} + (if $t == "" then {} else {tenantID:$t} end)')")
+  user_id=$(printf '%s' "$user_json" | jq -r '.data.id // empty')
+  [ -n "$user_id" ] || { echo "run.sh: could not create the $label user: $user_json" >&2; return 1; }
+
+  # Born must_change_password=TRUE, like every API-created account: its first token carries
+  # user:change-password alone, so without this rotation the principal would answer 403 to the
+  # permission:read it genuinely holds and every case below would pass for the wrong reason.
+  boot=$(login "$email" "$p1")
+  [ -n "$boot" ] || { echo "run.sh: the $label principal could not sign in" >&2; return 1; }
+  curl -s -X PATCH "$QA_BASE/users/$user_id/password" \
+    -H "Authorization: Bearer $boot" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg cp "$p1" --arg np "$p2" '{currentPassword:$cp, password:$np, passwordConfirmation:$np}')" >/dev/null
+  login "$email" "$p2"
+}
+
+QA_TOKEN_PERMREAD=$(make_reader permread "" || true)
+if [ -n "$QA_TOKEN_PERMREAD" ]; then
+  echo "   principal C: qa-permread-$QA_RUN_ID@authcore.local (permission:read only, master tenant)"
+else
+  echo "   principal C: NOT BUILT — qa/security.sh S4.4 will skip and say so" >&2
+fi
+
+# Principal D needs a tenant of its own before it can live in one.
+OTHER_TENANT=$(curl -s -X POST "$QA_BASE/tenants" \
+  -H "Authorization: Bearer $QA_TOKEN_ADMIN" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+  -d "$(jq -nc --arg w "qa-other-$QA_RUN_ID" \
+        '{name:"QA Other Tenant", workspace:$w,
+          description:"A second isolation partition, so the QA suite can prove the permission catalog is global.",
+          status:"active"}')" | jq -r '.data.id // empty')
+if [ -n "$OTHER_TENANT" ]; then
+  QA_TOKEN_OTHERTENANT=$(make_reader othertenant "$OTHER_TENANT" || true)
+else
+  QA_TOKEN_OTHERTENANT=""
+fi
+if [ -n "$QA_TOKEN_OTHERTENANT" ]; then
+  echo "   principal D: qa-othertenant-$QA_RUN_ID@authcore.local (permission:read only, tenant $OTHER_TENANT)"
+else
+  echo "   principal D: NOT BUILT — qa/security.sh S4.5 will skip and say so" >&2
+fi
+
 # The lanes need these to exercise the login route itself (§3b).
 QA_ADMIN_EMAIL="admin@authcore.local"
 QA_ADMIN_PASSWORD="$ADMIN_PASS"
 export QA_TOKEN_ADMIN QA_TOKEN_LIMITED QA_ADMIN_EMAIL QA_ADMIN_PASSWORD
+export QA_TOKEN_PERMREAD QA_TOKEN_OTHERTENANT
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
 # 7. the lanes

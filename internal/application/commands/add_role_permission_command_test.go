@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:45c781e743564c49a1be44f824ae6c6a7687d1dc3c434ba28392e270a5784878
+// generated:  2026-09-07
+// checksum:   sha256:24f9a850e9567f580d165cb683bf817c3c0a722b4876f2d63856083a17d93d9c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -54,7 +54,7 @@ func TestAddRolePermissionCommand_AppliesAndProjects(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	out, err := cmd.FromEntity(ctx, e)
 	if err != nil {

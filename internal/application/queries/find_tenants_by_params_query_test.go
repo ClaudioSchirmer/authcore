@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:e984faaeb764066dd13151c7e86c191d26a9658961ecb94c8de4e7fd9e3d3f13
+// generated:  2026-09-07
+// checksum:   sha256:6f29e6ff09e1b35e25567092508cda406b5a832d0d8ac74b26a2d4d7daeeabd9
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,6 +59,85 @@ func TestFindTenantsByParamsQuerySurvivesAnEmptyResult(t *testing.T) {
 	ctx := &configuration.AppContext{}
 	if _, err := (FindTenantsByParamsQuery{}).FromQueryResult(ctx, FindTenantsByParamsResult{}); err != nil {
 		t.Errorf("the listing derivation failed: %v", err)
+	}
+}
+
+// The listing is scoped to the caller, and ID is not the caller's to choose.
+//
+// Two identities, because one proves nothing: a mapper that pinned a constant
+// would satisfy a single case and hand every row to the second caller. The
+// query also ARRIVES with a value for the field, which is what a caller
+// probing for someone else's rows would send — it must be overwritten, not
+// merged.
+func TestTenantScopeIsForced(t *testing.T) {
+	for _, want := range []string{"tenant-a", "tenant-b"} {
+		ctx := &configuration.AppContext{}
+		ctx.SetIdentity(&configuration.Identity{Claims: map[string]any{"tenant_id": want}})
+		q := FindTenantsByParamsQuery{}
+		// What a caller fishing for someone else's rows would send.
+		q.Criteria.Filter = map[string]any{"ID": "somebody-else"}
+		out, err := q.ToCriteria(ctx)
+		if err != nil {
+			t.Fatalf("the listing criteria failed: %v", err)
+		}
+		if got := out.Filter["ID"]; got != want {
+			t.Errorf("the scope is %v, the caller is ID %v — the caller's rows are not the ones being read", got, want)
+		}
+	}
+
+	// No identity: the scope STANDS DOWN, as authz.noIdentity says. Only a
+	// dev bench reaches this — auth.mode disabled is refused outside
+	// APP_PROFILE=dev — and it is what makes a scoped entity usable there
+	// at all, instead of answering every listing empty.
+	anon := &configuration.AppContext{}
+	out, err := (FindTenantsByParamsQuery{}).ToCriteria(anon)
+	if err != nil {
+		t.Fatalf("the anonymous listing criteria failed: %v", err)
+	}
+	if _, ok := out.Filter["ID"]; ok {
+		t.Error("an anonymous read was scoped anyway — stand-down means no scope, not an empty one")
+	}
+}
+
+// Opening one record is scoped too, and ID is not the caller's to choose.
+//
+// The by-id read and the listing are two functions written by one emitter, and
+// for a while only the listing was asserted. It is the read where a missing
+// scope leaks most directly: the caller already holds the id.
+func TestTenantByIDScopeIsForced(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	ctx.SetIdentity(&configuration.Identity{Claims: map[string]any{"tenant_id": "tenant-a"}})
+	q := FindTenantByIDQuery{}
+	// What a caller fishing for someone else's record would send.
+	q.Criteria.Filter = map[string]any{"ID": "somebody-else"}
+	out, err := q.ToCriteria(ctx)
+	if err != nil {
+		t.Fatalf("the by-id criteria failed: %v", err)
+	}
+	if got := out.Filter["ID"]; got != "tenant-a" {
+		t.Errorf("the by-id read is scoped to %v — the caller's own scope is not what it forced", got)
+	}
+}
+
+// A super-admin (*:*) reads across every scope Tenant declares.
+//
+// The identity is a real one and the question is the framework's own
+// HasPermission, so what is under test is the QUESTION the criteria asks —
+// the domain's bypass test sets the flag by hand and cannot see it.
+func TestTenantBypassCrossesTheReadScope(t *testing.T) {
+	ctx := &configuration.AppContext{}
+	ctx.SetIdentity(&configuration.Identity{
+		Claims: map[string]any{
+			"tenant_id":   "tenant-a",
+			"permissions": []any{"*:*"},
+		},
+	})
+	out, err := (FindTenantsByParamsQuery{}).ToCriteria(ctx)
+	if err != nil {
+		t.Fatalf("the listing criteria failed: %v", err)
+	}
+	if got, ok := out.Filter["ID"]; ok {
+		t.Errorf("the bypass holder was scoped to %v on ID anyway — they cannot support a customer", got)
 	}
 }
 

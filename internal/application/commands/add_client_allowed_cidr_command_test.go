@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:392d14b648bb99a1cb2c38fd4265de574b58c25d8826686c8f83289bbe1c1435
+// generated:  2026-09-07
+// checksum:   sha256:41f8ac74f17b81b9793bd22033b02ea1102c11569c891eaef79616e3ada6fa7c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -44,7 +44,7 @@ func TestAddClientAllowedCIDRCommand_AppliesAndProjects(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"identity_kind": "someone@example.test",
 			"tenant_id":     "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
@@ -57,9 +57,9 @@ func TestAddClientAllowedCIDRCommand_AppliesAndProjects(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
-	if e.RequestingClientID != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
+	if e.RequestingClientID != "caller" {
 		t.Errorf("the caller's subject did not reach the entity (%q) — every rule reading it judges the wrong caller", e.RequestingClientID)
 	}
 	out, err := cmd.FromEntity(ctx, e)

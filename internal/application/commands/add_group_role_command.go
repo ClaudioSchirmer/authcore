@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:37af60e71655c6522f3f61b089ec406d63d7cb6594cd8f630cf562b0f2f433c3
+// generated:  2026-09-07
+// checksum:   sha256:038b6060b6e7247d7d6b1faa6a951f802ff8aeebd05bcb1b5ce66b7400aa2cc1
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -57,8 +57,8 @@ func (cmd *AddGroupRoleCommand) ApplyTo(ctx *configuration.AppContext, e *appdom
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
-		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
+		e.RequestingIdentityPresent = true
 		// The super-admin grant, not asked through HasPermission: that
 		// method panics on a wildcard, since the CLAIM wildcards and the
 		// question does not. The framework gives the wildcard its own

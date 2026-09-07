@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:298ebd53717bb3fbf03a70817dc99f3228f04bec26341ac1e9d666c7d27c7026
+// generated:  2026-09-07
+// checksum:   sha256:c324ed8220df292f6c3215b40e6c9d0a7afb7e50080282a0ce29c6393a43d5ec
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -121,7 +121,7 @@ func TestClaimByIDScopeIsForced(t *testing.T) {
 	}
 }
 
-// A super-admin (*:*) reads across the TenantID scope.
+// A super-admin (*:*) reads across every scope Claim declares.
 //
 // The identity is a real one and the question is the framework's own
 // HasPermission, so what is under test is the QUESTION the criteria asks —
@@ -139,7 +139,7 @@ func TestClaimBypassCrossesTheReadScope(t *testing.T) {
 		t.Fatalf("the listing criteria failed: %v", err)
 	}
 	if got, ok := out.Filter["TenantID"]; ok {
-		t.Errorf("the bypass holder was scoped to %v anyway — they cannot support a customer", got)
+		t.Errorf("the bypass holder was scoped to %v on TenantID anyway — they cannot support a customer", got)
 	}
 }
 

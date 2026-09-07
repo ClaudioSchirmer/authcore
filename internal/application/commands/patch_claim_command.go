@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c0c2961f2b88997b6fb7ad7a70871fd1354747028ad0b5c822ac01ae22bb5c48
+// generated:  2026-09-07
+// checksum:   sha256:9927660121ff3a213b1c0692a80cc111aa14ce071bcca66e545a8970cf71ed13
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -66,8 +66,8 @@ func (c *PatchClaimCommand) ApplyPartiallyTo(ctx *configuration.AppContext, e *a
 
 	// Identity-derived state the rules read. It is never persisted.
 	if id := ctx.Identity(); id != nil {
-		e.RequestingIdentityPresent = true
 		e.RequestingTenant = id.TenantID()
+		e.RequestingIdentityPresent = true
 		// The super-admin grant, not asked through HasPermission: that
 		// method panics on a wildcard, since the CLAIM wildcards and the
 		// question does not. The framework gives the wildcard its own

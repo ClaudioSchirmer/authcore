@@ -90,4 +90,60 @@ api POST /tenants "$(tenant_body "aaaa" "$WS_REJ" "A write that the domain refus
 got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Tenant' AND payload::jsonb -> 'snapshot' ->> 'Workspace' = '$WS_REJ';")
 if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#
+#   P E R M I S S I O N  —  the audit family of specs/qa/permission-contract/plan.md §4
+#
+#   Same framework promise, one aggregate over. What is worth asserting HERE rather than
+#   inheriting the Tenant cases wholesale is the shape peculiar to this entity: it has THREE
+#   write verbs, not four, because there is no unarchive — and the absence of that row in the
+#   timeline is itself a contract, not an omission.
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+R_AUD=$(pair_resource aud)
+ID_P=$(new_permission "$R_AUD" read "The audit fixture of the permission lane, written three times so its timeline can be read.") || exit 1
+
+case_ "A15 the INSERT wrote one audit row for Permission" "1 row, entity_type 'Permission', aggregate_id the catalog row's id"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND entity_type='Permission' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A16 the actor is the acting principal, not the row's owner" "the admin's sub — a catalog is global, but the WRITE is still attributable to a person"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='insert' AND actor IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A17 the actor's tenant claim is recorded" "not null — the catalog is not tenant-scoped, but the actor is"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='insert' AND tenant_id IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A18 the declared auditClaims ride the payload" "email and tenant_workspace are both present"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='insert' AND payload::jsonb -> 'actorClaims' ->> 'email' = 'admin@authcore.local' AND payload::jsonb -> 'actorClaims' ->> 'tenant_workspace' = 'master';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/permissions/$ID_P" '{"description":"The audit fixture of the permission lane, with its wording revised so a change block exists."}'
+
+case_ "A19 the UPDATE wrote its own row, carrying a changes block" "1 row with verb 'update' and a non-empty changes payload"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='update' AND payload::jsonb ? 'changes';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/permissions/$ID_P/archive"
+
+case_ "A20 the ARCHIVE wrote a transition row" "1 row with verb 'archive' and kind 'transition'"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='archive' AND kind='transition';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A21 there is NO unarchive row, ever" "0 — the verb does not exist on this aggregate, and its absence from the timeline is the contract, not a gap"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P' AND verb='unarchive';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A22 the three writes left exactly three rows" "3 — one event per write, and no fourth verb to write a fourth"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_P';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "3" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A23 a REFUSED permission write leaves no audit row" "0 — the row is written in the write's own transaction and rolls back with it"
+R_AUDREJ=$(pair_resource audrej)
+api POST /permissions "$(permission_body "$R_AUDREJ" "Read" "A permission write the domain refuses, so nothing at all is committed.")"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Permission' AND payload::jsonb -> 'snapshot' ->> 'Resource' = '$R_AUDREJ';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
 qa_finish

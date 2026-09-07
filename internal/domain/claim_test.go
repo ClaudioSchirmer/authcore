@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-06
-// checksum:   sha256:d1b1b12bd2b1d8ef9ac88dfadc3e15655f9ae128b57026d5c7307eddf0c78ef2
+// generated:  2026-09-07
+// checksum:   sha256:b806858c558979e777185909ad0546dc7c7e733d0da0ae7fe82ed992948bc4c5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -104,7 +104,7 @@ func validClaim() *Claim {
 		// that left it false would test those rules standing down rather than
 		// running — which is how a negative case passes while proving nothing.
 		RequestingIdentityPresent: true,
-		// The row is in the caller's own TenantID.
+		// The row is inside the caller's own TenantID.
 		RequestingTenant: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
 	}
 }
@@ -129,61 +129,61 @@ func TestClaimDeclaresItsAggregateContract(t *testing.T) {
 	}
 }
 
-// A insert of a row in another tenant is refused.
+// A insert of a row outside the caller's TenantID is refused.
 //
 // The caller holds the insert permission — that is a different question, and
 // it is already answered by the route. This is about WHICH ROW: the read side
 // would never have shown it to them, and without this the write side would let
 // them have it anyway.
-func TestClaim_InsertOutsideTenant_IsRefused(t *testing.T) {
+func TestClaim_InsertOutsideTenantID_IsRefused(t *testing.T) {
 	e := validClaim()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetInsertable(e, &stubClaimService{}, "GetInsertable")
 	if err == nil {
-		t.Fatal("a insert into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a insert outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !claimBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", claimRejectedFields(err))
 	}
 }
 
-// A update of a row in another tenant is refused.
+// A update of a row outside the caller's TenantID is refused.
 //
 // The caller holds the update permission — that is a different question, and
 // it is already answered by the route. This is about WHICH ROW: the read side
 // would never have shown it to them, and without this the write side would let
 // them have it anyway.
-func TestClaim_UpdateOutsideTenant_IsRefused(t *testing.T) {
+func TestClaim_UpdateOutsideTenantID_IsRefused(t *testing.T) {
 	e := validClaim()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetUpdatable(e, func(*Claim) error { return nil }, &stubClaimService{}, "GetUpdatable")
 	if err == nil {
-		t.Fatal("a update into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a update outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !claimBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", claimRejectedFields(err))
 	}
 }
 
-// A archive of a row in another tenant is refused.
+// A archive of a row outside the caller's TenantID is refused.
 //
 // The caller holds the archive permission — that is a different question,
 // and it is already answered by the route. This is about WHICH ROW: the read
 // side would never have shown it to them, and without this the write side
 // would let them have it anyway.
-func TestClaim_ArchiveOutsideTenant_IsRefused(t *testing.T) {
+func TestClaim_ArchiveOutsideTenantID_IsRefused(t *testing.T) {
 	e := validClaim()
 	e.RequestingTenant = "somebody-else"
 	_, err := domain.GetArchivable(e, &stubClaimService{}, "GetArchivable")
 	if err == nil {
-		t.Fatal("a archive into another tenant was accepted — the caller cannot even read this row back")
+		t.Fatal("a archive outside the caller's TenantID was accepted — the caller cannot even read this row back")
 	}
 	if !claimBlames(err, "TenantID") {
 		t.Errorf("the rejection should name TenantID, it named %v", claimRejectedFields(err))
 	}
 }
 
-// The *:* bypass crosses the tenant scope.
+// The *:* bypass crosses every scope this entity declares.
 //
 // It is the operator supporting a customer: they have to be able to repair a
 // row that is not theirs. Without a test the key can be declared, read off the
@@ -193,11 +193,11 @@ func TestClaim_BypassCrossesTheScope(t *testing.T) {
 	e.RequestingTenant = "somebody-else"
 	e.RequestingMayCrossScope = true
 	if _, err := domain.GetInsertable(e, &stubClaimService{}, "GetInsertable"); err != nil {
-		t.Fatalf("the bypass holder was refused a row outside their tenant: %v", err)
+		t.Fatalf("the bypass holder was refused a row outside their scope: %v", err)
 	}
 }
 
-// With no identity at all the guard stands down, as authz.noIdentity says.
+// With no identity at all the guards stand down, as authz.noIdentity says.
 //
 // Only a dev bench reaches it — the middleware is bypassable solely with
 // auth.mode disabled, which the framework refuses outside APP_PROFILE=dev —
@@ -219,13 +219,13 @@ func TestClaim_NoIdentityStandsDown(t *testing.T) {
 //
 // It arrives at the domain looking exactly like the anonymous case above —
 // an empty scope — and it is the opposite situation: an authenticated
-// request that simply cannot be placed in any tenant. Standing down for it
+// request that simply cannot be placed in any scope. Standing down for it
 // would let any claimless token write anywhere.
-func TestClaim_IdentityWithoutTheClaim_IsRefused(t *testing.T) {
+func TestClaim_IdentityWithoutTenantID_IsRefused(t *testing.T) {
 	e := validClaim()
 	e.RequestingTenant = ""
 	if _, err := domain.GetInsertable(e, &stubClaimService{}, "GetInsertable"); err == nil {
-		t.Fatal("a token carrying no tenant claim wrote into a tenant that is not theirs")
+		t.Fatal("a token carrying no tenant claim wrote into a row that is not theirs")
 	}
 }
 

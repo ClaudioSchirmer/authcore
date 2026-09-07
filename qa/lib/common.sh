@@ -274,6 +274,62 @@ ws() {
   printf 'qa-%s-%s-%d' "${1:-t}" "${QA_RUN_ID:-local}" "$n"
 }
 
+# ── Permission fixtures ──────────────────────────────────────────────────────────────────
+#
+# A resource has to be a lowercase slug — 2-64 runes, hyphen-separated alphanumeric groups,
+# no run of 4 identical runes (internal/domain/vos/permission_key.go). The run id is built
+# from a timestamp and a pid, so it CAN carry a run of four identical digits (midnight, or a
+# pid like 1000), and a fixture that 422s on some runs and not on others is worse than one
+# that never works. The collapse below turns any run of 3+ into 2, which makes the rule
+# unreachable by construction rather than by luck.
+qa_slug_runid() {
+  printf '%s' "${QA_RUN_ID:-local}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed -E 's/(.)\1{2,}/\1\1/g'
+}
+
+# pair_resource [PREFIX] → a resource unique to this run AND this call, like `ws` for tenants.
+# Same file-backed counter discipline: this is almost always called inside $( ), so an
+# in-memory counter would increment a copy the parent never sees and every call in a loop
+# would hand back the same pair.
+pair_resource() {
+  local f="${QA_RUN_DIR:-/tmp}/.pair-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'qa-%s-%s-%d' "${1:-p}" "$(qa_slug_runid)" "$n"
+}
+
+# permission_body RESOURCE ACTION DESCRIPTION
+#
+# The request speaks the composite's EXPOSED PARTS and never its own field name: `resource`
+# and `action` go in, `permission` comes back. Nothing on the write side carries the rendered
+# pair — that asymmetry is the entity's whole shape and the suite must not paper over it.
+permission_body() {
+  jq -nc --arg r "$1" --arg a "$2" --arg d "$3" '{resource:$r, action:$a, description:$d}'
+}
+
+# new_permission [RESOURCE] [ACTION] [DESCRIPTION] → echoes the created row's id.
+# Fixture creation, not a case: it asserts nothing and aborts the lane loudly if refused.
+new_permission() {
+  local resource="${1:-$(pair_resource f)}" action="${2:-read}"
+  local desc="${3:-Fixture catalog entry created by the QA suite for run ${QA_RUN_ID:-local}.}"
+  api POST /permissions "$(permission_body "$resource" "$action" "$desc")"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /permissions answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.id // .id'
+}
+
+# assert_absent JQ_PATH — the NEGATIVE half of the golden record, and the assertion this
+# entity exists to make: `resource` and `action` are stored, filterable and orderable, and
+# they must reach NO response body on ANY surface. Absent means the KEY is missing, not that
+# it is present and null — `has()` is what tells those two apart, and a suite that used
+# `== null` would pass on a field that leaked as an explicit null.
+assert_absent() {
+  local path="$1" got
+  got=$(printf '%s' "$HTTP_BODY" | jq -r "$path" 2>/dev/null)
+  if [ "$got" = "false" ]; then pass_; else fail_ "$path = '$got' (expected false — the key must not be present)"; fi
+}
+
 # tenant_body NAME WORKSPACE DESCRIPTION STATUS
 tenant_body() {
   jq -nc --arg n "$1" --arg w "$2" --arg d "$3" --arg s "$4" \
@@ -322,6 +378,36 @@ jwt_hs256() {
   signing="$h.$p"
   sig=$(printf '%s' "$signing" | openssl dgst -sha256 -hmac "$secret" -binary | b64url)
   printf '%s.%s' "$signing" "$sig"
+}
+
+# qa_login EMAIL PASSWORD → accessToken on stdout.
+#
+# The same flow run.sh uses for its own principals, exposed here because a LANE sometimes has
+# to mint a token mid-run: the revocation chain of domain.sh P9/P10 signs in, archives the
+# permission, and signs in AGAIN — and the whole assertion is the difference between the two
+# tokens. Nothing is invented: this service is its own IdP and this is its documented route.
+qa_login() {
+  curl -s -X POST "$QA_BASE/auth/user/token" \
+    -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg e "$1" --arg p "$2" '{email:$e, password:$p}')" \
+  | jq -r '.data.accessToken // empty'
+}
+
+# jwt_claim TOKEN CLAIM — READ one claim out of a token the suite already holds.
+#
+# Not a forgery seat: it never signs and never mints. It exists because the row-scope cases
+# need the CALLER's half of the comparison — principal B's own tenant — and every other way
+# to learn it asks the very endpoint under test, which would make the assertion circular.
+# The claim is the same value the service itself scopes by, read from the same token.
+jwt_claim() {
+  local payload="${1#*.}"
+  payload="${payload%%.*}"
+  case $(( ${#payload} % 4 )) in
+    2) payload="$payload==" ;;
+    3) payload="$payload=" ;;
+  esac
+  printf '%s' "$payload" | tr '_-' '/+' | openssl base64 -d -A 2>/dev/null \
+    | jq -r --arg c "$2" '.[$c] // empty'
 }
 
 now_epoch() { date +%s; }

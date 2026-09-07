@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:bc475e65c0e9ee14fa3be4eb538d8f32d696533475224aae5b6525ddf1c3010d
+// generated:  2026-09-07
+// checksum:   sha256:757cbfb4828d98c62188f40a2c5f45b807ed73a778636a2c37605c08888b06ed
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,7 +59,7 @@ func TestArchiveGroupCommandApplies(t *testing.T) {
 		t.Fatalf("the mapper failed: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	if _, err := c.FromEntity(ctx, e); err != nil {
 		t.Errorf("projecting the result failed: %v", err)

@@ -74,6 +74,31 @@ A new pair goes in every dialect this service targets (postgres), numbered after
 
 If this entity has NOT shipped anywhere yet — you are still the only one who ever ran it — deleting the pair above and regenerating writes it fresh from the current spec. That is safe exactly while that is true, and never after.
 
+### Yours in a shared file, and out of step with the spec
+
+The notification declarations and the seven translation catalogs are shared by every entity of the project. The generator maintains what IT wrote there — it records a hash of each declaration and each message, so a spec that moves takes its own text with it. These did NOT match what it recorded, which means somebody edited them, or they predate that record. Either way they are not the generator's to overwrite, so they were left exactly as they are:
+
+- TenantArchivedAtField — internal/application/translations/deu.go
+- TenantArchivedAtField — internal/application/translations/esp.go
+- TenantArchivedAtField — internal/application/translations/fra.go
+- TenantArchivedAtField — internal/application/translations/ita.go
+- TenantArchivedAtField — internal/application/translations/nld.go
+- TenantArchivedAtField — internal/application/translations/ptbr.go
+- TenantCreatedAtField — internal/application/translations/deu.go
+- TenantCreatedAtField — internal/application/translations/esp.go
+- TenantCreatedAtField — internal/application/translations/fra.go
+- TenantCreatedAtField — internal/application/translations/ita.go
+- TenantCreatedAtField — internal/application/translations/nld.go
+- TenantCreatedAtField — internal/application/translations/ptbr.go
+- TenantUpdatedAtField — internal/application/translations/deu.go
+- TenantUpdatedAtField — internal/application/translations/esp.go
+- TenantUpdatedAtField — internal/application/translations/fra.go
+- TenantUpdatedAtField — internal/application/translations/ita.go
+- TenantUpdatedAtField — internal/application/translations/nld.go
+- TenantUpdatedAtField — internal/application/translations/ptbr.go
+
+A notification DECLARATION on this list can stop the package compiling, and the error will not point here: if the spec gave it a `tvars` entry, the rules emitted for it now write `N{Max: "50"}` and the struct has no such field — add it, and it goes away. A translation on this list is cosmetic by comparison: the end user simply reads the older wording. If your version is the better one, put it in the spec; the two will then agree and it drops off this list.
+
 ## What to check
 
 ### Read what was generated — it is a first draft, not a verdict
@@ -101,7 +126,9 @@ These are the decisions the spec made that are expensive to change later. Read t
 | Operations | `insert`, `patch`, `archive`, `unarchive`, `byParams`, `byId` | Each one is a route with a permission; an unwanted one is a surface you did not mean to expose. |
 | Removal | archive (reversible) | `DELETE` is a permanent purge and is not mounted. The unarchive endpoint is what reverses it. |
 | Unique | `Workspace` — across the whole table, scope `all` (service-precheck+constraint) | an archived row keeps holding it, so the value is never free again; a duplicate is refused at the database and reported as `TenantWorkspaceAlreadyExistsNotification`. |
-| Data access | anyone-with-permission | Any caller holding the permission sees and edits every row. If some callers should only see their own, this is the line to change. |
+| Data access | scoped | Callers reach only the rows their identity places them in — see the scopes below. |
+| Row scope | `ID` (the row's own identity) = `Identity().TenantID()` — whichever claim `authorization.tenant.claim` names | Enforced on: read. The INSERT is outside it on purpose: the framework mints the identity on that verb, so the row belongs to nobody yet and comparing it would refuse every creation. Who may create one is `authz.permissions.insert`. |
+| Crossing the scope | `*:*` | Only a super-admin crosses the scope, and nothing new became grantable — what crosses is the claim they already carry. The wildcard cannot be handed to the framework's HasPermission (it panics on one), so the generated guard calls `Identity.IsSuperAdmin()` instead — the framework's own question for the `*:*` grant, nil-safe and honouring the configured permissions claim. A resource wildcard like `role:*` does NOT answer it. |
 | Read backing | relational | Reads come straight from the tables, so a write is visible immediately. Nothing is materialised: there is no collection, no version and no rebuild — a shape change here needs no bump and no operational step. |
 
 ### Where each endpoint answers
@@ -123,16 +150,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 |---|---|
 | the by-id query and its result | `internal/application/queries/find_tenant_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_tenants_by_params_query.go` |
-| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
-| the tenants schema (4 columns) | `internal/infra/schemas/tenant_schema.go` |
-| the by-id request and response | `internal/web/requests/find_tenant_by_id.go` |
-| the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
+| the read tests for find_tenants_by_params_query.go | `internal/application/queries/find_tenants_by_params_query_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -140,7 +158,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-29 file(s) were already up to date.
+31 file(s) were already up to date.
 
 ## What was NOT generated
 

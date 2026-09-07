@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:f44b42c6f748b254011af97e85fe83ea2229323c5fb3a3ef21874ef3e01f260f
+// generated:  2026-09-07
+// checksum:   sha256:2c1e7f3b74206533d8f50e744dc67ca099bfa25353de49d317bdbebe11283fb0
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -47,7 +47,7 @@ func TestPatchClientLeavesAbsentFieldsAlone(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"identity_kind": "someone@example.test",
 			"tenant_id":     "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
@@ -75,7 +75,7 @@ func TestPatchClientAppliesWhatItCarries(t *testing.T) {
 	// skipped entirely, and what a scoped write is checked against is exactly
 	// what the feed carries.
 	ctx.SetIdentity(&configuration.Identity{
-		Subject: "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",
+		Subject: "caller",
 		Claims: map[string]any{
 			"identity_kind": "someone@example.test",
 			"tenant_id":     "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410",

@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:b8fa31250a365ad32cf9956f781e858cc2a0e08b34866dd2e77a084e721b14ea
+// generated:  2026-09-07
+// checksum:   sha256:0a4b831ac22ea09b79f26ca5a965ba1db14c5561ea9dd074445b6bc3c895584a
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -66,7 +66,7 @@ func TestArchiveGroupRoleCommand_TakesTheEntryOut(t *testing.T) {
 		t.Fatalf("ApplyTo: %v", err)
 	}
 	if e.RequestingTenant != "0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" {
-		t.Errorf("the caller's scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
+		t.Errorf("the caller's TenantID scope did not reach the entity (%q) — a write outside it could not be refused", e.RequestingTenant)
 	}
 	for _, item := range domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot()) {
 		if item.GetID().Value() == "019ffd00-0000-7000-8000-0000000000a1" {
