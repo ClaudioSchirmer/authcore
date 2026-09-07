@@ -1,0 +1,100 @@
+# authcore — the QA suite's OWN profile. Selected by APP_PROFILE=qa together with
+# OMNICORE_CONFIG_PATH=qa/microservice.qa.yaml.
+#
+# WHY THIS FILE EXISTS. specs/qa/tenant-contract/plan.md §2: a tenant's workspace handle is
+# never reused, archived rows included, so every run that inserts tenants burns handles in
+# whatever database it touches — permanently. The suite therefore runs against a throwaway
+# database of its own (authcore_qa), dropped and recreated before every run, and it selects
+# that database through THIS file. microservice.dev.yaml is never touched and authcore_db is
+# never opened.
+#
+# It is a copy of the dev profile with four deltas, each marked ← QA below. Everything else
+# is deliberately identical: the point of a contract suite is to exercise the posture the
+# service actually ships with, not a relaxed one.
+service: authcore
+
+http:
+  # ← QA: :8099, not :8080. A dev instance left running on 8080 must never be the process
+  # under test — the runner probes this port and frees it with SIGTERM before booting.
+  addr: ":8099"
+
+  # No trustProxy block, exactly as in dev: the socket peer IS the caller on this bench.
+
+relational:
+  dialect: postgres
+  # ← QA: authcore_qa, the throwaway database. Same container, same credentials.
+  dsn: "${QA_DATABASE_URL:postgres://omnicore:omnicore@localhost:5432/authcore_qa?sslmode=disable}"
+  clock: db
+
+migrations:
+  dir: ./migrations/postgres
+  # ← QA: DECLARED, not left unset. An unset autoRun resolves to true only under
+  # APP_PROFILE=dev and to the strict `check` mode under every other profile — which would
+  # abort the boot on a freshly created, empty database instead of migrating it. The whole
+  # bootstrap seed (permission catalog, master tenant, master role, admin user) arrives
+  # through migration 0012, so this line is what makes the suite have a token source at all.
+  autoRun: true
+
+openapi:
+  uiPath: /docs
+  rootRedirect: true
+
+graphql:
+  path: /graphql
+  uiPath: /graphql/ui
+  playground: true
+  introspection: true
+
+auth:
+  mode: jwt
+
+  jwt:
+    algorithms: [RS256]
+    issuer: "${AUTH_SELF_URL:http://localhost:8099}"
+    audience: "${AUTH_AUDIENCE:authcore}"
+    jwksUrl: "${AUTH_SELF_URL:http://localhost:8099}/.well-known/jwks.json"
+
+  authorization:
+    enabled: true
+    tenant:
+      enabled: true
+      required: true
+
+  auditClaims:
+    - tenant_workspace
+    - email
+    - name
+    - identity_kind
+
+  issuer:
+    enabled: true
+    # ← QA: selfUrl follows the port. The framework refuses the boot when selfUrl and
+    # jwt.issuer disagree, so these two move together or not at all.
+    selfUrl: "${AUTH_SELF_URL:http://localhost:8099}"
+    audience:
+      - "${AUTH_AUDIENCE:authcore}"
+    tokenTtlSeconds: 900
+    maxTokenTtlSeconds: 3600
+    refreshTokenTtlSeconds: 2592000
+    keys:
+      - kid: "${JWT_SIGNING_KID:dev}"
+        algorithm: RS256
+        state: current
+        privateKeyPem: "${JWT_SIGNING_KEY}"
+    jwks:
+      path: /.well-known/jwks.json
+
+  # Byte-identical to the dev profile's list, on purpose: §3b asserts BOTH directions of
+  # this list, and a suite that ran against a different list would prove nothing about the
+  # one that ships. Validated at boot against the registered routes.
+  publicRoutes:
+    - GET /livez
+    - GET /readyz
+    - POST /auth/user/token
+    - POST /auth/user/token/refresh
+    - POST /auth/client/token
+
+shutdown:
+  drainTimeoutSeconds: 30
+  tracingDrainSeconds: 5
+  hardGraceSeconds: 5
