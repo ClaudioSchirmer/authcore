@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:80b735c27ebd8354f437be59e76a7fca3db30a045e413eb12c6aa6626732cfad
+// checksum:   sha256:5300d86b394c8dbc0164c89ec8bd06a01a76b9c2c8b5c894cc47eb34f806923c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -107,7 +107,7 @@ type FindClientsByParamsResult struct {
 	Status                  *string
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
-	DeletedAt               *time.Time
+	ArchivedAt              *time.Time
 	TenantWorkspace         *string
 	TenantStatus            *string
 	TenantArchivedAt        *time.Time

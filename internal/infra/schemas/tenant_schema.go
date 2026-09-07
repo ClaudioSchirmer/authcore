@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:8e5a8fc77853da5bfb563fbfc03e247a706a91619007b320239a67a0509f72f0
+// generated:  2026-09-06
+// checksum:   sha256:db46540f770131abc672f1e858ba68c90ce7f625797203ad774290246ca5dd3c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -48,7 +48,7 @@ func TenantSchema() *core.TableSchema {
 		Field("Workspace", "workspace").
 		Field("Description", "description").
 		Field("Status", "status").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

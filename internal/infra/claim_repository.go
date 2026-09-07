@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:4e635bf74e8bc4a1aaef727f14c7091baabf5e690be74a319359a4280df4e588
+// checksum:   sha256:c511e99950054a9727fb24ce365f5c2fc0d003d8b8e6314dbab1636534e58edf
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -81,7 +81,7 @@ func NewClaimRepository(engine core.RelationalEngine) *ClaimRepository {
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status").
-			Field("TenantArchivedAt", "deleted_at"),
+			Field("TenantArchivedAt", "archived_at"),
 	)
 	return r
 }

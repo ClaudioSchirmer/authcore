@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:b58fc7536e2e1b2c52700e5d576e92c80bd2f8f1afc4a7f3aa5b894c605e8715
+// checksum:   sha256:b0ae1effbf3e1e6b4522445f8924bb9f2f88dfd38e07002f3c15012fdab83c15
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -103,7 +103,7 @@ type FindGroupsByParamsResult struct {
 	Description      *string
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
-	DeletedAt        *time.Time
+	ArchivedAt       *time.Time
 	TenantWorkspace  *string
 	TenantStatus     *string
 	TenantArchivedAt *time.Time

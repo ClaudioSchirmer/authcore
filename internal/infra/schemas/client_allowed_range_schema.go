@@ -44,5 +44,5 @@ func ClientAllowedRangeSchema() *core.TableSchema {
 		ID("id").
 		ParentID("client_id").
 		Field("CIDR", "cidr").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:be768bb8965bc712c69eebcc8ead4c940bd6eec3bccdc0ecf71c5baa91f21846
+// generated:  2026-09-06
+// checksum:   sha256:373e1158417664519a7114bf42006cb894dcb2d4a7bd6196d87b645757932ea2
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -48,7 +48,7 @@ func ClientAllowedCIDRSchema() *core.TableSchema {
 		ParentID("client_id").
 		Field("CIDR", "cidr").
 		Field("Label", "label").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

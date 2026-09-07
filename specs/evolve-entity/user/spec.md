@@ -1,5 +1,11 @@
 # Evolve `User` — the `claims` collection (level 1 of the claim chain, user side)
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 **Status: APPROVED** — 2026-08-28.
 **Generation: omnicore-gen** — chosen at the same gate, and governs all three runs.
 **Sibling run:** `specs/evolve-entity/client/spec.md` builds the same collection on `Client`.
@@ -104,7 +110,7 @@ CREATE TABLE "user_claims" (
   "user_id"    UUID NOT NULL,
   "claim_id"   UUID NOT NULL,
   "value"      VARCHAR(256) NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "user_claims_pkey" PRIMARY KEY ("id"),
@@ -112,7 +118,7 @@ CREATE TABLE "user_claims" (
 );
 CREATE INDEX "user_claims_parent_idx" ON "user_claims" ("user_id");
 CREATE UNIQUE INDEX "user_claims_user_id_claim_id_key"
-  ON "user_claims" ("user_id", "claim_id") WHERE "deleted_at" IS NULL;
+  ON "user_claims" ("user_id", "claim_id") WHERE "archived_at" IS NULL;
 ```
 
 Plus `COMMENT ON` for the table and every column — the per-dialect spelling postgres uses, and
@@ -159,7 +165,7 @@ it gets — the table is new in this pair, so a `down` can only lose data writte
       shape: patch
       patchExcludes: [ClaimID]
     softRemove: true
-    archivedAt: deleted_at
+    archivedAt: archived_at
     businessIdentity: [ClaimID]
     duplicateNotification: UserAlreadyHoldsClaimNotification
     permissions:
@@ -216,7 +222,7 @@ user. Both conditions hold as of §3.
 `ClaimName` is the point: `GET /users/:id` names the claims a person holds without a second
 call, and the name is what a consumer greps for. `ClaimValueType` rides along because a value
 of `"true"` means nothing without knowing whether the definition is a `bool` or a `string`.
-`AppliesTo`, `DefaultValue` and the definition's `deleted_at` are **not** traversed: the first
+`AppliesTo`, `DefaultValue` and the definition's `archived_at` are **not** traversed: the first
 two belong to the catalog's own read, and republishing an owning aggregate's archive stamp
 through a neighbour is a back door to a decision already made the other way — the same line
 `UserGroup` and `UserRole` both hold.
@@ -476,7 +482,7 @@ and the collection's own `user_children_manual_test.go`):
    `UserAlreadyHoldsClaimNotification`; the same `ClaimID` under a *different* user is fine.
 6. `change` — correcting `Value` on an existing entry keeps the row id (the property that
    justified the verb existing at all).
-7. Soft remove — a removed entry leaves the row with `deleted_at` set, and re-adding the same
+7. Soft remove — a removed entry leaves the row with `archived_at` set, and re-adding the same
    `ClaimID` afterwards is accepted (the active-only index releasing the value).
 8. `ClaimValue` — empty refuses, 256 runes pass, 257 refuse, counted in **runes** not bytes.
 

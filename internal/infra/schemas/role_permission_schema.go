@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:98e2dd06b1923e90ec1141bd2ff698eaa18426772cd565cd9f45508986e7f7ab
+// generated:  2026-09-06
+// checksum:   sha256:88eb8f6d4511b25201ce3c19c3f92d8fb3580d86c6f4fda6c4d769d06ce70b4b
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,7 @@ func RolePermissionSchema() *core.TableSchema {
 		ID("id").
 		ParentID("role_id").
 		Field("PermissionID", "permission_id").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

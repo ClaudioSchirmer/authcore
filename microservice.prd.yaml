@@ -37,10 +37,10 @@ relational:
   dialect: postgres
   dsn: "${DATABASE_URL}"
   # Mandatory since v0.65.0, no default. The instant stamped on created_at, updated_at and
-  # the archive/unarchive deleted_at is read from Postgres once per write transaction, so
+  # the archive/unarchive archived_at is read from Postgres once per write transaction, so
   # every replica shares one clock — the app clock is a per-POD clock, and two replicas in
   # drift stamp rows out of order with nothing in the write path able to notice. This
-  # service is the IdP: its deleted_at stamps carry revocation and its audit trail is
+  # service is the IdP: its archived_at stamps carry revocation and its audit trail is
   # compared across replicas. Costs one extra round-trip per write TX.
   clock: db
 

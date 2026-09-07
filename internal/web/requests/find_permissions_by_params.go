@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:292a7006506b6b46436d5ba1962338e3d6d2d872c44c215c8cede1584bef0f32
+// checksum:   sha256:6b9c6af9403743f7ec57c60015b092052b494b9c17f5643ab655e71eab46698f
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -82,7 +82,7 @@ type FindPermissionsResponse struct {
 	Description *string    `json:"description,omitempty" exportLabelKey:"PermissionDescriptionField" example:"Read tenants: list the tenant registry and fetch a tenant by id."`
 	CreatedAt   *time.Time `json:"createdAt,omitempty" exportLabelKey:"PermissionCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt   *time.Time `json:"updatedAt,omitempty" exportLabelKey:"PermissionUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt   *time.Time `json:"deletedAt,omitempty" exportLabelKey:"PermissionDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt  *time.Time `json:"archivedAt,omitempty" exportLabelKey:"PermissionArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	// The permission as a token carries it and a route compares it:
 	// resource:action.
 	Permission *string `json:"permission,omitempty" exportLabelKey:"PermissionPermissionField" computed:"Resource,Action" example:"tenant:read"`

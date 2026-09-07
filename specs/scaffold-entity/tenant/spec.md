@@ -1,5 +1,11 @@
 # Spec: Tenant
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-19 — every ⚠️ OPEN slot
   answered (§B Q1–Q10) and the remaining `(proposed)` picks accepted in one go
@@ -355,7 +361,7 @@ survive precisely so the erased user's foreign keys and audit trail stay coheren
                                      Membership is enforced by the enum VO, not by a CHECK
     created_at   TIMESTAMPTZ NOT NULL   — managed
     updated_at   TIMESTAMPTZ NOT NULL   — managed
-    deleted_at   TIMESTAMPTZ NULL       — managed; NULL = active
+    archived_at   TIMESTAMPTZ NULL       — managed; NULL = active
     revision     managed
   ```
 
@@ -380,7 +386,7 @@ survive precisely so the erased user's foreign keys and audit trail stay coheren
 | `Description` | `vos.Description` (over `string`) | **new-raw, SHARED** | no | no | root | `Retail operations of the Acme group in Brazil.` | What this tenant is, in the platform operators' own words. |
 | `Status` | `vos.TenantStatus` (over `string`) | **new-enum, entity-specific** | no | no | root | `active` | Commercial lifecycle of the tenant: `trial`, `active` or `suspended`. Orthogonal to archiving — a suspended tenant is still listed and still authenticates for billing. |
 
-Managed columns (`CreatedAt`, `UpdatedAt`, `DeletedAt`, `Revision`) are declared by presence
+Managed columns (`CreatedAt`, `UpdatedAt`, `ArchivedAt`, `Revision`) are declared by presence
 on the schema; they are not modeled as domain fields.
 
 For `name`, `workspace`, `description` and `status` the wire name, the Go field name and
@@ -487,7 +493,7 @@ keeps §8 free to be PATCH-only (a sibling would force PUT into the shape).
 rejected in §6 — or drop `Update`, the "freeze-once" pattern, wrong here because a tenant
 legitimately renames itself).
 
-`Archive`/`Unarchive` in the set ⟺ the schema declares `DeletedAt("deleted_at")` ⟺ the
+`Archive`/`Unarchive` in the set ⟺ the schema declares `ArchivedAt("archived_at")` ⟺ the
 migration carries that column. The three move together or the boot panics.
 
 **`Status` is orthogonal to the mode set and must not be confused with it.** Archiving is
@@ -518,7 +524,7 @@ Nothing soft is ever wired behind `DELETE`.
 
 **What archiving actually executes at this pin:** the same UPDATE every other
 verb emits — the full field set, `updated_at` stamped, `revision` bumped and guarded —
-with `deleted_at` bound to the operation's instant as one more written column. Three
+with `archived_at` bound to the operation's instant as one more written column. Three
 consequences that reach the API contract: archiving a tenant **stamps `updated_at`** (it
 is a mutation, and it surfaces in "changed recently" listings); archiving a row that is
 not there answers **404** instead of committing an event about nothing; and archive can
@@ -750,7 +756,7 @@ so there is no surface on which a caller proposes it (§9).
   nothing else; an undeclared path is a typed 400 rather than a view-wide free-for-all.
 - **`createdAt` / `updatedAt` are exposed and filterable through `read.managed`**, which
   puts the framework-stamped columns on the read side by name. Each one needs its column
-  declared under `storage.managed`, which §1 already does. `deletedAt` stays off the read
+  declared under `storage.managed`, which §1 already does. `archivedAt` stays off the read
   side — archived state is reached through `?includeArchived`, not through a timestamp
   filter.
 - **The status renders localized, not as a raw token.** Each member's label is declared as

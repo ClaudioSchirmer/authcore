@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:d2a0d99c70ea505b2555058f2ff886bdf351f380a5697f918dacfa5edfe14e66
+// checksum:   sha256:e79343e56d658efe7d136667afc46d7fcb1a662b6d1d8869fab5e4dcd1364d6b
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,7 +50,7 @@ type ClientRole struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	RoleKey        string     // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
 	RoleName       string     // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
-	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.deleted_at, via the InnerJoin on role_id
+	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.archived_at, via the InnerJoin on role_id
 }
 
 // CollectionName is the name of the roles collection.

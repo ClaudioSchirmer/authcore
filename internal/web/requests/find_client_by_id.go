@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:ca7893fce6515002b53cb2ab118c089b63c9699e1eb767b35e5a2a15f4f4d390
+// checksum:   sha256:5ece3f4d39283bd010c743620246c6976f3e201b63e94a075dd7d905718ff197
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -79,7 +79,7 @@ type FindClientByIDResponse struct {
 	Status                  string                         `json:"status" exportLabelKey:"ClientStatusField" example:"active"`
 	CreatedAt               time.Time                      `json:"createdAt" exportLabelKey:"ClientCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt               time.Time                      `json:"updatedAt" exportLabelKey:"ClientUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt               *time.Time                     `json:"deletedAt" exportLabelKey:"ClientDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt              *time.Time                     `json:"archivedAt" exportLabelKey:"ClientArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace         string                         `json:"tenantWorkspace" exportLabelKey:"ClientTenantWorkspaceField" example:"acme-comercio"`
 	TenantArchivedAt        *time.Time                     `json:"tenantArchivedAt" exportLabelKey:"ClientTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
 	Roles                   []webdtos.ClientRoleRow        `json:"roles"`

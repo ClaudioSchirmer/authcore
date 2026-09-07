@@ -46,7 +46,7 @@ type RefreshToken struct {
 
 // RefreshTokenSchema maps RefreshToken to authentication_refresh_tokens.
 //
-// NO DeletedAt, and its absence is a decision the migration already argued: an
+// NO ArchivedAt, and its absence is a decision the migration already argued: an
 // expired token is DELETED outright, because keeping the hash of a dead credential
 // earns nothing and costs a growing table. Declaring an archive column here would
 // also silently gate every read on it — against a column that does not exist.

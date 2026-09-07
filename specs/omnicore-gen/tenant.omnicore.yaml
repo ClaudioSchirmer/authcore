@@ -33,7 +33,7 @@ storage:
     revision: revision
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
 
 fields:
   - name: Name
@@ -295,10 +295,10 @@ update:
   # Rule workspace-immutable below is the belt-and-braces layer over the same fact.
   patchExcludes: [Workspace]
 
-delete:
+removal:
   # Soft only. No DELETE verb: purging a tenant would orphan live tokens and every
   # future foreign key, and would release a workspace handle that must never be reused.
-  root: soft
+  root: archive
 
 rules:
   list:
@@ -375,8 +375,8 @@ read:
   # and belong to no fields[] entry — the aggregate carries no Go field for them — so the
   # read side names them here, by the fixed logical names. Listing one returns it from the
   # by-id read and from every listing row, and makes it filterable like any other field.
-  # DeletedAt joined the two stamps on 2026-09-06, and what it replaced is worth keeping in
-  # view: "DeletedAt stays OFF: archived state is reached through ?includeArchived, never
+  # ArchivedAt joined the two stamps on 2026-09-06, and what it replaced is worth keeping in
+  # view: "ArchivedAt stays OFF: archived state is reached through ?includeArchived, never
   # through a timestamp filter." That reasoning covered the FILTER, and was read as covering
   # the VALUE too — they are different questions. ?includeArchived decides whether an
   # archived row is in the answer at all; once it IS in the answer, nothing on the wire said
@@ -390,7 +390,7 @@ read:
   # Tenant is the ONE entity here with an unarchive verb, so its stamp is not only an
   # epitaph: a row that carries one today may not carry one tomorrow, and the caller that
   # asked to see archived tenants has no other way to tell which of them are which.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   byId: true
   byParams:
     filters:

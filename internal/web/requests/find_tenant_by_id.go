@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:8142ea00e9b01032175433c2bde1c60f22fadff8a9890d2d5a5ac9c6520fdc4c
+// checksum:   sha256:6c90b1dbd6bff95e111bdf2f414b156d9f25c4235c5d07dffe01e29ca39c13bb
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -76,7 +76,7 @@ type FindTenantByIDResponse struct {
 	Status      string     `json:"status" exportLabelKey:"TenantStatusField" example:"active"`
 	CreatedAt   time.Time  `json:"createdAt" exportLabelKey:"TenantCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt   time.Time  `json:"updatedAt" exportLabelKey:"TenantUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt   *time.Time `json:"deletedAt" exportLabelKey:"TenantDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt  *time.Time `json:"archivedAt" exportLabelKey:"TenantArchivedAtField" example:"2026-02-01T09:00:00Z"`
 }
 
 // FromResult projects the application Result onto FindTenantByIDResponse.

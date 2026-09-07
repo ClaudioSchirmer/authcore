@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:75d09817d8f1ee346db088c4c5289a4eb517084702443475af689ec45e1eae6a
+// generated:  2026-09-06
+// checksum:   sha256:25bb7a2c319c6a200d919226a5ffa9429b626204c489c50d89a7276add49a497
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,7 @@ func UserGroupSchema() *core.TableSchema {
 		ID("id").
 		ParentID("user_id").
 		Field("GroupID", "group_id").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

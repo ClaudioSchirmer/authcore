@@ -67,7 +67,7 @@ func UserGroupGrantSchema() *core.TableSchema {
 		ID("id").
 		ParentID("user_id").
 		Field("GroupID", "group_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func inheritedGroupsTarget() *core.TableSchema {
@@ -75,7 +75,7 @@ func inheritedGroupsTarget() *core.TableSchema {
 		ID("id").
 		Field("GroupKey", "group_key").
 		Field("GroupName", "name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 // inheritedGroupRolesTarget is `group_roles` reached FROM a group — the same 1:N
@@ -84,7 +84,7 @@ func inheritedGroupRolesTarget() *core.TableSchema {
 	return core.NewDirectSchema[UserGroupGrant]("group_roles").
 		ID("group_id").
 		Field("HopRoleID", "role_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func inheritedRolesTarget() *core.TableSchema {
@@ -92,14 +92,14 @@ func inheritedRolesTarget() *core.TableSchema {
 		ID("id").
 		Field("RoleKey", "role_key").
 		Field("RoleName", "name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func inheritedGrantsTarget() *core.TableSchema {
 	return core.NewDirectSchema[UserGroupGrant]("role_permissions").
 		ID("role_id").
 		Field("HopPermissionID", "permission_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func inheritedCatalogTarget() *core.TableSchema {
@@ -107,7 +107,7 @@ func inheritedCatalogTarget() *core.TableSchema {
 		ID("id").
 		Field("Resource", "resource_name").
 		Field("Action", "action_name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func InheritedGrantJoins() (groups, groupRoles, roles, grants, catalog *core.TableSchema) {

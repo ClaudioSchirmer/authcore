@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:98eef9fb3a5bf585014b20e8ead9c1bdf4ac1d63deb2503d7b35289e26cf9453
+// checksum:   sha256:5ea1b9c3d7989e2506331a5c6c5fa7b3c20922d53acb626cabf7f780bf437448
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -113,7 +113,7 @@ type FindRolesByParamsResult struct {
 	Description      *string
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
-	DeletedAt        *time.Time
+	ArchivedAt       *time.Time
 	TenantWorkspace  *string
 	TenantStatus     *string
 	TenantArchivedAt *time.Time

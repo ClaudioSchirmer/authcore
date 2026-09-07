@@ -1,5 +1,11 @@
 # Spec: Permission
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-19 — the OPEN slots answered
   at the model gate (§B), then three refinements taken at the plan gate (§B Q5–Q7): the
@@ -84,11 +90,11 @@ permissions                                   -- the global catalog of enforceab
   resource_name VARCHAR(64)  NOT NULL   -- part 1 of vos.PermissionKey; EXPOSED as `resource`
   action_name   VARCHAR(64)  NOT NULL   -- part 2 of vos.PermissionKey; EXPOSED as `action`
   description  VARCHAR(500)  NOT NULL
-  deleted_at   TIMESTAMPTZ   NULL       -- archive (one-way, §6)
+  archived_at   TIMESTAMPTZ   NULL       -- archive (one-way, §6)
   created_at   TIMESTAMPTZ   NOT NULL
   updated_at   TIMESTAMPTZ   NOT NULL
 
-  UNIQUE (resource_name, action_name) WHERE deleted_at IS NULL   -- partial: ACTIVE rows only (§B Q3)
+  UNIQUE (resource_name, action_name) WHERE archived_at IS NULL   -- partial: ACTIVE rows only (§B Q3)
 ```
 
   **The `_name` suffix is deliberate and is not a wire name.** `resource` is a **reserved
@@ -123,8 +129,8 @@ entity:
   resolving. They were already renamed once, away from `resource` / `action`, because
   `resource` is an oracle reserved word — that rename is now load-bearing beyond this
   aggregate and must not be undone casually.
-- **`deleted_at` is reachable, and `Role` maps it.** A join may carry the target's managed
-  columns — `created_at`, `updated_at`, `deleted_at`; `revision` is out — so `../role/spec.md`
+- **`archived_at` is reachable, and `Role` maps it.** A join may carry the target's managed
+  columns — `created_at`, `updated_at`, `archived_at`; `revision` is out — so `../role/spec.md`
   §2 renders each grant's `ArchivedAt` from this catalog's own archive stamp. Two boundaries
   come with it, and both belong here rather than only on the consuming side. First, the join
   is **not gated** on that state: an archived row keeps supplying its columns and an inner
@@ -234,7 +240,7 @@ and there is nothing to trade.
 | ~~`unarchive`~~ | **deliberately absent.** Un-archiving would re-enable, in one call, every grant still pointing at that row — old users would silently regain a permission nobody re-approved, with nothing in the audit trail reading like a grant. Coming back is therefore a **new row**, minted by an explicit `insert` that nobody holds yet (§6) |
 | ~~`delete`~~ | absent — a purge destroys the only human-readable record of what an issued token's claim meant (§6) |
 
-- `Modes()` lists `Archive`, so the schema declares its `deleted_at` column and the
+- `Modes()` lists `Archive`, so the schema declares its `archived_at` column and the
   migration carries it — the three must agree or the boot aborts.
 - **View archive regime**: the view is relational-backed (§9), so `DeleteOnArchive()` is not
   in play — an archived row is filtered out of default reads and returned when the caller
@@ -253,7 +259,7 @@ and there is nothing to trade.
   not look like granting anything. The maintainer's call: that is a silent privilege
   restoration, and the catalog must not offer it.
 - **How a retired permission comes back**, since it must sometimes: insert it again. The
-  unique index is partial (`WHERE deleted_at IS NULL`), so the archived remnant does not
+  unique index is partial (`WHERE archived_at IS NULL`), so the archived remnant does not
   block the pair — and the new row gets a **new `id`**, which is the whole point. Old
   `role_permissions` rows point at the archived id and stay dead; whoever wants the
   permission back must grant the new row explicitly, which is visible, attributable and
@@ -538,7 +544,7 @@ customer base, is the one where it will eventually need an index.
 |---|---|---|
 | **Q1** | Is `action` an open validated slug, a closed enum, or an open slug that also accepts `*`? | **Open slug, and `*` is allowed** — as a whole value only, on either part. An enum was rejected because it would cap the catalog at CRUD verbs while real non-CRUD actions are coming; wildcards were admitted because a broad grant is then one row instead of a growing list. The cost is recorded in §7d, and the shapes the claim matcher cannot honor are refused by rule 6 rather than stored |
 | **Q2** | Are `resource` and `action` frozen after insert? | **Frozen** — rule 9. The pair is the permission's identity everywhere except this table: the string in the JWT claim and the literal in `RequirePermission(...)`. Editing it would rewrite the meaning of every existing grant, retroactively and invisibly. `description` stays editable |
-| **Q3** | Is `UNIQUE(resource, action)` over all rows or active only? | **Active only** — a partial index `WHERE deleted_at IS NULL`. Nothing is derived from the pair (unlike `tenant.workspace`, whose reuse would mint a colliding public key), so an archived remnant must not block a new active row. With Q5 this becomes load-bearing rather than a convenience: re-inserting is the *only* way a retired permission comes back |
+| **Q3** | Is `UNIQUE(resource, action)` over all rows or active only? | **Active only** — a partial index `WHERE archived_at IS NULL`. Nothing is derived from the pair (unlike `tenant.workspace`, whose reuse would mint a colliding public key), so an archived remnant must not block a new active row. With Q5 this becomes load-bearing rather than a convenience: re-inserting is the *only* way a retired permission comes back |
 | **Q4** | Should the migration seed the catalog with the permissions the code already enforces? | **No** at the model gate — the migration creates the table and nothing else, and the catalog is populated through the API by whoever operates the platform. **Superseded 2026-09-01 by `migrations/postgres/0012_bootstrap_seed_manual.up.sql`, which seeds 39 rows**: the 38 `resource:action` pairs the routes in `internal/web` enforce today, plus the `*:*` wildcard. The reason is argued in that file's own header and could not be seen from here — every write endpoint sits behind `RequirePermission`, every permission is a row in a catalog that starts empty, and `no-wildcard-grant` refuses `*:*` through the API with no caller exempt, so on a fresh database there is no caller who could create the first permission, the first tenant or the first user. A seed migration is the only way a super-admin comes into existence, and that is deliberate rather than a gap. The consequence this answer recorded — routes gating on literals with no catalog row — is therefore closed by the seed instead of left to an operator, at the price that the seed and the `RequirePermission` calls now have to move together |
 | **Q5** | Does the aggregate accept `unarchive`? | **No — archive is one-way.** Un-archiving would re-enable, in a single call, every grant still pointing at that row: old users would silently regain a permission nobody re-approved, and the audit trail would show a restore rather than a grant. A retired permission comes back as a **new row** (new id) that must be granted explicitly — see §6. The mode is absent from `Modes()`, so no route, no mutation, no command, and no `IfUnarchive` rule is generated |
 | **Q6** | Do `resource` and `action` each get their own value object inside the composite? | **No — plain `string` parts, validated by the composite itself.** A value object earns its keep by giving a rule one home and by being reusable; here nothing else in this microservice carries a resource or an action alone, and both parts are built from one shared segment rule. Two named types would be two copies of one helper for no reader. The composite therefore owns **both** halves of the concept: how a permission is validated and how it is rendered. Extracting a part later is mechanical and touches no data. **The hierarchy stayed**: the resource is still a colon-joined path (§7a rule 3) — collapsing the types never required collapsing the vocabulary |
@@ -576,7 +582,7 @@ the reason it exists.
 framework-stamped columns by their fixed logical names. Listing one there returns it from
 the by-id read and every listing row and makes it filterable like any other field, which is
 what §9's operator table asks for — `{field: CreatedAt, ops: [gte, lte]}` is an ordinary
-filter once the column is exposed. `deletedAt` stays off: archived state is reached through
+filter once the column is exposed. `archivedAt` stays off: archived state is reached through
 `?includeArchived`, never through a timestamp filter.
 
 **Two things that are unreachable by construction and must not be "fixed" into existence:**

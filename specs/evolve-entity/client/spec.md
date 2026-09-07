@@ -1,5 +1,11 @@
 # Evolve `Client` — the `claims` collection (level 1 of the claim chain, client side)
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 **Status: APPROVED** — 2026-08-28.
 **Generation: omnicore-gen** — chosen at the same gate, and governs all three runs.
 **Sibling run:** `specs/evolve-entity/user/spec.md` builds the same collection on `User`, and
@@ -94,7 +100,7 @@ CREATE TABLE "client_claims" (
   "client_id"  UUID NOT NULL,
   "claim_id"   UUID NOT NULL,
   "value"      VARCHAR(256) NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "client_claims_pkey" PRIMARY KEY ("id"),
@@ -102,7 +108,7 @@ CREATE TABLE "client_claims" (
 );
 CREATE INDEX "client_claims_parent_idx" ON "client_claims" ("client_id");
 CREATE UNIQUE INDEX "client_claims_client_id_claim_id_key"
-  ON "client_claims" ("client_id", "claim_id") WHERE "deleted_at" IS NULL;
+  ON "client_claims" ("client_id", "claim_id") WHERE "archived_at" IS NULL;
 ```
 
 Plus `COMMENT ON` for the table and every column. **No `revision` column** — the stamp lives on
@@ -141,7 +147,7 @@ it.
       shape: patch
       patchExcludes: [ClaimID]
     softRemove: true
-    archivedAt: deleted_at
+    archivedAt: archived_at
     businessIdentity: [ClaimID]
     duplicateNotification: ClientAlreadyHoldsClaimNotification
     permissions:
@@ -178,7 +184,7 @@ rediscovered.
 
 `inner` is safe because `claim_id` is NOT NULL and FK-backed (§3) — inside a collection an inner
 join drops the **entry**, so that condition is load-bearing. `AppliesTo`, `DefaultValue` and the
-definition's `deleted_at` are not traversed, for the reasons in the user spec §4b. Load-only: a
+definition's `archived_at` are not traversed, for the reasons in the user spec §4b. Load-only: a
 filter over `claimName` is a typed 400.
 
 ### 4c — `ClaimValue`
@@ -344,7 +350,7 @@ and regenerated with the new collection. No assertion is weakened or edited to p
 5. Duplicate — two entries for one `ClaimID` in a write refuse; the same `ClaimID` under a
    different client is fine.
 6. `change` — correcting `Value` keeps the row id.
-7. Soft remove — the row survives with `deleted_at`; re-adding the same `ClaimID` is accepted.
+7. Soft remove — the row survives with `archived_at`; re-adding the same `ClaimID` is accepted.
 8. `ClaimValue` — empty refuses, 256 runes pass, 257 refuse, counted in runes.
 9. **No escalation probe is consulted** — `TestSettingAClaimValueDoesNotConsultTheCallersPermissions`
    asserts that setting a claim value asks neither `CallerLacksAnyPermissionOfRole` nor

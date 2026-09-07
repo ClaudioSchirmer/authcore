@@ -31,7 +31,7 @@ storage:
     revision: revision
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
 
 fields:
   # The permission itself — ONE concept across TWO columns, which is exactly when several
@@ -285,8 +285,8 @@ update:
   # holds it.
   patchExcludes: [Permission]
 
-delete:
-  root: soft
+removal:
+  root: archive
 
 rules:
   # Format, length and presence live in the value objects and are never repeated here: the
@@ -348,8 +348,8 @@ read:
     name: permissions
   backing: relational
   # The framework's own stamps.
-  # DeletedAt joined the two stamps on 2026-09-06, and what it replaced is worth keeping in
-  # view: "DeletedAt stays OFF: archived state is reached through ?includeArchived, never
+  # ArchivedAt joined the two stamps on 2026-09-06, and what it replaced is worth keeping in
+  # view: "ArchivedAt stays OFF: archived state is reached through ?includeArchived, never
   # through a timestamp filter." That reasoning covered the FILTER, and was read as covering
   # the VALUE too — they are different questions. ?includeArchived decides whether an
   # archived row is in the answer at all; once it IS in the answer, nothing on the wire said
@@ -359,7 +359,7 @@ read:
   # It is also what makes the sibling change coherent: other aggregates now republish this
   # column through their read joins, and a join republishing what its owner will not publish
   # was the objection that took the field out of Role's spec on 2026-08-24.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   # The read field no column holds. `from:` names the two STORED parts the derivation
   # reads — which is also what makes ?fields=permission push Resource + Action down to the
   # store automatically. The body is ours, written once, in the computed hook file; it

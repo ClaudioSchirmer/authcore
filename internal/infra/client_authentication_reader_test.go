@@ -283,7 +283,7 @@ func TestAssembleClientKeepsARoleThatConfersNothing(t *testing.T) {
 
 // The three archive gates are applied PER PAIR, and the role survives all of them.
 //
-// This is the assertion the shape forces: a `WHERE grant.deleted_at IS NULL` in the
+// This is the assertion the shape forces: a `WHERE grant.archived_at IS NULL` in the
 // predicate would drop the ROW, and the row is a role-and-grant pair — so the role
 // would vanish along with what it confers. A role whose every permission was revoked
 // is still a role the client holds.

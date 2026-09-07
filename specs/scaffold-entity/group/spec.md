@@ -1,5 +1,11 @@
 # Spec: Group
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-21 — the two OPEN slots of §B
   answered at the model gate. **Q1 → A**, `key` + `name` + `description` (the `Role` shape).
@@ -76,8 +82,8 @@ three of them are the interesting part of this spec.
 | A **read join** is declared once on the repository and inherited by **every** consumer of that loader — `FindByID`, `ScopedReader`, a service calling `repo.Loader.FindOne/FindAll`, and any relational view declared over it | `read-joins.html`, "Why the repository, and not the schema or the view" |
 | A join on a **collection** fills its fields on every loaded entry and is **not** addressable in a criteria | `read-joins.html`, "Joining from an aggregate child" |
 | A join's predicate is **always `fk = target.id`** — a traversal onto a non-id column of the target is not expressible | `read-joins.html`, "Mapping columns onto your own names" |
-| A join may map the target's **managed columns** — `created_at`, `updated_at`, `deleted_at`; `revision` is out — and a nullable one lands in a nullable Go type: `deleted_at` arrives as `*time.Time` | `read-joins.html`, "What a join field may be" · proven by generating this entity at this pin: the child entry comes out with `ArchivedAt *time.Time`, `go build` and `go vet` clean |
-| A join is **not gated on the archived state of the target** — an archived counterpart keeps supplying its columns. Mapping its `deleted_at` is therefore how a read *reports* that state, never how it filters on it | `read-joins.html`, "What a NULL means, and what archived means" |
+| A join may map the target's **managed columns** — `created_at`, `updated_at`, `archived_at`; `revision` is out — and a nullable one lands in a nullable Go type: `archived_at` arrives as `*time.Time` | `read-joins.html`, "What a join field may be" · proven by generating this entity at this pin: the child entry comes out with `ArchivedAt *time.Time`, `go build` and `go vet` clean |
+| A join is **not gated on the archived state of the target** — an archived counterpart keeps supplying its columns. Mapping its `archived_at` is therefore how a read *reports* that state, never how it filters on it | `read-joins.html`, "What a NULL means, and what archived means" |
 | `Identity.HasPermission` **panics** on any argument containing `*`; the panic message ends "Compose explicit OR over concrete actions, or call IsSuperAdmin." | `application/configuration/identity.go:67-76`, read |
 | `Identity.IsSuperAdmin()` is the sanctioned `*:*` question — nil-safe, reads the CONFIGURED claim name, shares the parsed-claim cache, unaffected by the `auth.authorization.enabled` switch. A resource wildcard (`group:*`) reports **false** | `identity.go:92-112`, read |
 | `TenantMismatchNotification` / `TenantMissingNotification` are framework-owned and already translated in all seven catalogs — this entity declares neither | established by `../role/spec.md`, unchanged at this pin |
@@ -209,15 +215,15 @@ id          UUID PK      ┌──── id           UUID PK         ┌──�
 tenant_id   UUID UQ  ────┘     tenant_id    UUID FK ────────┘     group_id    UUID FK → groups.id
 workspace   …                  group_key    VARCHAR(64)           role_id     UUID FK → roles.id
 …                              name         VARCHAR(120)          created_at / updated_at
-                               description  VARCHAR(500)          deleted_at
+                               description  VARCHAR(500)          archived_at
                                revision / created_at                     │
-                               updated_at / deleted_at                   │
+                               updated_at / archived_at                   │
                                                                          │
                                roles ────────────────────────────────────┘
                                id UUID PK · tenant_id · role_key · name · description
 
-UNIQUE (tenant_id, group_key) WHERE deleted_at IS NULL    -- groups
-UNIQUE (group_id, role_id)    WHERE deleted_at IS NULL    -- group_roles
+UNIQUE (tenant_id, group_key) WHERE archived_at IS NULL    -- groups
+UNIQUE (group_id, role_id)    WHERE archived_at IS NULL    -- group_roles
 INDEX  (group_id)                                         -- group_roles, the parent read
 ```
 
@@ -261,7 +267,7 @@ Child `GroupRole` (`internal/domain/aggregatevos/`):
 | `RoleID` | `domain.ID` | **stored column** `role_id` | no | yes, within the group | `0198f3e0-9c25-7a1f-b73d-5e08c4a29f61` | The role this entry confers — the id and not the key, so a retired-and-recreated role needs an explicit re-attach |
 | `RoleKey` | `string` | **read join** → `roles.role_key` | no | — | `billing-manager` | The conferred role's stable machine handle. Read-only, filled on load, never written through this aggregate |
 | `RoleName` | `string` | **read join** → `roles.name` | no | — | `Billing Manager` | The conferred role's display name. Same read-only contract |
-*(An `ArchivedAt` field — the conferred role's `deleted_at`, read across the same join — was
+*(An `ArchivedAt` field — the conferred role's `archived_at`, read across the same join — was
 declared here and is REMOVED. `Role` carried the equivalent on its own grants and dropped it
 on 2026-08-24: nothing in the service read it, and it republished a column the OWNING
 aggregate deliberately keeps off its own reads. The question it answered — "does this group
@@ -321,7 +327,7 @@ Four properties that are the framework's, not this model's:
    that confers a role the tenant later archived keeps showing that role's key and name; the
    inner join keeps matching it. That is wanted — an access review must be able to read what
    a past attachment meant, which is the whole reason `Role` never hard-deletes. What the
-   traversal deliberately does NOT bring is the role's `deleted_at`: `../role/spec.md`
+   traversal deliberately does NOT bring is the role's `archived_at`: `../role/spec.md`
    removed the equivalent field from its own grants on 2026-08-24, because republishing a
    column its owning aggregate keeps off its own reads is a back door to a decision already
    made the other way. So the join renders the attachment and says nothing about whether the
@@ -389,7 +395,7 @@ Notes on the decisions above:
   ops only:
   - **ATTACH** `POST /groups/:id/roles` — body carries `roleID`; the server mints the child id.
   - **DETACH** `PATCH /groups/:id/roles/:childId/archive` — soft removal. **Never `DELETE`**:
-    the row lingers with a `deleted_at` stamp, and a `DELETE` that soft-removes is a lying
+    the row lingers with a `archived_at` stamp, and a `DELETE` that soft-removes is a lying
     contract.
 
   Both are commands **on the root** (load root → a domain method mutates the one child →
@@ -602,7 +608,7 @@ Two further reasons the join could not carry these rules even if the values were
   table.
 - **It renders the attachment, it says nothing about availability.** A join is not gated on
   the target's archived state, and this one does not even carry that state — the role's
-  `deleted_at` is deliberately not traversed (see §2, property 3). So there is nothing here
+  `archived_at` is deliberately not traversed (see §2, property 3). So there is nothing here
   a rule could mistake for an answer. G6's *active* half stays with the probe, and its
   *same-tenant* half is outside what any traversal can answer at all.
 

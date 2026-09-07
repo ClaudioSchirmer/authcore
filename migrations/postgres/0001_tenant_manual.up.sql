@@ -30,7 +30,7 @@ CREATE TABLE "tenants" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "tenants_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "tenants" IS 'Isolation partitions of the platform. The row id IS the tenant''s key — issued as the tenant_id token claim and the target of every tenant-scoped foreign key. There is no second, derived identifier.';
@@ -42,7 +42,7 @@ COMMENT ON COLUMN "tenants"."status" IS 'Commercial lifecycle of the tenant. Ort
 COMMENT ON COLUMN "tenants"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "tenants"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "tenants"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "tenants"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "tenants"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 -- the repository binds this constraint's violation to a clean 409.
 

@@ -1,5 +1,11 @@
 # Spec: Role
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-20 — the five slots of §B
   answered at the model gate. Q1 → key + name + description · Q2 → **id only, plus the
@@ -49,8 +55,8 @@ row. A role belongs to somebody, and the whole of §10 exists because of it.
 | A join hanging off a **collection** (`LeftJoinInChild` / `InnerJoinInChild`) fills its fields on every loaded entry but is **not addressable in a criteria** — the same 1:N boundary every child field has | `read-joins.html`, "Joining from an aggregate child" |
 | A join's predicate is **always `fk = target.id`** — the target's declared id column, nothing else. A traversal onto a non-id column of the target is deliberately not expressible | `read-joins.html`, "Mapping columns onto your own names" |
 | A join field carries **no domain type** — no value object, no `domain.ID`. An identity column of the target arrives as canonical text in a `string` field | `read-joins.html`, "What a join field may be" |
-| A join may map the target's **managed columns** — `created_at`, `updated_at`, `deleted_at`; `revision` is out — and a nullable one lands in a nullable Go type: `deleted_at` arrives as `*time.Time` | `read-joins.html`, "What a join field may be" · proven by generating this entity at this pin: the child entry comes out with `ArchivedAt *time.Time`, `go build` and `go vet` clean |
-| A join is **not gated on the archived state of the target**: an archived counterpart keeps supplying its columns, and an inner join keeps matching it. Mapping `deleted_at` is therefore how a read *reports* that state — never how it filters on it | `read-joins.html`, "What a NULL means, and what archived means" |
+| A join may map the target's **managed columns** — `created_at`, `updated_at`, `archived_at`; `revision` is out — and a nullable one lands in a nullable Go type: `archived_at` arrives as `*time.Time` | `read-joins.html`, "What a join field may be" · proven by generating this entity at this pin: the child entry comes out with `ArchivedAt *time.Time`, `go build` and `go vet` clean |
+| A join is **not gated on the archived state of the target**: an archived counterpart keeps supplying its columns, and an inner join keeps matching it. Mapping `archived_at` is therefore how a read *reports* that state — never how it filters on it | `read-joins.html`, "What a NULL means, and what archived means" |
 | A relational view **declares no join of its own** — it carries the loader, and the loader carries whatever the repository declared | `relational-view.html`, "Read joins come from the loader, not from the view" |
 | Layer 3 tenant isolation = middleware claim gate + `crit.Filter["tenant_id"]` in `ToCriteria` + a `BuildRules` match check | `authz-seams.html`, Layer 3 |
 | `TenantMismatchNotification` (403) and `TenantMissingNotification` (403) are **framework-owned and already translated in all seven catalogs** — this entity declares neither | `application/translation/*.go` line 83 |
@@ -119,15 +125,15 @@ id            UUID PK      ┌──── id           UUID PK         ┌─�
 tenant_id     UUID UQ  ────┘     tenant_id    UUID FK ────────┘     role_id       UUID FK → roles.id
 workspace     …                  role_key     VARCHAR(64)          permission_id UUID FK → permissions.id
 …                                name         VARCHAR(120)         revision / created_at
-                                 description  VARCHAR(500)         updated_at / deleted_at
+                                 description  VARCHAR(500)         updated_at / archived_at
                                  revision / created_at                    │
-                                 updated_at / deleted_at                  │
+                                 updated_at / archived_at                  │
                                                                           │
                                  permissions ─────────────────────────────┘
                                  id UUID PK · resource_name · action_name · description
 
-UNIQUE (tenant_id, role_key) WHERE deleted_at IS NULL     -- roles
-UNIQUE (role_id, permission_id) WHERE deleted_at IS NULL  -- role_permissions
+UNIQUE (tenant_id, role_key) WHERE archived_at IS NULL     -- roles
+UNIQUE (role_id, permission_id) WHERE archived_at IS NULL  -- role_permissions
 ```
 
 | Table | Description (becomes the table COMMENT) |
@@ -172,7 +178,7 @@ Child `RolePermission` (`internal/domain/aggregatevos/`):
 | `Resource` | `string` | **read join** → `permissions.resource_name` | no | — | `tenant` | What the granted permission protects. Read-only, filled on load, never written through this aggregate |
 | `Action` | `string` | **read join** → `permissions.action_name` | no | — | `read` | What the granted permission allows on that resource. Same read-only contract |
 *(`ArchivedAt` was declared here and REMOVED 2026-08-24. Nothing in this service read it,
-and republishing it contradicted its owner: `Permission` deliberately keeps `deletedAt` off
+and republishing it contradicted its owner: `Permission` deliberately keeps `archivedAt` off
 its own reads, reaching archived state through `?includeArchived`. Surfacing the same column
 through a join was a back door to a decision the owning aggregate had already made the other
 way. The question it answered — "does this role still grant something retired?" — becomes
@@ -298,7 +304,7 @@ read.InnerJoinInChild(schemas.PermissionSchema()).To(...)   -- shape; the reposi
   RolePermission.permission_id  =  permissions.id
     → Resource    ← permissions.resource_name
     → Action      ← permissions.action_name
-    → ArchivedAt  ← permissions.deleted_at        -- managed column; arrives *time.Time
+    → ArchivedAt  ← permissions.archived_at        -- managed column; arrives *time.Time
 ```
 
 Declared **once on `RoleRepository` with `WithJoins`**, beside `WithSchema`. Every consumer
@@ -327,7 +333,7 @@ Four properties that are the framework's, not this model's, and that every layer
    inner join keeps matching it. That is the wanted behaviour here: a grant pointing at a
    retired row must stay *readable* — an access review has to be able to see what a past
    grant meant, which is the whole reason `Permission` never hard-deletes. Mapping the
-   catalog's `deleted_at` onto `ArchivedAt` is the other half of the same intent: the entry
+   catalog's `archived_at` onto `ArchivedAt` is the other half of the same intent: the entry
    is served either way, and the reader is told which it is. `Permission` archives one-way,
    so this is not a transient — a grant can point at a retired row for the rest of the
    role's life, and the read says so on every load.
@@ -386,7 +392,7 @@ Notes on the decisions embedded above:
   established style — `TenantService.WorkspaceTaken`, `PermissionService.PermissionKeyTaken`).
   A `RoleService.RoleKeyTaken(tenantID, key, selfID)` probe in `BuildRules` so the duplicate
   reports **together with** the other validation errors, plus
-  `CREATE UNIQUE INDEX roles_tenant_id_key_key ON roles (tenant_id, key) WHERE deleted_at IS NULL`
+  `CREATE UNIQUE INDEX roles_tenant_id_key_key ON roles (tenant_id, key) WHERE archived_at IS NULL`
   as the race backstop, bound in the repository's `Constraints` map to a 409.
 
 ## 3. Children (1:N)
@@ -408,7 +414,7 @@ Notes on the decisions embedded above:
   - **GRANT** `POST /roles/:id/permissions` — body carries `permissionID`; the server mints
     the child id.
   - **REVOKE** `PATCH /roles/:id/permissions/:childId/archive` — soft removal. **Never
-    `DELETE`**: the row lingers with a `deleted_at` stamp, and a `DELETE` that soft-removes
+    `DELETE`**: the row lingers with a `archived_at` stamp, and a `DELETE` that soft-removes
     is a lying contract.
 
   Both are commands **on the root** (load root → a domain method mutates the one child →

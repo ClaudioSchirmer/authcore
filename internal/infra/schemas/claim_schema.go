@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:e821082e751ca313e226332364bd54852f8ecea969464817d99a735a65175179
+// generated:  2026-09-06
+// checksum:   sha256:cc72a15a60caa2569d935f94dfb8613f35ad81a563a3826effdd0139950ce547
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,7 +50,7 @@ func ClaimSchema() *core.TableSchema {
 		Field("AppliesTo", "applies_to").
 		Field("DefaultValue", "default_value").
 		Field("Description", "description").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

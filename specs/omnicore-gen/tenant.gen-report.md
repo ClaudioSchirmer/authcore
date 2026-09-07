@@ -63,7 +63,7 @@ The shape the regenerated code expects, for `tenants`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -130,6 +130,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 | 1 ITA translation key(s) | `internal/application/translations/ita.go` |
 | 1 NLD translation key(s) | `internal/application/translations/nld.go` |
 | 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the tenants schema (4 columns) | `internal/infra/schemas/tenant_schema.go` |
 | the by-id request and response | `internal/web/requests/find_tenant_by_id.go` |
 | the listing request and response | `internal/web/requests/find_tenants_by_params.go` |
 
@@ -139,7 +140,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0001_tenant_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0001_tenant_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-30 file(s) were already up to date.
+29 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -155,9 +156,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

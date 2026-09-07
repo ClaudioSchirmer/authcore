@@ -1,5 +1,11 @@
 # POST /auth/user/token — what the endpoint actually needs, and what it reads today
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 Working note for the read-path redesign. Written before any change, from the code,
 so the redesign answers requirements rather than the shape that happens to exist.
 
@@ -15,7 +21,7 @@ so the redesign answers requirements rather than the shape that happens to exist
 | `users.tenant_id` | `tenant_id` claim, catalog lookup | |
 | `tenants.workspace` | `tenant_workspace` claim, body | |
 | `tenants.status` | `accountIsUsable` | `suspended` is refused; `trial`/`active` pass |
-| `tenants.deleted_at` | — | depth: a row archived outside the aggregate |
+| `tenants.archived_at` | — | depth: a row archived outside the aggregate |
 | `user_claims.claim_id` → `value` | `heldClaimValues` | level 1 of the claim chain |
 | claim catalog: `name`, `value_type`, `default_value` of the tenant's ACTIVE definitions | `resolveCustomClaims` | level 2, and the VOCABULARY the walk iterates |
 | group keys (live groups only) | `groups` claim, body | |
@@ -50,7 +56,7 @@ Captured from the Postgres statement log, one sign-in:
 ### The waste, named
 
 - **#2 and #5 are the same read.** Same table, same join, same request. The only
-  difference is that #5 also selects `groups.deleted_at` and filters on it. #2 is
+  difference is that #5 also selects `groups.archived_at` and filters on it. #2 is
   paid because the aggregate loader hydrates every declared child, whether the
   caller wants it or not.
 - **#3 is paid and largely discarded.** It brings the DIRECT grants with role

@@ -1,5 +1,11 @@
 # Spec: User
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-25 — every ⚠️ OPEN slot
   answered at the model gate. The full decision table is the first section below; the `§B`
@@ -83,7 +89,7 @@ NOT a copy of `Group` is the password**, and that is what most of this spec is a
 
 | Source | What it settled |
 |---|---|
-| `../../../README.md` § *One e-mail, one user* | `email` is unique **across the whole platform**, over ACTIVE rows — `CREATE UNIQUE INDEX users_email_key ON users (email) WHERE deleted_at IS NULL`. A person in two tenants is two users, through two corporate addresses. The escape hatch (a global `Identity` + a per-tenant `User`) is recorded there **as an escape hatch, not as a plan** → §B Q0 |
+| `../../../README.md` § *One e-mail, one user* | `email` is unique **across the whole platform**, over ACTIVE rows — `CREATE UNIQUE INDEX users_email_key ON users (email) WHERE archived_at IS NULL`. A person in two tenants is two users, through two corporate addresses. The escape hatch (a global `Identity` + a per-tenant `User`) is recorded there **as an escape hatch, not as a plan** → §B Q0 |
 | `../../../README.md` § *What is scoped to a tenant* · § *Where the platform operators live* | `User` is `tenant_id` **NOT NULL**; platform operators live in a reserved platform tenant rather than behind a nullable owner |
 | `../../../README.md` § *The shape we are building towards* | effective permissions = group path ∪ direct path, **no precedence and no deny rule**. Every edge is many-to-many except `tenant_id` |
 | `../group/spec.md` (APPROVED) | the pattern this entity follows one level up, and the five decisions it inherits: id-only child storage with the counterpart read across the FK, the ATTACH/DETACH pair, one-way archive, the transitive no-escalation rule + its wildcard interlock, and `<resource>:grant` as a fifth verb |
@@ -441,7 +447,7 @@ id       UUID PK  ┌──── id                UUID PK      ┌────
 workspace  …   ───┘     tenant_id         UUID FK ─────┘     user_id    UUID FK → users.id
 status     …          ┌ given_name        VARCHAR(75)        group_id   UUID FK → groups.id
               PersonName                                     created_at / updated_at
-              (composite) └ family_name    VARCHAR(75)        deleted_at
+              (composite) └ family_name    VARCHAR(75)        archived_at
                         email             VARCHAR(254)                │
                         email_verified_at TIMESTAMPTZ NULL         groups
                         password_hash     VARCHAR(255)                │
@@ -449,19 +455,19 @@ status     …          ┌ given_name        VARCHAR(75)        group_id   UUID
                         must_change_password BOOLEAN                   │
                         status            VARCHAR(16)                 │
                         revision / created_at                         │
-                        updated_at / deleted_at              user_roles
+                        updated_at / archived_at              user_roles
                                                              ──────────
                                                        ┌──── id         UUID PK
                                                        │     user_id    UUID FK → users.id
                                                        └───  role_id    UUID FK → roles.id
                                                              created_at / updated_at
-                                                             deleted_at
+                                                             archived_at
                                                                     │
                                                                  roles
 
-UNIQUE (email)             WHERE deleted_at IS NULL   -- users, GLOBAL, per the README
-UNIQUE (user_id, group_id) WHERE deleted_at IS NULL   -- user_groups
-UNIQUE (user_id, role_id)  WHERE deleted_at IS NULL   -- user_roles
+UNIQUE (email)             WHERE archived_at IS NULL   -- users, GLOBAL, per the README
+UNIQUE (user_id, group_id) WHERE archived_at IS NULL   -- user_groups
+UNIQUE (user_id, role_id)  WHERE archived_at IS NULL   -- user_roles
 INDEX  (tenant_id)                                    -- users, the isolation filter
 INDEX  (user_id)                                      -- both children, the parent read
 INDEX  (group_id) · INDEX (role_id)                   -- the reverse walk, when it exists
@@ -667,7 +673,7 @@ identical reason: archive is **one-way** on both `Group` and `Role`, so a retire
 back as a new row with a new id. An entry storing the *key* would silently re-attach to the
 recreated row; one storing the **id** cannot.
 
-**What the traversals do NOT bring: the target's `deleted_at`.** `Role` carried the
+**What the traversals do NOT bring: the target's `archived_at`.** `Role` carried the
 equivalent on its own grants and dropped it on 2026-08-24, and `Group`'s spec was amended to
 match. Republishing a column the owning aggregate deliberately keeps off its own reads is a
 back door to a decision already made the other way. So a read renders *what* this user
@@ -999,7 +1005,7 @@ way rather than another:
    this API or through a future one — that can produce it.
 3. **It reaches the ROW, not just the audit event**, because archive is an ordinary
    full-field write at this pin: it emits the same UPDATE every other verb does, with
-   `deleted_at` riding along as one more column. This is a pin-dependent fact and it is why
+   `archived_at` riding along as one more column. This is a pin-dependent fact and it is why
    the rule can live in `IfArchive` at all.
 4. **It cannot collide with U14.** U14 is `IfUpdate`, U15 is `IfArchive`, and the two modes
    never run together — so "suspended is not a legal transition from here" can never fire
@@ -1879,7 +1885,7 @@ touches.
   error path. It is the last place a plaintext could still reach a log line after §2 removed
   every other one — `redact` cannot help, because the value never becomes a column.
 - **U15 must be verified against the ROW, not only the audit event.** Archive a user, then
-  `SELECT status, deleted_at FROM users WHERE id = …`: `deleted_at` set **and** status
+  `SELECT status, archived_at FROM users WHERE id = …`: `archived_at` set **and** status
   `suspended`. A rule that reached only the audit trail would look correct in the event and
   leave an archived-and-active row in the table.
 - **U7g must be declared FIRST and must actually be a `guard`.** Test it the way an attacker

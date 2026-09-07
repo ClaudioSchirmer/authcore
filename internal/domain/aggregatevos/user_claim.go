@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:8008c757432221cd469e3a72bb19c901bdd430d5a70fee5c757b82327b0e1f6f
+// checksum:   sha256:cd0f9cc2be2e4452a5e2faf8b153f45d11ced1b01c17e2c814cc90df2ffa6fdc
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -53,7 +53,7 @@ type UserClaim struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	ClaimName       string     // The claim's exact name as a token would carry it, prefix included. Read-only, filled on load — Claim.name, via the InnerJoin on claim_id
 	ClaimValueType  string     // What the value beside it must parse as, per the definition. Read-only, filled on load — a stored "true" is unreadable without it — Claim.value_type, via the InnerJoin on claim_id
-	ClaimArchivedAt *time.Time // When the claim definition behind this entry was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Claim.deleted_at, via the InnerJoin on claim_id
+	ClaimArchivedAt *time.Time // When the claim definition behind this entry was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Claim.archived_at, via the InnerJoin on claim_id
 }
 
 // CollectionName is the name of the claims collection.

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:6fc46a6970602e994f7d85055e9635607e7bfa9256f03b3e3aa4cfb5cd0312f2
+// checksum:   sha256:9606c797d39ec6ef23a7e40323b33da0c951998769afe264cfdc71cea16b1c57
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -51,7 +51,7 @@ type RolePermission struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	Resource             string     // What the granted permission protects. Read-only, filled on load, never written through this aggregate — Permission.resource_name, via the InnerJoin on permission_id
 	Action               string     // What the granted permission allows on that resource. Read-only, filled on load, never written through this aggregate — Permission.action_name, via the InnerJoin on permission_id
-	PermissionArchivedAt *time.Time // When the catalog row behind this grant was retired, or absent while it is live. Read-only, filled on load, never written through this aggregate — Permission.deleted_at, via the InnerJoin on permission_id
+	PermissionArchivedAt *time.Time // When the catalog row behind this grant was retired, or absent while it is live. Read-only, filled on load, never written through this aggregate — Permission.archived_at, via the InnerJoin on permission_id
 }
 
 // CollectionName is the name of the permissions collection.

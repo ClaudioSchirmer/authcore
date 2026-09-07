@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:d22333952e61d8d3588c391dde49ade27fc887fca5061bb28b629f6628af31d5
+// generated:  2026-09-06
+// checksum:   sha256:4a05fa4b99eb90ab73df8f5192430add211504718c1fdbb7bd4fb658deaf4e60
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,7 +49,7 @@ func PermissionSchema() *core.TableSchema {
 			Field("Resource", "resource_name").
 			Field("Action", "action_name")).
 		Field("Description", "description").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

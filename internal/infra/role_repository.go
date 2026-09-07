@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:39ed9b628a6785521be390e18be64eb859f7f87d27338dbd0469b413a7ab544c
+// checksum:   sha256:211641be7cac9be0dd5ee84331a677c04573b5fbacc64882a0edf51eeb58f6fe
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -82,7 +82,7 @@ func NewRoleRepository(engine core.RelationalEngine) *RoleRepository {
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status").
-			Field("TenantArchivedAt", "deleted_at"),
+			Field("TenantArchivedAt", "archived_at"),
 		// RolePermission → Permission, on every loaded entry. No counterpart
 		// drops the ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.RolePermissionSchema()).
@@ -90,7 +90,7 @@ func NewRoleRepository(engine core.RelationalEngine) *RoleRepository {
 			On("permission_id").
 			Field("Resource", "resource_name").
 			Field("Action", "action_name").
-			Field("PermissionArchivedAt", "deleted_at"),
+			Field("PermissionArchivedAt", "archived_at"),
 	)
 	return r
 }

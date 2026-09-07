@@ -30,7 +30,7 @@ CREATE TABLE "groups" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "groups_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "groups" IS 'A tenant''s own org unit — the bundle of roles a member inherits by belonging to it. Owned by exactly one tenant; groups never nest, and membership lives in its own aggregate.';
@@ -42,13 +42,13 @@ COMMENT ON COLUMN "groups"."description" IS 'What belonging to this group actual
 COMMENT ON COLUMN "groups"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "groups"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "groups"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "groups"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "groups"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 CREATE TABLE "group_roles" (
   "id" UUID NOT NULL,
   "group_id" UUID NOT NULL,
   "role_id" UUID NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "group_roles_pkey" PRIMARY KEY ("id"),
@@ -58,7 +58,7 @@ COMMENT ON TABLE "group_roles" IS 'The roles a group confers on its members. One
 COMMENT ON COLUMN "group_roles"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
 COMMENT ON COLUMN "group_roles"."group_id" IS 'The groups row this entry belongs to.';
 COMMENT ON COLUMN "group_roles"."role_id" IS 'The role this entry confers — the id and not the key, so a retired-and-recreated role needs an explicit re-attach.';
-COMMENT ON COLUMN "group_roles"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "group_roles"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "group_roles"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "group_roles"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -70,7 +70,7 @@ CREATE INDEX "group_roles_parent_idx" ON "group_roles" ("group_id");
 -- check refuses the two disagreeing.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "groups_tenant_id_group_key_key" ON "groups" ("tenant_id", "group_key") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "groups_tenant_id_group_key_key" ON "groups" ("tenant_id", "group_key") WHERE "archived_at" IS NULL;
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by group_id, the owner: an entry has no identity outside its
@@ -79,7 +79,7 @@ CREATE UNIQUE INDEX "groups_tenant_id_group_key_key" ON "groups" ("tenant_id", "
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "group_roles_group_id_role_id_key" ON "group_roles" ("group_id", "role_id") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "group_roles_group_id_role_id_key" ON "group_roles" ("group_id", "role_id") WHERE "archived_at" IS NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- HAND-WRITTEN BELOW THIS LINE.

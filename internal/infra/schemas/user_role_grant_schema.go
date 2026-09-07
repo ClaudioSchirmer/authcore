@@ -68,7 +68,7 @@ func UserRoleGrantSchema() *core.TableSchema {
 		ID("id").
 		ParentID("user_id").
 		Field("RoleID", "role_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func directRolesTarget() *core.TableSchema {
@@ -76,7 +76,7 @@ func directRolesTarget() *core.TableSchema {
 		ID("id").
 		Field("RoleKey", "role_key").
 		Field("RoleName", "name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 // directGrantsTarget is `role_permissions` reached FROM a role, and the
@@ -86,7 +86,7 @@ func directGrantsTarget() *core.TableSchema {
 	return core.NewDirectSchema[UserRoleGrant]("role_permissions").
 		ID("role_id").
 		Field("HopPermissionID", "permission_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func directCatalogTarget() *core.TableSchema {
@@ -94,7 +94,7 @@ func directCatalogTarget() *core.TableSchema {
 		ID("id").
 		Field("Resource", "resource_name").
 		Field("Action", "action_name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 // The traversals the reader declares, exported as ONE call per path so the join

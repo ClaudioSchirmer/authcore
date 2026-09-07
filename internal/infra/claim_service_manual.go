@@ -201,7 +201,7 @@ func (s *ClaimServiceImpl) clientClaimEdges() claimEdge {
 // claim definition.
 //
 // ACTIVE is the query's DEFAULT SCOPE rather than a predicate spelled here, and
-// that is exactly what it should be: the schema declares deleted_at, so the gate
+// that is exactly what it should be: the schema declares archived_at, so the gate
 // is the framework's. Archived edges must not count — a value somebody removed is
 // history, and history must not freeze a definition's shape forever, which is the
 // direct consequence of both collections choosing softRemove.

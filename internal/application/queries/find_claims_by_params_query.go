@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:ca16d2448acc4a442c71762c99b164984c2afc72ce44b0fb7690b71296e56dac
+// checksum:   sha256:7490b1474aa66eee6f8ca7eb67be8ef2bc6d050eecca9a76fd8114a1a1af5462
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -103,7 +103,7 @@ type FindClaimsByParamsResult struct {
 	Description      *string
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
-	DeletedAt        *time.Time
+	ArchivedAt       *time.Time
 	TenantWorkspace  *string
 	TenantStatus     *string
 	TenantArchivedAt *time.Time

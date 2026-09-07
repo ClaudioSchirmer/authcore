@@ -30,7 +30,7 @@ CREATE TABLE "roles" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "roles" IS 'A tenant''s own bundle of catalog permissions — the unit a user or a group is granted. Owned by exactly one tenant; the platform''s own roles live in the reserved platform tenant rather than in a null scope.';
@@ -42,13 +42,13 @@ COMMENT ON COLUMN "roles"."description" IS 'What holding this role actually lets
 COMMENT ON COLUMN "roles"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "roles"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "roles"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "roles"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "roles"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 CREATE TABLE "role_permissions" (
   "id" UUID NOT NULL,
   "role_id" UUID NOT NULL,
   "permission_id" UUID NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("id"),
@@ -58,7 +58,7 @@ COMMENT ON TABLE "role_permissions" IS 'The permissions a role grants. One row p
 COMMENT ON COLUMN "role_permissions"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
 COMMENT ON COLUMN "role_permissions"."role_id" IS 'The roles row this entry belongs to.';
 COMMENT ON COLUMN "role_permissions"."permission_id" IS 'The catalog row this grant points at — the id and not the string, so a retired-and-recreated permission needs an explicit re-grant.';
-COMMENT ON COLUMN "role_permissions"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "role_permissions"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "role_permissions"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "role_permissions"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -70,7 +70,7 @@ CREATE INDEX "role_permissions_parent_idx" ON "role_permissions" ("role_id");
 -- check refuses the two disagreeing.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "roles_tenant_id_role_key_key" ON "roles" ("tenant_id", "role_key") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "roles_tenant_id_role_key_key" ON "roles" ("tenant_id", "role_key") WHERE "archived_at" IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Hand-written below this line. Everything above came from the generator; the
@@ -90,7 +90,7 @@ CREATE UNIQUE INDEX "roles_tenant_id_role_key_key" ON "roles" ("tenant_id", "rol
 -- is no per-entry unarchive and a fresh add is the only way to re-grant.
 CREATE UNIQUE INDEX "role_permissions_role_id_permission_id_key"
   ON "role_permissions" ("role_id", "permission_id")
-  WHERE "deleted_at" IS NULL;
+  WHERE "archived_at" IS NULL;
 
 -- The two CROSS-AGGREGATE foreign keys. The generator writes the parent key
 -- only — a collection's owner is part of the aggregate that declares it — so a

@@ -190,7 +190,7 @@ The shape the regenerated code expects, for `clients`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -207,7 +207,7 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `client_id` | id | no | foreign key to clients |
 | `role_id` | id | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -219,7 +219,7 @@ Indexes it expects:
 | `client_id` | id | no | foreign key to clients |
 | `cidr` | string(43) | no |  |
 | `label` | string(120) | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -231,7 +231,7 @@ Indexes it expects:
 | `client_id` | id | no | foreign key to clients |
 | `claim_id` | id | no |  |
 | `value` | string(256) | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -354,23 +354,23 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the read shape of one ClientClaim entry | `internal/application/queries/dtos/client_claim_row_result.go` |
-| the read shape of one ClientRole entry | `internal/application/queries/dtos/client_role_row_result.go` |
 | the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
-| 4 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 4 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 4 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 4 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 4 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 4 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 4 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
 | the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
 | the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
 | the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
-| the wire shapes of one ClientClaim entry | `internal/web/requests/dtos/client_claim.go` |
-| the wire shapes of one ClientRole entry | `internal/web/requests/dtos/client_role.go` |
+| the client_allowed_cidrs child schema | `internal/infra/schemas/client_allowed_cidr_schema.go` |
+| the client_claims child schema | `internal/infra/schemas/client_claim_schema.go` |
+| the client_roles child schema | `internal/infra/schemas/client_role_schema.go` |
+| the clients schema (8 columns) | `internal/infra/schemas/client_schema.go` |
 | the by-id request and response | `internal/web/requests/find_client_by_id.go` |
 | the listing request and response | `internal/web/requests/find_clients_by_params.go` |
 
@@ -397,9 +397,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

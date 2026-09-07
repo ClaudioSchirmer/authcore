@@ -1,5 +1,11 @@
 # Evolve `Claim` — refuse an `appliesTo` narrowing that would strand held values
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 **Status: APPROVED** — 2026-08-28, at the same gate that approved the two edge collections.
 **Generation: omnicore-gen** — inherited from that gate; asked once for all three runs.
 **Runs LAST.** The two facts this spec adds query `user_claims` and `client_claims`, which do
@@ -143,7 +149,7 @@ Name)` identifies the definition exactly — both immutable, and `Name` unique p
 
 That uniqueness is scoped to the **active** rows, which is load-bearing in the body rather than
 a footnote: an archived definition may share the pair with the live one, so both queries join
-with `claims.deleted_at IS NULL` as well. Without it a retired row's leftover edges would block
+with `claims.archived_at IS NULL` as well. Without it a retired row's leftover edges would block
 a narrowing on the row that replaced it, forever, with nothing saying why.
 
 - `ClaimIsHeldByAUser` — whether any **active** `user_claims` row references this definition.

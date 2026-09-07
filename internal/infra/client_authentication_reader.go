@@ -98,13 +98,13 @@ func newClientGrantRepository(engine core.RelationalEngine) *read.DirectReposito
 		WithJoins(read.InnerJoin(roles).On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name").
-			Field("RoleArchivedAt", "deleted_at").
+			Field("RoleArchivedAt", "archived_at").
 			Then(read.LeftJoin(grants).On("id").
-				Field("GrantArchivedAt", "deleted_at").
+				Field("GrantArchivedAt", "archived_at").
 				Then(read.LeftJoin(catalog).On("permission_id").
 					Field("Resource", "resource_name").
 					Field("Action", "action_name").
-					Field("PermissionArchivedAt", "deleted_at"))))
+					Field("PermissionArchivedAt", "archived_at"))))
 }
 
 // ── step one: the account ───────────────────────────────────────────────────
@@ -121,7 +121,7 @@ func newClientGrantRepository(engine core.RelationalEngine) *read.DirectReposito
 // predicate states. The tenant gate is DEPTH rather than the mechanism: Tenant's
 // own rules force Status to suspended when it is archived, and the sign-in refuses
 // a suspended tenant, so through the API the two states cannot come apart. What
-// this catches is a row that reached `deleted_at` without going through the
+// this catches is a row that reached `archived_at` without going through the
 // aggregate — a migration, a support script, a hand-run UPDATE. It costs no round
 // trip: the subquery rides inside the statement this already issues.
 func (r *ClientAuthenticationReader) LoadClientByID(

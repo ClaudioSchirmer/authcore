@@ -7,7 +7,7 @@
 #   permission_id   stored on role_permissions — the catalog row's id, and nothing else
 #   resource        NOT stored — read across the foreign key on every load
 #   action          NOT stored — same
-#   deleted_at      NOT stored — the counterpart's archive stamp, read the same way
+#   archived_at      NOT stored — the counterpart's archive stamp, read the same way
 #
 # Storing the id and not the string is what keeps the README's Permission rule 3 true: a
 # retired permission comes back as a NEW row with a NEW id, so a grant holding the string
@@ -31,7 +31,7 @@ storage:
     revision: revision
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
 
 fields:
   # The owning tenant, by PRIMARY KEY. Tenant has exactly one identifier: the derived
@@ -334,8 +334,8 @@ children:
     # A revoke is a SOFT removal: the row lingers with a stamp and the per-child verb mounts
     # as PATCH .../archive rather than DELETE. A DELETE that soft-removes is a lying
     # contract, and an access review needs to read what a past grant meant.
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     businessIdentity: [PermissionID]
     duplicateNotification: RoleAlreadyGrantsPermissionNotification
     # A verb of its own, NOT the root's update, and this was reopened on 2026-08-28.
@@ -463,9 +463,9 @@ joins:
           ita: Stato del tenant
           nld: Tenantstatus
       # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
-      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # column of it — the read side resolves created_at, updated_at and archived_at under
       # their fixed logical names, so a traversal may name one without Tenant carrying a Go
-      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # field for it. It lands as *time.Time whatever the join's kind: archived_at is NULL on
       # every LIVE counterpart, which is precisely the row this read usually returns.
       #
       # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
@@ -474,7 +474,7 @@ joins:
       # caller actually asks — is the owner still alive? — is what TenantStatus answers with
       # eq/in. Absent by choice, not by limitation.
       - name: TenantArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the owning tenant was archived, or absent while it is live. Read-only, filled
@@ -507,7 +507,7 @@ joins:
   #
   # It was removed on 2026-08-24 on two grounds: nothing in this service read it, and
   # republishing it was inconsistent with its OWNER — `Permission` deliberately kept
-  # `deletedAt` off its own reads, reaching archived state through ?includeArchived instead,
+  # `archivedAt` off its own reads, reaching archived state through ?includeArchived instead,
   # so surfacing the same column through a join was the back door to a decision the owning
   # aggregate had already made the other way.
   #
@@ -518,7 +518,7 @@ joins:
   # exactly like a live one.
   #
   # The second was not answered by dropping the field but by closing the asymmetry from the
-  # other side: `Permission` now declares DeletedAt in read.managed, so its own by-id read
+  # other side: `Permission` now declares ArchivedAt in read.managed, so its own by-id read
   # and every listing row carry the stamp too. The join republishes what the owner publishes,
   # which is what the 2026-08-24 note was really asking for.
   - kind: inner
@@ -565,7 +565,7 @@ joins:
       # one composes with nothing and is the entry's only account of a grant that has
       # outlived what it points at.
       - name: PermissionArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the catalog row behind this grant was retired, or absent while it is live.
@@ -585,8 +585,8 @@ modes: [display, insert, update, archive]
 update:
   shape: patch
 
-delete:
-  root: soft
+removal:
+  root: archive
 
 rules:
   list:
@@ -769,7 +769,7 @@ read:
   backing: relational
   view:
     name: roles
-  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the same reasoning
+  # ArchivedAt joined the two stamps on 2026-09-06. It used to stay off, on the same reasoning
   # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
   # never through a timestamp. That reasoning covered the FILTER and was read as covering the
   # VALUE too — and the two are different questions. ?includeArchived decides whether an
@@ -777,7 +777,7 @@ read:
   # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
   # or even that it was. The stamp is not declared in byParams.filters, so the filter half of
   # that decision stands untouched.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   byId: true
   byParams:
     filters:

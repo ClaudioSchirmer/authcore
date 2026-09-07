@@ -9,7 +9,7 @@
 --
 --   * no revision: nothing here is edited by a caller, so there is no lost-update
 --     race for an optimistic guard to catch;
---   * no deleted_at: an expired token is deleted outright, because keeping the
+--   * no archived_at: an expired token is deleted outright, because keeping the
 --     hash of a dead credential earns nothing and costs a growing table;
 --   * no REST surface: an endpoint listing refresh tokens would be a credential
 --     exfiltration endpoint, whatever permission guarded it.

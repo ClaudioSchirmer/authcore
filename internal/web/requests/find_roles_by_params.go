@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:d8a4c005b304a45a59e56f440b3efc7c417ca9891ad7180b20618fd7bb59c2c2
+// checksum:   sha256:a73880115e93d48f0c30fcb04038fb0a060e8afbb216403b746e30b7c96b9ed3
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -88,7 +88,7 @@ type FindRolesResponse struct {
 	Description      *string                     `json:"description,omitempty" exportLabelKey:"RoleDescriptionField" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
 	CreatedAt        *time.Time                  `json:"createdAt,omitempty" exportLabelKey:"RoleCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt        *time.Time                  `json:"updatedAt,omitempty" exportLabelKey:"RoleUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt        *time.Time                  `json:"deletedAt,omitempty" exportLabelKey:"RoleDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt       *time.Time                  `json:"archivedAt,omitempty" exportLabelKey:"RoleArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace  *string                     `json:"tenantWorkspace,omitempty" exportLabelKey:"RoleTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus     *string                     `json:"tenantStatus,omitempty" exportLabelKey:"RoleTenantStatusField" example:"active"`
 	TenantArchivedAt *time.Time                  `json:"tenantArchivedAt,omitempty" exportLabelKey:"RoleTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
