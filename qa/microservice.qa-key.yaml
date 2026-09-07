@@ -1,0 +1,110 @@
+# authcore — the SECURITY lane's second, short-lived profile. Selected by APP_PROFILE=qa
+# together with OMNICORE_CONFIG_PATH=qa/microservice.qa-key.yaml.
+#
+# WHY A SECOND CONFIG EXISTS — specs/qa/tenant-contract/plan.md §3c, option (a), approved by
+# the maintainer on 2026-09-06.
+#
+# auth.authorization.tenant.required: true promises a 403 TenantMissingNotification for an
+# authenticated caller whose token carries no tenant claim. That promise cannot be reached
+# through the ordinary profile: every token THIS service mints carries tenant_id
+# (users.tenant_id is NOT NULL), and a token the suite signs itself would not validate against
+# the service's own JWKS. So for this one family the SUITE is the issuer — it generates a
+# throwaway RSA keypair, publishes the public half here, and signs two tokens of its own: one
+# carrying tenant_id and one without. The gate must refuse the second and admit the first.
+#
+# This invents no credential of the maintainer's and touches nothing the project owns. The
+# keypair lives under qa/.tmp/<run-id>/ and dies with the run.
+#
+# ONE DELTA from qa/microservice.qa.yaml, marked ← KEY: how auth.jwt resolves signing keys.
+# The port moves too, so this boot can stand beside the main one without a collision.
+service: authcore
+
+http:
+  # ← KEY: :8098. The main QA instance holds :8099 for the whole run; this one comes up
+  # beside it for a handful of cases and goes away again.
+  addr: ":8098"
+
+relational:
+  dialect: postgres
+  # The SAME throwaway database. This boot writes nothing — it serves refusals.
+  dsn: "${QA_DATABASE_URL:postgres://omnicore:omnicore@localhost:5432/authcore_qa?sslmode=disable}"
+  clock: db
+
+migrations:
+  dir: ./migrations/postgres
+  # The database is already migrated by the main boot; `true` keeps this one from aborting
+  # on the strict check if the order ever changes.
+  autoRun: true
+
+openapi:
+  uiPath: /docs
+  rootRedirect: true
+
+graphql:
+  path: /graphql
+  uiPath: /graphql/ui
+  playground: true
+  introspection: true
+
+auth:
+  mode: jwt
+
+  jwt:
+    algorithms: [RS256]
+    # Equal to auth.issuer.selfUrl below, and it has to be: the framework refuses the
+    # boot when both blocks are configured and they disagree about who this service is
+    # (bootstrap/auth_config.go:348). So the suite signs its tokens with THIS `iss`.
+    issuer: "${AUTH_KEY_SELF_URL:http://localhost:8098}"
+    audience: "${AUTH_AUDIENCE:authcore}"
+    # ← KEY: the suite's own public half, in SubjectPublicKeyInfo (PEM) form, interpolated
+    # with literal backslash-n exactly the way start.sh feeds the signing key — config
+    # interpolation runs on the raw file text, so real newlines inside a double-quoted
+    # scalar would be folded into spaces by the yaml parser and the key would never parse.
+    #
+    # jwksUrl is ABSENT here: with it present the framework would prefer it, and this boot
+    # would validate the service's own tokens instead of the suite's.
+    publicKeyPem: "${QA_SUITE_PUBLIC_KEY}"
+
+  authorization:
+    enabled: true
+    tenant:
+      enabled: true
+      required: true
+
+  auditClaims:
+    - tenant_workspace
+    - email
+    - name
+    - identity_kind
+
+  # The issuer block stays: this service's own token routes are mounted from it
+  # (internal/web/authentication_routes_manual.go), and publicRoutes below names them, which
+  # the boot validates against the registered routes. Nothing in this lane calls them — the
+  # suite mints its own tokens offline and only sends them.
+  issuer:
+    enabled: true
+    selfUrl: "${AUTH_KEY_SELF_URL:http://localhost:8098}"
+    audience:
+      - "${AUTH_AUDIENCE:authcore}"
+    tokenTtlSeconds: 900
+    maxTokenTtlSeconds: 3600
+    refreshTokenTtlSeconds: 2592000
+    keys:
+      - kid: "${JWT_SIGNING_KID:dev}"
+        algorithm: RS256
+        state: current
+        privateKeyPem: "${JWT_SIGNING_KEY}"
+    jwks:
+      path: /.well-known/jwks.json
+
+  publicRoutes:
+    - GET /livez
+    - GET /readyz
+    - POST /auth/user/token
+    - POST /auth/user/token/refresh
+    - POST /auth/client/token
+
+shutdown:
+  drainTimeoutSeconds: 30
+  tracingDrainSeconds: 5
+  hardGraceSeconds: 5
