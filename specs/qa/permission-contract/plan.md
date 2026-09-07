@@ -1,6 +1,8 @@
 # QA plan — `permission-contract`
 
-- **Status:** DRAFT — nothing is written under `qa/` and nothing is executed until this is approved.
+- **Status:** APPROVED — maintainer (Cláudio Schirmer Guedes), 2026-09-07. §3c **(i)** and **(ii)**
+  both approved; the Permission scope question of §3c(ii) resolved in the same breath — see the
+  note under §3c.
 - **Suite slug:** `permission-contract` — what this round proves: the whole wire contract of the
   `Permission` catalog on both surfaces it is mounted on, the business rules its own specs
   declare, and the one thing that makes this entity unlike every other in the service —
@@ -356,7 +358,7 @@ they are. The layer-1 families:
 | | the same ten rows on **GraphQL**, where the key rides `errors[].extensions` — a route gated on REST is not thereby gated on GraphQL | |
 | **2 — identity-derived `BuildRules` / `ToCriteria`** | — | **`N/A`, by decision and not by omission**: `authz.dataAccess: anyone-with-permission` (§10 of the spec — the catalog is global, has no `tenant_id` and no owner), both `ToCriteria` implementations return the criteria unchanged, `BuildRules` reads no principal field, and no `Restrict` is declared. There is no per-row or per-field boundary on Permission to assert |
 | **3 — tenant scoping** | the tenant gate itself | inherited (§0b) |
-| | a cross-tenant READ leaking another tenant's row | **`N/A`** — the catalog is global by design; there is no row scope on this entity to leak |
+| | a cross-tenant READ | **not a leak here — a PROMISE.** The catalog is global by design, so principal **D** (a different tenant, `permission:read`) must see exactly what principal **C** sees: same `totalCount`, same first page, on REST and on GraphQL. This is §3c(ii), and it is the inverse assertion of the one every scoped entity makes |
 
 **⚠️ Two proposals in this section, both cheap, both for the maintainer to take or drop at this
 gate.** Neither is assumed:
@@ -373,9 +375,38 @@ gate.** Neither is assumed:
   first page as a principal in `master`. Cost: one extra tenant + role + user + rotation. Drop
   it and the plan records the global catalog as proven only by code inspection, printed as SKIP.
 
-**This plan proposes taking (i) and taking (ii).** (i) is the sharper of the two — it is a real
-regression shape — and (ii) is the only case in the round that proves a design decision rather
-than a mechanism.
+**Both were taken** (maintainer, 2026-09-07). Principal **C** (`permission:read` only, in the
+`master` tenant) and principal **D** (`permission:read` only, in a SECOND tenant the suite
+creates) are built in `qa/run.sh`'s principal section, each mirroring principal B: a role, a
+user, a password rotation, a sign-in. Both are constructible through the API because
+`InsertUserRequest` and `InsertRoleRequest` each carry an optional `tenantID` that defaults to
+the caller's claim — and principal A, holding `*:*`, crosses the scope to set it.
+
+### The Permission scope question, raised and closed at this gate
+
+The gate surfaced a real ambiguity and it is recorded rather than smoothed over. Commit
+`33eb883` declares `authz.scopes: [{field: ID, from: tenant, applies: [read]}]` on **Tenant** and
+migrates five further entities onto `dataAccess: scoped` — a genuine isolation fix, and the
+reason §3c(ii) was worth asking at all. It did **not** touch Permission, and the maintainer
+confirmed on 2026-09-07 that this was deliberate: *"Global mesmo — era o Tenant que eu
+corrigi."*
+
+Verified on disk before this line was written, because an expectation built on a misread is
+worth nothing:
+
+- `specs/omnicore-gen/permission.omnicore.yaml:478` — still `dataAccess: anyone-with-permission`;
+  Permission is the ONE of the seven aggregates that is not `scoped`;
+- `find_permissions_by_params_query.go:50` and `find_permission_by_id_query.go:54` — both still
+  `return q.Criteria, nil`, no forced `Filter`;
+- `migrations/postgres/0002_permission_manual.up.sql` — the `permissions` table has **no
+  `tenant_id` column**, so tenant scoping is not expressible here without a migration and a
+  supersession of the approved model (§B, §10, and the README's "what is scoped to a tenant and
+  what is not"). That would be `/omnicore:evolve-entity` work, not QA's.
+
+So §3c(ii) is asserted in its ORIGINAL direction and becomes the round's one design-proving
+case: **principal D, in a different tenant, must see exactly what principal C sees** — same
+`totalCount`, same first page. If the catalog is ever scoped, this case is the one that turns
+RED first, which is precisely what it is for.
 
 ### 3d — `auth.mode` posture
 
@@ -466,15 +497,14 @@ that the matrix grows from five rows to seven. A lane that never ran still print
 
 ---
 
-## Approval
+## Approval — closed 2026-09-07
 
-Three things need a word before anything is generated:
-
-1. **The plan as a whole** — `Status: DRAFT` until you say otherwise. This includes the four
-   EDITED files of §5, which `CLAUDE.md` rule 1 puts behind this same gate.
-2. **§3c (i)** — principal C, holding exactly `permission:read`, so the per-verb gate is
-   separable from the per-caller one. **Proposed: take it.**
-3. **§3c (ii)** — a second-tenant principal proving the catalog is global. **Proposed: take it**;
-   drop it and it is printed as SKIP with that reason.
-
-Nothing is written under `qa/` and nothing is executed until all three are answered.
+| Gate item | Answer |
+|---|---|
+| The plan as a whole, including the five EDITED files of §5 (`CLAUDE.md` rule 1) | **Approved** — *"Aprovado — pode gerar e executar"* |
+| §3c (i) — principal C, holding exactly `permission:read` | **Taken** |
+| §3c (ii) — a second-tenant principal proving the catalog is global | **Taken**, in its original direction; the Permission-vs-Tenant scope ambiguity closed above |
+| §1b rows 9 and 10 — the revocation chain, own fixture | **Taken** — *"Sim, com fixture própria"* |
+| §1b row 9's premise — an archived permission keeps its grants | **Confirmed as correct** — *"Está certo"* |
+| §4 — the seeded catalog as a contract | **Out of scope this round** — *"Nenhum — a seed não é contrato desta rodada"* |
+| §1b ranking | Rows 1–4 all **critical** |

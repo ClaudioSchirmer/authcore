@@ -255,6 +255,187 @@ gql 'query { tenants(first: 100) { edges { node { id } } } }' '{}' "$QA_TOKEN_LI
 assert_gql_ok '[(.data.tenants.edges | length), ([.data.tenants.edges[].node.id] | unique | join(","))] | join("|")' "1|$OWN_TEN"
 
 # ═════════════════════════════════════════════════════════════════════════════════════════
+#
+#   P E R M I S S I O N  —  §3 of specs/qa/permission-contract/plan.md
+#
+#   Cases S4.x. The 401 family, the framework's appended public surfaces and the introspection
+#   bypass are INHERITED from S3a/S3b above and deliberately not repeated — they are properties
+#   of the middleware, not of an entity. What is per-entity is everything below: a route this
+#   round added must answer 401 tokenless, and its permission gate must discriminate.
+#
+#   THREE PRINCIPALS, and each one exists because the other two cannot see what it sees:
+#     A  *:*                      — the super-admin. Proves the gate is not shut for everyone.
+#     B  tenant:read only         — proves the gate refuses a caller who holds SOMETHING else.
+#     C  permission:read only     — the sharp one. A and B both answer the same on all five
+#                                   permission routes, so neither can see the failure where all
+#                                   five were gated on the SAME literal. C separates them.
+#     D  permission:read, in a
+#        SECOND tenant            — proves the catalog is GLOBAL: the design decision, not a
+#                                   mechanism. If Permission is ever scoped, S4.5 goes RED first.
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+# ── S4.1 the public-route split, direction 2, for the routes this round added ─────────────
+#
+# publicRoutes names no /permissions path. One tokenless call per mounted route is what
+# catches an entry widened past its intent — and it has to be per ROUTE, because the list is
+# matched as exact METHOD /path with no prefix rule.
+
+case_ "S4.1a GET /permissions tokenless" "401 MissingAuthorizationNotification"
+api GET "/permissions" "" "-"
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S4.1b GET /permissions/{id} tokenless" "401"
+api GET "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" "" "-"
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S4.1c POST /permissions tokenless" "401 — refused before the body is ever validated"
+api POST "/permissions" '{"resource":"tenant","action":"read","description":"A tokenless attempt to write into the platform permission catalog."}' "-"
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S4.1d PATCH /permissions/{id} tokenless" "401"
+api PATCH "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" '{"description":"A tokenless attempt to reword a catalog entry."}' "-"
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S4.1e PATCH /permissions/{id}/archive tokenless" "401"
+api PATCH "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410/archive" "" "-"
+assert_rest 401 MissingAuthorizationNotification
+
+case_ "S4.1f the GraphQL connection tokenless" "401 — the bearer is checked before the document is parsed, so this is the REST envelope, not a GraphQL error"
+gql 'query { permissions(first: 1) { totalCount } }' '{}' "-"
+assert_status 401
+
+# ── S4.2 layer 1: a principal holding SOMETHING ELSE ──────────────────────────────────────
+
+case_ "S4.2a principal B (tenant:read) on the permission LISTING" "403 MissingPermissionNotification — holding a permission is not holding THIS one"
+api GET "/permissions" "" "$QA_TOKEN_LIMITED"
+assert_rest 403 MissingPermissionNotification
+
+case_ "S4.2b principal B on the by-id read" "403"
+api GET "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" "" "$QA_TOKEN_LIMITED"
+assert_rest 403 MissingPermissionNotification
+
+case_ "S4.2c principal B on insert" "403 — permission:insert is a platform-only grant"
+api POST "/permissions" '{"resource":"tenant","action":"read","description":"A write attempted by a principal that holds no catalog grant at all."}' "$QA_TOKEN_LIMITED"
+assert_rest 403 MissingPermissionNotification
+
+case_ "S4.2d principal B on patch" "403"
+api PATCH "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410" '{"description":"A reword attempted by a principal with no catalog grant."}' "$QA_TOKEN_LIMITED"
+assert_rest 403 MissingPermissionNotification
+
+case_ "S4.2e principal B on archive" "403"
+api PATCH "/permissions/0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410/archive" "" "$QA_TOKEN_LIMITED"
+assert_rest 403 MissingPermissionNotification
+
+# ── S4.3 the complement: a gate that refuses everyone is also broken ──────────────────────
+
+case_ "S4.3a principal A reads the catalog" "200 — the wildcard grant satisfies every check"
+api GET "/permissions?first=1"
+assert_status 200
+
+case_ "S4.3b principal A writes into it" "201"
+api POST /permissions "$(permission_body "$(pair_resource s4)" read "A catalog entry written by the privileged principal, proving the gate is not shut for everyone.")"
+assert_status 201
+S4_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+
+case_ "S4.3c principal A patches it" "200"
+api PATCH "/permissions/$S4_ID" '{"description":"The privileged-principal fixture, reworded to prove the update gate opens for it."}'
+assert_status 200
+
+case_ "S4.3d principal A archives it" "204"
+api PATCH "/permissions/$S4_ID/archive"
+assert_empty_body 204
+
+# ── S4.4 principal C: the gate must discriminate PER VERB, not per caller ─────────────────
+#
+# This is the block A and B cannot produce between them. If someone re-mounted all five routes
+# on `permission:read`, every case above would still pass: B is refused by all five either way
+# and A passes all five either way. C is the only principal for which the five answers differ.
+
+if [ -z "${QA_TOKEN_PERMREAD:-}" ]; then
+  case_ "S4.4 principal C — permission:read and nothing else" "the per-verb split"
+  skip_ "principal C was not built by run.sh (QA_TOKEN_PERMREAD is empty) — the per-verb half of the permission gate is UNPROVEN this run"
+else
+  case_ "S4.4a principal C on the LISTING it holds" "200 — permission:read reaches the collection"
+  api GET "/permissions?first=1" "" "$QA_TOKEN_PERMREAD"
+  assert_status 200
+
+  case_ "S4.4b principal C on the by-id read it holds" "200 — the two reads share one literal, and both must open"
+  api GET "/permissions?first=1" "" "$QA_TOKEN_PERMREAD"
+  PC_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data[0].id')
+  api GET "/permissions/$PC_ID" "" "$QA_TOKEN_PERMREAD"
+  assert_status 200
+
+  case_ "S4.4c principal C on INSERT" "403 MissingPermissionNotification — reading the catalog is not writing it"
+  api POST "/permissions" '{"resource":"tenant","action":"read","description":"A write attempted by a principal that may only read the catalog."}' "$QA_TOKEN_PERMREAD"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "S4.4d principal C on PATCH" "403 — permission:update is its own grant"
+  api PATCH "/permissions/$PC_ID" '{"description":"A reword attempted by a principal that may only read the catalog."}' "$QA_TOKEN_PERMREAD"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "S4.4e principal C on ARCHIVE" "403 — permission:archive is its own grant, and retiring a row is not rewording one"
+  api PATCH "/permissions/$PC_ID/archive" "" "$QA_TOKEN_PERMREAD"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "S4.4f the same per-verb split holds on GRAPHQL" "the read resolves, the mutation is refused — a route gated on REST is not thereby gated here"
+  # edges is selected on purpose: totalCount ALONE is the only-total mode on this surface, so
+  # `first:` beside it would trip the only-total conflict matrix and refuse for a reason that
+  # has nothing to do with the gate under test.
+  gql 'query { permissions(first: 1) { totalCount edges { node { id } } } }' '{}' "$QA_TOKEN_PERMREAD"
+  assert_gql_ok '(.data.permissions.totalCount > 0)' "true"
+
+  case_ "S4.4g and the GraphQL mutation refuses it" "MissingPermissionNotification in errors[].extensions"
+  gql 'mutation($i: CreatePermissionInput!) { createPermission(input: $i) { id } }' \
+      '{"i":{"resource":"tenant","action":"read","description":"A mutation attempted by a principal that may only read the catalog."}}' \
+      "$QA_TOKEN_PERMREAD"
+  assert_gql MissingPermissionNotification
+fi
+
+# ── S4.5 principal D: the catalog is GLOBAL, and that is a decision being proven ──────────
+#
+# Six of this service's seven aggregates are `dataAccess: scoped` and narrow every read to the
+# caller's tenant. Permission is the ONE that is not, deliberately: it is the platform's
+# catalog, not a customer's data (spec §10, and the maintainer confirmed it on 2026-09-07 when
+# the tenant-scoping fix of 33eb883 raised the question). Today that is asserted only by the
+# ABSENCE of a filter in ToCriteria. This is the case that asserts it positively — and the case
+# that turns RED first if the catalog is ever scoped.
+
+if [ -z "${QA_TOKEN_OTHERTENANT:-}" ]; then
+  case_ "S4.5 principal D — permission:read from a SECOND tenant" "the same catalog as principal C"
+  skip_ "principal D was not built by run.sh (QA_TOKEN_OTHERTENANT is empty) — the global-catalog decision is UNPROVEN this run, asserted only by code inspection"
+else
+  case_ "S4.5a principal D is genuinely in another tenant" "a tenant_id claim different from principal C's — otherwise the comparison below proves nothing"
+  TEN_C=$(jwt_claim "${QA_TOKEN_PERMREAD:-$QA_TOKEN_ADMIN}" tenant_id)
+  TEN_D=$(jwt_claim "$QA_TOKEN_OTHERTENANT" tenant_id)
+  if [ -n "$TEN_D" ] && [ "$TEN_D" != "$TEN_C" ]; then pass_; else fail_ "tenant_id C='$TEN_C' D='$TEN_D'"; fi
+
+  case_ "S4.5b principal D reaches the catalog at all" "200 — permission:read is not narrowed away by a tenant it does not share"
+  api GET "/permissions?onlyTotal=true" "" "$QA_TOKEN_OTHERTENANT"
+  assert_status 200
+  TOTAL_D=$(printf '%s' "$HTTP_BODY" | jq -r '.pagination.totalCount')
+
+  case_ "S4.5c and it sees exactly what the master-tenant principal sees" "the SAME totalCount — the catalog is global, so a second tenant is not a second view of it"
+  api GET "/permissions?onlyTotal=true" "" "${QA_TOKEN_PERMREAD:-$QA_TOKEN_ADMIN}"
+  assert_json_at 200 '.pagination.totalCount' "$TOTAL_D"
+
+  case_ "S4.5d the same first page, row for row" "identical ids in identical order — a scoped read would differ here even when the counts happened to match"
+  api GET "/permissions?orderBy=resource&first=5" "" "${QA_TOKEN_PERMREAD:-$QA_TOKEN_ADMIN}"
+  PAGE_C=$(printf '%s' "$HTTP_BODY" | jq -r '[.data[].id] | join(",")')
+  api GET "/permissions?orderBy=resource&first=5" "" "$QA_TOKEN_OTHERTENANT"
+  assert_json_at 200 '[.data[].id] | join(",")' "$PAGE_C"
+
+  case_ "S4.5e and the same on GRAPHQL" "the same totalCount from the other surface"
+  gql 'query { permissions { totalCount } }' '{}' "$QA_TOKEN_OTHERTENANT"
+  assert_gql_ok '.data.permissions.totalCount' "$TOTAL_D"
+fi
+
+# ── S4.6 layer 2, and why there is nothing to assert ──────────────────────────────────────
+
+case_ "S4.6 identity-derived row and field rules on Permission" "recorded as a DECISION, and deliberately not exercised"
+skip_ "authz.dataAccess: anyone-with-permission (spec §10): the catalog is global, carries no tenant_id and has no owner. Both ToCriteria implementations return the criteria unchanged, BuildRules reads no principal field, and no Restrict is declared — so there is no per-row or per-field boundary on this entity to assert. S4.5 proves the positive form of the same decision"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
 # 3c layer 3 — the tenant gate. Option (a), approved 2026-09-06: a second, short boot whose
 # auth.jwt validates through a keypair the SUITE owns, so the suite can present a token that
 # carries no tenant claim. No token this service mints can lack one.
