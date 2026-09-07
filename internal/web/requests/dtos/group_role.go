@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:6d275b5ba6cc01d19f2cbfeeae2bd16163894a155decf82928a59c5e135a4056
+// generated:  2026-09-06
+// checksum:   sha256:abc7ce6651c90c683a2e20b35a7f1ad7bbf25237e4317f4766918929c4d569a1
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,14 +27,18 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // GroupRoleRow is one entry of the roles collection as a read returns it.
 type GroupRoleRow struct {
-	ID       *string    `json:"id,omitempty"`
-	RoleID   *domain.ID `json:"roleID,omitempty" exportLabelKey:"GroupRoleRoleIDField" example:"0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"`
-	RoleKey  *string    `json:"roleKey,omitempty" exportLabelKey:"GroupRoleRoleKeyField" example:"billing-manager"`
-	RoleName *string    `json:"roleName,omitempty" exportLabelKey:"GroupRoleRoleNameField" example:"Billing Manager"`
+	ID             *string    `json:"id,omitempty"`
+	RoleID         *domain.ID `json:"roleID,omitempty" exportLabelKey:"GroupRoleRoleIDField" example:"0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"`
+	RoleKey        *string    `json:"roleKey,omitempty" exportLabelKey:"GroupRoleRoleKeyField" example:"billing-manager"`
+	RoleName       *string    `json:"roleName,omitempty" exportLabelKey:"GroupRoleRoleNameField" example:"Billing Manager"`
+	RoleArchivedAt *time.Time `json:"roleArchivedAt,omitempty" exportLabelKey:"GroupRoleRoleArchivedAtField" example:"2026-01-31T12:00:00Z"`
 }
 
 // GroupRoleRequest is one entry sent in the roles collection.

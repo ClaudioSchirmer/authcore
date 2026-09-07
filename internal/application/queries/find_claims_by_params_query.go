@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:42e07dff60f8b96f5a3b8e9e6e251386117570005c12dae7e71657fa6843eba8
+// generated:  2026-09-06
+// checksum:   sha256:ca16d2448acc4a442c71762c99b164984c2afc72ce44b0fb7690b71296e56dac
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -94,15 +94,17 @@ func (q FindClaimsByParamsQuery) ContextName() string { return "Claim" }
 // framework boot-guards that contract on the Result as well as on the
 // Response.
 type FindClaimsByParamsResult struct {
-	ID              *string
-	TenantID        *domain.ID
-	Name            *string
-	ValueType       *string
-	AppliesTo       *string
-	DefaultValue    *string
-	Description     *string
-	CreatedAt       *time.Time
-	UpdatedAt       *time.Time
-	TenantWorkspace *string
-	TenantStatus    *string
+	ID               *string
+	TenantID         *domain.ID
+	Name             *string
+	ValueType        *string
+	AppliesTo        *string
+	DefaultValue     *string
+	Description      *string
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	DeletedAt        *time.Time
+	TenantWorkspace  *string
+	TenantStatus     *string
+	TenantArchivedAt *time.Time
 }

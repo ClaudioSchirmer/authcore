@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-31
-// checksum:   sha256:ac7488dcd40826a6ac410b285228d68e41b0f59e7ad064f541112d6c6bd628db
+// generated:  2026-09-06
+// checksum:   sha256:4e635bf74e8bc4a1aaef727f14c7091baabf5e690be74a319359a4280df4e588
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -80,7 +80,8 @@ func NewClaimRepository(engine core.RelationalEngine) *ClaimRepository {
 		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
-			Field("TenantStatus", "status"),
+			Field("TenantStatus", "status").
+			Field("TenantArchivedAt", "deleted_at"),
 	)
 	return r
 }

@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-31
-// checksum:   sha256:531ab351a5ca3a765b79d8c5af60fda70d37dab6b79b3f2db18d66487b0dadef
+// generated:  2026-09-06
+// checksum:   sha256:d886c280dc9f3d81f92d512f6b604b149c363397bfa7443de73922a75d2afc0f
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,28 +83,32 @@ func NewUserRepository(engine core.RelationalEngine) *UserRepository {
 		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
-			Field("TenantStatus", "status"),
+			Field("TenantStatus", "status").
+			Field("TenantArchivedAt", "deleted_at"),
 		// UserGroup → Group, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.UserGroupSchema()).
 			To(schemas.GroupSchema().AsDirectSchema()).
 			On("group_id").
 			Field("GroupKey", "group_key").
-			Field("GroupName", "name"),
+			Field("GroupName", "name").
+			Field("GroupArchivedAt", "deleted_at"),
 		// UserRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.UserRoleSchema()).
 			To(schemas.RoleSchema().AsDirectSchema()).
 			On("role_id").
 			Field("RoleKey", "role_key").
-			Field("RoleName", "name"),
+			Field("RoleName", "name").
+			Field("RoleArchivedAt", "deleted_at"),
 		// UserClaim → Claim, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.UserClaimSchema()).
 			To(schemas.ClaimSchema().AsDirectSchema()).
 			On("claim_id").
 			Field("ClaimName", "name").
-			Field("ClaimValueType", "value_type"),
+			Field("ClaimValueType", "value_type").
+			Field("ClaimArchivedAt", "deleted_at"),
 	)
 	return r
 }

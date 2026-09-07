@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:20bc3b850558e20cba491a881af1b466289da475df126c42edd3812544f1515b
+// generated:  2026-09-06
+// checksum:   sha256:803ffc35afbc605e21003c581ec57c14997a6fa829248afc715eb93f37ca1486
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -88,6 +88,7 @@ type FindPermissionsByParamsResult struct {
 	Description *string
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
+	DeletedAt   *time.Time
 	// Permission is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from Resource+Action.
 	Permission *string

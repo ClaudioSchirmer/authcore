@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:4d29277bc3b074625812df033c3d7321991afa205e94c970a422ad98df1f031a
+// generated:  2026-09-06
+// checksum:   sha256:693a7d02d8006f989105aa35422f29df1feb64c2c4c6c1c144f27c5f34225caf
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,13 +27,17 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // RolePermissionRow is one entry of the permissions collection as a read
 // returns it.
 type RolePermissionRow struct {
-	ID           *string    `json:"id,omitempty"`
-	PermissionID *domain.ID `json:"permissionID,omitempty" exportLabelKey:"RolePermissionPermissionIDField" example:"0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"`
+	ID                   *string    `json:"id,omitempty"`
+	PermissionID         *domain.ID `json:"permissionID,omitempty" exportLabelKey:"RolePermissionPermissionIDField" example:"0198f3d4-1a77-7b52-8e04-2c9f5a13d6b8"`
+	PermissionArchivedAt *time.Time `json:"permissionArchivedAt,omitempty" exportLabelKey:"RolePermissionPermissionArchivedAtField" example:"2026-01-31T12:00:00Z"`
 	// The permission as a token carries it and a route compares it:
 	// resource:action.
 	Permission *string `json:"permission,omitempty" exportLabelKey:"RolePermissionPermissionField" computed:"Resource,Action" example:"tenant:read"`

@@ -415,13 +415,27 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the read shape of one UserClaim entry | `internal/application/queries/dtos/user_claim_row_result.go` |
+| the read shape of one UserGroup entry | `internal/application/queries/dtos/user_group_row_result.go` |
+| the read shape of one UserRole entry | `internal/application/queries/dtos/user_role_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
+| 5 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 5 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 5 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 5 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 5 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 5 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 5 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the UserClaim child value object | `internal/domain/aggregatevos/user_claim.go` |
 | the UserGroup child value object | `internal/domain/aggregatevos/user_group.go` |
 | the UserRole child value object | `internal/domain/aggregatevos/user_role.go` |
 | the User aggregate root, its modes and its rules | `internal/domain/user.go` |
-| tests for User's rules | `internal/domain/user_test.go` |
-| the ClaimValue value object | `internal/domain/vos/claim_value.go` |
-| the Email value object | `internal/domain/vos/email.go` |
+| the User repository and its constraint bindings | `internal/infra/user_repository.go` |
+| the wire shapes of one UserClaim entry | `internal/web/requests/dtos/user_claim.go` |
+| the wire shapes of one UserGroup entry | `internal/web/requests/dtos/user_group.go` |
+| the wire shapes of one UserRole entry | `internal/web/requests/dtos/user_role.go` |
+| the by-id request and response | `internal/web/requests/find_user_by_id.go` |
 | the listing request and response | `internal/web/requests/find_users_by_params.go` |
 
 **Left untouched** (yours, by design):
@@ -432,7 +446,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-86 file(s) were already up to date.
+79 file(s) were already up to date.
 
 ## What was NOT generated
 

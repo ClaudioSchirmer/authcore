@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:bef44a66584607cee984647ad6d10806f1c14b7702dcdf898abf09b4c18db08e
+// generated:  2026-09-06
+// checksum:   sha256:0ed77ae36cb5c02e380686cf71bff3642b78cc3f1e764f52cf24a86ffc6d3fa5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -70,16 +70,18 @@ func (r FindGroupByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *appqueri
 type FindGroupByIDResponse struct {
 	fwresponses.Auto
 
-	ID              string                 `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID        domain.ID              `json:"tenantID" exportLabelKey:"GroupTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key             string                 `json:"key" exportLabelKey:"GroupKeyField" example:"engineering"`
-	Name            string                 `json:"name" exportLabelKey:"GroupNameField" example:"Engineering"`
-	Description     string                 `json:"description" exportLabelKey:"GroupDescriptionField" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
-	CreatedAt       time.Time              `json:"createdAt" exportLabelKey:"GroupCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt       time.Time              `json:"updatedAt" exportLabelKey:"GroupUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	TenantWorkspace string                 `json:"tenantWorkspace" exportLabelKey:"GroupTenantWorkspaceField" example:"acme-comercio"`
-	TenantStatus    string                 `json:"tenantStatus" exportLabelKey:"GroupTenantStatusField" example:"active"`
-	Roles           []webdtos.GroupRoleRow `json:"roles"`
+	ID               string                 `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID         domain.ID              `json:"tenantID" exportLabelKey:"GroupTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Key              string                 `json:"key" exportLabelKey:"GroupKeyField" example:"engineering"`
+	Name             string                 `json:"name" exportLabelKey:"GroupNameField" example:"Engineering"`
+	Description      string                 `json:"description" exportLabelKey:"GroupDescriptionField" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
+	CreatedAt        time.Time              `json:"createdAt" exportLabelKey:"GroupCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt        time.Time              `json:"updatedAt" exportLabelKey:"GroupUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt        *time.Time             `json:"deletedAt" exportLabelKey:"GroupDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	TenantWorkspace  string                 `json:"tenantWorkspace" exportLabelKey:"GroupTenantWorkspaceField" example:"acme-comercio"`
+	TenantStatus     string                 `json:"tenantStatus" exportLabelKey:"GroupTenantStatusField" example:"active"`
+	TenantArchivedAt *time.Time             `json:"tenantArchivedAt" exportLabelKey:"GroupTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
+	Roles            []webdtos.GroupRoleRow `json:"roles"`
 }
 
 // FromResult projects the application Result onto FindGroupByIDResponse.

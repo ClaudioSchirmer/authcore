@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:064c24bcb5894fa46ef64fe1168d82c8ca110221fb15bde404f0edd54af291bf
+// checksum:   sha256:d2a0d99c70ea505b2555058f2ff886bdf351f380a5697f918dacfa5edfe14e66
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,10 @@
 
 package aggregatevos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // ClientRole is one entry of Client's roles collection.
 //
@@ -45,8 +48,9 @@ type ClientRole struct {
 	// internal/infra. They are ordinary fields of this entry, populated on EVERY
 	// load, and readable by the rules like any other; they are absent from the
 	// TableSchema, so no write can carry them and no migration creates them.
-	RoleKey  string // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
-	RoleName string // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
+	RoleKey        string     // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
+	RoleName       string     // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
+	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.deleted_at, via the InnerJoin on role_id
 }
 
 // CollectionName is the name of the roles collection.

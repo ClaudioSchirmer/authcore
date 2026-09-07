@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:29b4bf4e9e9562f691505edcc701f66342553e6b32e3c0141d90e293364990a0
+// checksum:   sha256:5689ce24bc2e6d06c8d5e2c45828eb18cfdd9164fbd0ca80dcd22a9a3496f1da
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,10 @@
 
 package aggregatevos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // UserRole is one entry of User's roles collection.
 //
@@ -45,8 +48,9 @@ type UserRole struct {
 	// internal/infra. They are ordinary fields of this entry, populated on EVERY
 	// load, and readable by the rules like any other; they are absent from the
 	// TableSchema, so no write can carry them and no migration creates them.
-	RoleKey  string // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
-	RoleName string // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
+	RoleKey        string     // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
+	RoleName       string     // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
+	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.deleted_at, via the InnerJoin on role_id
 }
 
 // CollectionName is the name of the roles collection.

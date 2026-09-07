@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:a6b59813825ca87111e61c0450d40ef4a05039fa7e3d86d4c946a9fc66677368
+// generated:  2026-09-06
+// checksum:   sha256:1ca4859d1620fa606f92f82c44d8d464722fc59d4d67cb4225e2845ab256a682
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -101,14 +101,16 @@ func (q FindGroupByIDQuery) ContextName() string { return "Group" }
 // refused at boot. This read declares no ?fields=, so plain values are right
 // — an absent key fills as the zero value.
 type FindGroupByIDResult struct {
-	ID              string
-	TenantID        domain.ID
-	Key             string
-	Name            string
-	Description     string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	TenantWorkspace string
-	TenantStatus    string
-	Roles           []qrydtos.GroupRoleRowResult
+	ID               string
+	TenantID         domain.ID
+	Key              string
+	Name             string
+	Description      string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
+	TenantWorkspace  string
+	TenantStatus     string
+	TenantArchivedAt *time.Time
+	Roles            []qrydtos.GroupRoleRowResult
 }

@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:6e4419fed750238c7110be3cca7edc4d4ed6f4e2426c6cef84283e1cc71b46c9
+// generated:  2026-09-06
+// checksum:   sha256:84e926f19977466777f65976d8d561ea89028213b6ee3b6bcea70abb4e10a191
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -116,8 +116,10 @@ type FindUsersByParamsResult struct {
 	Status             *string
 	CreatedAt          *time.Time
 	UpdatedAt          *time.Time
+	DeletedAt          *time.Time
 	TenantWorkspace    *string
 	TenantStatus       *string
+	TenantArchivedAt   *time.Time
 	// FullName is COMPUTED: no column backs it, and FromQueryResult fills it
 	// from GivenName+FamilyName.
 	FullName *string

@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:ab74479942cb678efcaeb8759f3e65020c8e1cfa073a20b142fcfbe72bbba32b
+// generated:  2026-09-06
+// checksum:   sha256:b00564bc8c45382971f3f9c2beb195b02ae6d5c4032108ea512a757d615b07a7
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,15 +27,19 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // UserClaimRow is one entry of the claims collection as a read returns it.
 type UserClaimRow struct {
-	ID             *string    `json:"id,omitempty"`
-	ClaimID        *domain.ID `json:"claimID,omitempty" exportLabelKey:"UserClaimClaimIDField" example:"0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"`
-	Value          *string    `json:"value,omitempty" exportLabelKey:"UserClaimValueField" example:"1000"`
-	ClaimName      *string    `json:"claimName,omitempty" exportLabelKey:"UserClaimClaimNameField" example:"x_cost_center"`
-	ClaimValueType *string    `json:"claimValueType,omitempty" exportLabelKey:"UserClaimClaimValueTypeField" example:"string"`
+	ID              *string    `json:"id,omitempty"`
+	ClaimID         *domain.ID `json:"claimID,omitempty" exportLabelKey:"UserClaimClaimIDField" example:"0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"`
+	Value           *string    `json:"value,omitempty" exportLabelKey:"UserClaimValueField" example:"1000"`
+	ClaimName       *string    `json:"claimName,omitempty" exportLabelKey:"UserClaimClaimNameField" example:"x_cost_center"`
+	ClaimValueType  *string    `json:"claimValueType,omitempty" exportLabelKey:"UserClaimClaimValueTypeField" example:"string"`
+	ClaimArchivedAt *time.Time `json:"claimArchivedAt,omitempty" exportLabelKey:"UserClaimClaimArchivedAtField" example:"2026-01-31T12:00:00Z"`
 }
 
 // UserClaimRequest is one entry sent in the claims collection.

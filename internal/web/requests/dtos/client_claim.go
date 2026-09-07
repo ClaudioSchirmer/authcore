@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:4933cc70277aebedaa7264f88e55e9c5f458d729dacd65ad640a848b6fdb160c
+// generated:  2026-09-06
+// checksum:   sha256:86ed79b7077f4a1ff917546db6b8b2c21cc0bcf6827a9dfd5285264d979243ec
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,15 +27,19 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // ClientClaimRow is one entry of the claims collection as a read returns it.
 type ClientClaimRow struct {
-	ID             *string    `json:"id,omitempty"`
-	ClaimID        *domain.ID `json:"claimID,omitempty" exportLabelKey:"ClientClaimClaimIDField" example:"0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"`
-	Value          *string    `json:"value,omitempty" exportLabelKey:"ClientClaimValueField" example:"sa-east-1"`
-	ClaimName      *string    `json:"claimName,omitempty" exportLabelKey:"ClientClaimClaimNameField" example:"x_region"`
-	ClaimValueType *string    `json:"claimValueType,omitempty" exportLabelKey:"ClientClaimClaimValueTypeField" example:"string"`
+	ID              *string    `json:"id,omitempty"`
+	ClaimID         *domain.ID `json:"claimID,omitempty" exportLabelKey:"ClientClaimClaimIDField" example:"0198f3e0-7b31-7c02-8a55-1f9d2e6b4c17"`
+	Value           *string    `json:"value,omitempty" exportLabelKey:"ClientClaimValueField" example:"sa-east-1"`
+	ClaimName       *string    `json:"claimName,omitempty" exportLabelKey:"ClientClaimClaimNameField" example:"x_region"`
+	ClaimValueType  *string    `json:"claimValueType,omitempty" exportLabelKey:"ClientClaimClaimValueTypeField" example:"string"`
+	ClaimArchivedAt *time.Time `json:"claimArchivedAt,omitempty" exportLabelKey:"ClientClaimClaimArchivedAtField" example:"2026-01-31T12:00:00Z"`
 }
 
 // ClientClaimRequest is one entry sent in the claims collection.

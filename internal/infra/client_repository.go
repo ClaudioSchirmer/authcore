@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-31
-// checksum:   sha256:eed1603d05ce72eaf258fe46eb21acf0e889635e9bdd52545b027abcc4b2321e
+// generated:  2026-09-06
+// checksum:   sha256:fc9be21093724b78ce5b412ce1f59da0220ce33be2c0b0d1a17d505719fa2196
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -83,21 +83,24 @@ func NewClientRepository(engine core.RelationalEngine) *ClientRepository {
 		read.InnerJoin(schemas.TenantSchema().AsDirectSchema()).
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
-			Field("TenantStatus", "status"),
+			Field("TenantStatus", "status").
+			Field("TenantArchivedAt", "deleted_at"),
 		// ClientRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.ClientRoleSchema()).
 			To(schemas.RoleSchema().AsDirectSchema()).
 			On("role_id").
 			Field("RoleKey", "role_key").
-			Field("RoleName", "name"),
+			Field("RoleName", "name").
+			Field("RoleArchivedAt", "deleted_at"),
 		// ClientClaim → Claim, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.ClientClaimSchema()).
 			To(schemas.ClaimSchema().AsDirectSchema()).
 			On("claim_id").
 			Field("ClaimName", "name").
-			Field("ClaimValueType", "value_type"),
+			Field("ClaimValueType", "value_type").
+			Field("ClaimArchivedAt", "deleted_at"),
 	)
 	return r
 }

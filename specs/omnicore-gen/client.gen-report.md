@@ -354,11 +354,24 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the ClientAllowedCIDR child value object | `internal/domain/aggregatevos/client_allowed_cidr.go` |
+| the read shape of one ClientClaim entry | `internal/application/queries/dtos/client_claim_row_result.go` |
+| the read shape of one ClientRole entry | `internal/application/queries/dtos/client_role_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_client_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_clients_by_params_query.go` |
+| 4 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 4 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 4 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 4 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 4 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 4 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 4 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the ClientClaim child value object | `internal/domain/aggregatevos/client_claim.go` |
 | the ClientRole child value object | `internal/domain/aggregatevos/client_role.go` |
 | the Client aggregate root, its modes and its rules | `internal/domain/client.go` |
-| tests for Client's rules | `internal/domain/client_test.go` |
+| the Client repository and its constraint bindings | `internal/infra/client_repository.go` |
+| the wire shapes of one ClientClaim entry | `internal/web/requests/dtos/client_claim.go` |
+| the wire shapes of one ClientRole entry | `internal/web/requests/dtos/client_role.go` |
+| the by-id request and response | `internal/web/requests/find_client_by_id.go` |
 | the listing request and response | `internal/web/requests/find_clients_by_params.go` |
 
 **Left untouched** (yours, by design):
@@ -368,7 +381,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0008_client_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0008_client_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-84 file(s) were already up to date.
+78 file(s) were already up to date.
 
 ## What was NOT generated
 

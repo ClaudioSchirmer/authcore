@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:400208f1e118ef45e0d480c7b978dfc50c136354b50d28d98d9264ba7d0a99c3
+// checksum:   sha256:133f39872ff5b98d1a3333815f3b04dfee2e2be8427d4fba1490e55ff55cd55e
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -30,6 +30,7 @@ package aggregatevos
 import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
 )
 
 // ClientClaim is one entry of Client's claims collection.
@@ -50,8 +51,9 @@ type ClientClaim struct {
 	// internal/infra. They are ordinary fields of this entry, populated on EVERY
 	// load, and readable by the rules like any other; they are absent from the
 	// TableSchema, so no write can carry them and no migration creates them.
-	ClaimName      string // The claim's exact name as a token would carry it, prefix included. Read-only, filled on load — Claim.name, via the InnerJoin on claim_id
-	ClaimValueType string // What the value beside it must parse as, per the definition. Read-only, filled on load — a stored "true" is unreadable without it — Claim.value_type, via the InnerJoin on claim_id
+	ClaimName       string     // The claim's exact name as a token would carry it, prefix included. Read-only, filled on load — Claim.name, via the InnerJoin on claim_id
+	ClaimValueType  string     // What the value beside it must parse as, per the definition. Read-only, filled on load — a stored "true" is unreadable without it — Claim.value_type, via the InnerJoin on claim_id
+	ClaimArchivedAt *time.Time // When the claim definition behind this entry was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Claim.deleted_at, via the InnerJoin on claim_id
 }
 
 // CollectionName is the name of the claims collection.

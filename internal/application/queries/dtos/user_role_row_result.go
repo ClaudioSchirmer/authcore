@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:9f258eef3010fd1cb700c11eabe9b6e0a0fa0348f84dec6a47d8787b6f15ba55
+// generated:  2026-09-06
+// checksum:   sha256:e520af3c1134ab2985ad9803d02a62e40fb92af437ce7aafe6a1c587b1ec8712
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,11 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"time"
+
+	"github.com/ClaudioSchirmer/omnicore/domain"
+)
 
 // UserRoleRowResult is one entry of the roles collection as the application
 // reads it.
@@ -35,8 +39,9 @@ import "github.com/ClaudioSchirmer/omnicore/domain"
 // Pointers throughout, for the same reason the root is: the listing serves
 // ?fields=, and the sparse-fill contract is enforced recursively.
 type UserRoleRowResult struct {
-	ID       *string
-	RoleID   *domain.ID
-	RoleKey  *string
-	RoleName *string
+	ID             *string
+	RoleID         *domain.ID
+	RoleKey        *string
+	RoleName       *string
+	RoleArchivedAt *time.Time
 }

@@ -223,12 +223,6 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
-| What | File |
-|---|---|
-| the RolePermission child value object | `internal/domain/aggregatevos/role_permission.go` |
-| the Role aggregate root, its modes and its rules | `internal/domain/role.go` |
-| tests for Role's rules | `internal/domain/role_test.go` |
-
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/utils/role_computed_manual.go` — hand-written rules live here, by design
@@ -237,7 +231,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-45 file(s) were already up to date.
+48 file(s) were already up to date.
 
 ## What was NOT generated
 

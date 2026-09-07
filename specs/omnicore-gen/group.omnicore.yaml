@@ -452,6 +452,32 @@ joins:
           deu: Mandantenstatus
           ita: Stato del tenant
           nld: Tenantstatus
+      # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
+      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # their fixed logical names, so a traversal may name one without Tenant carrying a Go
+      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # every LIVE counterpart, which is precisely the row this read usually returns.
+      # 
+      # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
+      # a criteria, so it could be; the read filter vocabulary has no isnull/notnull, so all
+      # a declaration would buy is "archived between these dates", while the question a
+      # caller actually asks — is the owner still alive? — is what TenantStatus answers with
+      # eq/in. Absent by choice, not by limitation.
+      - name: TenantArchivedAt
+        column: deleted_at
+        example: "2026-01-31T12:00:00Z"
+        description: >-
+          When the owning tenant was archived, or absent while it is live. Read-only, filled
+          on every load, never written through this aggregate.
+        labelKey: GroupTenantArchivedAtField
+        text:
+          eng: Tenant archived at
+          ptbr: Inquilino arquivado em
+          esp: Inquilino archivado el
+          fra: Locataire archivé le
+          deu: Mandant archiviert am
+          ita: Tenant archiviato il
+          nld: Tenant gearchiveerd op
 
   # The traversal into the role catalog, hung off the bundle. Declared ONCE here and
   # inherited by every consumer of the loader: FindByID (the load the write-side auto
@@ -505,6 +531,29 @@ joins:
           deu: Rollenname
           ita: Nome del ruolo
           nld: Rolnaam
+      # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
+      # the two above reach declared columns. It lands as *time.Time whatever the join's
+      # kind: deleted_at is NULL on every LIVE counterpart.
+      # 
+      # A join is NOT gated on the archived state of its target — ?includeArchived governs
+      # which ROOTS a read returns, never the rows a traversal reaches across into — so
+      # an archived role was already arriving in this collection, indexed exactly like a live one.
+      # This is the field that says so.
+      - name: RoleArchivedAt
+        column: deleted_at
+        example: "2026-01-31T12:00:00Z"
+        description: >-
+          When the role behind this entry was archived, or absent while it is live.
+          Read-only, filled on load, never written through this aggregate.
+        labelKey: GroupRoleRoleArchivedAtField
+        text:
+          eng: Role archived at
+          ptbr: Papel arquivado em
+          esp: Rol archivado el
+          fra: Rôle archivé le
+          deu: Rolle archiviert am
+          ita: Ruolo archiviato il
+          nld: Rol gearchiveerd op
 
 # ONE-WAY archive, no unarchive. A group is granted to USERS, and those memberships point at
 # the group's id, which does not change — so a single PATCH /groups/:id/unarchive would
@@ -751,7 +800,15 @@ read:
   backing: relational
   view:
     name: groups
-  managed: [CreatedAt, UpdatedAt]
+  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
+  # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
+  # never through a timestamp. That reasoning covered the FILTER and was read as covering
+  # the VALUE too — and the two are different questions. ?includeArchived decides whether
+  # an archived row is in the answer at all; once it IS in the answer, or once another
+  # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
+  # or even that it was. The stamp is not declared in byParams.filters, so the filter half
+  # of that decision stands untouched.
+  managed: [CreatedAt, UpdatedAt, DeletedAt]
   byId: true
   byParams:
     filters:

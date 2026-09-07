@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:085b013c417d5ea5046587442fdb30d6a7ae6c99d61e0f6a2958400ab1dd85d5
+// checksum:   sha256:dbd24ded0446ec9bb74d6bc6b5af125e41d679c30f9e188ef551eb10de7b62b0
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -97,8 +97,10 @@ type FindUsersResponse struct {
 	Status             *string    `json:"status,omitempty" exportLabelKey:"UserStatusField" example:"active"`
 	CreatedAt          *time.Time `json:"createdAt,omitempty" exportLabelKey:"UserCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt          *time.Time `json:"updatedAt,omitempty" exportLabelKey:"UserUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt          *time.Time `json:"deletedAt,omitempty" exportLabelKey:"UserDeletedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace    *string    `json:"tenantWorkspace,omitempty" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus       *string    `json:"tenantStatus,omitempty" exportLabelKey:"UserTenantStatusField" example:"active"`
+	TenantArchivedAt   *time.Time `json:"tenantArchivedAt,omitempty" exportLabelKey:"UserTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
 	// The person's given and family names on one line, for listings.
 	FullName *string                `json:"fullName,omitempty" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups   []webdtos.UserGroupRow `json:"groups,omitempty"`

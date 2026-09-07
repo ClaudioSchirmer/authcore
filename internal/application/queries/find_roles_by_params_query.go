@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:ecfc30f77fe7095bf422e99e135bf1bbdf3c4dadef791b9ec85f5013212c46e9
+// generated:  2026-09-06
+// checksum:   sha256:98eef9fb3a5bf585014b20e8ead9c1bdf4ac1d63deb2503d7b35289e26cf9453
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -106,14 +106,16 @@ func (q FindRolesByParamsQuery) ContextName() string { return "Role" }
 // framework boot-guards that contract on the Result as well as on the
 // Response.
 type FindRolesByParamsResult struct {
-	ID              *string
-	TenantID        *domain.ID
-	Key             *string
-	Name            *string
-	Description     *string
-	CreatedAt       *time.Time
-	UpdatedAt       *time.Time
-	TenantWorkspace *string
-	TenantStatus    *string
-	Permissions     []qrydtos.RolePermissionRowResult
+	ID               *string
+	TenantID         *domain.ID
+	Key              *string
+	Name             *string
+	Description      *string
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	DeletedAt        *time.Time
+	TenantWorkspace  *string
+	TenantStatus     *string
+	TenantArchivedAt *time.Time
+	Permissions      []qrydtos.RolePermissionRowResult
 }
