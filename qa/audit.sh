@@ -146,4 +146,96 @@ api POST /permissions "$(permission_body "$R_AUDREJ" "Read" "A permission write 
 got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Permission' AND payload::jsonb -> 'snapshot' ->> 'Resource' = '$R_AUDREJ';")
 if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#
+#   R O L E  —  the audit family of specs/qa/role-contract/plan.md §4
+#
+#   Same framework promise, one aggregate over — and the FIRST one that brings a shape neither
+#   Tenant nor Permission has. Role's collection carries two verbs of its own, and a child op
+#   is a command on the ROOT: so a GRANT and a REVOKE must each write an `update` row against
+#   the ROOT's aggregate_id, never against the child's. Nothing else in this suite would notice
+#   an entry that audited itself instead of its owner.
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+AUD_TEN=$(new_tenant active "$(ws audrole)") || exit 1
+AUD_P1=$(permission_id_of tenant read)
+AUD_P2=$(permission_id_of role read)
+AUD_K=$(role_key aud)
+ID_R=$(new_role "$AUD_K" "$AUD_TEN" "$AUD_P1") || exit 1
+
+case_ "A24 the INSERT wrote one audit row for Role" "1 row, entity_type 'Role', aggregate_id the role's id"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND entity_type='Role' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A25 the insert row's kind is 'snapshot'" "snapshot — a creation records the whole record, not a delta"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='insert' AND kind='snapshot';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A26 the actor is the acting principal" "the admin's sub — the row belongs to a tenant, the WRITE belongs to a person"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='insert' AND actor IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A27 the ACTOR's tenant is stamped, not the ROW's" "master — the role was created inside a tenant of the suite's own, and the audit column records who was asking, which is the column per-tenant retention filters on"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='insert' AND tenant_id='$QA_MASTER_TENANT_ID';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A28 the declared auditClaims ride the payload" "email, tenant_workspace and identity_kind — Actor on its own is a UUID nobody out in the mesh can resolve"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='insert' AND payload::jsonb -> 'actorClaims' ->> 'email' = 'admin@authcore.local' AND payload::jsonb -> 'actorClaims' ->> 'tenant_workspace' = 'master' AND payload::jsonb -> 'actorClaims' ->> 'identity_kind' IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A29 an UNDECLARED claim never reaches the row" "no 'permissions' key — auditClaims is an allowlist, and authorization state is deliberately absent from it"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND payload::jsonb -> 'actorClaims' ? 'permissions';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/roles/$ID_R" '{"name":"QA Audit Role, relabelled so a change block exists"}'
+
+case_ "A30 the PATCH wrote an update row carrying a changes block" "1 row with verb 'update' and a changes payload naming the DOMAIN field"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='update' AND payload::jsonb ? 'changes';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+# ── the two collection verbs, which is what Role adds to this lane ────────────────────────
+
+api POST "/roles/$ID_R/permissions" "$(jq -nc --arg p "$AUD_P2" '{permissionID:$p}')"
+AUD_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.rolePermission.id')
+
+case_ "A31 a GRANT wrote an audit row against the ROOT" "2 update rows now on the role's own aggregate_id — a child op is a command on the root, so this is where its trail belongs"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='update';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "2" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A32 and NOT against the entry's own id" "0 rows carrying the child id as an aggregate — an entry that audited itself would split one role's history across two timelines"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$AUD_CHILD';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A33 the GRANT's row carries a changes block naming the collection" "a changes payload mentioning the permissions collection — what a role can DO changed, and the trail has to say so"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='update' AND payload::text ILIKE '%ermission%';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" -ge 1 ] 2>/dev/null; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/roles/$ID_R/permissions/$AUD_CHILD/archive"
+
+case_ "A34 a REVOKE wrote its own row, against the ROOT again" "3 update rows — a revocation is the write an access review most needs to find, and it is not a DELETE precisely so it can be found"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='update';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "3" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/roles/$ID_R/archive"
+
+case_ "A35 the ARCHIVE wrote a transition row" "1 row with verb 'archive' and kind 'transition'"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='archive' AND kind='transition';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A36 there is NO unarchive row, ever" "0 — the verb does not exist on this aggregate, and its absence from the timeline is the contract, not a gap"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R' AND verb='unarchive';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A37 the five writes left exactly five rows" "5 — insert, patch, grant, revoke, archive: one event per write, never two and never none"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_R';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "5" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A38 a REFUSED role write leaves no audit row at all" "0 — the row is written in the write's own transaction, so a rejected write rolls it back with everything else"
+AUD_REJ="qa-audit-rejected-$(qa_slug_runid)"
+api POST /roles "$(jq -nc --arg k "$AUD_REJ" --arg t "$AUD_TEN" '{key:$k, name:"X", description:"short", tenantID:$t, permissions:[]}')"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Role' AND payload::text LIKE '%$AUD_REJ%';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
 qa_finish
