@@ -171,28 +171,28 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 		if r.archived != "" {
 			archived = r.archived
 		}
-		exec(`INSERT INTO roles (id, tenant_id, role_key, name, description, deleted_at)
+		exec(`INSERT INTO roles (id, tenant_id, role_key, name, description, archived_at)
 		      VALUES ($1, $2, $3, $3, '', `+archived+`)`, r.id, grantTenant, r.key)
 	}
 
-	exec(`INSERT INTO groups (id, tenant_id, group_key, name, description, deleted_at)
+	exec(`INSERT INTO groups (id, tenant_id, group_key, name, description, archived_at)
 	      VALUES ($1, $2, 'live-team', 'Live Team', '', NULL)`, groupLive, grantTenant)
-	exec(`INSERT INTO groups (id, tenant_id, group_key, name, description, deleted_at)
+	exec(`INSERT INTO groups (id, tenant_id, group_key, name, description, archived_at)
 	      VALUES ($1, $2, 'retired-team', 'Retired Team', '', NOW())`, groupRetired, grantTenant)
 
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'invoice', 'read', '', NULL)`, permissionLive)
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'invoice', 'delete', '', NOW())`, permissionRevoked)
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'report', 'read', '', NULL)`, permissionShared)
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'ledger', 'purge', '', NULL)`, permissionOnlyViaRetired)
 
 	// The user's own grants. One live, one onto a retired role, one onto a role
 	// that grants nothing, one onto a role whose every permission was revoked,
 	// and one REVOKED grant onto a perfectly live role.
-	exec(`INSERT INTO user_roles (id, user_id, role_id, deleted_at) VALUES
+	exec(`INSERT INTO user_roles (id, user_id, role_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL),
 	      (gen_random_uuid(), $1, $4, NULL),
@@ -202,42 +202,42 @@ func seedGrantFixture(t *testing.T, eng *postgres.Postgres) {
 		roleAllPermissionsRevoked, roleRevokedGrant)
 
 	// Both memberships are live; one of the groups is not.
-	exec(`INSERT INTO user_groups (id, user_id, group_id, deleted_at) VALUES
+	exec(`INSERT INTO user_groups (id, user_id, group_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL)`, grantUser, groupLive, groupRetired)
 
-	exec(`INSERT INTO group_roles (id, group_id, role_id, deleted_at) VALUES
+	exec(`INSERT INTO group_roles (id, group_id, role_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, groupLive, roleInherited)
-	exec(`INSERT INTO group_roles (id, group_id, role_id, deleted_at) VALUES
+	exec(`INSERT INTO group_roles (id, group_id, role_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, groupRetired, roleInRetiredTeam)
 
 	// What the roles confer. `report:read` is reached through BOTH the direct and
 	// the inherited role, which is the duplicate the walk has to collapse.
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL),
 	      (gen_random_uuid(), $1, $4, NULL)`,
 		roleHeldDirectly, permissionLive, permissionRevoked, permissionShared)
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, roleInherited, permissionShared)
 	// The retired role and the one behind the retired group both grant something —
 	// so if either leaked into the answer, it would leak a permission too.
 	// The retired role grants a LIVE permission nothing else grants. A gate that
 	// stopped excluding the role would put `ledger:purge` in the answer, and
 	// nothing else can.
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL)`, roleRetired, permissionLive, permissionOnlyViaRetired)
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, roleInRetiredTeam, permissionLive)
 	// The live role whose ONLY grant points at a REVOKED catalog entry. The grant
 	// itself is live — nobody revoked it — so what drops the permission is the
 	// catalog's own archive stamp, and the role must survive that.
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, roleAllPermissionsRevoked, permissionRevoked)
 	// A REVOKED grant of a live permission, held by a live role. The edge's own
 	// scope gate is what drops this one.
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NOW())`, roleGrantingNone, permissionShared)
 }
 
@@ -417,7 +417,7 @@ func TestLive_AnUnknownSubjectAnswersEmpty(t *testing.T) {
 // THIS IS DEPTH, NOT THE MECHANISM. Tenant's own rules force Status to suspended
 // when it is archived (archive-forces-suspended), and the sign-in refuses a
 // suspended tenant — so through the API the two states never come apart. What is
-// arranged here is a row that reached `deleted_at` WITHOUT going through the
+// arranged here is a row that reached `archived_at` WITHOUT going through the
 // aggregate, which is what a migration or a support script does, and the fixture
 // writes it exactly that way: a direct UPDATE, leaving status untouched.
 //
@@ -434,7 +434,7 @@ func TestLive_AnArchivedTenantAuthenticatesNobody(t *testing.T) {
 
 	// Straight to the row, on purpose — see the doc comment.
 	if _, err := eng.Pool().Exec(context.Background(),
-		`UPDATE tenants SET deleted_at = NOW() WHERE id = $1`, grantTenant); err != nil {
+		`UPDATE tenants SET archived_at = NOW() WHERE id = $1`, grantTenant); err != nil {
 		t.Fatalf("archiving the tenant: %v", err)
 	}
 

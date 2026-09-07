@@ -66,5 +66,5 @@ func SignInAccountSchema() *core.TableSchema {
 		Field("PasswordHash", "password_hash").
 		Field("Status", "status").
 		Field("MustChangePassword", "must_change_password").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

@@ -1,5 +1,11 @@
 # task — domain
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 Model authority: `spec.md` §1, §2, §5, §7. Layout/naming/granularity: `service-layout.html`.
 
 ## Read BEFORE generating (mandatory, at pin v0.57.0)
@@ -13,7 +19,7 @@ Model authority: `spec.md` §1, §2, §5, §7. Layout/naming/granularity: `servi
 | `service-layout.html` | where each type lives and how files are split |
 
 **The fact this layer leans on:** a mutation performed inside an `IfArchive` closure reaches
-the database — archive executes the update path, not a `deleted_at`-only statement. Rule 13
+the database — archive executes the update path, not a `archived_at`-only statement. Rule 13
 depends entirely on it. And it is `IfArchive` / `IfUnarchive` that fire on the archive verbs,
 never `ModeUpdate`.
 

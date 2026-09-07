@@ -106,7 +106,7 @@ The shape the regenerated code expects, for `groups`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -121,7 +121,7 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `group_id` | id | no | foreign key to groups |
 | `role_id` | id | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -205,20 +205,20 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the read shape of one GroupRole entry | `internal/application/queries/dtos/group_role_row_result.go` |
 | the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
-| 3 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 3 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 3 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 3 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 3 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 3 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 3 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
 | the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
 | the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
-| the wire shapes of one GroupRole entry | `internal/web/requests/dtos/group_role.go` |
+| the group_roles child schema | `internal/infra/schemas/group_role_schema.go` |
+| the groups schema (4 columns) | `internal/infra/schemas/group_schema.go` |
 | the by-id request and response | `internal/web/requests/find_group_by_id.go` |
 | the listing request and response | `internal/web/requests/find_groups_by_params.go` |
 
@@ -245,9 +245,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

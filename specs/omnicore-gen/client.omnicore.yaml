@@ -26,7 +26,7 @@ storage:
   managed:
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
     revision: revision
 
 fields:
@@ -305,11 +305,11 @@ update:
   # The credential columns have no request shape reaching them at all (assignedFrom:
   # derived), so they need no exclusion here.
 
-delete:
+removal:
   # Soft only. An archived client's row is the evidence of what a credential was allowed
   # to do while it lived; purging it deletes the answer to the question an incident asks
-  # first. Each collection declares its own removal with softRemove, above.
-  root: soft
+  # first. Each collection declares its own removal with archiveOnRemove, above.
+  root: archive
 
 rules:
   list:
@@ -805,8 +805,8 @@ children:
     # it can change and still be the same entry — a change would turn grant A into grant B
     # while keeping A's row id, which an audit trail reads as one grant BECOMING another.
     operations: [add, remove]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     businessIdentity: [RoleID]
     duplicateNotification: ClientAlreadyGrantsRoleNotification
     # Granting a role is a different job from renaming an integration: this is the edge that
@@ -846,8 +846,8 @@ children:
     ownedBy: root
     editStrategy: per-child
     operations: [add, remove]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     businessIdentity: [CIDR]
     duplicateNotification: ClientAlreadyAllowsCIDRNotification
     # A verb of its own, NOT the root's update, reopened on 2026-08-28.
@@ -963,8 +963,8 @@ children:
     change:
       shape: patch
       patchExcludes: [ClaimID]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     # Over ClaimID alone: the entry also carries read-only join fields that are BLANK on a
     # freshly added entry, so comparing everything would answer "different" for an addition
     # that duplicates a stored one. Value is excluded for a second reason of its own — two
@@ -1062,9 +1062,9 @@ joins:
         description: The owning tenant's commercial lifecycle. Read by the rules, never served.
         labelKey: ClientTenantStatusField
       # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
-      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # column of it — the read side resolves created_at, updated_at and archived_at under
       # their fixed logical names, so a traversal may name one without Tenant carrying a Go
-      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # field for it. It lands as *time.Time whatever the join's kind: archived_at is NULL on
       # every LIVE counterpart, which is precisely the row this read usually returns.
       # 
       # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
@@ -1079,7 +1079,7 @@ joins:
       # state to the integration. An archive stamp says the owner is gone — which the
       # caller finds out anyway, on the next request, as a refusal it cannot explain.
       - name: TenantArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the owning tenant was archived, or absent while it is live. Read-only, filled
@@ -1127,14 +1127,14 @@ joins:
           nld: Rolnaam
       # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
       # the two above reach declared columns. It lands as *time.Time whatever the join's
-      # kind: deleted_at is NULL on every LIVE counterpart.
+      # kind: archived_at is NULL on every LIVE counterpart.
       # 
       # A join is NOT gated on the archived state of its target — ?includeArchived governs
       # which ROOTS a read returns, never the rows a traversal reaches across into — so
       # an archived role was already arriving in this collection, indexed exactly like a live one.
       # This is the field that says so.
       - name: RoleArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the role behind this grant was archived, or absent while it is live.
@@ -1158,7 +1158,7 @@ joins:
   #
   # ClaimName is the string a consuming service greps for; ClaimValueType rides along
   # because a stored "true" means nothing without knowing whether the definition is a bool
-  # or a string. AppliesTo, DefaultValue and the definition's deleted_at are NOT traversed —
+  # or a string. AppliesTo, DefaultValue and the definition's archived_at are NOT traversed —
   # the first two belong to the catalog's own read, and republishing an owning aggregate's
   # archive stamp through a neighbour is a back door to a decision already made the other
   # way.
@@ -1199,14 +1199,14 @@ joins:
           nld: Waardetype
       # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
       # the two above reach declared columns. It lands as *time.Time whatever the join's
-      # kind: deleted_at is NULL on every LIVE counterpart.
+      # kind: archived_at is NULL on every LIVE counterpart.
       # 
       # A join is NOT gated on the archived state of its target — ?includeArchived governs
       # which ROOTS a read returns, never the rows a traversal reaches across into — so
       # an archived definition was already arriving in this collection, indexed exactly like a live one.
       # This is the field that says so.
       - name: ClaimArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the claim definition behind this entry was archived, or absent while it is
@@ -1324,7 +1324,7 @@ read:
   backing: relational
   view:
     name: clients
-  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
+  # ArchivedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
   # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
   # never through a timestamp. That reasoning covered the FILTER and was read as covering
   # the VALUE too — and the two are different questions. ?includeArchived decides whether
@@ -1332,7 +1332,7 @@ read:
   # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
   # or even that it was. The stamp is not declared in byParams.filters, so the filter half
   # of that decision stands untouched.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   byId: true
   byParams:
     filters:

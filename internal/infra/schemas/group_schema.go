@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:6d077ed77bb6e2a6fe0908700448790a8d0e1bd9ae79cbcd9b5150d10049c893
+// generated:  2026-09-06
+// checksum:   sha256:a39abd286bb3f104524ce003e91fdcf00d999ea39b4af9d095ad9a4d1ad8e090
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,7 +49,7 @@ func GroupSchema() *core.TableSchema {
 		Field("Key", "group_key").
 		Field("Name", "name").
 		Field("Description", "description").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:cfd98aefffca6b7618ca84336c00da1e9d2061b978eeaf7e187d3dcea3ff8bbd
+// checksum:   sha256:5742c1208b49fbeab78a2fa58123ea4e388fc99e38388596bdf3be6b38cd38ab
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -82,7 +82,7 @@ func NewGroupRepository(engine core.RelationalEngine) *GroupRepository {
 			On("tenant_id").
 			Field("TenantWorkspace", "workspace").
 			Field("TenantStatus", "status").
-			Field("TenantArchivedAt", "deleted_at"),
+			Field("TenantArchivedAt", "archived_at"),
 		// GroupRole → Role, on every loaded entry. No counterpart drops the
 		// ENTRY, not the root — a hole in the collection.
 		read.InnerJoinInChild(schemas.GroupRoleSchema()).
@@ -90,7 +90,7 @@ func NewGroupRepository(engine core.RelationalEngine) *GroupRepository {
 			On("role_id").
 			Field("RoleKey", "role_key").
 			Field("RoleName", "name").
-			Field("RoleArchivedAt", "deleted_at"),
+			Field("RoleArchivedAt", "archived_at"),
 	)
 	return r
 }

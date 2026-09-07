@@ -47,7 +47,7 @@ storage:
     revision: revision
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
 
 fields:
   # The owning tenant, by PRIMARY KEY — the same shape Role carries, and the tenant_id JWT
@@ -576,9 +576,9 @@ joins:
           ita: Stato del tenant
           nld: Tenantstatus
       # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
-      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # column of it — the read side resolves created_at, updated_at and archived_at under
       # their fixed logical names, so a traversal may name one without Tenant carrying a Go
-      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # field for it. It lands as *time.Time whatever the join's kind: archived_at is NULL on
       # every LIVE counterpart, which is precisely the row this read usually returns.
       # 
       # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
@@ -587,7 +587,7 @@ joins:
       # caller actually asks — is the owner still alive? — is what TenantStatus answers with
       # eq/in. Absent by choice, not by limitation.
       - name: TenantArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the owning tenant was archived, or absent while it is live. Read-only, filled
@@ -623,8 +623,8 @@ update:
   # one exclusion — and two spellings can disagree. Same reading user.omnicore.yaml takes.
   patchExcludes: [Name, ValueType]
 
-delete:
-  root: soft
+removal:
+  root: archive
 
 rules:
   list:
@@ -837,7 +837,7 @@ service:
     # index those migrations add by hand, which is the second thing that index is for
     # beside the read join.
     #
-    # ACTIVE ONLY, on both, and that is the direct consequence of choosing softRemove on
+    # ACTIVE ONLY, on both, and that is the direct consequence of choosing archiveOnRemove on
     # the two collections: a soft-removed edge is history, and history must not freeze a
     # definition's shape forever.
     #
@@ -866,7 +866,7 @@ service:
       filters: [ID]
       description: >-
         Whether any ACTIVE user_claims row references this claim definition. Read user_claims
-        alone, by claim_id, requiring user_claims.deleted_at IS NULL — archived edges do not
+        alone, by claim_id, requiring user_claims.archived_at IS NULL — archived edges do not
         count, because a value somebody removed must not freeze the definition's shape.
 
     - name: ClaimIsHeldByAClient
@@ -925,7 +925,7 @@ read:
   backing: relational
   view:
     name: claims
-  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
+  # ArchivedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
   # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
   # never through a timestamp. That reasoning covered the FILTER and was read as covering
   # the VALUE too — and the two are different questions. ?includeArchived decides whether
@@ -933,7 +933,7 @@ read:
   # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
   # or even that it was. The stamp is not declared in byParams.filters, so the filter half
   # of that decision stands untouched.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   byId: true
   byParams:
     filters:

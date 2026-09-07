@@ -28,7 +28,7 @@ storage:
   managed:
     createdAt: created_at
     updatedAt: updated_at
-    archivedAt: deleted_at
+    archivedAt: archived_at
     revision: revision
 
 fields:
@@ -841,8 +841,8 @@ update:
   # on an update, and if some future shape ever could, the rule still refuses it.
   patchExcludes: [Email]
 
-delete:
-  root: soft
+removal:
+  root: archive
 
 rules:
   list:
@@ -1104,8 +1104,8 @@ children:
     ownedBy: root
     editStrategy: per-child
     operations: [add, remove]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     # Over GroupID ALONE, explicitly. The entry carries three fields and two of them are
     # read-only join values that are BLANK on a freshly added entry — comparing all three
     # would answer "different" for an addition that duplicates a stored one, which is the
@@ -1151,8 +1151,8 @@ children:
     ownedBy: root
     editStrategy: per-child
     operations: [add, remove]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     businessIdentity: [RoleID]
     duplicateNotification: UserAlreadyGrantsRoleNotification
     permissions:
@@ -1225,8 +1225,8 @@ children:
     change:
       shape: patch
       patchExcludes: [ClaimID]
-    softRemove: true
-    archivedAt: deleted_at
+    archiveOnRemove: true
+    archivedAt: archived_at
     # Over ClaimID ALONE, explicitly, for the reason UserGroup spells out: the entry also
     # carries read-only join fields that are BLANK on a freshly added entry, so comparing
     # everything would answer "different" for an addition that duplicates a stored one —
@@ -1334,9 +1334,9 @@ joins:
           ita: Stato del tenant
           nld: Tenantstatus
       # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
-      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # column of it — the read side resolves created_at, updated_at and archived_at under
       # their fixed logical names, so a traversal may name one without Tenant carrying a Go
-      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # field for it. It lands as *time.Time whatever the join's kind: archived_at is NULL on
       # every LIVE counterpart, which is precisely the row this read usually returns.
       # 
       # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
@@ -1345,7 +1345,7 @@ joins:
       # caller actually asks — is the owner still alive? — is what TenantStatus answers with
       # eq/in. Absent by choice, not by limitation.
       - name: TenantArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the owning tenant was archived, or absent while it is live. Read-only, filled
@@ -1368,7 +1368,7 @@ joins:
   # user. LOAD-ONLY: a filter over these is a typed 400, which is the 1:N boundary and not
   # the backing.
   #
-  # The group's deleted_at is deliberately NOT traversed, matching Role and Group:
+  # The group's archived_at is deliberately NOT traversed, matching Role and Group:
   # republishing a column the OWNING aggregate keeps off its own reads is a back door to a
   # decision already made the other way.
   - kind: inner
@@ -1404,14 +1404,14 @@ joins:
           nld: Groepsnaam
       # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
       # the two above reach declared columns. It lands as *time.Time whatever the join's
-      # kind: deleted_at is NULL on every LIVE counterpart.
+      # kind: archived_at is NULL on every LIVE counterpart.
       # 
       # A join is NOT gated on the archived state of its target — ?includeArchived governs
       # which ROOTS a read returns, never the rows a traversal reaches across into — so
       # an archived group was already arriving in this collection, indexed exactly like a live one.
       # This is the field that says so.
       - name: GroupArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the group behind this membership was archived, or absent while it is live.
@@ -1460,14 +1460,14 @@ joins:
           nld: Rolnaam
       # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
       # the two above reach declared columns. It lands as *time.Time whatever the join's
-      # kind: deleted_at is NULL on every LIVE counterpart.
+      # kind: archived_at is NULL on every LIVE counterpart.
       # 
       # A join is NOT gated on the archived state of its target — ?includeArchived governs
       # which ROOTS a read returns, never the rows a traversal reaches across into — so
       # an archived role was already arriving in this collection, indexed exactly like a live one.
       # This is the field that says so.
       - name: RoleArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the role behind this grant was archived, or absent while it is live.
@@ -1492,7 +1492,7 @@ joins:
   #
   # ClaimName is the point — it is the string a consuming service greps for. ClaimValueType
   # rides along because a stored "true" means nothing without knowing whether the definition
-  # is a bool or a string. AppliesTo, DefaultValue and the definition's deleted_at are NOT
+  # is a bool or a string. AppliesTo, DefaultValue and the definition's archived_at are NOT
   # traversed: the first two belong to the catalog's own read, and republishing an owning
   # aggregate's archive stamp through a neighbour is a back door to a decision already made
   # the other way — the line UserGroup and UserRole both hold.
@@ -1533,14 +1533,14 @@ joins:
           nld: Waardetype
       # The counterpart's archive stamp, a MANAGED slot of the target reached the same way
       # the two above reach declared columns. It lands as *time.Time whatever the join's
-      # kind: deleted_at is NULL on every LIVE counterpart.
+      # kind: archived_at is NULL on every LIVE counterpart.
       # 
       # A join is NOT gated on the archived state of its target — ?includeArchived governs
       # which ROOTS a read returns, never the rows a traversal reaches across into — so
       # an archived definition was already arriving in this collection, indexed exactly like a live one.
       # This is the field that says so.
       - name: ClaimArchivedAt
-        column: deleted_at
+        column: archived_at
         example: "2026-01-31T12:00:00Z"
         description: >-
           When the claim definition behind this entry was archived, or absent while it is
@@ -1722,7 +1722,7 @@ read:
   backing: relational
   view:
     name: users
-  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
+  # ArchivedAt joined the two stamps on 2026-09-06. It used to stay off, on the reasoning
   # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
   # never through a timestamp. That reasoning covered the FILTER and was read as covering
   # the VALUE too — and the two are different questions. ?includeArchived decides whether
@@ -1730,7 +1730,7 @@ read:
   # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
   # or even that it was. The stamp is not declared in byParams.filters, so the filter half
   # of that decision stands untouched.
-  managed: [CreatedAt, UpdatedAt, DeletedAt]
+  managed: [CreatedAt, UpdatedAt, ArchivedAt]
   # The rendered whole of the composite name, derived per row from the two stored halves —
   # no column, and the method that renders it lives on the value object, so REST, GraphQL
   # and the export all read the same definition. Named FullName rather than Name because the

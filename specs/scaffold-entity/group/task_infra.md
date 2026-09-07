@@ -1,5 +1,11 @@
 # Task 4 — infra
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 ## Docs to READ (mandatory, at the pin)
 
 - `table-schema` — the Go↔column mapping, the **supported column shapes** (the id contract at
@@ -44,14 +50,14 @@ read.InnerJoinInChild(<child schema>).To(<role schema>)
   GroupRole.role_id  =  roles.id
     → RoleKey     ← roles.role_key
     → RoleName    ← roles.name
-    → ArchivedAt  ← roles.deleted_at              -- managed column; *time.Time
+    → ArchivedAt  ← roles.archived_at              -- managed column; *time.Time
 ```
 
 `inner` is correct only because `role_id` is `NOT NULL` and FK-backed — inside a child an
 inner join drops the ENTRY, and over a nullable key it would drop entries from `FindByID`
 too. The three fields are read-only, carry no domain type (`RoleKey` is a plain `string`,
 never `vos.RoleKey`), and are absent from the `TableSchema`, so none of them reaches an
-INSERT or an UPDATE. `ArchivedAt` is `*time.Time` because the target's `deleted_at` is
+INSERT or an UPDATE. `ArchivedAt` is `*time.Time` because the target's `archived_at` is
 nullable. **No traversal to `Tenant`** — spec §2 names the trap: `groups.tenant_id` points at
 `tenants.id` since 2026-08-24 (the derived key was removed), so the traversal IS expressible now; what follows is the record of why it was refused while that key existed — it would have been accepted and would have matched
 nothing.

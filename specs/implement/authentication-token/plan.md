@@ -1,5 +1,11 @@
 # Capability plan — authentication-token
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPLIED (2026-08-26) — round 2 complete and proven against a live boot.
   Round 1 (the lockout counter, `/omnicore:evolve-entity`) is NOT started; see §3.
 - **Framework pin:** `github.com/ClaudioSchirmer/omnicore v0.61.0` (latest published — checked
@@ -380,7 +386,7 @@ Two grant paths must be unioned:
 
 - **Proposed:** ONE `SELECT DISTINCT` over the neutral read seam (`repo.Engine.Querier()`),
   composed at runtime from the five `TableSchema` declarations — `Table()`, `ColumnOf(...)`,
-  `IDColumn()`, `ParentIDColumn()` and `Resolve("DeletedAt")` are all public
+  `IDColumn()`, `ParentIDColumn()` and `Resolve("ArchivedAt")` are all public
   (`infra/db/core/table_schema.go:845-1010`) — with `Dialect().Placeholder(n)`,
   `QuoteIdent(...)` and `EncodeArg(...)` for the engine-specific bits. No identifier is
   hardcoded, so a schema rename moves the statement with it, and the query is dialect-neutral

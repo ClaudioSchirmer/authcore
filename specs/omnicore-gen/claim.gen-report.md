@@ -60,7 +60,7 @@ The spec marked these questions as ones the generator cannot answer, so it decla
 
 **`ClaimIsHeldByAUser(id domain.ID) bool`**
 
-> Whether any ACTIVE user_claims row references this claim definition. Read user_claims alone, by claim_id, requiring user_claims.deleted_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape.
+> Whether any ACTIVE user_claims row references this claim definition. Read user_claims alone, by claim_id, requiring user_claims.archived_at IS NULL — archived edges do not count, because a value somebody removed must not freeze the definition's shape.
 
 **`ClaimIsHeldByAClient(id domain.ID) bool`**
 
@@ -111,7 +111,7 @@ The shape the regenerated code expects, for `claims`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -190,15 +190,17 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 |---|---|
 | the by-id query and its result | `internal/application/queries/find_claim_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_claims_by_params_query.go` |
-| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the Claim aggregate root, its modes and its rules | `internal/domain/claim.go` |
+| the Claim service port (5 fact(s)) | `internal/domain/claim_service.go` |
 | the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
+| the claims schema (6 columns) | `internal/infra/schemas/claim_schema.go` |
 | the by-id request and response | `internal/web/requests/find_claim_by_id.go` |
 | the listing request and response | `internal/web/requests/find_claims_by_params.go` |
 
@@ -209,7 +211,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-28 file(s) were already up to date.
+26 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -225,9 +227,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

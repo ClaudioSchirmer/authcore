@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:fa95e28cb8f9a1cd188a918db25b4a24f1bf87545ffa04fc20866d5232bc433a
+// generated:  2026-09-06
+// checksum:   sha256:45f42c9fcfdaf059c5ccc005267db872729bb80ce22efec57095b9d829d8cc2b
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -49,7 +49,7 @@ func RoleSchema() *core.TableSchema {
 		Field("Key", "role_key").
 		Field("Name", "name").
 		Field("Description", "description").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

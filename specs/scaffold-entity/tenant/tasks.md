@@ -1,5 +1,11 @@
 # tasks — Tenant
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 Control file for the generation of the `Tenant` aggregate.
 
 **Model authority: `spec.md` (Status: APPROVED).** Nothing here restates the model — when a
@@ -93,7 +99,7 @@ Run on 2026-08-24 against the built tree. Commands are quoted so each line can b
 
 | Level | Result | Evidence |
 |---|---|---|
-| 1 — boot-trap checklist | **PASS** | Every applicable item ran BEFORE any boot. `.up.sql` ↔ `.down.sql` twin present; no `path:"id"` on any request; no `json:`/`db:` tag anywhere under `internal/domain/`; no regex or format check inline in a root rule (every one lives in a value object); `Modes()` Archive/Unarchive ⟺ `DeletedAt("deleted_at")` on the schema ⟺ `deleted_at TIMESTAMPTZ NULL` in the migration; `?fields=` declared with every `FindTenantsResponse` field a pointer + `,omitempty`; the `sort:` tags are exactly the three declared ordering paths (`Name`, `Workspace`, `CreatedAt`), with `UpdatedAt` carrying `filter:` and no `sort:`; every scalar `query:`-tagged filter a pointer, so none renders REQUIRED in OpenAPI; `RequiresService() … true` matched by `NewTenantServiceImpl(repo)` in the feature and `Service:` on all 8 write handlers (4 REST + 4 GraphQL); one root schema per file. N/A here: native-id sweep (postgres only), SQLite constraint-name reflex, view `Version` bump (a relational read model has none — and the emitted view declares no `Version`), root-archive auto handler (no children). |
+| 1 — boot-trap checklist | **PASS** | Every applicable item ran BEFORE any boot. `.up.sql` ↔ `.down.sql` twin present; no `path:"id"` on any request; no `json:`/`db:` tag anywhere under `internal/domain/`; no regex or format check inline in a root rule (every one lives in a value object); `Modes()` Archive/Unarchive ⟺ `ArchivedAt("archived_at")` on the schema ⟺ `archived_at TIMESTAMPTZ NULL` in the migration; `?fields=` declared with every `FindTenantsResponse` field a pointer + `,omitempty`; the `sort:` tags are exactly the three declared ordering paths (`Name`, `Workspace`, `CreatedAt`), with `UpdatedAt` carrying `filter:` and no `sort:`; every scalar `query:`-tagged filter a pointer, so none renders REQUIRED in OpenAPI; `RequiresService() … true` matched by `NewTenantServiceImpl(repo)` in the feature and `Service:` on all 8 write handlers (4 REST + 4 GraphQL); one root schema per file. N/A here: native-id sweep (postgres only), SQLite constraint-name reflex, view `Version` bump (a relational read model has none — and the emitted view declares no `Version`), root-archive auto handler (no children). |
 | 2 — format · vet · build | **PASS** | `gofmt -l bootstrap/ internal/` prints nothing · `go vet -tags postgres ./...` clean · `go build -tags postgres ./...` clean. |
 | 3 — unit tests, per generated FILE | **PASS with one stated deviation** | `go test -tags postgres -coverpkg=./internal/... -coverprofile=… ./internal/...` — all suites green. Read per file from the profile: **27 of 30 files at 100.0%**, total 83.1% of statements. The three exceptions are at **0.0%** and are the ones `spec.md` named in advance: `internal/infra/tenant_repository.go`, `internal/infra/tenant_service.go` and `internal/web/tenant_routes.go` — a repository, a domain-service implementation and route mounts cannot be exercised without a live relational engine and a running app. That is the collision `spec.md` records between `CLAUDE.md` rule 6's 95% floor and the framework's own test division; `/omnicore:qa` is the route to closing it without touching production code. |
 | 4 — existing QA suite | **NO-OP, reported rather than skipped** | The service has no QA suite yet, so there is no regression to prove. This level did not run because there was nothing to run, not because it was passed over. |

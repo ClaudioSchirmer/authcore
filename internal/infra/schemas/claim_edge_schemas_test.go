@@ -58,8 +58,8 @@ func assertEdgePair(t *testing.T, child, direct *core.TableSchema) {
 	// agreement: a Direct schema that stopped declaring it would still compile and
 	// still answer — about archived entries too, which is the one answer the two
 	// collections chose softRemove to avoid.
-	childDel, childHas := child.DeletedAtColumn()
-	directDel, directHas := direct.DeletedAtColumn()
+	childDel, childHas := child.ArchivedAtColumn()
+	directDel, directHas := direct.ArchivedAtColumn()
 	switch {
 	case !childHas:
 		t.Errorf("%s: the aggregate child declares no archive column", child.Table())

@@ -57,5 +57,5 @@ func ClaimDefinitionSchema() *core.TableSchema {
 		Field("ValueType", "value_type").
 		Field("AppliesTo", "applies_to").
 		Field("DefaultValue", "default_value").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

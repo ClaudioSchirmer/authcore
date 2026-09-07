@@ -79,7 +79,7 @@ func (e *User) customRules(actionName string, service domain.Service, r *domain.
 		//
 		// It reaches the ROW and not merely the audit event, because archive is
 		// an ordinary full-field write at this pin: it emits the same UPDATE
-		// every other verb does, with deleted_at riding along as one more
+		// every other verb does, with archived_at riding along as one more
 		// column.
 		//
 		// It cannot collide with the status transition rule: that one is

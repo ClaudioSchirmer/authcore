@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:8eb924dcc914227e70d1166d715d0f2e739431d0287d2a53b139d709c69673b4
+// checksum:   sha256:f5da73d8a66f69b100d2fdb48e5ce208da1002dec3e5b3710140d32ae16f3fc5
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -69,7 +69,7 @@ type User struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	TenantWorkspace  string     // The owning tenant's immutable handle. Read-only, filled on every load — Tenant.workspace, via the InnerJoin on tenant_id
 	TenantStatus     string     // The owning tenant's commercial lifecycle. Read-only, filled on every load — Tenant.status, via the InnerJoin on tenant_id
-	TenantArchivedAt *time.Time // When the owning tenant was archived, or absent while it is live. Read-only, filled on every load, never written through this aggregate — Tenant.deleted_at, via the InnerJoin on tenant_id
+	TenantArchivedAt *time.Time // When the owning tenant was archived, or absent while it is live. Read-only, filled on every load, never written through this aggregate — Tenant.archived_at, via the InnerJoin on tenant_id
 
 	// Fed from the caller's identity by the command mapper and read by the
 	// rules below. Never persisted, so it carries no labelKey and no column.

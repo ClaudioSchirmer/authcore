@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:bab708a55c5deb1f9b7a5fbbf797696cd46af3d5dae60fc9ff0061d6b9d8212a
+// checksum:   sha256:7329ebea907a05069e007f0a7f749a97a375c3fad9affe05906d6e05873399ad
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -51,7 +51,7 @@ type GroupRole struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	RoleKey        string     // The conferred role's stable machine handle. Read-only, filled on load, never written through this aggregate — Role.role_key, via the InnerJoin on role_id
 	RoleName       string     // The conferred role's display name. Read-only, filled on load, never written through this aggregate — Role.name, via the InnerJoin on role_id
-	RoleArchivedAt *time.Time // When the role behind this entry was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.deleted_at, via the InnerJoin on role_id
+	RoleArchivedAt *time.Time // When the role behind this entry was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.archived_at, via the InnerJoin on role_id
 }
 
 // CollectionName is the name of the roles collection.

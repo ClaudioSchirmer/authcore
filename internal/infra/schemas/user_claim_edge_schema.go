@@ -49,7 +49,7 @@ type UserClaimEdge struct {
 
 // UserClaimEdgeSchema maps UserClaimEdge to user_claims for a Direct read.
 //
-// DeletedAt is declared even though no field carries it: the scope gate reads the
+// ArchivedAt is declared even though no field carries it: the scope gate reads the
 // COLUMN off the schema, which is what makes `active` the query's default and
 // keeps the archive predicate out of every call site. Dropping it would silently
 // widen every probe to include removed entries — the one mistake this table's
@@ -58,5 +58,5 @@ func UserClaimEdgeSchema() *core.TableSchema {
 	return core.NewDirectSchema[UserClaimEdge]("user_claims").
 		ID("id").
 		Field("ClaimID", "claim_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

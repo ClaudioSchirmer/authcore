@@ -32,7 +32,7 @@ CREATE TABLE "claims" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "claims_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "claims" IS 'The vocabulary of tenant-defined claims: one row per claim name a token of this tenant may carry, holding the type its values must have, which identity kinds may hold one, and the default used when no principal-level value is set.';
@@ -46,7 +46,7 @@ COMMENT ON COLUMN "claims"."description" IS 'What the value means, in the tenant
 COMMENT ON COLUMN "claims"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "claims"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "claims"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "claims"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "claims"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by TenantID: the value is unique WITHIN that, not across the
@@ -54,7 +54,7 @@ COMMENT ON COLUMN "claims"."deleted_at" IS 'Archive stamp; a non-null value hide
 -- check refuses the two disagreeing.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "claims_tenant_id_name_key" ON "claims" ("tenant_id", "name") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "claims_tenant_id_name_key" ON "claims" ("tenant_id", "name") WHERE "archived_at" IS NULL;
 
 -- Added by hand: a reference to ANOTHER aggregate is outside the generator's
 -- spec language, so this block is the part of the pair that is not emitted.

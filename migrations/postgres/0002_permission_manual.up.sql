@@ -29,7 +29,7 @@ CREATE TABLE "permissions" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "permissions_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "permissions" IS 'The global catalog of enforceable permissions. One row per resource:action pair some route enforces; defined by the platform, never by a tenant. The resource:action string is rendered on read, never stored.';
@@ -40,11 +40,11 @@ COMMENT ON COLUMN "permissions"."description" IS 'What holding this permission a
 COMMENT ON COLUMN "permissions"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "permissions"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "permissions"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "permissions"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "permissions"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Over the TUPLE: this constraint belongs to a composite value object,
 -- whose parts identify together and mean nothing apart.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "permissions_resource_name_action_name_key" ON "permissions" ("resource_name", "action_name") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "permissions_resource_name_action_name_key" ON "permissions" ("resource_name", "action_name") WHERE "archived_at" IS NULL;

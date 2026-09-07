@@ -30,7 +30,7 @@ CREATE TABLE "client_claims" (
   "client_id" UUID NOT NULL,
   "claim_id" UUID NOT NULL,
   "value" VARCHAR(256) NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "client_claims_pkey" PRIMARY KEY ("id"),
@@ -41,7 +41,7 @@ COMMENT ON COLUMN "client_claims"."id" IS 'Row id — a UUID v7 minted by the fr
 COMMENT ON COLUMN "client_claims"."client_id" IS 'The clients row this entry belongs to.';
 COMMENT ON COLUMN "client_claims"."claim_id" IS 'The claim definition this value belongs to — the id and not the name, so a retired-and-recreated definition needs an explicit re-set rather than silently inheriting a value written for the old one.';
 COMMENT ON COLUMN "client_claims"."value" IS 'The value this client carries for the definition above. Validated against the definition''s declared value_type by a domain rule, since no value object can read another aggregate''s field.';
-COMMENT ON COLUMN "client_claims"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "client_claims"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "client_claims"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "client_claims"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 
@@ -59,7 +59,7 @@ CREATE INDEX "client_claims_parent_idx" ON "client_claims" ("client_id");
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "client_claims_client_id_claim_id_key" ON "client_claims" ("client_id", "claim_id") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "client_claims_client_id_claim_id_key" ON "client_claims" ("client_id", "claim_id") WHERE "archived_at" IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- HAND-WRITTEN BELOW THIS LINE, in the sense that even on the generated path it

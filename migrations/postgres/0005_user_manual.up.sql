@@ -35,7 +35,7 @@ CREATE TABLE "users" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "users" IS 'A person''s account inside exactly one tenant: who they are, the credential they sign in with, and the state of that account. The e-mail is unique across the whole platform over active rows — one address is one user, never two.';
@@ -52,13 +52,13 @@ COMMENT ON COLUMN "users"."status" IS 'The account''s state — active or suspen
 COMMENT ON COLUMN "users"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "users"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "users"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "users"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "users"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 CREATE TABLE "user_groups" (
   "id" UUID NOT NULL,
   "user_id" UUID NOT NULL,
   "group_id" UUID NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "user_groups_pkey" PRIMARY KEY ("id"),
@@ -68,7 +68,7 @@ COMMENT ON TABLE "user_groups" IS 'The groups this user belongs to. One row per 
 COMMENT ON COLUMN "user_groups"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
 COMMENT ON COLUMN "user_groups"."user_id" IS 'The users row this entry belongs to.';
 COMMENT ON COLUMN "user_groups"."group_id" IS 'The group this membership joins — the id and not the key, so a retired-and-recreated group needs an explicit re-join.';
-COMMENT ON COLUMN "user_groups"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "user_groups"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "user_groups"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "user_groups"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -78,7 +78,7 @@ CREATE TABLE "user_roles" (
   "id" UUID NOT NULL,
   "user_id" UUID NOT NULL,
   "role_id" UUID NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "user_roles_pkey" PRIMARY KEY ("id"),
@@ -88,7 +88,7 @@ COMMENT ON TABLE "user_roles" IS 'The roles granted to this user directly, besid
 COMMENT ON COLUMN "user_roles"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
 COMMENT ON COLUMN "user_roles"."user_id" IS 'The users row this entry belongs to.';
 COMMENT ON COLUMN "user_roles"."role_id" IS 'The role granted directly to this user — the id and not the key, for the same reason the membership stores one.';
-COMMENT ON COLUMN "user_roles"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "user_roles"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "user_roles"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "user_roles"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -97,7 +97,7 @@ CREATE INDEX "user_roles_parent_idx" ON "user_roles" ("user_id");
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "users_email_key" ON "users" ("email") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "users_email_key" ON "users" ("email") WHERE "archived_at" IS NULL;
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by user_id, the owner: an entry has no identity outside its
@@ -106,7 +106,7 @@ CREATE UNIQUE INDEX "users_email_key" ON "users" ("email") WHERE "deleted_at" IS
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "user_groups_user_id_group_id_key" ON "user_groups" ("user_id", "group_id") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "user_groups_user_id_group_id_key" ON "user_groups" ("user_id", "group_id") WHERE "archived_at" IS NULL;
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by user_id, the owner: an entry has no identity outside its
@@ -115,7 +115,7 @@ CREATE UNIQUE INDEX "user_groups_user_id_group_id_key" ON "user_groups" ("user_i
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "user_roles_user_id_role_id_key" ON "user_roles" ("user_id", "role_id") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "user_roles_user_id_role_id_key" ON "user_roles" ("user_id", "role_id") WHERE "archived_at" IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- HAND-WRITTEN BELOW THIS LINE. The generator writes the parent key of a

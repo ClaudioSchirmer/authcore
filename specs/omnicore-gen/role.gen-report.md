@@ -126,7 +126,7 @@ The shape the regenerated code expects, for `roles`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -141,7 +141,7 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `role_id` | id | no | foreign key to roles |
 | `permission_id` | id | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -223,6 +223,25 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 ## What was generated
 
+| What | File |
+|---|---|
+| the by-id query and its result | `internal/application/queries/find_role_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_roles_by_params_query.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the RolePermission child value object | `internal/domain/aggregatevos/role_permission.go` |
+| the Role aggregate root, its modes and its rules | `internal/domain/role.go` |
+| the Role repository and its constraint bindings | `internal/infra/role_repository.go` |
+| the role_permissions child schema | `internal/infra/schemas/role_permission_schema.go` |
+| the roles schema (4 columns) | `internal/infra/schemas/role_schema.go` |
+| the by-id request and response | `internal/web/requests/find_role_by_id.go` |
+| the listing request and response | `internal/web/requests/find_roles_by_params.go` |
+
 **Left untouched** (yours, by design):
 
 - `internal/application/queries/utils/role_computed_manual.go` — hand-written rules live here, by design
@@ -231,7 +250,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-48 file(s) were already up to date.
+39 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -247,9 +266,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:4f6f779a272d55d61d01d2ef1ee5a7765051e383cfd495ecd0438b1f53d57129
+// generated:  2026-09-06
+// checksum:   sha256:bcb8687709c36d416b98b28bbdf59a061a05b0fdb9a0a76d4681cf3dc5d10079
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -58,9 +58,9 @@ type ClaimService interface {
 	TenantIsUnavailable(tenantID domain.ID) bool
 
 	// Whether any ACTIVE user_claims row references this claim definition.
-	// Read user_claims alone, by claim_id, requiring user_claims.deleted_at IS
-	// NULL — archived edges do not count, because a value somebody removed
-	// must not freeze the definition's shape.
+	// Read user_claims alone, by claim_id, requiring user_claims.archived_at
+	// IS NULL — archived edges do not count, because a value somebody
+	// removed must not freeze the definition's shape.
 	ClaimIsHeldByAUser(id domain.ID) bool
 
 	// Whether any ACTIVE client_claims row references this claim definition.

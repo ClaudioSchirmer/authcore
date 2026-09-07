@@ -1,5 +1,11 @@
 # Spec: Claim
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-28 — both ⚠️ OPEN slots answered
   at the model gate: **the reserved prefix is `x_`** (OPEN-1, option (a)) and **the prefix is
@@ -101,8 +107,8 @@ status        …         └───────────── name       
                                        default_value  VARCHAR(256)           NULL
                                        description    VARCHAR(500)           NOT NULL
                                        revision       …
-                                       created_at / updated_at / deleted_at
-                                       UNIQUE (tenant_id, name) WHERE deleted_at IS NULL
+                                       created_at / updated_at / archived_at
+                                       UNIQUE (tenant_id, name) WHERE archived_at IS NULL
 ```
 
   - **`claims`** — *The vocabulary of tenant-defined claims: one row per claim name a token
@@ -130,7 +136,7 @@ status        …         └───────────── name       
 | `DefaultValue` | `*string` | **plain** (see below) | **yes** | no | root | `1000` | Level 2 of the chain: the value every principal of this tenant gets when none is set on the principal itself. Null means the claim is simply absent from the token |
 | `Description` | `vos.Description` | reuse | no | no | root | `Internal cost center this account is billed against, as the ERP knows it.` | What the value means, for the operator filling it in |
 
-Managed columns as everywhere else: `revision`, `created_at`, `updated_at`, `deleted_at`.
+Managed columns as everywhere else: `revision`, `created_at`, `updated_at`, `archived_at`.
 
 **`DefaultValue` is `plain`, and that is a decision rather than an omission.** Its rule is
 *"parse as whatever `ValueType` says"* — a rule that reads ANOTHER field, which a value object

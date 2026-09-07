@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a6b5fd704b7eb3a2af42c842ae58b0124bbdfe2b6ce1c6e0eeb98dac252dc5f3
+// generated:  2026-09-06
+// checksum:   sha256:28ff35f2ce0c2e0044aff80f1d9bcad90827a1ab11c70cfd4f37f48c0474b765
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -46,7 +46,7 @@ func ClientRoleSchema() *core.TableSchema {
 		ID("id").
 		ParentID("client_id").
 		Field("RoleID", "role_id").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

@@ -34,7 +34,7 @@ CREATE TABLE "clients" (
   "revision" BIGINT NOT NULL DEFAULT 0,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   CONSTRAINT "clients_pkey" PRIMARY KEY ("id")
 );
 COMMENT ON TABLE "clients" IS 'A machine account: an integration that authenticates as itself, holding a server-minted credential and a set of role grants inside exactly one tenant. The row id IS the client id the caller signs in with, and the label is unique per tenant over active rows.';
@@ -50,13 +50,13 @@ COMMENT ON COLUMN "clients"."status" IS 'The account''s state — active or susp
 COMMENT ON COLUMN "clients"."revision" IS 'Optimistic-concurrency stamp: bumped on every write, and the value each update is guarded on. Maintained by the framework.';
 COMMENT ON COLUMN "clients"."created_at" IS 'When the row was created; written by the database default.';
 COMMENT ON COLUMN "clients"."updated_at" IS 'When the row was last written, maintained by the framework.';
-COMMENT ON COLUMN "clients"."deleted_at" IS 'Archive stamp; a non-null value hides the row from reads.';
+COMMENT ON COLUMN "clients"."archived_at" IS 'Archive stamp; a non-null value hides the row from reads.';
 
 CREATE TABLE "client_roles" (
   "id" UUID NOT NULL,
   "client_id" UUID NOT NULL,
   "role_id" UUID NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "client_roles_pkey" PRIMARY KEY ("id"),
@@ -66,7 +66,7 @@ COMMENT ON TABLE "client_roles" IS 'The roles granted to this client. One row pe
 COMMENT ON COLUMN "client_roles"."id" IS 'Row id — a UUID v7 minted by the framework, not a sequence.';
 COMMENT ON COLUMN "client_roles"."client_id" IS 'The clients row this entry belongs to.';
 COMMENT ON COLUMN "client_roles"."role_id" IS 'The role granted to this client — the id and not the key, so a retired-and-recreated role needs an explicit re-grant.';
-COMMENT ON COLUMN "client_roles"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "client_roles"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "client_roles"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "client_roles"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -77,7 +77,7 @@ CREATE TABLE "client_allowed_cidrs" (
   "client_id" UUID NOT NULL,
   "cidr" VARCHAR(43) NOT NULL,
   "label" VARCHAR(120) NOT NULL,
-  "deleted_at" TIMESTAMPTZ NULL,
+  "archived_at" TIMESTAMPTZ NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT "client_allowed_cidrs_pkey" PRIMARY KEY ("id"),
@@ -88,7 +88,7 @@ COMMENT ON COLUMN "client_allowed_cidrs"."id" IS 'Row id — a UUID v7 minted by
 COMMENT ON COLUMN "client_allowed_cidrs"."client_id" IS 'The clients row this entry belongs to.';
 COMMENT ON COLUMN "client_allowed_cidrs"."cidr" IS 'A network range this client may authenticate from, stored normalised.';
 COMMENT ON COLUMN "client_allowed_cidrs"."label" IS 'What this range is, in the tenant''s words — an unlabelled range is one nobody dares remove.';
-COMMENT ON COLUMN "client_allowed_cidrs"."deleted_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
+COMMENT ON COLUMN "client_allowed_cidrs"."archived_at" IS 'Archive stamp; a non-null value hides the entry from reads.';
 COMMENT ON COLUMN "client_allowed_cidrs"."created_at" IS 'When the entry was created; written by the database default.';
 COMMENT ON COLUMN "client_allowed_cidrs"."updated_at" IS 'When the entry was last written, maintained by the framework.';
 -- every read of the aggregate loads this collection by the key below.
@@ -100,7 +100,7 @@ CREATE INDEX "client_allowed_cidrs_parent_idx" ON "client_allowed_cidrs" ("clien
 -- check refuses the two disagreeing.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "clients_tenant_id_name_key" ON "clients" ("tenant_id", "name") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "clients_tenant_id_name_key" ON "clients" ("tenant_id", "name") WHERE "archived_at" IS NULL;
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by client_id, the owner: an entry has no identity outside its
@@ -109,7 +109,7 @@ CREATE UNIQUE INDEX "clients_tenant_id_name_key" ON "clients" ("tenant_id", "nam
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "client_roles_client_id_role_id_key" ON "client_roles" ("client_id", "role_id") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "client_roles_client_id_role_id_key" ON "client_roles" ("client_id", "role_id") WHERE "archived_at" IS NULL;
 
 -- the repository binds this constraint's violation to a clean 409.
 -- Scoped by client_id, the owner: an entry has no identity outside its
@@ -118,7 +118,7 @@ CREATE UNIQUE INDEX "client_roles_client_id_role_id_key" ON "client_roles" ("cli
 -- cannot be: that check sees ONE write, never the concurrent one.
 -- Scoped to the ACTIVE rows: an archived row releases the value, so it
 -- can be taken again while the old row stays as history.
-CREATE UNIQUE INDEX "client_allowed_cidrs_client_id_cidr_key" ON "client_allowed_cidrs" ("client_id", "cidr") WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "client_allowed_cidrs_client_id_cidr_key" ON "client_allowed_cidrs" ("client_id", "cidr") WHERE "archived_at" IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- HAND-WRITTEN BELOW THIS LINE. The generator writes the parent key of a

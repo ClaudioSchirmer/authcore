@@ -79,7 +79,7 @@ type AuthenticationAttempt struct {
 
 // AuthenticationAttemptSchema maps AuthenticationAttempt to authentication_attempts.
 //
-// NO DeletedAt, and its absence is a decision. An attempt rollup is operational
+// NO ArchivedAt, and its absence is a decision. An attempt rollup is operational
 // state, not a record anyone archives: the failure row is cleared by a successful
 // sign-in and re-anchored by the next burst, and there is no state in between
 // worth keeping invisible. Declaring the column here would also silently gate

@@ -1,5 +1,11 @@
 # task: migrations — Permission
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 ## Read first (mandatory, at execution time)
 
 - `migrations` — numbering, the up/down pairing requirement, and dialect handling.
@@ -24,7 +30,7 @@ One table, in the project's single migration directory (postgres is the only dia
 | resource | varchar(64) | not null | first part of the permission key |
 | action | varchar(64) | not null | second part |
 | description | varchar(500) | not null | |
-| deleted_at | timestamptz | null | archive marker; one-way |
+| archived_at | timestamptz | null | archive marker; one-way |
 | created_at | timestamptz | not null | |
 | updated_at | timestamptz | not null | |
 

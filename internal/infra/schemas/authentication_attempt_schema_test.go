@@ -168,7 +168,7 @@ func TestAuthenticationAttemptSchema_IsADirectAnchor(t *testing.T) {
 	}
 	// NO archive column, deliberately: declaring one would silently gate every
 	// read on a column the migration never created.
-	if col, has := schema.DeletedAtColumn(); has {
+	if col, has := schema.ArchivedAtColumn(); has {
 		t.Errorf("the schema declares the archive column %q, which this table does not have — "+
 			"every read would be gated on it", col)
 	}

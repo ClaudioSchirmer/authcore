@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:cf79ef0ca6975fa8b17564704fc0fb94d92bcca68225b3e0dcf4d64c2214b725
+// checksum:   sha256:7d83a821cda9c32d93297e8250ee50940efd9b5529e96bf3ab8dfa24e5d00321
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -78,7 +78,7 @@ type FindClaimByIDResponse struct {
 	Description      string     `json:"description" exportLabelKey:"ClaimDescriptionField" example:"Internal cost center this account is billed against, as the ERP knows it."`
 	CreatedAt        time.Time  `json:"createdAt" exportLabelKey:"ClaimCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt        time.Time  `json:"updatedAt" exportLabelKey:"ClaimUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt        *time.Time `json:"deletedAt" exportLabelKey:"ClaimDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt       *time.Time `json:"archivedAt" exportLabelKey:"ClaimArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace  string     `json:"tenantWorkspace" exportLabelKey:"ClaimTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus     string     `json:"tenantStatus" exportLabelKey:"ClaimTenantStatusField" example:"active"`
 	TenantArchivedAt *time.Time `json:"tenantArchivedAt" exportLabelKey:"ClaimTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`

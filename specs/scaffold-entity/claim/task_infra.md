@@ -1,5 +1,11 @@
 # task_infra — Claim
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 Model authority: [`spec.md`](spec.md) §1, §2, §7, §9. Layout, naming and granularity:
 `service-layout.html`.
 
@@ -17,7 +23,7 @@ Model authority: [`spec.md`](spec.md) §1, §2, §7, §9. Layout, naming and gra
 ## What this layer must contain
 
 **The table schema** — one schema per file, six fields plus the managed set
-(`revision`, `created_at`, `updated_at`, `deleted_at`). The archive column declaration and
+(`revision`, `created_at`, `updated_at`, `archived_at`). The archive column declaration and
 the aggregate's `Archive` mode must agree; they are one decision expressed twice, and a
 disagreement is a boot failure rather than a subtle bug. The claim name's storage column is
 renamed to avoid the reserved word; **only the storage name moves** — the exposed name stays

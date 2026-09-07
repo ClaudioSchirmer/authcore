@@ -77,5 +77,5 @@ func SignInClientSchema() *core.TableSchema {
 		Field("SecretHash", "secret_hash").
 		Field("PreviousSecretHash", "previous_secret_hash").
 		Field("PreviousSecretExpiresAt", "previous_secret_expires_at").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

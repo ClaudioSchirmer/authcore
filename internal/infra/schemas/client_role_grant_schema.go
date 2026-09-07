@@ -15,7 +15,7 @@
 //
 // EVERY ARCHIVE STAMP IS A MAPPED COLUMN, and the filtering happens in GO rather
 // than in the predicate: a declared traversal is NOT gated on the archived state of
-// its target, and the row is a ROLE-AND-GRANT pair — a `WHERE grant.deleted_at IS
+// its target, and the row is a ROLE-AND-GRANT pair — a `WHERE grant.archived_at IS
 // NULL` would drop the role along with what it confers, and a role whose every
 // permission was revoked is still a role the client holds.
 //
@@ -73,7 +73,7 @@ func ClientRoleGrantSchema() *core.TableSchema {
 		ID("id").
 		ParentID("client_id").
 		Field("RoleID", "role_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func clientRolesTarget() *core.TableSchema {
@@ -81,7 +81,7 @@ func clientRolesTarget() *core.TableSchema {
 		ID("id").
 		Field("RoleKey", "role_key").
 		Field("RoleName", "name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 // clientGrantsTarget is `role_permissions` reached FROM a role, and the declaration
@@ -91,7 +91,7 @@ func clientGrantsTarget() *core.TableSchema {
 	return core.NewDirectSchema[ClientRoleGrant]("role_permissions").
 		ID("role_id").
 		Field("HopPermissionID", "permission_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 func clientCatalogTarget() *core.TableSchema {
@@ -99,7 +99,7 @@ func clientCatalogTarget() *core.TableSchema {
 		ID("id").
 		Field("Resource", "resource_name").
 		Field("Action", "action_name").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }
 
 // ClientGrantJoins is the traversal the reader declares, exported as ONE call so

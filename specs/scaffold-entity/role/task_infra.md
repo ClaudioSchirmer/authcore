@@ -1,5 +1,11 @@
 # task: infra — Role
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 Model: `spec.md` §1, §2, §3, §7, §9. Convention: `conventions/infra.md` +
 `conventions/aggregate-children.md`. Layout/naming: `service-layout.html`.
 
@@ -44,7 +50,7 @@ read.InnerJoinInChild(<child schema>).To(<permission schema>)
   RolePermission.permission_id  =  permissions.id
     → Resource    ← permissions.resource_name
     → Action      ← permissions.action_name
-    → ArchivedAt  ← permissions.deleted_at        -- managed column; *time.Time
+    → ArchivedAt  ← permissions.archived_at        -- managed column; *time.Time
 ```
 
 Four things about this declaration that this layer is responsible for, because nothing
@@ -62,7 +68,7 @@ downstream can repair them:
   `FindByID` too, turning a legitimate write into a 404.
 - **The join fields are read-only and carry no domain type.** `Resource` and `Action` are
   plain `string`, never `vos.PermissionKey`; `ArchivedAt` is `*time.Time`, nullable because
-  the target's `deleted_at` is. None of the three is in the `TableSchema`, so none reaches an
+  the target's `archived_at` is. None of the three is in the `TableSchema`, so none reaches an
   INSERT or an UPDATE.
 - **`ArchivedAt` renders, it never gates.** The join is not archive-gated: an archived
   permission keeps supplying its columns and the inner join keeps matching it. The rule that

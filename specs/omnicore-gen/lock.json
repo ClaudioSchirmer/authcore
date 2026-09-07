@@ -3,8 +3,8 @@
   "entities": {
     "Claim": {
       "spec": "specs/omnicore-gen/claim.omnicore.yaml",
-      "specHash": "e33c575d78a36dc5cdeff23429d89205a32d9ded3c67e8e9643d33a226a4285f",
-      "framework": "v0.73.0",
+      "specHash": "19c225f2856fc4fa1313bb8b3350481e53d6fcbc810647bf5be516a60639d93f",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/claim_feature.go": {
           "class": "owned",
@@ -36,7 +36,7 @@
         },
         "internal/application/queries/find_claim_by_id_query.go": {
           "class": "owned",
-          "hash": "ccc9e558b70026c7ae7aa5c48603e3d13a702d32ca1bc8fc0e0a0162766117da"
+          "hash": "7ab0269b483f00bc2459ced48635c4bb34090da5253f3b002cfb600c93c92390"
         },
         "internal/application/queries/find_claim_by_id_query_test.go": {
           "class": "owned",
@@ -44,7 +44,7 @@
         },
         "internal/application/queries/find_claims_by_params_query.go": {
           "class": "owned",
-          "hash": "59b4fe263f451ed513b6a02245d4f1babed40bd66679309d5288d47636233375"
+          "hash": "9c553bbbe048266b05e32579c91572e8c82faf719eb17323c98440b50e25ef80"
         },
         "internal/application/queries/find_claims_by_params_query_test.go": {
           "class": "owned",
@@ -52,7 +52,7 @@
         },
         "internal/domain/claim.go": {
           "class": "owned",
-          "hash": "724964fe65f348cfff031c449daf26757cd367298bf6700283c141b6f14c102d"
+          "hash": "a36a4ac5284ec464384ce5e179f27f5f22b2ec9d00464309d2c32834a625679f"
         },
         "internal/domain/claim_rules_manual.go": {
           "class": "hook",
@@ -60,7 +60,7 @@
         },
         "internal/domain/claim_service.go": {
           "class": "owned",
-          "hash": "9db019d7c8af1a3403076b416cc2fb4bb5741ba29566cbd44aaf989174217abb"
+          "hash": "e89bc58e916f9a00cf815c390e7552247936ac9b9b77ea993f371dc5a09aa011"
         },
         "internal/domain/claim_test.go": {
           "class": "owned",
@@ -88,7 +88,7 @@
         },
         "internal/infra/claim_repository.go": {
           "class": "owned",
-          "hash": "be112587ba8cfdb65138b57ae238318b735c80ec15ed366d39ba7ee6ced6bfc5"
+          "hash": "7c5eaae781b7efea83b5b2eb7ea723053f68358e46b273fe24e4eb375ca933dd"
         },
         "internal/infra/claim_service.go": {
           "class": "owned",
@@ -100,7 +100,7 @@
         },
         "internal/infra/schemas/claim_schema.go": {
           "class": "owned",
-          "hash": "2b4bdda6de57b013a6d94a323b89ad9daad4335256c9ff23a525337158cb43f1"
+          "hash": "16e072642c49dd5e6bae30648a82c48b8e744f6a3c333cbbde75b0899f358e98"
         },
         "internal/infra/schemas/claim_schema_test.go": {
           "class": "owned",
@@ -120,7 +120,7 @@
         },
         "internal/web/requests/find_claim_by_id.go": {
           "class": "owned",
-          "hash": "431e8539d8567e76df6d0457081d272b169a180b435d2d04dad6adf78e2005a2"
+          "hash": "4486ad30e57654b28b5976185d45923b0564245cc9255c45ebe2c8f5e608cd6c"
         },
         "internal/web/requests/find_claim_by_id_test.go": {
           "class": "owned",
@@ -128,7 +128,7 @@
         },
         "internal/web/requests/find_claims_by_params.go": {
           "class": "owned",
-          "hash": "b9d3cda29116d4d8e9a593e65024f269cab556eb460d9a857709d60b00318f50"
+          "hash": "74c16a4d75ba6cfb07c086defcc5047b7b3bb51f1d72084e1f2fe1625fda4841"
         },
         "internal/web/requests/find_claims_by_params_test.go": {
           "class": "owned",
@@ -163,9 +163,9 @@
           "ClaimAppliesTo.user": "80033f8258eb0e27bae769f87dc61600b5336211492d75e13024d59bf87cb2ed",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "9d701da5f4a4137605ab16323a41690654c33926b85b2cd36f2ee4329c579866",
           "ClaimAppliesToField": "de499889c5c6451b6936fb1a3bd2a537943dcc9dbd5765356522f22e75a8eecd",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "1058bb6b626726aeb1a6f13de905d52cfda32951373afbca23e56f7b008dd3d8",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "ClaimNameAlreadyExistsNotification": "8a0c670dbeb2dc2c93a48f2b1a9fd04229be898032a0c4bb22ef4fc83dbe7ecd",
           "ClaimNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
@@ -197,9 +197,9 @@
           "ClaimAppliesTo.user": "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "02e73adc07726350728546bb530a670f6d920ab699d8b049c078493d8bbd52f8",
           "ClaimAppliesToField": "6687458beee57a58a82d748251b86704c07e978e1bc15863879868e024ae4c9f",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "e6fdffbb82b605ae5e6e49e3aef0d7114b57792358ecd84f68be6fafde57e319",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClaimNameAlreadyExistsNotification": "8510fcc6673f94a57e97309568827f9324a8176b9b87519b6418d081349c55f5",
           "ClaimNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
@@ -231,9 +231,9 @@
           "ClaimAppliesTo.user": "63614ffde2d350df40e2c69689693d0612835b1370e0e2037d4d198939bb5184",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "26d91ec444bb383adda45a9df9c018ae9f4552c5e7cac6c13e2bb15412fd416e",
           "ClaimAppliesToField": "9090f600ec57506b959fb65e16871e191a54770262b81f76b5eeec60d43bc8f7",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "ead23458b7cd857d3c3d3f34cfbe8db57df8f721e9f9f9d6b265939542d3ba08",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "ClaimNameAlreadyExistsNotification": "003ce736758f2608428ec81d993d97c7e0a4f0919bdb478ece7bed0a7e4bc236",
           "ClaimNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
@@ -265,9 +265,9 @@
           "ClaimAppliesTo.user": "721e5b29ababb5190f8619abaff97f0801d01b3c94ded914bb26241584b60382",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "4075f91bc641fa9cc4eaf30f73f8982cd3e9dc0d45c389b00c4d0d1b33f29b16",
           "ClaimAppliesToField": "f7b66f134da1f563afb3858c17f96f58cbd09fa0890d7613d35c5c393d56ebdb",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "4e42d6603e47145793e772faf9eff85004efb1505da0542ba9b91879511007c9",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClaimNameAlreadyExistsNotification": "490ceddd8a87d878df5f994771974f6b988f064d8da41182705fdc047bbb0d34",
           "ClaimNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
@@ -299,9 +299,9 @@
           "ClaimAppliesTo.user": "cacbd25f723d75b1482c6bb61e140674efe256490611108bf14a11bc1172bdf4",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "21ec2cb264181f7ad63f12c959c52c8d393146c8fde6fbdb6dda911385fa8c19",
           "ClaimAppliesToField": "c75d9a49ec35850ffab1aa4c9e00fa5c0940cdfdc67963d26882587297895011",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "f14e320cd78e4e2fcb379dae30288fb1392b15b2b5ac8f805d47e3648d758e71",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "ClaimNameAlreadyExistsNotification": "ec91595f6bd1c47d1ee2ab0a13f5c12cbc29762aae580fa1348bea0e7513ea70",
           "ClaimNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
@@ -333,9 +333,9 @@
           "ClaimAppliesTo.user": "48d7b90e728a759b02418ca0374664780b7cd9c60aea57ae92fc8c3d70a278dd",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "c2e198d5396cb6f197552c74a3699226d49437e9fe856f4ca97329e62165dcf6",
           "ClaimAppliesToField": "edcfb0009d2b8f6e975acff9a347c3e6302db759a988eb264872a3619bcb8a90",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "7213ac0551613f69792d6bf60a59861c0054ee5f52810d4119308c4b8c038365",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
           "ClaimNameAlreadyExistsNotification": "a39ea2bf251e53c4e116ae0071eed60012ee5bad5e72df368004fd0e272c3d74",
           "ClaimNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
@@ -367,9 +367,9 @@
           "ClaimAppliesTo.user": "f53bbaa05faef8e20f9a492a1fa067990e19c0aafd3746fbe9072c253f885ce6",
           "ClaimAppliesToCannotExcludeHeldValuesNotification": "523b2d6faa4fd3d12de55216755335f5790fcd9a7693b595e5f3ada8be645ea2",
           "ClaimAppliesToField": "b634235c011a136d030715ee8dcb17590433d8d9ae5556ca6604f4aa38561046",
+          "ClaimArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClaimCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "ClaimDefaultValueField": "3f9fee46634431721f4f68e2559b22962e82264783e2b1e83b4b9ced69defcc7",
-          "ClaimDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClaimDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "ClaimNameAlreadyExistsNotification": "a9209671f82cbc1602d5cdc8a50043e99eac0157d1cc348dc3074b7a213d3a20",
           "ClaimNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
@@ -415,8 +415,8 @@
     },
     "Client": {
       "spec": "specs/omnicore-gen/client.omnicore.yaml",
-      "specHash": "fb3d6b6a2198de80bc70d558292f9217fd6c00c60c22807c2fa80c4ab3f3fb85",
-      "framework": "v0.73.0",
+      "specHash": "be70bb77615274021b54aac67c1f8967c2b155c9ef6629d3bcf68ba68e17e2c2",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/client_feature.go": {
           "class": "owned",
@@ -564,7 +564,7 @@
         },
         "internal/application/queries/find_client_by_id_query.go": {
           "class": "owned",
-          "hash": "736269f53a1e2dcd22e35af364d94a930b8743244ef3320438cf482af1390da0"
+          "hash": "442f9fe56e4bea5acc28149384dd119670c16253563f5be84eed49af582b0e9f"
         },
         "internal/application/queries/find_client_by_id_query_test.go": {
           "class": "owned",
@@ -572,7 +572,7 @@
         },
         "internal/application/queries/find_clients_by_params_query.go": {
           "class": "owned",
-          "hash": "84fd1a6cf4b6f576cfd6da114d8734382c6f6d6c227fc5d955b5526e673be77e"
+          "hash": "1bee5332c3b920854041725331ba4002e80f5d8d3859fe1504b7af3cc8601adf"
         },
         "internal/application/queries/find_clients_by_params_query_test.go": {
           "class": "owned",
@@ -588,7 +588,7 @@
         },
         "internal/domain/aggregatevos/client_claim.go": {
           "class": "owned",
-          "hash": "33e5d63e69e497971c6de72657f53be64f72c6eee53ba33f02c8c2ce3ce78c9b"
+          "hash": "3866df571525f1da3599363c045889563484e10c8e1a35f92e16e5ed357dacb3"
         },
         "internal/domain/aggregatevos/client_claim_test.go": {
           "class": "owned",
@@ -596,7 +596,7 @@
         },
         "internal/domain/aggregatevos/client_role.go": {
           "class": "owned",
-          "hash": "03d7b819bfc5f454de42ee215b56d5e388f340d2bab8add15310716a76065cb3"
+          "hash": "67b9bc1d97deb2c44804cb01d902e57d9072035053cf52e20ec610739371bf80"
         },
         "internal/domain/aggregatevos/client_role_test.go": {
           "class": "owned",
@@ -604,7 +604,7 @@
         },
         "internal/domain/client.go": {
           "class": "owned",
-          "hash": "9adea580ef272df9fa65d6a054658931b4e06749a0611f683719df437497bd5e"
+          "hash": "157b5c5d395cfeab933b5531673d6d74f704562b7f915d428a070a25e864986e"
         },
         "internal/domain/client_rules_manual.go": {
           "class": "hook",
@@ -632,7 +632,7 @@
         },
         "internal/infra/client_repository.go": {
           "class": "owned",
-          "hash": "3ddd23214cee3506a8d35a05ae779450ac67b045483849b9b9f540336de3bc55"
+          "hash": "138a9cfb21ded09d78a6ab40df5251c229ef48df865a19f432c5c6719aaf3c3a"
         },
         "internal/infra/client_service.go": {
           "class": "owned",
@@ -644,7 +644,7 @@
         },
         "internal/infra/schemas/client_allowed_cidr_schema.go": {
           "class": "owned",
-          "hash": "309acaf41b10e12e84a3ad43e2ac994da134007bff9aeb9c02237ae8ba005aaa"
+          "hash": "85067ea01fd01ace4f424cda14685114dd56bbd60d2f88a8692bd0f4110e6fa7"
         },
         "internal/infra/schemas/client_allowed_cidr_schema_test.go": {
           "class": "owned",
@@ -652,7 +652,7 @@
         },
         "internal/infra/schemas/client_claim_schema.go": {
           "class": "owned",
-          "hash": "ec01b5e113eb45b9d7d9418fa3ab165103261335dad8023af6304f00487f35ba"
+          "hash": "1d5fa0b2d034e77042decdae46154af03207738b359d2094efe51a502eb29f63"
         },
         "internal/infra/schemas/client_claim_schema_test.go": {
           "class": "owned",
@@ -660,7 +660,7 @@
         },
         "internal/infra/schemas/client_role_schema.go": {
           "class": "owned",
-          "hash": "4a1409cbd8ea61266a4bcf5f0dd97014191d08b216e4c92b98cc50c4e4b116d4"
+          "hash": "e341b3f7380603628a647fe146e77b4819f78a10d9e23f893d412f3490b6a2b4"
         },
         "internal/infra/schemas/client_role_schema_test.go": {
           "class": "owned",
@@ -668,7 +668,7 @@
         },
         "internal/infra/schemas/client_schema.go": {
           "class": "owned",
-          "hash": "57e3c30d1b8fd8646eb50d96a97192ba6c7529dac2dda4d4165a994c745eccff"
+          "hash": "f0c5f401076d4f1ae202ea4f04ae7e4ea62a81f1a744d1e2ff3782a8fd3cbe48"
         },
         "internal/infra/schemas/client_schema_test.go": {
           "class": "owned",
@@ -748,7 +748,7 @@
         },
         "internal/web/requests/find_client_by_id.go": {
           "class": "owned",
-          "hash": "bfab1c17ae16ba90d24f0e6a851844b1d8122bc9647c0f7433363be5e0aaf877"
+          "hash": "1a073c43b28b855216757f0b13b2e37f09f2a7a56a82320ab5dd7e2a6b2e3a31"
         },
         "internal/web/requests/find_client_by_id_test.go": {
           "class": "owned",
@@ -756,7 +756,7 @@
         },
         "internal/web/requests/find_clients_by_params.go": {
           "class": "owned",
-          "hash": "d1ff66c8bc485fbb0e0331b38667bbbefa514898993a3f16cfc0885f6ccbc97e"
+          "hash": "51ac28afbc67e8fdaba76d06122256608e27bca4491c214e57df9988777ed58a"
         },
         "internal/web/requests/find_clients_by_params_test.go": {
           "class": "owned",
@@ -805,13 +805,13 @@
           "ClientAlreadyAllowsCIDRNotification": "ef08772b45b367e80142b2e4cc4848ef961f3442526559505c3474b359fde2f0",
           "ClientAlreadyGrantsRoleNotification": "740fc9e795b03bdce05299bdd634cc9d1bd635ef771a390ed9654ac48a49ee9e",
           "ClientAlreadyHoldsClaimNotification": "1e9fe48571eabf26d46c13ba449a74878c4fa7383c62aafbde1d48249aed3c66",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "c83ac341610e4b49359c13891191e2833d9e93ac1f1c47e2f14e91872829497f",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "95835ee87c0e9911f8df69d2bbbaa9ab7061da95f30de0d28dfff6e42d1cbb85",
           "ClientClaimClaimValueTypeField": "2b1954612391aeaf9db1c1400d722d739b5d5f6e1cb379d443c95a990116cf97",
           "ClientClaimValueField": "7e347daa5ec7fbe8426998f8523a67670f032e8f308b775db34b8b9e2bf6b89a",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "4196495b75afbd903c1f3a3369ad03a49a1d5c6a0e23ad489e7205fd7cb51554",
@@ -863,13 +863,13 @@
           "ClientAlreadyAllowsCIDRNotification": "61da14f10ce523dd86e75389cefd75cd75447ecfe0e297f2215949a6470c9461",
           "ClientAlreadyGrantsRoleNotification": "7473c139a7c8ad8431a865f20fc3ce56858e429a8ac4554f115f71c7a467a88f",
           "ClientAlreadyHoldsClaimNotification": "3e2c4647442e28cb30df50e27aab8b0caa02e45e01d5fb6ab72cdc37cb2590c1",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "d00d97cb100629d095d4bf8c18bcb08df0d088d1e87f6cbec7863c93f399870e",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "aee76de9328d2b73f929cb7b68a82f28286782cb6b8222e61737e6d4f3a85442",
           "ClientClaimClaimValueTypeField": "5582ca4d29b5eb050577ff4741e7a41b36e1535307364a8f9b5b002c9a95a121",
           "ClientClaimValueField": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "3b5449d71da2b7ed769d11517f5588559e6f91af27bcbe5245f6172a71a7b157",
@@ -921,13 +921,13 @@
           "ClientAlreadyAllowsCIDRNotification": "f5154527ca997f428804f8c03936edcc145b5d2885e28569eee56d6428bf0365",
           "ClientAlreadyGrantsRoleNotification": "f9250d5ff4edaf447bc5e980d126e2613637d5f875d52d543ddcada0daae57bc",
           "ClientAlreadyHoldsClaimNotification": "559f7b6ffc1374d6bcb5cf35c726d9bd7813747d69c4ddb6821daaf4710994e6",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "d7735a914c47003f36d483ace7c8097a0227de78962fbae532bd03d726548ae1",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "298b8e5db2344c36127aa449704c3816104fa75594277880a14248629c4af4d9",
           "ClientClaimClaimValueTypeField": "f7ff8dd110454bd3a914b15eca36ee5876eb55f29502632eeba0724d9b6288de",
           "ClientClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "a11f6c5af435e4125e5c4f6d7a1bdd80791b826d2e26b9f94aa338fb424f0728",
@@ -979,13 +979,13 @@
           "ClientAlreadyAllowsCIDRNotification": "8e789e155d88350085aeccff95b4c4bc5f22b146207a080130825b73f73c81dc",
           "ClientAlreadyGrantsRoleNotification": "2850e5bf38fc101c1add7b9f85e978c4b8a44985c86be4b2894079fc826a681e",
           "ClientAlreadyHoldsClaimNotification": "295efaf605efe58e46287aff1be50ee2f3345539e7ee14a9320433895815efa4",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "1d8a2e37314bd451c360bfb9f82ae59d7c5067077308a53689297144d99b22ba",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "234e6f5c5db909b04a75dd2c69d92105d34fa261b470667b996eba23fa13a21f",
           "ClientClaimClaimValueTypeField": "e4f84c59d3a6f9cabd5d94840ef5be88a8ba97754068fd5487460e9b936d1f4a",
           "ClientClaimValueField": "6e8f3132d8e2e2a80dc214d69072afde8c645be6f890572a4eaff8b4811b9bde",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "64d333756c4d353c5e4e082195b6c963ad7778d723d672fdca3488fc9047dd53",
@@ -1037,13 +1037,13 @@
           "ClientAlreadyAllowsCIDRNotification": "328363cdb0fb94c21ac3f5ab7190ea9daf54343a964376932251d1f112661f47",
           "ClientAlreadyGrantsRoleNotification": "57b25aa2d46c6fb41c4edd998233a0f670dafa4d13b2d1851298d6a7bb48d59e",
           "ClientAlreadyHoldsClaimNotification": "d0b9df95c308a89d342d99debad49c4ee08cf04227bd81f272279aaa709a8172",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "689f0a2cbad9baad8f5dd3f1f8893f6d7bd639e0ce357e3ba72022946bea1fd8",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "b8f5c8b46248c963ea3e43697b37ca60371cce08f98b33adbdd4439c1620b4de",
           "ClientClaimClaimValueTypeField": "f43a758a4424cb3583724a7e466d629a5ea8a927d427b91cec109d0c72f4fb38",
           "ClientClaimValueField": "3b50ed0e6ec244182f4b4d135b47acb095f81c710d5ed782b2173084a3de4533",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "f40994446b95257e57ff7196d01029457fa1d4252e041c450c5cbfef249aea57",
@@ -1095,13 +1095,13 @@
           "ClientAlreadyAllowsCIDRNotification": "b28ca48b7182fbf9e8018af623977fcd4f083c9b48f5dd427b1704fe197b7184",
           "ClientAlreadyGrantsRoleNotification": "d865f1ed4b67b5eeaa1e2118c88ace0c3f7ada5456f7b68d9b5563bcb466600e",
           "ClientAlreadyHoldsClaimNotification": "0d4788756bbcbcef4c12158965f55c83efe9ee357e783a166977e241bb862539",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "88ec3db8fc32484ad47728e41dbdd1e4b1cab83af4b5d1488b90a503b259b532",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "92863d8aac8b34c2770fd461e77fb701793ffebf721b464ee4bca1fd1b34a78b",
           "ClientClaimClaimValueTypeField": "16e6e203c81eea9515ee3a9caa0251efb74b2230006dc22e28b79c7d7706493a",
           "ClientClaimValueField": "2bea5ab708c74ff971d94327782f04fd2d1c39517676fe756946fb76b783125c",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "9b2cfb9ec6124c06b7796e378d61f78b8e1c34efd72ea87093cdb70ae099342f",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "d9356bb0bb0d0625554c01deebe465ebf66486a4ac574a6a96afd1b2ec6ac374",
@@ -1153,13 +1153,13 @@
           "ClientAlreadyAllowsCIDRNotification": "fe820c19b847b8e227230bb6b6d674ad1603e076b64280463cf905a97d8f9a44",
           "ClientAlreadyGrantsRoleNotification": "24afcffd826cf419bff15d24acaf5d8b247b8c3dee0d1cf49cbd00d0736d5b1e",
           "ClientAlreadyHoldsClaimNotification": "67b634658a60bcf062518953394a2b869314d16fa27ebbeee8ae1bf11242d00f",
+          "ClientArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "ClientClaimClaimArchivedAtField": "94bec0ae91932469d63275f0e20f74317d0e97fc301fd75814ebb723d7cb925b",
           "ClientClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "ClientClaimClaimNameField": "f8888bb1ce9c45b8755d9745d367bffc9c5c016ae87f3b479a1b00d5dbb8c49d",
           "ClientClaimClaimValueTypeField": "46a22018675ad53ed993a8132476e50540c1b8cde0466c215523472606dacb85",
           "ClientClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "ClientCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "ClientDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "ClientDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "ClientGracePeriodSecondsField": "855ec315cb59392babe73e303e34e64eda511042528ffab630c3986642760109",
           "ClientMayOnlyRotateItsOwnSecretNotification": "083b83b95f528058d541922f1a12b8181be21e3fd967e780707fd31fff9873e9",
@@ -1230,8 +1230,8 @@
     },
     "Group": {
       "spec": "specs/omnicore-gen/group.omnicore.yaml",
-      "specHash": "67f075cf13b3f52dec59ba5853e70ba94c5c93ab43bd7c2e4a1d04924e6e940a",
-      "framework": "v0.73.0",
+      "specHash": "ad5096e6cf93f7e6e458c2b1412663bc0ed005338225f41c198ce182d38a0f55",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/group_feature.go": {
           "class": "owned",
@@ -1299,7 +1299,7 @@
         },
         "internal/application/queries/find_group_by_id_query.go": {
           "class": "owned",
-          "hash": "2d1fe7cde8bc992dbbb12d4defce25cf6da659aa180e1e2451b53ca0f31bc32a"
+          "hash": "235c8e0cd9a81dc144a6856520cd0fe098641136440a260269d958924067dd06"
         },
         "internal/application/queries/find_group_by_id_query_test.go": {
           "class": "owned",
@@ -1307,7 +1307,7 @@
         },
         "internal/application/queries/find_groups_by_params_query.go": {
           "class": "owned",
-          "hash": "4a2e28712eb1f0f0497193a2b223346821db683dedffa8a422598c71e9a5d546"
+          "hash": "42c8aee5b91609a046f70ae2e2e26eb00b5f16425e3c2979fe19d049ccab1157"
         },
         "internal/application/queries/find_groups_by_params_query_test.go": {
           "class": "owned",
@@ -1315,7 +1315,7 @@
         },
         "internal/domain/aggregatevos/group_role.go": {
           "class": "owned",
-          "hash": "390aee9dfa03d9a301711ee6da837e02252cf644e5227b27e027c75a84d790ea"
+          "hash": "e6e697f07f17448a9ebfba1c07be51e607dfb3c3a82046e9375bd50f3059ec27"
         },
         "internal/domain/aggregatevos/group_role_test.go": {
           "class": "owned",
@@ -1323,7 +1323,7 @@
         },
         "internal/domain/group.go": {
           "class": "owned",
-          "hash": "902055ca2cb4de41c1c7f370edeecf1af3ea285c7d9f2f2dffac42129f9521db"
+          "hash": "2001277a7b69b0160088a615d488cfe763eb748b38870b8af2fd16194e4c5601"
         },
         "internal/domain/group_rules_manual.go": {
           "class": "hook",
@@ -1343,7 +1343,7 @@
         },
         "internal/infra/group_repository.go": {
           "class": "owned",
-          "hash": "baf953b10abb3957a4e6c9d516da4dd7a179340f2428a02ef84e398fb47c7f75"
+          "hash": "7805c5140c689229c688f3da853088abf3841bb8a1c1452f2c03b08715497fdd"
         },
         "internal/infra/group_service.go": {
           "class": "owned",
@@ -1355,7 +1355,7 @@
         },
         "internal/infra/schemas/group_role_schema.go": {
           "class": "owned",
-          "hash": "85bba27b73f901af1f180c4730999e306ce5f8d3de96250a07db592e9c721485"
+          "hash": "fe7eb6f611976dc54d297ae334a94167d95e0d2485d3aff46935ee7641c54396"
         },
         "internal/infra/schemas/group_role_schema_test.go": {
           "class": "owned",
@@ -1363,7 +1363,7 @@
         },
         "internal/infra/schemas/group_schema.go": {
           "class": "owned",
-          "hash": "bbf926f9b54d5d6cbbcf815fece56214d8049ac6b68a3bdd2d8b807d0d8affe9"
+          "hash": "6c87c306a06edcf81bbfc49b94dd384c639a46056e27328b75073e77120494ac"
         },
         "internal/infra/schemas/group_schema_test.go": {
           "class": "owned",
@@ -1403,7 +1403,7 @@
         },
         "internal/web/requests/find_group_by_id.go": {
           "class": "owned",
-          "hash": "3d4e95242192ecdd6eacf5846fc474926b686dbc75e75157a09fe380bb5c17c2"
+          "hash": "40858a11ff33bd6afa4c2948fde7992322f83cc98b074afbbfcab3c20b9dec10"
         },
         "internal/web/requests/find_group_by_id_test.go": {
           "class": "owned",
@@ -1411,7 +1411,7 @@
         },
         "internal/web/requests/find_groups_by_params.go": {
           "class": "owned",
-          "hash": "ff9db3dad00292cd6c6d302dd9aa6b0a1ea566080f85d8b00e130c7f22a79b72"
+          "hash": "7ada85f04249d59bfbe063d5ac3b69aa2e74e7d294363a4b373e2c1285da8fbb"
         },
         "internal/web/requests/find_groups_by_params_test.go": {
           "class": "owned",
@@ -1444,8 +1444,8 @@
           "CannotGrantWildcardRoleNotification": "5562b839d65a4f35501eda0756bfd7eaa5fec261a99e0f603626670d70a54614",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "6b1182dc65c8729cb33e14de7cbb725cfa22a56d5ba8c55b25a3bba32819855a",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "GroupKeyAlreadyExistsNotification": "c6c1f4097c06baf3a5e4499dff1a5db19bb11057efa340d45d26acc3b5849426",
           "GroupKeyField": "1fbd7a00cacba0b89a31bb00cd29e60d3f86c08dd7806bbe891642214672af0c",
@@ -1471,8 +1471,8 @@
           "CannotGrantWildcardRoleNotification": "8b4904d3e750fe24fda55063b4afd7d1e365bb4b1f5ff9dc5bf29b3ab81c6db4",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "2df842b04ba1c417163f86586df02022f12daaf377562b5ad89782d34b687dd4",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "GroupKeyAlreadyExistsNotification": "292f6a977483e33993ea52e374e67f3879d78387d3164464625c42856b310eb2",
           "GroupKeyField": "99a52df3ff3d499488e2fa28150c4106a2cb5e928891a830a9aa3922b2d32160",
@@ -1498,8 +1498,8 @@
           "CannotGrantWildcardRoleNotification": "68b6e391cf60b086cbe328b9b62f0d507ac6f75c424bbd31bf08f34125892a50",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "4e4c806c55fcb892cb26d957fc8da4b17ea53bbb812998c9ff2da2ad2c42c087",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "GroupKeyAlreadyExistsNotification": "38856b906d935196d02912b1c71a45dc87d633c29fa9711bb540380f1a203b12",
           "GroupKeyField": "e0da0a07e0419695c0878abb9f1feff08cfabd6d0dea509486f4dbe883cb3be6",
@@ -1525,8 +1525,8 @@
           "CannotGrantWildcardRoleNotification": "97bc205e0923214429435ad68011cd3fe3fa2463f761280fd44ec86514df690d",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "27722baec4f9b10f5c1d87064a05ae169aa635b1d62a7a69252956fe443109eb",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "GroupKeyAlreadyExistsNotification": "67bb7dcc26bed51307f9941759cceefb79669be8a33880bd31796618afffd799",
           "GroupKeyField": "51dcb443ce8062e536d22d775344e02a0ad3810502a71b432ad812b721fe0e81",
@@ -1552,8 +1552,8 @@
           "CannotGrantWildcardRoleNotification": "4ecc9da8cf662d7ba3183819f9440ed2bdd4cbf35b1e5e2799f2f2a5fee86357",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "4a80a9754e1f0d82237ae1fe3b2d6d3ee33bd93003ac8f38bb78c6a74e98f8bb",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "GroupKeyAlreadyExistsNotification": "3e7dbd36f02de38cbde6694762ff7a4e9a1b0b231b6e3d76d6debc845e16dced",
           "GroupKeyField": "9d56366d9b9893ea7edbf416b95af8acee3fc688cb822733f116c5c8e6e51211",
@@ -1579,8 +1579,8 @@
           "CannotGrantWildcardRoleNotification": "7d704eb4412fe74d28b199bf40c67d231871ee1683ba34b87daae5d0c349fe7e",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "4093af764603f8ddfa16adaf60daf06eaab84290143b1d956ab099f22832ce6a",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
           "GroupKeyAlreadyExistsNotification": "7bea9e68687768e771251667c7411a396c87222aeb927f7eeb4577660f709d5c",
           "GroupKeyField": "1dcc011996ad83331da8adb65704dfa7ea6a11d80d400878b17b016a90910254",
@@ -1606,8 +1606,8 @@
           "CannotGrantWildcardRoleNotification": "341078ea9c2c9e66e3ffc86187906b01eb39de2f11444cc0d3caa7d9a41f2ffa",
           "Group": "34ca0e76608842ff3e7d924a455a396a82f471052c15e3f2ed7f090ac702e5c1",
           "GroupAlreadyGrantsRoleNotification": "c2c233d6b8f2f0cb2c52e104c2bc4a85624072b74caf8b937d59e8b663f8e853",
+          "GroupArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "GroupCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "GroupDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "GroupDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "GroupKeyAlreadyExistsNotification": "8580631314a6af4b446628779de9af1ce10a9be7929163bec19e1e0b5a147c55",
           "GroupKeyField": "01966c51593afa085f19b1f1c364d8582ed1cdd1db66b820d74681c908d40645",
@@ -1646,8 +1646,8 @@
     },
     "Permission": {
       "spec": "specs/omnicore-gen/permission.omnicore.yaml",
-      "specHash": "c6bac1671e4e4bc3591a8edb4224144dea98f1975ec799b77751f25bd0db6971",
-      "framework": "v0.73.0",
+      "specHash": "7db7f327421bda347cf5585c500fcade9260235106f8dfeab11fb4dc3ab86ec9",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/permission_feature.go": {
           "class": "owned",
@@ -1679,7 +1679,7 @@
         },
         "internal/application/queries/find_permission_by_id_query.go": {
           "class": "owned",
-          "hash": "70e674e0af97c1eccd40722bab14c58aaa5b1924eb92f9b4ca7b4c70da6df98d"
+          "hash": "dcfab1c924fbd0282fd7e6c329ab6ecfff87317e22e7930e19bd3d37609b91a3"
         },
         "internal/application/queries/find_permission_by_id_query_test.go": {
           "class": "owned",
@@ -1687,7 +1687,7 @@
         },
         "internal/application/queries/find_permissions_by_params_query.go": {
           "class": "owned",
-          "hash": "7fbfe1cb7bc9ec2c4ef7640b6b52274acf91b47abdd8152b5d569e9f4f7727f7"
+          "hash": "2e6ed946bd38317cdb794980b7cd0dac3a6ddcf403ea03998b5f746bc2de6db7"
         },
         "internal/application/queries/find_permissions_by_params_query_test.go": {
           "class": "owned",
@@ -1727,7 +1727,7 @@
         },
         "internal/infra/schemas/permission_schema.go": {
           "class": "owned",
-          "hash": "8792a25ead347ba7528e60a0ef65d0589bba8d453873f503ca208f258f60c0de"
+          "hash": "bc0ea926d7a2fdab09bd7a56149c98372b154273d6c0eb62e08677d27e536b01"
         },
         "internal/infra/schemas/permission_schema_test.go": {
           "class": "owned",
@@ -1747,7 +1747,7 @@
         },
         "internal/web/requests/find_permission_by_id.go": {
           "class": "owned",
-          "hash": "5ed5c4183c6bdabdb67aeab10231a7f81a9dce4018978e5bce3de127dca6c0bc"
+          "hash": "24fe817d1a6925552543ef564bca21696c23d1e4336ff231be05d2d9b420a6d0"
         },
         "internal/web/requests/find_permission_by_id_test.go": {
           "class": "owned",
@@ -1755,7 +1755,7 @@
         },
         "internal/web/requests/find_permissions_by_params.go": {
           "class": "owned",
-          "hash": "402dc8fc4c489b84970590891e8549149156d9eb3a63a69a8d8cf0603764eb61"
+          "hash": "99f80b9835ad1ed6f928858d04aca30ddd62a4d75a6d8bd2fd056da2585e266d"
         },
         "internal/web/requests/find_permissions_by_params_test.go": {
           "class": "owned",
@@ -1789,8 +1789,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "a4ad259e71cbbe0cce1beed3d6247c6527a21a76af90efa3322fc5bac2f89acb",
           "PermissionAlreadyExistsNotification": "e10a5a2b36e4976b2df0bde91c83c4518af56f7eaf292e2e23017892c6f8e34a",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "f4335e1f62fc825d198c9756d2d4977046f70660e6fb4fa9a1376d5f787c8dd0",
           "PermissionDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "PermissionKeyIsImmutableNotification": "b73bbde4bfcf51f292539c02cde390a7d1cead1bc0ed2c802bbbd881bd128ea8",
@@ -1805,8 +1805,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "64cff1319d2fd2cbb7a1e84ccecf22c1cc07b24435cdb522f8c0aa525d6002a6",
           "PermissionAlreadyExistsNotification": "3fe31615c2cd54e7512d46652d2a1ce4ec985495fb0b215ac8c1fa5dca95f8c2",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "83fec0183528875bbac33af9cadd148cd79efe0e16042819ff910f3261debeac",
           "PermissionDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "PermissionKeyIsImmutableNotification": "2c125482f52dc4fd7827469a18d91006c8b915493bb1d5f420919e47c099e302",
@@ -1821,8 +1821,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "212e06c386ff2f18fc00aebb6c17d3b301a82635e7f234d7e117904cd2f121cf",
           "PermissionAlreadyExistsNotification": "8bb65c85af57c42581c02803a5377b4644b4c47940d88c2d710fff2a6c5febb9",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "c7058348671e42cb8a9bd720feb30f62449a5e1453beca1e4007a9ae9e27bb07",
           "PermissionDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "PermissionKeyIsImmutableNotification": "30513b35dd575eb9b7b9b40f7757d1352ad0b7c1edda59c36157a53e97b78751",
@@ -1837,8 +1837,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "64cff1319d2fd2cbb7a1e84ccecf22c1cc07b24435cdb522f8c0aa525d6002a6",
           "PermissionAlreadyExistsNotification": "80b0e753ba21b3b11ed2b68c3a462a5cf5e7efde1d0c50f6a1b1917ad473f1bb",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "a717f45553085a7987da79dac2a36cfd324ccccaf29486b2cd5c7d596a70b066",
           "PermissionDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "PermissionKeyIsImmutableNotification": "1a954de17bd8a87cf56ef74fc06967ac27fe53ff56e7796a6d0de3103c914e32",
@@ -1853,8 +1853,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "b4d17ea7c696e58b7212b962730459d2dd74f14c0f8f4e28b400f2b04528e839",
           "PermissionAlreadyExistsNotification": "ca623162146b973bbc645e82f8e8752471bb43c958125a30d867270c9303b7dc",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "96b53234ae3c8f67d6b5e7b419b09c79f4dc30a929047541afd50be3bf0c2014",
           "PermissionDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "PermissionKeyIsImmutableNotification": "7ceb63dc08a0dfa8b4f0edd0a42433787b7cc547e5812727178b067828f2c3f2",
@@ -1869,8 +1869,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "42c1e7aeeae0345f4dea73869ab4b869f94f1df3a3c00e2112ac6485a2769fb0",
           "PermissionAlreadyExistsNotification": "ec52d34c92154760f9d42bff18ea26a82e3d4c60bd61c4a11afc0916735f7611",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "a760d6423012e5f0e20a83e3b8bce01b50ecfceed4d94c16e59204ac87778dc2",
           "PermissionDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
           "PermissionKeyIsImmutableNotification": "ac9d9337efed6c40b0740394e7e240690238ba27714db3f3bca9ba8785b01482",
@@ -1885,8 +1885,8 @@
           "Permission": "229efc8f526335f103d962810fe99f785811ad8ed36b9437a4a215a44c7152fe",
           "PermissionActionField": "1dfbdde6410ab51a811ae7e551c89cff5e8cb7153b7a28a9e178584430f844d4",
           "PermissionAlreadyExistsNotification": "05f598da8991e6b5b402a8993942da1887179013ea6b85d289bef571cd6b9124",
+          "PermissionArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "PermissionCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "PermissionDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "PermissionDescriptionEchoesKeyNotification": "5a5ceec275803999dd8d34fcb5fd24336d9f9ea28c30d08ab7d762860af50c79",
           "PermissionDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "PermissionKeyIsImmutableNotification": "e3b67ea382302b06a6b92f45d234bf3476542d99d8fe831bb2d02f81ac696422",
@@ -1909,8 +1909,8 @@
     },
     "Role": {
       "spec": "specs/omnicore-gen/role.omnicore.yaml",
-      "specHash": "ea2f09eb387b53680973f61e89c28c3473cb248bb5491f8aef1b4f0c5f4dbc74",
-      "framework": "v0.73.0",
+      "specHash": "207e1f271e8349845e7fed99213e1bca1a0955c60de6397ffc2b84c42788ca93",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/role_feature.go": {
           "class": "owned",
@@ -1978,7 +1978,7 @@
         },
         "internal/application/queries/find_role_by_id_query.go": {
           "class": "owned",
-          "hash": "2613ce0b6129c62bcad3d7c5183fde4e74c0d05563a6bbec038d51b4162cde6d"
+          "hash": "0e1c1e9c796ea5e75f0eb01acb6943e04405496e2a2dd8a91b8a4c1295c2ed6b"
         },
         "internal/application/queries/find_role_by_id_query_test.go": {
           "class": "owned",
@@ -1986,7 +1986,7 @@
         },
         "internal/application/queries/find_roles_by_params_query.go": {
           "class": "owned",
-          "hash": "5371042cf3a8dab2dacac4c47e6b93497cf39a63066090566f11928121b6ab3b"
+          "hash": "214cf402e3d2e129be997fd0abb44e7072c3c68f6bb1c802928649ba2130e8e1"
         },
         "internal/application/queries/find_roles_by_params_query_test.go": {
           "class": "owned",
@@ -1998,7 +1998,7 @@
         },
         "internal/domain/aggregatevos/role_permission.go": {
           "class": "owned",
-          "hash": "f3cdca50df55b902463281307b447551afe9aa7e3043448162c6ce7957e6127c"
+          "hash": "eef1a8d2ee4b0e7d4d6793cbb92724c7c3f9b3903a669d530cd5712132716d41"
         },
         "internal/domain/aggregatevos/role_permission_test.go": {
           "class": "owned",
@@ -2006,7 +2006,7 @@
         },
         "internal/domain/role.go": {
           "class": "owned",
-          "hash": "a92eae65e8180b496812c161e92a15b67bf5c8897d0a1f4984a5638fa2732753"
+          "hash": "a6ce4ea7856ff58f83db055ddba30910484d5c02fa7e7932e67e76499224033d"
         },
         "internal/domain/role_rules_manual.go": {
           "class": "hook",
@@ -2026,7 +2026,7 @@
         },
         "internal/infra/role_repository.go": {
           "class": "owned",
-          "hash": "052ef596bc416fb13d47c8b48cf5801341e022b9fca2e91bbf79bdabf85bbe5f"
+          "hash": "a0be216616479ee45e56ef5b9935bee4d65d4d1add6c74e09dd9705e0650fa96"
         },
         "internal/infra/role_service.go": {
           "class": "owned",
@@ -2038,7 +2038,7 @@
         },
         "internal/infra/schemas/role_permission_schema.go": {
           "class": "owned",
-          "hash": "577aba1bd5bdf41c7bb11a11f7996ef5762fe7df01f14044c54a248145f6e54a"
+          "hash": "6f331ae33af2e811d4863f87e00c42e0d3e7f0166b82d9aed5461cbcb4bb7467"
         },
         "internal/infra/schemas/role_permission_schema_test.go": {
           "class": "owned",
@@ -2046,7 +2046,7 @@
         },
         "internal/infra/schemas/role_schema.go": {
           "class": "owned",
-          "hash": "5625fd953e78e7682dbcd4ec245029667be487cdd06d130939cb41a1458e7c00"
+          "hash": "d27bbebfbda42ecc24720bd086ada33270e496e060686ae98a3822faa7a47884"
         },
         "internal/infra/schemas/role_schema_test.go": {
           "class": "owned",
@@ -2082,7 +2082,7 @@
         },
         "internal/web/requests/find_role_by_id.go": {
           "class": "owned",
-          "hash": "cf7b37d98015b38c10125e3920a2390b8ca82153651fb240aa7268e3339937a4"
+          "hash": "de7e1cebaca480d8d38560773f9b69b957dbfbf503387c4fb566a8226f6ef6b9"
         },
         "internal/web/requests/find_role_by_id_test.go": {
           "class": "owned",
@@ -2090,7 +2090,7 @@
         },
         "internal/web/requests/find_roles_by_params.go": {
           "class": "owned",
-          "hash": "ea61c396822a10f6cee2c40c7ad749f26d675a56cf5ceebbbc4d32826ee3dd7e"
+          "hash": "661617cf294838a9b09f05281e82282563b2a7a99c2260b695aff8eb7d3fad37"
         },
         "internal/web/requests/find_roles_by_params_test.go": {
           "class": "owned",
@@ -2129,8 +2129,8 @@
           "PermissionNotInCatalogNotification": "587ff821349cbf74c2ca361e327e07faff4b2f36a8971eeca4680e05556541b0",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "ad7a41d6a151bf7343c72277ce16f45e449e2377f610724043ea1317401695ce",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "RoleKeyAlreadyExistsNotification": "765d48def5a64d3fcdbdaa4324e38d625aee963734c54f077ff124b4ad0b91bc",
           "RoleKeyField": "1fbd7a00cacba0b89a31bb00cd29e60d3f86c08dd7806bbe891642214672af0c",
@@ -2157,8 +2157,8 @@
           "PermissionNotInCatalogNotification": "e2c7620cc2ca0de1e91265f2afe1c5769148cf087b9dbdd7925e9ab07bbead2b",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "25332602a13fed8bfd07941e8cd2d2bda26d40c4818e50c66d7f09b07ab32ff0",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "RoleKeyAlreadyExistsNotification": "109f83c4dedc00f7869b3ae40ea6fd9be37a686d8dbb8043924825fb3742a578",
           "RoleKeyField": "99a52df3ff3d499488e2fa28150c4106a2cb5e928891a830a9aa3922b2d32160",
@@ -2185,8 +2185,8 @@
           "PermissionNotInCatalogNotification": "f602c9c378559bccd5cd92358ed780b852f46822a520621e2c3b9f39501f3036",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "07058d62f186f48505efcdd6be7c7f4a3240c07e5ca6ffada861bf40e8daef4f",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "RoleKeyAlreadyExistsNotification": "97c0f46ccb27254e8de19a34f2f2df21a61b77bff4806ac692c2132cb71e286b",
           "RoleKeyField": "e0da0a07e0419695c0878abb9f1feff08cfabd6d0dea509486f4dbe883cb3be6",
@@ -2213,8 +2213,8 @@
           "PermissionNotInCatalogNotification": "b4c9737f5a1e63216f9116bcd57fe2eb4e7aba060aae544b38bbef6a63fff6d0",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "95a3ee415555aa0310476ea0b66c6b2c0efce5b2311eee865dee2bcd8b0d55d9",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "RoleKeyAlreadyExistsNotification": "734c2febc252290d9dbd220e57eb24be6cd9977ba1cc6acafb793333e3aa0cd7",
           "RoleKeyField": "51dcb443ce8062e536d22d775344e02a0ad3810502a71b432ad812b721fe0e81",
@@ -2241,8 +2241,8 @@
           "PermissionNotInCatalogNotification": "9eb8df3d8f3ed792cd2f2a641f708c4c7159b87f66e814e0b8cc49f316519272",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "03da01c94fd297d0bc7c8e076f18c7519be565248b709716d993fe009c356bcb",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "RoleKeyAlreadyExistsNotification": "66fc33e394d6de8ec28d9dd62ed305239406a38307ddda68c34548d157b21686",
           "RoleKeyField": "9d56366d9b9893ea7edbf416b95af8acee3fc688cb822733f116c5c8e6e51211",
@@ -2269,8 +2269,8 @@
           "PermissionNotInCatalogNotification": "ca1347256d93bb2d9b58be3a54536fa104de36f8e65d2b8cb7920f4ea464a4b8",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "f511397fb4d9dbc3d6a57f69963abf58c486c6b51e8a79da0d1a318043111fb3",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
           "RoleKeyAlreadyExistsNotification": "aa641c7ed020c29e96c906700ee2f6f23bb29646e45a274e2f947794c859dbd9",
           "RoleKeyField": "1dcc011996ad83331da8adb65704dfa7ea6a11d80d400878b17b016a90910254",
@@ -2297,8 +2297,8 @@
           "PermissionNotInCatalogNotification": "cb13f2dfc8410fedc50569f90e9266008c40d465cb5370b15f40cc152d9b11ce",
           "Role": "14736a2eb9f4159f4b6b86f192c3c222243fd9659aadf2ecc0139e3d72bed85c",
           "RoleAlreadyGrantsPermissionNotification": "4139e56c58e8799226a1150d32e08176971dacd579d8ada68654de2fb625d942",
+          "RoleArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "RoleCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "RoleDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "RoleDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "RoleKeyAlreadyExistsNotification": "b97c15c39c654ea6e1c864f155018f05350352119d602411ccf8b740fbfeb51e",
           "RoleKeyField": "01966c51593afa085f19b1f1c364d8582ed1cdd1db66b820d74681c908d40645",
@@ -2336,8 +2336,8 @@
     },
     "Tenant": {
       "spec": "specs/omnicore-gen/tenant.omnicore.yaml",
-      "specHash": "d2987340d1dce2ea4b0404439856e0753310cffd508947652f4a411f08a3e8d8",
-      "framework": "v0.73.0",
+      "specHash": "984c570040df854b241f4d9ee608224d7b727767b3b94c6b79bc08bcab10688f",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/tenant_feature.go": {
           "class": "owned",
@@ -2377,7 +2377,7 @@
         },
         "internal/application/queries/find_tenant_by_id_query.go": {
           "class": "owned",
-          "hash": "b9c4daf5521bbc5fd375bc9963e46db8aaadb95760dc6251f0a99ecba571b391"
+          "hash": "7cec629a0b4f53a70a3c24c2bc97fccbab3df15234149a18b6d0de7c078c6338"
         },
         "internal/application/queries/find_tenant_by_id_query_test.go": {
           "class": "owned",
@@ -2385,7 +2385,7 @@
         },
         "internal/application/queries/find_tenants_by_params_query.go": {
           "class": "owned",
-          "hash": "d64284262871997702ff1cd3f2a15c52957ab67d9275848f90d5ef48bf06bc6d"
+          "hash": "4d94b6574dfeff255473cc840bd9d6924e064fe408ee6a51bb9e0a2ef2f2d323"
         },
         "internal/application/queries/find_tenants_by_params_query_test.go": {
           "class": "owned",
@@ -2421,7 +2421,7 @@
         },
         "internal/infra/schemas/tenant_schema.go": {
           "class": "owned",
-          "hash": "6f7e543b772567dce5e954b17c59ed72660ef59c4cab6a7abd60939dc22782c9"
+          "hash": "c5f98eed8fd619b6043f9871669da4c10b502046d79a35ab49e8a6e725b82697"
         },
         "internal/infra/schemas/tenant_schema_test.go": {
           "class": "owned",
@@ -2445,7 +2445,7 @@
         },
         "internal/web/requests/find_tenant_by_id.go": {
           "class": "owned",
-          "hash": "f21da5554cf8ce766726cd15e396c00b88efc7b9ffa1be5e7846c51fed70d135"
+          "hash": "e8aa7e7fe6c1008810b056d875aa7b86c82219b59de8603bfa68cf88eadb3800"
         },
         "internal/web/requests/find_tenant_by_id_test.go": {
           "class": "owned",
@@ -2453,7 +2453,7 @@
         },
         "internal/web/requests/find_tenants_by_params.go": {
           "class": "owned",
-          "hash": "5e8c049138bbd0f404e100ac1b08f13b82df84b3b0761ea1b029f6a349099cd9"
+          "hash": "a2216a1f6449a952d70ed0ab80ecf23ebd5b09d4b6e329c22b7a9fef6b3e2143"
         },
         "internal/web/requests/find_tenants_by_params_test.go": {
           "class": "owned",
@@ -2492,8 +2492,8 @@
           "InvalidTenantWorkspaceNotification": "7dd37f51e5750375077e8bce8c06a149c256ab4ea0ed23452928b351619efce4",
           "ReservedTenantWorkspaceNotification": "45e2a4c335db93e931f2eb4c5268584312b0cdcb7eddaecc43d9eb6a89a68415",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "e9262f007dfbc513350f9396ca3ebf7aec9535551e4f9d3bbd54ac5bd57bb71c",
           "TenantDescriptionMustDifferNotification": "76d2c33be108b8985b97d6fb115e732cc2b0ae8286bf418f75f73bae65ff41c7",
           "TenantNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
@@ -2514,8 +2514,8 @@
           "InvalidTenantWorkspaceNotification": "6567b20dee8ffb44bc568ac75420504c31933ee68dd3000930fd73c0cc3e0b76",
           "ReservedTenantWorkspaceNotification": "2d13d9f28cd75f53d2d35603d1549ab73fe907e0f008d7ee37491d413e74b963",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "TenantDescriptionMustDifferNotification": "4881d9028772f2199774ec8fec2edce7715dd0d907f0a8ff26ce7d19145b9748",
           "TenantNameField": "dcd1d5223f73b3a965c07e3ff5dbee3eedcfedb806686a05b9b3868a2c3d6d50",
@@ -2536,8 +2536,8 @@
           "InvalidTenantWorkspaceNotification": "aa7eaa375e0eee38a1f260f57920feafa8405164bc01784bfa5be2f0c8b4e846",
           "ReservedTenantWorkspaceNotification": "a26e4a2438c89a5c798453b96277463da7a33b3f8658a445dc2bd0a4eab819c0",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "ee00b96fff266fe2567d47cd27bc5d8ffcbf15c1615c6e4c98ee2cfe991d515a",
           "TenantDescriptionMustDifferNotification": "3980718ee00edf67534a4a8b8e338bd1063fd225d0453d244eae3b170881affe",
           "TenantNameField": "562bb15757a8b593d6fdc812b0767c0e198bf7d8e19157933110de09c9db9012",
@@ -2558,8 +2558,8 @@
           "InvalidTenantWorkspaceNotification": "8ab4c1b8c93734a4a253786e8baef73c017d4d6e00715fcb965729eb0df165c1",
           "ReservedTenantWorkspaceNotification": "dd530cb71c85a4edaffd970f87c62a7465947d9ee4bb43d6d2b755e4461349f9",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "526e0087cc3f254d9f86f6c7d8e23d954c4dfda2b312efc29194ae8a860106ba",
           "TenantDescriptionMustDifferNotification": "36a6eeb0366a0f863353b7479820fc868acd544ebc3c8b59da27fc58b99403cc",
           "TenantNameField": "b2c124536d218059c091750c0a8e7d30b55563164f478147fa4cafdf549545d8",
@@ -2580,8 +2580,8 @@
           "InvalidTenantWorkspaceNotification": "ead76b0a829fad259533d80454eba40c98a7554b41fa07400482a8d53a164199",
           "ReservedTenantWorkspaceNotification": "f697ee55780b9c2e81d92dbcf09390eed5f831fd585f897826151a5f64715ee5",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "6fb818621896d9df8a8294db7efa8529bd90203096fba77b54b5a1eea055fc6e",
           "TenantDescriptionMustDifferNotification": "3a0cb1140783a8e777a16b6e002d84d659b8f65aadf731ad11f47709a73d669a",
           "TenantNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
@@ -2602,8 +2602,8 @@
           "InvalidTenantWorkspaceNotification": "601177bceac4b1b75f3906bbc076e4f065996b56dca0152044bc4e415cb773cc",
           "ReservedTenantWorkspaceNotification": "b5d542c943688931e2deb1d76631f7b7ffb242ce9fe3e3b18fc41743035b2c82",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "1d6e3b45e9b1ebcb9e67bc4f664897785a4567bbd521bc8eba15f03154b213c6",
           "TenantDescriptionMustDifferNotification": "9189cc8aadf6b63418e3d08f0002c62eaea422ccc197fff2b3087ace435c5229",
           "TenantNameField": "eca46fcab2ab68be18dba9651913d1194a89c2a2e07049808f456b8e3cf50317",
@@ -2624,8 +2624,8 @@
           "InvalidTenantWorkspaceNotification": "355d9ae213bfeaeaaab478fa76aca6e93dc2f28e8607f93be8013c9e5ede8b57",
           "ReservedTenantWorkspaceNotification": "904b40fdd512a9dff9909d08a23efb43b7d9efd908df1ec7071c52325272e948",
           "Tenant": "e23969d284c3424c8014c6e5b1b85ebc275bc5c74321e7677a21d023e6ea154c",
+          "TenantArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "TenantCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
-          "TenantDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "TenantDescriptionField": "46332f9d834ef8dd3a196297b8864654b0038973be0734ba0bf27a9a6336651e",
           "TenantDescriptionMustDifferNotification": "76f27327c31526c6ed59fe6c17deae2b7ea4a1a940f9e564ec00b0c711b7a86f",
           "TenantNameField": "5086900635fec3efdf730450a45b60a3f56059cf37e68369ac7c4b8eeeca3db5",
@@ -2656,8 +2656,8 @@
     },
     "User": {
       "spec": "specs/omnicore-gen/user.omnicore.yaml",
-      "specHash": "ae2ac32acfc54d86caa97e547fa5c147ff266c8c2d6208333612277846aeeef0",
-      "framework": "v0.73.0",
+      "specHash": "aa8d485876f5910d5a646b32882d5f2163b2d3289be61c8173986744281a4e1f",
+      "framework": "v0.74.0",
       "files": {
         "bootstrap/user_feature.go": {
           "class": "owned",
@@ -2805,7 +2805,7 @@
         },
         "internal/application/queries/find_user_by_id_query.go": {
           "class": "owned",
-          "hash": "ebc6b36cf623dfafd677e02efe47cf66da3d98d3570b9ead3769ba896007394a"
+          "hash": "de78892038733cf41795d8c001ba196086d91ecee04452bb6bb5e3a79c4a6543"
         },
         "internal/application/queries/find_user_by_id_query_test.go": {
           "class": "owned",
@@ -2813,7 +2813,7 @@
         },
         "internal/application/queries/find_users_by_params_query.go": {
           "class": "owned",
-          "hash": "1bb1e890f486e90446e297435fa9f4698ecf57685e6434aef09734cacb057e17"
+          "hash": "ba3e645085bb7d960b034ff7ab0f44ed91ff9d0769fcfe5c0faf66c7a97fa379"
         },
         "internal/application/queries/find_users_by_params_query_test.go": {
           "class": "owned",
@@ -2825,7 +2825,7 @@
         },
         "internal/domain/aggregatevos/user_claim.go": {
           "class": "owned",
-          "hash": "a0d26ba6aa97f291d138257c02fa33d3abf594c468293eeca5a632afbd65fca8"
+          "hash": "cce1df3e13d5ca1996c488370f5178ed40a1abf23e469201704528c9ebcaba4d"
         },
         "internal/domain/aggregatevos/user_claim_test.go": {
           "class": "owned",
@@ -2833,7 +2833,7 @@
         },
         "internal/domain/aggregatevos/user_group.go": {
           "class": "owned",
-          "hash": "921592e4bd8d58d5a0d7fb6c8e575fa319cb125679e58ba5de8572e5613c489d"
+          "hash": "65f59f1d46735d3aed6bb7440fb8a6aa6fe4851d8f5aaa6609a8b17bd8553ddf"
         },
         "internal/domain/aggregatevos/user_group_test.go": {
           "class": "owned",
@@ -2841,7 +2841,7 @@
         },
         "internal/domain/aggregatevos/user_role.go": {
           "class": "owned",
-          "hash": "20ba7ab986695a994830aed457c84bf7d762d19eb33a61bf1979ec56d4f55603"
+          "hash": "19fabcbf5c8662e258230f6cec91afb9a9840e7aa334584a6efc0004927209f9"
         },
         "internal/domain/aggregatevos/user_role_test.go": {
           "class": "owned",
@@ -2849,7 +2849,7 @@
         },
         "internal/domain/user.go": {
           "class": "owned",
-          "hash": "59d3c88147d02456a0dddfe1c39a9fae0f746bb7f0a03c4512ffe4206f3dbb4b"
+          "hash": "2036d258b64f115c45d1b0cd583019c6425bb4adbb43daea7d9840e7a713f23a"
         },
         "internal/domain/user_rules_manual.go": {
           "class": "hook",
@@ -2893,7 +2893,7 @@
         },
         "internal/infra/schemas/user_claim_schema.go": {
           "class": "owned",
-          "hash": "e1db6c49514dd38ef5a2f53c5b7a6d2b612a68d270bbecfa0caa10e91e56aec2"
+          "hash": "20431ef5c33641a4f821e804da13eb6cec2684f25debf10f286d59dce42fc4e9"
         },
         "internal/infra/schemas/user_claim_schema_test.go": {
           "class": "owned",
@@ -2901,7 +2901,7 @@
         },
         "internal/infra/schemas/user_group_schema.go": {
           "class": "owned",
-          "hash": "2455511d152335dc2fdf4a0d2a60e73e5284d00edff79b85b407fccc53960af4"
+          "hash": "fca93896d7c39520a87c6a59d604ff6a8d009b84f898cf78d67f451243e137bd"
         },
         "internal/infra/schemas/user_group_schema_test.go": {
           "class": "owned",
@@ -2909,7 +2909,7 @@
         },
         "internal/infra/schemas/user_role_schema.go": {
           "class": "owned",
-          "hash": "ec80294172ef53b23e0583ef8e3c5f281bd43fa419a3a92d3a6694e8dcc1598b"
+          "hash": "5506910f3e772e763b836ba2eef7b5d5b2fb66ea50af87755fb8f24b84ac1e53"
         },
         "internal/infra/schemas/user_role_schema_test.go": {
           "class": "owned",
@@ -2917,7 +2917,7 @@
         },
         "internal/infra/schemas/user_schema.go": {
           "class": "owned",
-          "hash": "a92823bceceed1d50712e7ed3b4f0702ef0655b3cd5b8baccf66926934925537"
+          "hash": "5fe1fd958d51bc70a23b7e6c2b736ee2d5e5b32d56ab538cd66924150133ca17"
         },
         "internal/infra/schemas/user_schema_test.go": {
           "class": "owned",
@@ -2925,7 +2925,7 @@
         },
         "internal/infra/user_repository.go": {
           "class": "owned",
-          "hash": "5a6bb7a2016c732b570b7d6d4b3fdade039cb090b5e87d9d9d2423b6b3164a24"
+          "hash": "df35e138b90b42b8878ab0f38e18dd738b33e54adcdbcdd99acd82f982ee8c04"
         },
         "internal/infra/user_service.go": {
           "class": "owned",
@@ -3005,7 +3005,7 @@
         },
         "internal/web/requests/find_user_by_id.go": {
           "class": "owned",
-          "hash": "f026e2e9bd647375273963a48ea051b601b5f433c3cdfdc3be4e8baae1232f85"
+          "hash": "cc769d17376d9886b69a962be27bdccff820403d486edc20bb4ca3e68b39f59f"
         },
         "internal/web/requests/find_user_by_id_test.go": {
           "class": "owned",
@@ -3013,7 +3013,7 @@
         },
         "internal/web/requests/find_users_by_params.go": {
           "class": "owned",
-          "hash": "c30a1d4aec6ee80e84882ff4d0e5670c1cd6905749ed68700a1ab2d9a93bedb8"
+          "hash": "d9ee379a06aa91b263dd9e74f3baf1edc6cd1152ad1a6f19a90792ce23224591"
         },
         "internal/web/requests/find_users_by_params_test.go": {
           "class": "owned",
@@ -3078,6 +3078,7 @@
           "UserAlreadyGrantsRoleNotification": "0e2d6d60d4048d3971c347d7dc0f50bf9a77856f9ce919f68d1d25d596d642ed",
           "UserAlreadyHoldsClaimNotification": "c671ff5cb3edab1ddfdcb038aaa41f3af2fdaad85b95258cacd503a516ea92b1",
           "UserAlreadyInGroupNotification": "cc354803a744150beee8f02ee3ca1f109c060db6e72410da7f3b63831e572074",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "c83ac341610e4b49359c13891191e2833d9e93ac1f1c47e2f14e91872829497f",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "95835ee87c0e9911f8df69d2bbbaa9ab7061da95f30de0d28dfff6e42d1cbb85",
@@ -3085,7 +3086,6 @@
           "UserClaimValueField": "7e347daa5ec7fbe8426998f8523a67670f032e8f308b775db34b8b9e2bf6b89a",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "7bdf6e89701c96379abd8f7d04db640ed05aa9d0a950a7387628091cf46eca78",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "a3bf3541a27ab0465e0f5d97e8290e161d8e52e3228aadc757fd8ef43c1b3650",
           "UserEmailField": "2fae6fb30b0d0077f771923d6d037d8e43c45e6078e2b3c31637a489c029cee5",
           "UserEmailIsImmutableNotification": "67805635ae3501599f9179513293d158ed480e2e53c3cae3e3a4928b071de961",
@@ -3145,6 +3145,7 @@
           "UserAlreadyGrantsRoleNotification": "38701cd9d8535bca5a2d42e367b5820690bacf726f83234616dec1080bcb5040",
           "UserAlreadyHoldsClaimNotification": "9c1114aa32c599ca11c6d010d5d5cb50f40f08a1bb5992fbfe880238facae71a",
           "UserAlreadyInGroupNotification": "163260aa1f237a17cf6082b624da38f2584a83857908f103eda793a871caad61",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "d00d97cb100629d095d4bf8c18bcb08df0d088d1e87f6cbec7863c93f399870e",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "aee76de9328d2b73f929cb7b68a82f28286782cb6b8222e61737e6d4f3a85442",
@@ -3152,7 +3153,6 @@
           "UserClaimValueField": "8e37953d23daca5ff01b8282c33f4e0a2152f1d1885f94c06418617e3ee1d24e",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "72ed2bd767cef62711f4293e17fef76dfe2858fe169db0a6b5c757193d45aa0c",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "177c6e66be69cdca73089bddc72ad532662d1f0001280492954e7c77c4ea4c01",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "11a698b102ed082cae792fbf27dace0226c3a75031615fcde2a02a71286e2c79",
@@ -3212,6 +3212,7 @@
           "UserAlreadyGrantsRoleNotification": "cf417fdec1770eda0482e7d6bb79164f6d01826398787db73c964ccf4cbac55e",
           "UserAlreadyHoldsClaimNotification": "e19ef1df02c73381314dc697542f4bf6314cc3729b76bed3b752e6d8d34cce3b",
           "UserAlreadyInGroupNotification": "64ed17dad09bb62600a487b35363f5aa7d2cbd396e7c24704e9452504687bc43",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "d7735a914c47003f36d483ace7c8097a0227de78962fbae532bd03d726548ae1",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "298b8e5db2344c36127aa449704c3816104fa75594277880a14248629c4af4d9",
@@ -3219,7 +3220,6 @@
           "UserClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "14a433147337bb11c36e113f92c9c4aea0ed4048145fe41b4da35665c8b571ed",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "13c1b25a7e481a7564b298b2bb68a900ce1f6393de370cb4ba1e7148b95c5050",
           "UserEmailField": "ec64dc30a483cdcfaf24992c5aaec20a4ae391af91ada725f886fc3270b669ac",
           "UserEmailIsImmutableNotification": "c0441c657db3d121e9d0b1d352c9732927bad8b26b58faa894ca8255f03a28db",
@@ -3279,6 +3279,7 @@
           "UserAlreadyGrantsRoleNotification": "6c03b6de97361ce7ac16b1671c5f4bffb28c76d8f707c3bcaabbc9635a1f0a92",
           "UserAlreadyHoldsClaimNotification": "655c155ed9968d496d931412cb8ae6234ae426ca3c6b9b9b6c4ec45572bffa48",
           "UserAlreadyInGroupNotification": "521b0a2034d0fe6c66c146f214a8c97c389141bf3adbca364d2fda7f00ef46c1",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "1d8a2e37314bd451c360bfb9f82ae59d7c5067077308a53689297144d99b22ba",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "234e6f5c5db909b04a75dd2c69d92105d34fa261b470667b996eba23fa13a21f",
@@ -3286,7 +3287,6 @@
           "UserClaimValueField": "6e8f3132d8e2e2a80dc214d69072afde8c645be6f890572a4eaff8b4811b9bde",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "55f685a23ed5787e1435caed5eb3d4ef0942cb01cf72fa1db56a31036ced125c",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "385f1af72c6feb3b541921890c7efa2e758ee8627f15c6ec2192ee7ce16b1099",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "96fcd19c5488eeb6c35baecea027cc5fab8597cc26802001566b2d07639cdc2e",
@@ -3346,6 +3346,7 @@
           "UserAlreadyGrantsRoleNotification": "f344519f77f3b6189ebfb54f36d502980a7d3a53db57691c90c29da2ec657555",
           "UserAlreadyHoldsClaimNotification": "72201443d97b647d05ee31175d2760ec7f0810b2178f936f45d08f84cb8ce671",
           "UserAlreadyInGroupNotification": "703734d89a16c7b7af1b5ebb3bf2e2b2b6e7a1dbc0e66644a6163fe274d496b4",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "689f0a2cbad9baad8f5dd3f1f8893f6d7bd639e0ce357e3ba72022946bea1fd8",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "b8f5c8b46248c963ea3e43697b37ca60371cce08f98b33adbdd4439c1620b4de",
@@ -3353,7 +3354,6 @@
           "UserClaimValueField": "3b50ed0e6ec244182f4b4d135b47acb095f81c710d5ed782b2173084a3de4533",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "3f72f02a13c746cf4424cab34f2970abf917ec5b53164aa3f80c8f2a6b1e9d49",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "ac0068261b02fb988d3eaf3d6c5ac7e134353aff0ac5f817272cdba7a4d1280d",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "6b1278d34fccb83a33d2a35561100cbadd19d3204fd80be5611c26b380d624c8",
@@ -3413,6 +3413,7 @@
           "UserAlreadyGrantsRoleNotification": "d7d6b48743a1888a0d97beafd47d964efd41c2556d1a118790facb93fcd36e38",
           "UserAlreadyHoldsClaimNotification": "41ea49b1625b46a545e885c5724762d4429c4ff33e69ab00f6fcd318dd03f28f",
           "UserAlreadyInGroupNotification": "ef2527ad772de28bed023e6cbeede605ca8746bb81f80e6181b5494009c76505",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "88ec3db8fc32484ad47728e41dbdd1e4b1cab83af4b5d1488b90a503b259b532",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "92863d8aac8b34c2770fd461e77fb701793ffebf721b464ee4bca1fd1b34a78b",
@@ -3420,7 +3421,6 @@
           "UserClaimValueField": "2bea5ab708c74ff971d94327782f04fd2d1c39517676fe756946fb76b783125c",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "46bba9f06496ea930f327e7ecd1a6fd007fa95b5727c5dc1c2b273bf0fa2afe6",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "29209603faab44e8e2cd502cf2537fea6fbaf0b68ac005dd82f4eb5b2ebc1d40",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "46bea914a6ac7de9dabec495e6a8e80e1b495005caaabc8b6d044b48988822a9",
@@ -3480,6 +3480,7 @@
           "UserAlreadyGrantsRoleNotification": "6ec4d47e5fdd6c7e4303d00c6c1439fcf967de8eaea90ab30571f7479bc6b87b",
           "UserAlreadyHoldsClaimNotification": "bd38d9bb14f440549d53e067f71900dcaa4e7afdd5b57fa6724152cc4e528f90",
           "UserAlreadyInGroupNotification": "eff8abb233bc3eb405e537e06cb6b12d56d3b56ea454169176697b22904f8727",
+          "UserArchivedAtField": "af24b9b5eda450d720e502e7c4af2b0511f8e0bb9f7e68f06b643a203666f34a",
           "UserClaimClaimArchivedAtField": "94bec0ae91932469d63275f0e20f74317d0e97fc301fd75814ebb723d7cb925b",
           "UserClaimClaimIDField": "4ca41db0282537009663db9b9ae8142e0e6b60812996d07075e5a9291d3d91bf",
           "UserClaimClaimNameField": "f8888bb1ce9c45b8755d9745d367bffc9c5c016ae87f3b479a1b00d5dbb8c49d",
@@ -3487,7 +3488,6 @@
           "UserClaimValueField": "b2f530c46991311cd367c992a825763bc55140682c347ad2e24d2fce316cd324",
           "UserCreatedAtField": "3d44337010bfbdf7eea614f64842ccdf0c2104adfdba8114a192b786bcf6abdc",
           "UserCurrentPasswordField": "070b4b3394f4075c1602d65a79baef777b52b1f9bd1db9b8e795271535ae0010",
-          "UserDeletedAtField": "ecf8c7651cb73327ec106a91d3761bdabdef133374f0a765cc3c330339a0a466",
           "UserEmailAlreadyExistsNotification": "0acee3000c1a49d028d0ddf849ba31e472be58d44ebede913817f71a97b007a7",
           "UserEmailField": "2550d962e536e7c0889f563a957c5389c97aa7507881efe2b754769b814d8256",
           "UserEmailIsImmutableNotification": "84c4366010b16b39b73cdb272baed8dbbabcaa94d9109e046c186c1d48a90072",

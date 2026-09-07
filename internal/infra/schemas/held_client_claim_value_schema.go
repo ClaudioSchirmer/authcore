@@ -43,5 +43,5 @@ func HeldClientClaimValueSchema() *core.TableSchema {
 		ParentID("client_id").
 		Field("ClaimID", "claim_id").
 		Field("Value", "value").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

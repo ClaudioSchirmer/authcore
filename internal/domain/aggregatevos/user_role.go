@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:5689ce24bc2e6d06c8d5e2c45828eb18cfdd9164fbd0ca80dcd22a9a3496f1da
+// checksum:   sha256:6a96d476f1eab41f3e40d43d697752e2df1dd0e868707c414683171f94ebaa19
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -50,7 +50,7 @@ type UserRole struct {
 	// TableSchema, so no write can carry them and no migration creates them.
 	RoleKey        string     // The granted role's stable machine handle. Read-only, filled on load — Role.role_key, via the InnerJoin on role_id
 	RoleName       string     // The granted role's display name. Read-only, filled on load — Role.name, via the InnerJoin on role_id
-	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.deleted_at, via the InnerJoin on role_id
+	RoleArchivedAt *time.Time // When the role behind this grant was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Role.archived_at, via the InnerJoin on role_id
 }
 
 // CollectionName is the name of the roles collection.

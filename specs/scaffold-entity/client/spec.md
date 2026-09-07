@@ -1,5 +1,11 @@
 # Spec: Client
 
+> **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
+> `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
+> and this service renamed the physical column `deleted_at` → `archived_at` in the same
+> run. The vocabulary below was rewritten accordingly; the decisions it records are
+> unchanged. See `../../upgrade/v0.73.0-to-v0.74.0/migration-plan.md`.
+
 - **Status:** APPROVED
 - **Approved:** maintainer (Cláudio Schirmer Guedes), 2026-08-26 — **every ⚠️ OPEN slot and
   every high-risk `(proposed)` pick was answered at the model gate, over six rounds.** One
@@ -364,19 +370,19 @@ clients                                  -- A machine account: an integration th
   status            VARCHAR(16)  NOT NULL
   revision          BIGINT NOT NULL DEFAULT 0
   created_at / updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  deleted_at        TIMESTAMPTZ NULL
+  archived_at        TIMESTAMPTZ NULL
 
-  UNIQUE (tenant_id, name) WHERE deleted_at IS NULL     -- see §2, Unique
+  UNIQUE (tenant_id, name) WHERE archived_at IS NULL     -- see §2, Unique
   INDEX  (tenant_id)                                    -- the isolation filter runs on every listing
 
 client_roles                             -- The roles granted to this client. One row per
   id          UUID PK                    --   grant, holding nothing but the role's id — so
   client_id   UUID NOT NULL FK → clients(id) ON DELETE CASCADE
   role_id     UUID NOT NULL FK → roles(id)  NO ACTION   --   a retired-and-recreated role is
-  deleted_at  TIMESTAMPTZ NULL                          --   never silently re-granted.
+  archived_at  TIMESTAMPTZ NULL                          --   never silently re-granted.
   created_at / updated_at
 
-  UNIQUE (client_id, role_id) WHERE deleted_at IS NULL
+  UNIQUE (client_id, role_id) WHERE archived_at IS NULL
   INDEX  (client_id)          -- every read of the aggregate loads the collection by it
   INDEX  (role_id)            -- the reverse walk; and the FK check on every role delete
 
@@ -385,10 +391,10 @@ client_allowed_cidrs                     -- The network ranges this client may a
   client_id   UUID NOT NULL FK → clients(id) ON DELETE CASCADE
   cidr        VARCHAR(43)  NOT NULL      --   the restriction is opt-in, and the listing says
   label       VARCHAR(120) NOT NULL      --   which of the two a client is in.
-  deleted_at  TIMESTAMPTZ NULL
+  archived_at  TIMESTAMPTZ NULL
   created_at / updated_at
 
-  UNIQUE (client_id, cidr) WHERE deleted_at IS NULL
+  UNIQUE (client_id, cidr) WHERE archived_at IS NULL
   INDEX  (client_id)
 ```
 
@@ -816,7 +822,7 @@ What this spec hands that run:
 - the row shape it reads — `secret_hash`, and `previous_secret_hash` + its expiry: **two
   verifies on the miss path**, which is what Q4's cost argument was about and what Q4's
   answer makes cheap;
-- the eligibility checks it must make: `status = active`, `deleted_at IS NULL`, and the
+- the eligibility checks it must make: `status = active`, `archived_at IS NULL`, and the
   owning tenant neither archived nor suspended — all of it answered by one aggregate load
   through the read joins;
 - `identity_kind = 'client'` on every `authentication_attempts` row, which the table already

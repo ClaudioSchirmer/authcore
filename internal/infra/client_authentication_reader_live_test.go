@@ -124,15 +124,15 @@ func seedMachineFixture(t *testing.T, eng *postgres.Postgres) {
 	// one, because "suspended" is a decision the handler makes and a row it needs
 	// in hand to make it.
 	exec(`INSERT INTO clients (id, tenant_id, name, description, secret_hash,
-	                           secret_changed_at, status, deleted_at)
+	                           secret_changed_at, status, archived_at)
 	      VALUES ($1, $2, 'Billing integration', '', 'stored-hash', NOW(), 'active', NULL)`,
 		machineClient, machineTenant)
 	exec(`INSERT INTO clients (id, tenant_id, name, description, secret_hash,
-	                           secret_changed_at, status, deleted_at)
+	                           secret_changed_at, status, archived_at)
 	      VALUES ($1, $2, 'Retired integration', '', 'stored-hash', NOW(), 'active', NOW())`,
 		machineClientArchived, machineTenant)
 	exec(`INSERT INTO clients (id, tenant_id, name, description, secret_hash,
-	                           secret_changed_at, status, deleted_at)
+	                           secret_changed_at, status, archived_at)
 	      VALUES ($1, $2, 'Lapsed integration', '', 'stored-hash', NOW(), 'suspended', NULL)`,
 		machineClientSuspended, machineTenantSuspended)
 
@@ -142,19 +142,19 @@ func seedMachineFixture(t *testing.T, eng *postgres.Postgres) {
 		{machineRoleNoGrants, "grants-nothing", "NULL"},
 		{machineRoleRevokedFor, "revoked-grant", "NULL"},
 	} {
-		exec(`INSERT INTO roles (id, tenant_id, role_key, name, description, deleted_at)
+		exec(`INSERT INTO roles (id, tenant_id, role_key, name, description, archived_at)
 		      VALUES ($1, $2, $3, $3, '', `+r.archived+`)`, r.id, machineTenant, r.key)
 	}
 
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'invoice', 'read', '', NULL)`, machinePermLive)
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'ledger', 'purge', '', NULL)`, machinePermOnlyViaRetired)
-	exec(`INSERT INTO permissions (id, resource_name, action_name, description, deleted_at)
+	exec(`INSERT INTO permissions (id, resource_name, action_name, description, archived_at)
 	      VALUES ($1, 'invoice', 'delete', '', NOW())`, machinePermRevoked)
 
 	// The client's grants: three live edges and one REVOKED edge onto a live role.
-	exec(`INSERT INTO client_roles (id, client_id, role_id, deleted_at) VALUES
+	exec(`INSERT INTO client_roles (id, client_id, role_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL),
 	      (gen_random_uuid(), $1, $4, NULL),
@@ -164,12 +164,12 @@ func seedMachineFixture(t *testing.T, eng *postgres.Postgres) {
 	// What the roles confer. The retired role grants a LIVE permission that nothing
 	// else grants, so a gate that stopped excluding it would put `ledger:purge` in
 	// the answer and nothing else could.
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL),
 	      (gen_random_uuid(), $1, $3, NULL)`, machineRoleHeld, machinePermLive, machinePermRevoked)
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, machineRoleRetired, machinePermOnlyViaRetired)
-	exec(`INSERT INTO role_permissions (id, role_id, permission_id, deleted_at) VALUES
+	exec(`INSERT INTO role_permissions (id, role_id, permission_id, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, NULL)`, machineRoleRevokedFor, machinePermLive)
 
 	// THE CLAIM CATALOG, one definition per `appliesTo` member plus a retired one.
@@ -182,14 +182,14 @@ func seedMachineFixture(t *testing.T, eng *postgres.Postgres) {
 		{claimRetired, "x_legacy", "client", "NOW()"},
 	} {
 		exec(`INSERT INTO claims (id, tenant_id, name, value_type, applies_to,
-		                          default_value, description, deleted_at)
+		                          default_value, description, archived_at)
 		      VALUES ($1, $2, $3, 'string', $4, NULL, '', `+c.archived+`)`,
 			c.id, machineTenant, c.name, c.applies)
 	}
 
 	// The client's own values. The one on the RETIRED definition is the second half
 	// of that gate: holding a value must not resurrect a definition nobody offers.
-	exec(`INSERT INTO client_claims (id, client_id, claim_id, value, deleted_at) VALUES
+	exec(`INSERT INTO client_claims (id, client_id, claim_id, value, archived_at) VALUES
 	      (gen_random_uuid(), $1, $2, 'fleet-a', NULL),
 	      (gen_random_uuid(), $1, $3, 'gone', NULL),
 	      (gen_random_uuid(), $1, $4, 'removed', NOW())`,
@@ -198,7 +198,7 @@ func seedMachineFixture(t *testing.T, eng *postgres.Postgres) {
 	// The allow-list: one live range and one REVOKED entry. The revoked one is the
 	// property this fixture exists for — an archived restriction that kept admitting
 	// would read as revoked in the API and still be enforced.
-	exec(`INSERT INTO client_allowed_cidrs (id, client_id, cidr, label, deleted_at) VALUES
+	exec(`INSERT INTO client_allowed_cidrs (id, client_id, cidr, label, archived_at) VALUES
 	      (gen_random_uuid(), $1, '203.0.113.0/24', 'office', NULL),
 	      (gen_random_uuid(), $1, '198.51.100.0/24', 'old NAT', NOW())`, machineClient)
 }

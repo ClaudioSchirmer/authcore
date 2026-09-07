@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:c552783515a240192a2126dbf615cf45b0ec2b1fc0ec425ca8ed9233797fb284
+// checksum:   sha256:f1ebda1988d3ca04b749f3c445acb6050cf3900a175e519115f29b376512e851
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -89,7 +89,7 @@ type FindGroupsResponse struct {
 	Description      *string                `json:"description,omitempty" exportLabelKey:"GroupDescriptionField" example:"Everyone in the product engineering org: read access to the tenant registry and the permission catalog, plus deploy rights."`
 	CreatedAt        *time.Time             `json:"createdAt,omitempty" exportLabelKey:"GroupCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt        *time.Time             `json:"updatedAt,omitempty" exportLabelKey:"GroupUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt        *time.Time             `json:"deletedAt,omitempty" exportLabelKey:"GroupDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt       *time.Time             `json:"archivedAt,omitempty" exportLabelKey:"GroupArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace  *string                `json:"tenantWorkspace,omitempty" exportLabelKey:"GroupTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus     *string                `json:"tenantStatus,omitempty" exportLabelKey:"GroupTenantStatusField" example:"active"`
 	TenantArchivedAt *time.Time             `json:"tenantArchivedAt,omitempty" exportLabelKey:"GroupTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`

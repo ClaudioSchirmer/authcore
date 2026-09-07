@@ -237,7 +237,7 @@ The shape the regenerated code expects, for `users`:
 | `revision` | int64 | no | optimistic concurrency, maintained by the framework |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 
 Indexes it expects:
 
@@ -254,7 +254,7 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `user_id` | id | no | foreign key to users |
 | `group_id` | id | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -265,7 +265,7 @@ Indexes it expects:
 | `id` | id | no | primary key |
 | `user_id` | id | no | foreign key to users |
 | `role_id` | id | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -277,7 +277,7 @@ Indexes it expects:
 | `user_id` | id | no | foreign key to users |
 | `claim_id` | id | no |  |
 | `value` | string(256) | no |  |
-| `deleted_at` | time | yes | archive stamp |
+| `archived_at` | time | yes | archive stamp |
 | `created_at` | time | no |  |
 | `updated_at` | time | no |  |
 
@@ -415,26 +415,24 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the read shape of one UserClaim entry | `internal/application/queries/dtos/user_claim_row_result.go` |
-| the read shape of one UserGroup entry | `internal/application/queries/dtos/user_group_row_result.go` |
-| the read shape of one UserRole entry | `internal/application/queries/dtos/user_role_row_result.go` |
 | the by-id query and its result | `internal/application/queries/find_user_by_id_query.go` |
 | the listing query and its result | `internal/application/queries/find_users_by_params_query.go` |
-| 5 DEU translation key(s) | `internal/application/translations/deu.go` |
-| 5 ENG translation key(s) | `internal/application/translations/eng.go` |
-| 5 ESP translation key(s) | `internal/application/translations/esp.go` |
-| 5 FRA translation key(s) | `internal/application/translations/fra.go` |
-| 5 ITA translation key(s) | `internal/application/translations/ita.go` |
-| 5 NLD translation key(s) | `internal/application/translations/nld.go` |
-| 5 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the UserClaim child value object | `internal/domain/aggregatevos/user_claim.go` |
 | the UserGroup child value object | `internal/domain/aggregatevos/user_group.go` |
 | the UserRole child value object | `internal/domain/aggregatevos/user_role.go` |
 | the User aggregate root, its modes and its rules | `internal/domain/user.go` |
+| the user_claims child schema | `internal/infra/schemas/user_claim_schema.go` |
+| the user_groups child schema | `internal/infra/schemas/user_group_schema.go` |
+| the user_roles child schema | `internal/infra/schemas/user_role_schema.go` |
+| the users schema (9 columns) | `internal/infra/schemas/user_schema.go` |
 | the User repository and its constraint bindings | `internal/infra/user_repository.go` |
-| the wire shapes of one UserClaim entry | `internal/web/requests/dtos/user_claim.go` |
-| the wire shapes of one UserGroup entry | `internal/web/requests/dtos/user_group.go` |
-| the wire shapes of one UserRole entry | `internal/web/requests/dtos/user_role.go` |
 | the by-id request and response | `internal/web/requests/find_user_by_id.go` |
 | the listing request and response | `internal/web/requests/find_users_by_params.go` |
 
@@ -446,7 +444,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0005_user_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0005_user_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-79 file(s) were already up to date.
+81 file(s) were already up to date.
 
 ## What was NOT generated
 
@@ -462,9 +460,9 @@ Read controls this listing does NOT serve: `?search=`. That is a contract, not a
 
 ## Framework compatibility and next steps
 
-Verdict: **exact** (project pins v0.73.0)
+Verdict: **exact** (project pins v0.74.0)
 
-framework v0.73.0 meets the required v0.73.0
+framework v0.74.0 meets the required v0.74.0
 
 Verify what was generated:
 

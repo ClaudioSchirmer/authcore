@@ -30,5 +30,5 @@ func ClientClaimEdgeSchema() *core.TableSchema {
 	return core.NewDirectSchema[ClientClaimEdge]("client_claims").
 		ID("id").
 		Field("ClaimID", "claim_id").
-		DeletedAt("deleted_at")
+		ArchivedAt("archived_at")
 }

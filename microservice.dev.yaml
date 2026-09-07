@@ -24,7 +24,7 @@ relational:
   dialect: postgres
   dsn: "${DATABASE_URL:postgres://omnicore:omnicore@localhost:5432/authcore_db?sslmode=disable}"
   # Mandatory since v0.65.0, no default. `db` reads the write instant from Postgres once
-  # per write transaction, so every replica stamps created_at/updated_at/deleted_at against
+  # per write transaction, so every replica stamps created_at/updated_at/archived_at against
   # one clock instead of its own; `app` would keep time.Now().UTC() and each pod's drift.
   # One extra round-trip per write TX. The value is the SAME in prd on purpose — dev and
   # prd must not write their histories against different clocks.

@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:bd39770eb162d2b36eb066989476d9e549589d27db9edb73cbfebafa30f948ee
+// generated:  2026-09-06
+// checksum:   sha256:e1836c1a671573b9c981ad0f5474dc501b90d2c2c389861a87b88741fb8f75ee
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -59,7 +59,7 @@ func ClientSchema() *core.TableSchema {
 			core.InAudit(core.RedactWith("***"))).
 		Field("PreviousSecretExpiresAt", "previous_secret_expires_at").
 		Field("Status", "status").
-		DeletedAt("deleted_at").
+		ArchivedAt("archived_at").
 		CreatedAt("created_at").
 		UpdatedAt("updated_at")
 }

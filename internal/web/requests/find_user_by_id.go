@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:f783559a0e46fc43adfca3221615c2c6bc05877c521b453814c09623b0167afa
+// checksum:   sha256:489a0a4413f44a4d29dd68b67bcb6b613a5c5b335e4c1e44b059a7a04d5837b4
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -81,7 +81,7 @@ type FindUserByIDResponse struct {
 	Status             string     `json:"status" exportLabelKey:"UserStatusField" example:"active"`
 	CreatedAt          time.Time  `json:"createdAt" exportLabelKey:"UserCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt          time.Time  `json:"updatedAt" exportLabelKey:"UserUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	DeletedAt          *time.Time `json:"deletedAt" exportLabelKey:"UserDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	ArchivedAt         *time.Time `json:"archivedAt" exportLabelKey:"UserArchivedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace    string     `json:"tenantWorkspace" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus       string     `json:"tenantStatus" exportLabelKey:"UserTenantStatusField" example:"active"`
 	TenantArchivedAt   *time.Time `json:"tenantArchivedAt" exportLabelKey:"UserTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
