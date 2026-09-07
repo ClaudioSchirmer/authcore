@@ -134,8 +134,17 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the Permission aggregate root, its modes and its rules | `internal/domain/permission.go` |
-| tests for Permission's rules | `internal/domain/permission_test.go` |
+| the by-id query and its result | `internal/application/queries/find_permission_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_permissions_by_params_query.go` |
+| 1 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 1 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 1 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 1 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 1 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 1 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 1 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the by-id request and response | `internal/web/requests/find_permission_by_id.go` |
+| the listing request and response | `internal/web/requests/find_permissions_by_params.go` |
 
 **Left untouched** (yours, by design):
 
@@ -144,7 +153,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0002_permission_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0002_permission_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-28 file(s) were already up to date.
+26 file(s) were already up to date.
 
 ## What was NOT generated
 

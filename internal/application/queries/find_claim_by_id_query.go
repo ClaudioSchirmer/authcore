@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:c1dedee4cdc018c0c2e55e0fd83130993830ccbf4fdbd934e3b2bc7b2882708d
+// generated:  2026-09-06
+// checksum:   sha256:667e989137db86ce5ec83a5e8c89ddc68edd2274876533a44d663090307cf33f
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -99,15 +99,17 @@ func (q FindClaimByIDQuery) ContextName() string { return "Claim" }
 // refused at boot. This read declares no ?fields=, so plain values are right
 // — an absent key fills as the zero value.
 type FindClaimByIDResult struct {
-	ID              string
-	TenantID        domain.ID
-	Name            string
-	ValueType       string
-	AppliesTo       string
-	DefaultValue    *string
-	Description     string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	TenantWorkspace string
-	TenantStatus    string
+	ID               string
+	TenantID         domain.ID
+	Name             string
+	ValueType        string
+	AppliesTo        string
+	DefaultValue     *string
+	Description      string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
+	TenantWorkspace  string
+	TenantStatus     string
+	TenantArchivedAt *time.Time
 }

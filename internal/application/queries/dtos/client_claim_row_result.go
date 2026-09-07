@@ -5,8 +5,8 @@
 // entity:     Client
 // spec:       specs/omnicore-gen/client.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:42bb01bcc36e7b6042618f7666b75ed838980e28703de656de6f2ebd8048d294
+// generated:  2026-09-06
+// checksum:   sha256:716a65ede91716a733904e7446575a773e5666fa45c2d5a429e30fad7e9e6561
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,11 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"time"
+
+	"github.com/ClaudioSchirmer/omnicore/domain"
+)
 
 // ClientClaimRowResult is one entry of the claims collection as the
 // application reads it.
@@ -35,9 +39,10 @@ import "github.com/ClaudioSchirmer/omnicore/domain"
 // Pointers throughout, for the same reason the root is: the listing serves
 // ?fields=, and the sparse-fill contract is enforced recursively.
 type ClientClaimRowResult struct {
-	ID             *string
-	ClaimID        *domain.ID
-	Value          *string
-	ClaimName      *string
-	ClaimValueType *string
+	ID              *string
+	ClaimID         *domain.ID
+	Value           *string
+	ClaimName       *string
+	ClaimValueType  *string
+	ClaimArchivedAt *time.Time
 }

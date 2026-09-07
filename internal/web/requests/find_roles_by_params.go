@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-03
-// checksum:   sha256:268e7923d9c096c61dd2322de94bf9dc678d68eb8ba309a6060a57f6dfe4d970
+// generated:  2026-09-06
+// checksum:   sha256:d8a4c005b304a45a59e56f440b3efc7c417ca9891ad7180b20618fd7bb59c2c2
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -81,16 +81,18 @@ func (r FindRolesRequest) ToQuery(criteria fwqueries.ReadCriteria) *appqueries.F
 type FindRolesResponse struct {
 	fwresponses.Auto
 
-	ID              *string                     `json:"id,omitempty" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID        *domain.ID                  `json:"tenantID,omitempty" exportLabelKey:"RoleTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Key             *string                     `json:"key,omitempty" exportLabelKey:"RoleKeyField" example:"billing-manager"`
-	Name            *string                     `json:"name,omitempty" exportLabelKey:"RoleNameField" example:"Billing Manager"`
-	Description     *string                     `json:"description,omitempty" exportLabelKey:"RoleDescriptionField" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
-	CreatedAt       *time.Time                  `json:"createdAt,omitempty" exportLabelKey:"RoleCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt       *time.Time                  `json:"updatedAt,omitempty" exportLabelKey:"RoleUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	TenantWorkspace *string                     `json:"tenantWorkspace,omitempty" exportLabelKey:"RoleTenantWorkspaceField" example:"acme-comercio"`
-	TenantStatus    *string                     `json:"tenantStatus,omitempty" exportLabelKey:"RoleTenantStatusField" example:"active"`
-	Permissions     []webdtos.RolePermissionRow `json:"permissions,omitempty"`
+	ID               *string                     `json:"id,omitempty" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID         *domain.ID                  `json:"tenantID,omitempty" exportLabelKey:"RoleTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Key              *string                     `json:"key,omitempty" exportLabelKey:"RoleKeyField" example:"billing-manager"`
+	Name             *string                     `json:"name,omitempty" exportLabelKey:"RoleNameField" example:"Billing Manager"`
+	Description      *string                     `json:"description,omitempty" exportLabelKey:"RoleDescriptionField" example:"Grants read access to the tenant registry and the permission catalog, without any write verb."`
+	CreatedAt        *time.Time                  `json:"createdAt,omitempty" exportLabelKey:"RoleCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt        *time.Time                  `json:"updatedAt,omitempty" exportLabelKey:"RoleUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt        *time.Time                  `json:"deletedAt,omitempty" exportLabelKey:"RoleDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	TenantWorkspace  *string                     `json:"tenantWorkspace,omitempty" exportLabelKey:"RoleTenantWorkspaceField" example:"acme-comercio"`
+	TenantStatus     *string                     `json:"tenantStatus,omitempty" exportLabelKey:"RoleTenantStatusField" example:"active"`
+	TenantArchivedAt *time.Time                  `json:"tenantArchivedAt,omitempty" exportLabelKey:"RoleTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
+	Permissions      []webdtos.RolePermissionRow `json:"permissions,omitempty"`
 }
 
 // FromResult projects the application Result onto FindRolesResponse.

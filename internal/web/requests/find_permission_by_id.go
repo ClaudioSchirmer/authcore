@@ -5,8 +5,8 @@
 // entity:     Permission
 // spec:       specs/omnicore-gen/permission.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:a385ae9c043fc5741eda05881f46a37689153da8284c8fd31363a2d77f211fb5
+// generated:  2026-09-06
+// checksum:   sha256:9a6076187c4103aaec00610b22f1eacbbac7366d41993eaf46ddc4b41fed6cb6
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -69,10 +69,11 @@ func (r FindPermissionByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *app
 type FindPermissionByIDResponse struct {
 	fwresponses.Auto
 
-	ID          string    `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	Description string    `json:"description" exportLabelKey:"PermissionDescriptionField" example:"Read tenants: list the tenant registry and fetch a tenant by id."`
-	CreatedAt   time.Time `json:"createdAt" exportLabelKey:"PermissionCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt   time.Time `json:"updatedAt" exportLabelKey:"PermissionUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	ID          string     `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	Description string     `json:"description" exportLabelKey:"PermissionDescriptionField" example:"Read tenants: list the tenant registry and fetch a tenant by id."`
+	CreatedAt   time.Time  `json:"createdAt" exportLabelKey:"PermissionCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt   time.Time  `json:"updatedAt" exportLabelKey:"PermissionUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt   *time.Time `json:"deletedAt" exportLabelKey:"PermissionDeletedAtField" example:"2026-02-01T09:00:00Z"`
 	// The permission as a token carries it and a route compares it:
 	// resource:action.
 	Permission string `json:"permission" exportLabelKey:"PermissionPermissionField" computed:"Resource,Action" example:"tenant:read"`

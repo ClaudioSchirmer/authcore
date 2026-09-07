@@ -205,10 +205,22 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the patch command and result | `internal/application/commands/patch_group_command.go` |
-| tests for patch_group_command.go | `internal/application/commands/patch_group_command_test.go` |
-| the patch request and response | `internal/web/requests/patch_group.go` |
-| the wire mapper tests for patch_group.go | `internal/web/requests/patch_group_test.go` |
+| the read shape of one GroupRole entry | `internal/application/queries/dtos/group_role_row_result.go` |
+| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
+| 3 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 3 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 3 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 3 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 3 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 3 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 3 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
+| the GroupRole child value object | `internal/domain/aggregatevos/group_role.go` |
+| the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
+| the Group repository and its constraint bindings | `internal/infra/group_repository.go` |
+| the wire shapes of one GroupRole entry | `internal/web/requests/dtos/group_role.go` |
+| the by-id request and response | `internal/web/requests/find_group_by_id.go` |
+| the listing request and response | `internal/web/requests/find_groups_by_params.go` |
 
 **Left untouched** (yours, by design):
 
@@ -217,7 +229,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-44 file(s) were already up to date.
+39 file(s) were already up to date.
 
 ## What was NOT generated
 

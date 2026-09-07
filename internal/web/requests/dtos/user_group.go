@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:0700abfbb5d157f7ad539da55b8ad89fac6b3424255b3f614090959c9872a88e
+// generated:  2026-09-06
+// checksum:   sha256:04928882ad75c13218b62501e4ba6f1c8b95e83c684e716e40f7711e439a81e8
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,14 +27,18 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // UserGroupRow is one entry of the groups collection as a read returns it.
 type UserGroupRow struct {
-	ID        *string    `json:"id,omitempty"`
-	GroupID   *domain.ID `json:"groupID,omitempty" exportLabelKey:"UserGroupGroupIDField" example:"0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"`
-	GroupKey  *string    `json:"groupKey,omitempty" exportLabelKey:"UserGroupGroupKeyField" example:"engineering"`
-	GroupName *string    `json:"groupName,omitempty" exportLabelKey:"UserGroupGroupNameField" example:"Engineering"`
+	ID              *string    `json:"id,omitempty"`
+	GroupID         *domain.ID `json:"groupID,omitempty" exportLabelKey:"UserGroupGroupIDField" example:"0198f3e0-9c25-7a1f-b73d-5e08c4a29f61"`
+	GroupKey        *string    `json:"groupKey,omitempty" exportLabelKey:"UserGroupGroupKeyField" example:"engineering"`
+	GroupName       *string    `json:"groupName,omitempty" exportLabelKey:"UserGroupGroupNameField" example:"Engineering"`
+	GroupArchivedAt *time.Time `json:"groupArchivedAt,omitempty" exportLabelKey:"UserGroupGroupArchivedAtField" example:"2026-01-31T12:00:00Z"`
 }
 
 // UserGroupRequest is one entry sent in the groups collection.

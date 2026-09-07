@@ -5,8 +5,8 @@
 // entity:     User
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:7518075acc41e7fdbe5f05b54ca91ba02e14357b55fe2ab8c46ddd3458608fc7
+// generated:  2026-09-06
+// checksum:   sha256:f783559a0e46fc43adfca3221615c2c6bc05877c521b453814c09623b0167afa
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -81,8 +81,10 @@ type FindUserByIDResponse struct {
 	Status             string     `json:"status" exportLabelKey:"UserStatusField" example:"active"`
 	CreatedAt          time.Time  `json:"createdAt" exportLabelKey:"UserCreatedAtField" example:"2026-02-01T09:00:00Z"`
 	UpdatedAt          time.Time  `json:"updatedAt" exportLabelKey:"UserUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt          *time.Time `json:"deletedAt" exportLabelKey:"UserDeletedAtField" example:"2026-02-01T09:00:00Z"`
 	TenantWorkspace    string     `json:"tenantWorkspace" exportLabelKey:"UserTenantWorkspaceField" example:"acme-comercio"`
 	TenantStatus       string     `json:"tenantStatus" exportLabelKey:"UserTenantStatusField" example:"active"`
+	TenantArchivedAt   *time.Time `json:"tenantArchivedAt" exportLabelKey:"UserTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
 	// The person's given and family names on one line, for listings.
 	FullName string                 `json:"fullName" exportLabelKey:"UserFullNameField" computed:"GivenName,FamilyName" example:"Maria Souza Lima"`
 	Groups   []webdtos.UserGroupRow `json:"groups"`

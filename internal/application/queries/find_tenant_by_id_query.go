@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:141a7e2db9a12c55b3c6555f166bb5c6b690330a685a0183fa83eb4228191865
+// generated:  2026-09-06
+// checksum:   sha256:f36457b2b52623ad9179d4e679a60f2f60781e67da2fdd1cbd5b1e9ad0395b67
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -84,4 +84,5 @@ type FindTenantByIDResult struct {
 	Status      string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }

@@ -5,8 +5,8 @@
 // entity:     Tenant
 // spec:       specs/omnicore-gen/tenant.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:143a6d22d7ce404eca2414c0e79767f0403b4f36f4d5cb7513c9a147a3acd87c
+// generated:  2026-09-06
+// checksum:   sha256:8142ea00e9b01032175433c2bde1c60f22fadff8a9890d2d5a5ac9c6520fdc4c
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -69,13 +69,14 @@ func (r FindTenantByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *appquer
 type FindTenantByIDResponse struct {
 	fwresponses.Auto
 
-	ID          string    `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	Name        string    `json:"name" exportLabelKey:"TenantNameField" example:"Acme Comércio e Serviços Ltda"`
-	Workspace   string    `json:"workspace" exportLabelKey:"TenantWorkspaceField" example:"acme-comercio"`
-	Description string    `json:"description" exportLabelKey:"TenantDescriptionField" example:"Retail operations of the Acme group in Brazil."`
-	Status      string    `json:"status" exportLabelKey:"TenantStatusField" example:"active"`
-	CreatedAt   time.Time `json:"createdAt" exportLabelKey:"TenantCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt   time.Time `json:"updatedAt" exportLabelKey:"TenantUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	ID          string     `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	Name        string     `json:"name" exportLabelKey:"TenantNameField" example:"Acme Comércio e Serviços Ltda"`
+	Workspace   string     `json:"workspace" exportLabelKey:"TenantWorkspaceField" example:"acme-comercio"`
+	Description string     `json:"description" exportLabelKey:"TenantDescriptionField" example:"Retail operations of the Acme group in Brazil."`
+	Status      string     `json:"status" exportLabelKey:"TenantStatusField" example:"active"`
+	CreatedAt   time.Time  `json:"createdAt" exportLabelKey:"TenantCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt   time.Time  `json:"updatedAt" exportLabelKey:"TenantUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt   *time.Time `json:"deletedAt" exportLabelKey:"TenantDeletedAtField" example:"2026-02-01T09:00:00Z"`
 }
 
 // FromResult projects the application Result onto FindTenantByIDResponse.

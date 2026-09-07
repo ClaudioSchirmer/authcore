@@ -462,6 +462,32 @@ joins:
           deu: Mandantenstatus
           ita: Stato del tenant
           nld: Tenantstatus
+      # The OWNER's archive stamp, a MANAGED slot of the target rather than a declared
+      # column of it — the read side resolves created_at, updated_at and deleted_at under
+      # their fixed logical names, so a traversal may name one without Tenant carrying a Go
+      # field for it. It lands as *time.Time whatever the join's kind: deleted_at is NULL on
+      # every LIVE counterpart, which is precisely the row this read usually returns.
+      #
+      # Deliberately NOT in byParams.filters or sort. A root join's fields ARE addressable in
+      # a criteria, so it could be; the read filter vocabulary has no isnull/notnull, so all
+      # a declaration would buy is "archived between these dates", while the question a
+      # caller actually asks — is the owner still alive? — is what TenantStatus answers with
+      # eq/in. Absent by choice, not by limitation.
+      - name: TenantArchivedAt
+        column: deleted_at
+        example: "2026-01-31T12:00:00Z"
+        description: >-
+          When the owning tenant was archived, or absent while it is live. Read-only, filled
+          on every load, never written through this aggregate.
+        labelKey: RoleTenantArchivedAtField
+        text:
+          eng: Tenant archived at
+          ptbr: Inquilino arquivado em
+          esp: Inquilino archivado el
+          fra: Locataire archivé le
+          deu: Mandant archiviert am
+          ita: Tenant archiviato il
+          nld: Tenant gearchiveerd op
 
   # The traversal into the catalog, hung off the grants collection. Declared ONCE here and
   # inherited by every consumer of the loader: FindByID (the load the write-side auto
@@ -476,11 +502,25 @@ joins:
   # Both HIDDEN: they exist to feed the composed `permission` token and nothing else, so the
   # caller reads one string instead of two halves.
   #
-  # The catalog's archive stamp used to ride along here too. It was removed on 2026-08-24:
-  # nothing in this service read it, and republishing it was inconsistent with its OWNER —
-  # `Permission` deliberately keeps `deletedAt` off its own reads, reaching archived state
-  # through ?includeArchived instead. Surfacing the same column through a join was the back
-  # door to a decision the owning aggregate had already made the other way.
+  # The catalog's archive stamp rides along again as of 2026-09-06, and the note that
+  # replaced it is worth keeping in view rather than deleting.
+  #
+  # It was removed on 2026-08-24 on two grounds: nothing in this service read it, and
+  # republishing it was inconsistent with its OWNER — `Permission` deliberately kept
+  # `deletedAt` off its own reads, reaching archived state through ?includeArchived instead,
+  # so surfacing the same column through a join was the back door to a decision the owning
+  # aggregate had already made the other way.
+  #
+  # The first ground expired: a caller reading a role's grants needs to know WHICH of them
+  # point at a retired catalog row, and the join is the only place that answer exists —
+  # ?includeArchived governs which ROOTS a read returns, never the rows a traversal reaches
+  # across into, so an archived permission was already arriving here, silently, indexed
+  # exactly like a live one.
+  #
+  # The second was not answered by dropping the field but by closing the asymmetry from the
+  # other side: `Permission` now declares DeletedAt in read.managed, so its own by-id read
+  # and every listing row carry the stamp too. The join republishes what the owner publishes,
+  # which is what the 2026-08-24 note was really asking for.
   - kind: inner
     to: Permission
     inChild: RolePermission
@@ -520,6 +560,25 @@ joins:
           deu: Aktion
           ita: Azione
           nld: Actie
+      # NOT hidden, unlike the two above. Resource and Action are off the wire because they
+      # are halves of the composed `permission` token and the caller reads the whole; this
+      # one composes with nothing and is the entry's only account of a grant that has
+      # outlived what it points at.
+      - name: PermissionArchivedAt
+        column: deleted_at
+        example: "2026-01-31T12:00:00Z"
+        description: >-
+          When the catalog row behind this grant was retired, or absent while it is live.
+          Read-only, filled on load, never written through this aggregate.
+        labelKey: RolePermissionPermissionArchivedAtField
+        text:
+          eng: Permission archived at
+          ptbr: Permissão arquivada em
+          esp: Permiso archivado el
+          fra: Permission archivée le
+          deu: Berechtigung archiviert am
+          ita: Permesso archiviato il
+          nld: Recht gearchiveerd op
 
 modes: [display, insert, update, archive]
 
@@ -710,7 +769,15 @@ read:
   backing: relational
   view:
     name: roles
-  managed: [CreatedAt, UpdatedAt]
+  # DeletedAt joined the two stamps on 2026-09-06. It used to stay off, on the same reasoning
+  # Permission and Tenant wrote down: archived state is reached through ?includeArchived,
+  # never through a timestamp. That reasoning covered the FILTER and was read as covering the
+  # VALUE too — and the two are different questions. ?includeArchived decides whether an
+  # archived row is in the answer at all; once it IS in the answer, or once another
+  # aggregate's join reaches across into it, nothing on the wire said WHEN it was archived,
+  # or even that it was. The stamp is not declared in byParams.filters, so the filter half of
+  # that decision stands untouched.
+  managed: [CreatedAt, UpdatedAt, DeletedAt]
   byId: true
   byParams:
     filters:

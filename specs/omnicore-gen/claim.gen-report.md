@@ -188,8 +188,18 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
+| the by-id query and its result | `internal/application/queries/find_claim_by_id_query.go` |
+| the listing query and its result | `internal/application/queries/find_claims_by_params_query.go` |
+| 2 DEU translation key(s) | `internal/application/translations/deu.go` |
+| 2 ENG translation key(s) | `internal/application/translations/eng.go` |
+| 2 ESP translation key(s) | `internal/application/translations/esp.go` |
+| 2 FRA translation key(s) | `internal/application/translations/fra.go` |
+| 2 ITA translation key(s) | `internal/application/translations/ita.go` |
+| 2 NLD translation key(s) | `internal/application/translations/nld.go` |
+| 2 PTBR translation key(s) | `internal/application/translations/ptbr.go` |
 | the Claim aggregate root, its modes and its rules | `internal/domain/claim.go` |
-| tests for Claim's rules | `internal/domain/claim_test.go` |
+| the Claim repository and its constraint bindings | `internal/infra/claim_repository.go` |
+| the by-id request and response | `internal/web/requests/find_claim_by_id.go` |
 | the listing request and response | `internal/web/requests/find_claims_by_params.go` |
 
 **Left untouched** (yours, by design):
@@ -199,7 +209,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0009_claim_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0009_claim_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-31 file(s) were already up to date.
+28 file(s) were already up to date.
 
 ## What was NOT generated
 

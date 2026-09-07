@@ -375,9 +375,22 @@ read:
   # and belong to no fields[] entry — the aggregate carries no Go field for them — so the
   # read side names them here, by the fixed logical names. Listing one returns it from the
   # by-id read and from every listing row, and makes it filterable like any other field.
-  # DeletedAt stays OFF: archived state is reached through ?includeArchived, never through
-  # a timestamp filter.
-  managed: [CreatedAt, UpdatedAt]
+  # DeletedAt joined the two stamps on 2026-09-06, and what it replaced is worth keeping in
+  # view: "DeletedAt stays OFF: archived state is reached through ?includeArchived, never
+  # through a timestamp filter." That reasoning covered the FILTER, and was read as covering
+  # the VALUE too — they are different questions. ?includeArchived decides whether an
+  # archived row is in the answer at all; once it IS in the answer, nothing on the wire said
+  # WHEN it was archived, or even that it was. The stamp is NOT declared in byParams.filters,
+  # so the filter half of the original decision stands exactly as written.
+  #
+  # It is also what makes the sibling change coherent: other aggregates now republish this
+  # column through their read joins, and a join republishing what its owner will not publish
+  # was the objection that took the field out of Role's spec on 2026-08-24.
+  #
+  # Tenant is the ONE entity here with an unarchive verb, so its stamp is not only an
+  # epitaph: a row that carries one today may not carry one tomorrow, and the caller that
+  # asked to see archived tenants has no other way to tell which of them are which.
+  managed: [CreatedAt, UpdatedAt, DeletedAt]
   byId: true
   byParams:
     filters:

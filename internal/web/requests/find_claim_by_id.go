@@ -5,8 +5,8 @@
 // entity:     Claim
 // spec:       specs/omnicore-gen/claim.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-08-29
-// checksum:   sha256:b43730cebc1a85d40718ffcbf1e95a0af0642c30838db10d574ac8fd437b1ec8
+// generated:  2026-09-06
+// checksum:   sha256:cf79ef0ca6975fa8b17564704fc0fb94d92bcca68225b3e0dcf4d64c2214b725
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -69,17 +69,19 @@ func (r FindClaimByIDRequest) ToQuery(criteria fwqueries.ReadCriteria) *appqueri
 type FindClaimByIDResponse struct {
 	fwresponses.Auto
 
-	ID              string    `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
-	TenantID        domain.ID `json:"tenantID" exportLabelKey:"ClaimTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
-	Name            string    `json:"name" exportLabelKey:"ClaimNameField" example:"x_cost_center"`
-	ValueType       string    `json:"valueType" exportLabelKey:"ClaimValueTypeField" example:"string"`
-	AppliesTo       string    `json:"appliesTo" exportLabelKey:"ClaimAppliesToField" example:"both"`
-	DefaultValue    *string   `json:"defaultValue" exportLabelKey:"ClaimDefaultValueField" example:"1000"`
-	Description     string    `json:"description" exportLabelKey:"ClaimDescriptionField" example:"Internal cost center this account is billed against, as the ERP knows it."`
-	CreatedAt       time.Time `json:"createdAt" exportLabelKey:"ClaimCreatedAtField" example:"2026-02-01T09:00:00Z"`
-	UpdatedAt       time.Time `json:"updatedAt" exportLabelKey:"ClaimUpdatedAtField" example:"2026-02-01T09:00:00Z"`
-	TenantWorkspace string    `json:"tenantWorkspace" exportLabelKey:"ClaimTenantWorkspaceField" example:"acme-comercio"`
-	TenantStatus    string    `json:"tenantStatus" exportLabelKey:"ClaimTenantStatusField" example:"active"`
+	ID               string     `json:"id" example:"7b3c1f10-3c7e-4a8d-9f0e-9d2a8e6d4b51"`
+	TenantID         domain.ID  `json:"tenantID" exportLabelKey:"ClaimTenantIDField" example:"0198f3c2-6b41-7c9e-9f2a-6d3b1e77a410"`
+	Name             string     `json:"name" exportLabelKey:"ClaimNameField" example:"x_cost_center"`
+	ValueType        string     `json:"valueType" exportLabelKey:"ClaimValueTypeField" example:"string"`
+	AppliesTo        string     `json:"appliesTo" exportLabelKey:"ClaimAppliesToField" example:"both"`
+	DefaultValue     *string    `json:"defaultValue" exportLabelKey:"ClaimDefaultValueField" example:"1000"`
+	Description      string     `json:"description" exportLabelKey:"ClaimDescriptionField" example:"Internal cost center this account is billed against, as the ERP knows it."`
+	CreatedAt        time.Time  `json:"createdAt" exportLabelKey:"ClaimCreatedAtField" example:"2026-02-01T09:00:00Z"`
+	UpdatedAt        time.Time  `json:"updatedAt" exportLabelKey:"ClaimUpdatedAtField" example:"2026-02-01T09:00:00Z"`
+	DeletedAt        *time.Time `json:"deletedAt" exportLabelKey:"ClaimDeletedAtField" example:"2026-02-01T09:00:00Z"`
+	TenantWorkspace  string     `json:"tenantWorkspace" exportLabelKey:"ClaimTenantWorkspaceField" example:"acme-comercio"`
+	TenantStatus     string     `json:"tenantStatus" exportLabelKey:"ClaimTenantStatusField" example:"active"`
+	TenantArchivedAt *time.Time `json:"tenantArchivedAt" exportLabelKey:"ClaimTenantArchivedAtField" example:"2026-01-31T12:00:00Z"`
 }
 
 // FromResult projects the application Result onto FindClaimByIDResponse.

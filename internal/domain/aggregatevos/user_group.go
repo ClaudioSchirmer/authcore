@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/user.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:bec3aaf613727e3222de84a4d67818c901537c5d5e84cff02a8de2126b94b499
+// checksum:   sha256:493b793a70648af5dad81c1e3e9bc036aa16960e6c99d2a0000b5e732b842030
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,10 @@
 
 package aggregatevos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
+)
 
 // UserGroup is one entry of User's groups collection.
 //
@@ -46,8 +49,9 @@ type UserGroup struct {
 	// internal/infra. They are ordinary fields of this entry, populated on EVERY
 	// load, and readable by the rules like any other; they are absent from the
 	// TableSchema, so no write can carry them and no migration creates them.
-	GroupKey  string // The group's stable machine handle. Read-only, filled on load — Group.group_key, via the InnerJoin on group_id
-	GroupName string // The group's display name. Read-only, filled on load — Group.name, via the InnerJoin on group_id
+	GroupKey        string     // The group's stable machine handle. Read-only, filled on load — Group.group_key, via the InnerJoin on group_id
+	GroupName       string     // The group's display name. Read-only, filled on load — Group.name, via the InnerJoin on group_id
+	GroupArchivedAt *time.Time // When the group behind this membership was archived, or absent while it is live. Read-only, filled on load, never written through this aggregate — Group.deleted_at, via the InnerJoin on group_id
 }
 
 // CollectionName is the name of the groups collection.

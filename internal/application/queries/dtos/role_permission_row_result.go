@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-01
-// checksum:   sha256:01bda946457de348783fa7bcc6609cad6296b040c65780f7bb061196a7a2f072
+// generated:  2026-09-06
+// checksum:   sha256:84baba7cc576b30071e0be15db20ffb343729de386887e5a007e55eaacfffada
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -27,7 +27,11 @@
 
 package dtos
 
-import "github.com/ClaudioSchirmer/omnicore/domain"
+import (
+	"time"
+
+	"github.com/ClaudioSchirmer/omnicore/domain"
+)
 
 // RolePermissionRowResult is one entry of the permissions collection as the
 // application reads it.
@@ -35,10 +39,11 @@ import "github.com/ClaudioSchirmer/omnicore/domain"
 // Pointers throughout, for the same reason the root is: the listing serves
 // ?fields=, and the sparse-fill contract is enforced recursively.
 type RolePermissionRowResult struct {
-	ID           *string
-	PermissionID *domain.ID
-	Resource     *string
-	Action       *string
+	ID                   *string
+	PermissionID         *domain.ID
+	Resource             *string
+	Action               *string
+	PermissionArchivedAt *time.Time
 	// Permission is COMPUTED per entry: no column backs it, and
 	// FromQueryResult fills it from Resource+Action.
 	Permission *string

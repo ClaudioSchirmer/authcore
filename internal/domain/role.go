@@ -6,7 +6,7 @@
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
 // generated:  2026-09-06
-// checksum:   sha256:c19aef11c8a4a71c90b1dc9e1c5c04405235ea807667430110bd1eeb249802de
+// checksum:   sha256:0bf65165a1b4f3895b9a83a43a927e4f04afb31d1c31fcd4b98fa2552633d8fe
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -32,6 +32,7 @@ import (
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/omnicore/application/notifications"
 	"github.com/ClaudioSchirmer/omnicore/domain"
+	"time"
 )
 
 // A tenant's own bundle of catalog permissions — the unit a user or a group
@@ -61,8 +62,9 @@ type Role struct {
 	// internal/infra. They are ordinary fields of this entity, populated on EVERY
 	// load, and readable by the rules like any other; they are absent from the
 	// TableSchema, so no write can carry them and no migration creates them.
-	TenantWorkspace string // The owning tenant's immutable handle — what URLs, logs and support conversations say. Read-only, filled on every load, never written through this aggregate — Tenant.workspace, via the InnerJoin on tenant_id
-	TenantStatus    string // The owning tenant's commercial lifecycle — trial, active or suspended. Read-only, filled on every load, never written through this aggregate — Tenant.status, via the InnerJoin on tenant_id
+	TenantWorkspace  string     // The owning tenant's immutable handle — what URLs, logs and support conversations say. Read-only, filled on every load, never written through this aggregate — Tenant.workspace, via the InnerJoin on tenant_id
+	TenantStatus     string     // The owning tenant's commercial lifecycle — trial, active or suspended. Read-only, filled on every load, never written through this aggregate — Tenant.status, via the InnerJoin on tenant_id
+	TenantArchivedAt *time.Time // When the owning tenant was archived, or absent while it is live. Read-only, filled on every load, never written through this aggregate — Tenant.deleted_at, via the InnerJoin on tenant_id
 
 	// Fed from the caller's identity by the command mapper and read by the
 	// rules below. Never persisted, so it carries no labelKey and no column.
