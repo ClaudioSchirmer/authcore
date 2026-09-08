@@ -1205,4 +1205,314 @@ skip_ "spec.md §10 records that user:change-password must reach EVERY user or n
 case_ "S7.5b the externalValidator path" "unproven, and named"
 skip_ "auth.externalValidator is configured in no profile, so a locally-valid token is never refused by a second opinion. There is nothing to assert and nothing is claimed"
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#  S8 — §3 of specs/qa/client-contract/plan.md. The Client gate.
+#
+#  §3a (the 401 family), §3b (the public-route split) and the framework's appended surfaces
+#  are INHERITED from the five approved rounds and are not repeated here.
+#
+#  What is new: EIGHT distinct literals over thirteen routes — the widest vocabulary in the
+#  service, three collections each under a verb of its OWN (grant / manage-network /
+#  set-claim: zero overlap, each a different blast radius) plus the hand-written
+#  rotate-secret. And the first MACHINE captors: S8.2's row rule is driven by a token this
+#  service minted for a client, through its own public exchange route.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S8_DEAD="01990000-dead-7000-8000-000000000000"
+
+# ── S8.1 Layer 1 on REST: the negative, over all thirteen routes ──────────────────────────
+s8_denied() { s5_denied "$@"; }
+
+s8_denied "S8.1a principal B on the client LISTING"   GET   "/clients"                                          ""                                       "client:read"
+s8_denied "S8.1b principal B on the by-id read"       GET   "/clients/$S8_DEAD"                                 ""                                       "client:read"
+s8_denied "S8.1c principal B on insert"               POST  "/clients"                                          '{"name":"X","description":"A body principal B must never get to land anywhere.","status":"active"}' "client:insert"
+s8_denied "S8.1d principal B on patch"                PATCH "/clients/$S8_DEAD"                                 '{"description":"A relabel principal B must never get to land."}' "client:update"
+s8_denied "S8.1e principal B on archive"              PATCH "/clients/$S8_DEAD/archive"                         ""                                       "client:archive"
+s8_denied "S8.1f principal B on GRANT A ROLE"         POST  "/clients/$S8_DEAD/roles"                           '{"roleID":"'"$S8_DEAD"'"}'              "client:grant"
+s8_denied "S8.1g principal B on REVOKE A ROLE"        PATCH "/clients/$S8_DEAD/roles/$S8_DEAD/archive"          ""                                       "client:grant"
+s8_denied "S8.1h principal B on ALLOW A RANGE"        POST  "/clients/$S8_DEAD/allowedCIDRs"                    '{"cidr":"203.0.113.0/24","label":"X"}'  "client:manage-network"
+s8_denied "S8.1i principal B on REMOVE A RANGE"       PATCH "/clients/$S8_DEAD/allowedCIDRs/$S8_DEAD/archive"   ""                                       "client:manage-network"
+s8_denied "S8.1j principal B on SET A CLAIM"          POST  "/clients/$S8_DEAD/claims"                          '{"claimID":"'"$S8_DEAD"'","value":"x"}' "client:set-claim"
+s8_denied "S8.1k principal B on CHANGE A CLAIM"       PATCH "/clients/$S8_DEAD/claims/$S8_DEAD"                 '{"value":"x"}'                          "client:set-claim"
+s8_denied "S8.1l principal B on WITHDRAW A CLAIM"     PATCH "/clients/$S8_DEAD/claims/$S8_DEAD/archive"         ""                                       "client:set-claim"
+s8_denied "S8.1m principal B on ROTATE A SECRET"      POST  "/clients/$S8_DEAD/secret"                          '{}'                                     "client:rotate-secret"
+
+case_ "S8.1n THE COUNT: eight distinct literals gate thirteen routes" "client:read/insert/update/archive/grant/manage-network/set-claim/rotate-secret — a route that lost its RequirePermission would answer something other than 403 above, and a collection route that borrowed a neighbour's literal would show up here"
+GATED=$(printf '%s\n' "client:read" "client:read" "client:insert" "client:update" "client:archive" "client:grant" "client:grant" "client:manage-network" "client:manage-network" "client:set-claim" "client:set-claim" "client:set-claim" "client:rotate-secret" | sort -u | wc -l | tr -d ' ')
+if [ "$GATED" = "8" ]; then pass_; else fail_ "distinct literals asserted above = $GATED"; fi
+
+# ── S8.1o-u the complement: a gate that refuses everyone is also broken ───────────────────
+#
+# For the writes the target id addresses nothing ON PURPOSE: reaching the HANDLER — a 404,
+# never a 403 — is what proves the gate opened.
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S8.1o-u — principal K was not built, so the Layer-1 complement is UNPROVEN this run and only the negative half above stands"
+else
+  case_ "S8.1o principal K on the client LISTING" "200 — it holds client:read"
+  api GET "/clients?first=1" "" "$QA_TOKEN_CLIENTOP"
+  assert_status 200
+
+  case_ "S8.1p principal K on insert" "201 — it holds client:insert"
+  new_client "$(client_label s8k)" "" "$QA_TOKEN_CLIENTOP" || true
+  S8_TARGET="$CLIENT_ID"
+  if [ -n "$S8_TARGET" ]; then pass_; else fail_ "K could not create a client"; fi
+
+  case_ "S8.1q principal K on patch" "200 — it holds client:update"
+  if [ -n "${S8_TARGET:-}" ]; then
+    api PATCH "/clients/$S8_TARGET" '{"description":"A relabel by the operator principal, proving the gate opens for the verb it holds."}' "$QA_TOKEN_CLIENTOP"
+    assert_status 200
+  else skip_ "S8.1q — the target could not be created"; fi
+
+  case_ "S8.1r principal K on a role grant" "404 and NOT 403 — the gate opened and the handler was reached; the id addresses nothing on purpose"
+  api POST "/clients/$S8_DEAD/roles" "$(jq -nc --arg r "$S8_DEAD" '{roleID:$r}')" "$QA_TOKEN_CLIENTOP"
+  assert_status_not 403
+
+  case_ "S8.1s principal K on a range add" "404 and NOT 403 — client:manage-network is a literal of its own, and this is what proves K holds it separately from client:grant"
+  api POST "/clients/$S8_DEAD/allowedCIDRs" '{"cidr":"203.0.113.0/24","label":"QA gate probe"}' "$QA_TOKEN_CLIENTOP"
+  assert_status_not 403
+
+  case_ "S8.1t principal K on a claim add" "404 and NOT 403 — the third literal, held separately from the other two"
+  api POST "/clients/$S8_DEAD/claims" "$(jq -nc --arg c "$S8_DEAD" '{claimID:$c, value:"x"}')" "$QA_TOKEN_CLIENTOP"
+  assert_status_not 403
+
+  case_ "S8.1u principal K on THE ROTATION" "200 — it holds client:rotate-secret, and the hand-written route's gate opens exactly like the generated ones'"
+  if [ -n "${S8_TARGET:-}" ]; then
+    rotate_secret "$S8_TARGET" '{}' "$QA_TOKEN_CLIENTOP"
+    assert_status 200
+  else skip_ "S8.1u — the target could not be created"; fi
+fi
+
+# ── S8.1v-y THE SPLIT: principal L, the only caller for which the eight verbs differ ──────
+#
+# L holds client:read and client:update and NONE of the other six. A and B answer identically
+# on all thirteen routes either way; L is what makes the split visible — "may fix a typo in a
+# description" and "may confer privilege" and "may open the credential to the internet" and
+# "may hand out a new production credential" are four different jobs, and §10 of the spec
+# argues each split on its own blast radius.
+
+if [ -z "${QA_TOKEN_CLIENTLIM:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S8.1v-y — principal L was not built, so the eight-way verb split is UNPROVEN this run"
+else
+  new_client "$(client_label s8l)" "$QA_TENANT_SCOPED" || true
+  S8_L_TARGET="$CLIENT_ID"
+
+  if [ -z "${S8_L_TARGET:-}" ]; then
+    skip_ "S8.1v-y — the split's target client could not be created"
+  else
+    case_ "S8.1v principal L MAY relabel" "200 — client:update is the verb it holds, and it must keep working"
+    api PATCH "/clients/$S8_L_TARGET" '{"description":"A relabel by the limited principal, the one verb it is meant to keep."}' "$QA_TOKEN_CLIENTLIM"
+    assert_status 200
+
+    s8l_denied() { # s8l_denied CASE METHOD PATH BODY LITERAL WHY
+      case_ "$1" "403 MissingPermissionNotification, value '$5' — whoever may fix a typo in a description must not be able to $6"
+      api "$2" "$3" "$4" "$QA_TOKEN_CLIENTLIM"
+      local hit
+      hit=$(printf '%s' "$HTTP_BODY" | jq -r --arg v "$5" \
+        '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .field=="permission" and .value==$v)] | length' 2>/dev/null)
+      if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on '$5'"; fi
+    }
+
+    s8l_denied "S8.1w1 principal L on GRANT A ROLE"    POST  "/clients/$S8_L_TARGET/roles" "$(jq -nc --arg r "$S8_DEAD" '{roleID:$r}')" "client:grant" "confer privilege"
+    s8l_denied "S8.1w2 principal L on REVOKE A ROLE"   PATCH "/clients/$S8_L_TARGET/roles/$S8_DEAD/archive" "" "client:grant" "withdraw it either"
+    s8l_denied "S8.1w3 principal L on ALLOW A RANGE"   POST  "/clients/$S8_L_TARGET/allowedCIDRs" '{"cidr":"203.0.113.0/24","label":"QA split probe"}' "client:manage-network" "touch the network boundary"
+    s8l_denied "S8.1w4 principal L on REMOVE A RANGE"  PATCH "/clients/$S8_L_TARGET/allowedCIDRs/$S8_DEAD/archive" "" "client:manage-network" "open the credential to the internet by archiving the last range"
+    s8l_denied "S8.1w5 principal L on SET A CLAIM"     POST  "/clients/$S8_L_TARGET/claims" "$(jq -nc --arg c "$S8_DEAD" '{claimID:$c, value:"x"}')" "client:set-claim" "set a value this service cannot audit the consequences of"
+    s8l_denied "S8.1w6 principal L on CHANGE A CLAIM"  PATCH "/clients/$S8_L_TARGET/claims/$S8_DEAD" '{"value":"x"}' "client:set-claim" "correct one either"
+    s8l_denied "S8.1w7 principal L on WITHDRAW A CLAIM" PATCH "/clients/$S8_L_TARGET/claims/$S8_DEAD/archive" "" "client:set-claim" "withdraw one either"
+    s8l_denied "S8.1x  principal L on ROTATE A SECRET" POST  "/clients/$S8_L_TARGET/secret" '{}' "client:rotate-secret" "hand out a new production credential"
+    s8l_denied "S8.1x2 principal L on INSERT"          POST  "/clients" '{"name":"X","description":"A creation the limited principal must be refused.","status":"active"}' "client:insert" "mint a machine account"
+    s8l_denied "S8.1x3 principal L on ARCHIVE"         PATCH "/clients/$S8_L_TARGET/archive" "" "client:archive" "revoke one"
+
+    case_ "S8.1y client:update DELIBERATELY DOES NOT REACH THE ROTATION" "the relabel passed and the rotation was refused, same principal, same row — an operator who may fix a typo is not thereby an operator who may hand out a new production credential (spec.md §10, the user:reset-password argument applied here)"
+    api PATCH "/clients/$S8_L_TARGET" '{"description":"Still relabelling, still allowed."}' "$QA_TOKEN_CLIENTLIM"; S_REN="$HTTP_STATUS"
+    rotate_secret "$S8_L_TARGET" '{}' "$QA_TOKEN_CLIENTLIM"; S_ROT="$HTTP_STATUS"
+    if [ "$S_REN" = "200" ] && [ "$S_ROT" = "403" ]; then pass_; else HTTP_BODY="relabel=$S_REN rotate=$S_ROT"; fail_ "the two verbs did not separate"; fi
+  fi
+fi
+
+# ── S8.1gql Layer 1 on GRAPHQL. A route gated on REST is not thereby gated here ───────────
+s8_gql_denied() { s5_gql_denied "$@"; }
+
+s8_gql_denied "S8.1gql-a principal B on the clients connection"   "query { clients(first: 1) { totalCount } }" "" "client:read"
+s8_gql_denied "S8.1gql-b principal B on client(id:)"              "query { client(id: \"$S8_DEAD\") { id } }" "" "client:read"
+s8_gql_denied "S8.1gql-c principal B on createClient"             "mutation(\$i: CreateClientInput!) { createClient(input: \$i) { id } }" '{"i":{"name":"X","description":"A body principal B must never get to land anywhere.","status":"active"}}' "client:insert"
+s8_gql_denied "S8.1gql-d principal B on patchClient"              "mutation(\$i: PatchClientInput!) { patchClient(id: \"$S8_DEAD\", input: \$i) { id } }" '{"i":{"description":"A relabel principal B must never get to land."}}' "client:update"
+s8_gql_denied "S8.1gql-e principal B on archiveClient"            "mutation { archiveClient(id: \"$S8_DEAD\") { success } }" "" "client:archive"
+s8_gql_denied "S8.1gql-f principal B on addClientRole"            "mutation(\$i: AddClientRoleInput!) { addClientRole(id: \"$S8_DEAD\", input: \$i) { clientId } }" '{"i":{"roleID":"'"$S8_DEAD"'"}}' "client:grant"
+s8_gql_denied "S8.1gql-g principal B on archiveClientRole"        "mutation(\$i: ArchiveClientRoleInput!) { archiveClientRole(id: \"$S8_DEAD\", input: \$i) { success } }" '{"i":{"clientRoleId":"'"$S8_DEAD"'"}}' "client:grant"
+s8_gql_denied "S8.1gql-h principal B on addClientAllowedCIDR"     "mutation(\$i: AddClientAllowedCIDRInput!) { addClientAllowedCIDR(id: \"$S8_DEAD\", input: \$i) { clientId } }" '{"i":{"cidr":"203.0.113.0/24","label":"X"}}' "client:manage-network"
+s8_gql_denied "S8.1gql-i principal B on archiveClientAllowedCIDR" "mutation(\$i: ArchiveClientAllowedCIDRInput!) { archiveClientAllowedCIDR(id: \"$S8_DEAD\", input: \$i) { success } }" '{"i":{"clientAllowedCIDRId":"'"$S8_DEAD"'"}}' "client:manage-network"
+s8_gql_denied "S8.1gql-j principal B on addClientClaim"           "mutation(\$i: AddClientClaimInput!) { addClientClaim(id: \"$S8_DEAD\", input: \$i) { clientId } }" '{"i":{"claimID":"'"$S8_DEAD"'","value":"x"}}' "client:set-claim"
+s8_gql_denied "S8.1gql-k principal B on patchClientClaim"         "mutation(\$i: PatchClientClaimInput!) { patchClientClaim(id: \"$S8_DEAD\", input: \$i) { clientId } }" '{"i":{"clientClaimId":"'"$S8_DEAD"'","value":"x"}}' "client:set-claim"
+s8_gql_denied "S8.1gql-l principal B on archiveClientClaim"       "mutation(\$i: ArchiveClientClaimInput!) { archiveClientClaim(id: \"$S8_DEAD\", input: \$i) { success } }" '{"i":{"clientClaimId":"'"$S8_DEAD"'"}}' "client:set-claim"
+s8_gql_denied "S8.1gql-m principal B on rotateClientSecret"       "mutation(\$i: RotateClientSecretInput!) { rotateClientSecret(id: \"$S8_DEAD\", input: \$i) { id } }" '{"i":{}}' "client:rotate-secret"
+
+case_ "S8.1gql-n the admin's GraphQL connection is served" "200 with no errors — the per-surface complement"
+gql "query { clients(first: 1) { totalCount edges { node { id } } } }"
+assert_gql_ok '(.data.clients.totalCount >= 0)' "true"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S8.2 — LAYER 2: the identity-derived row rule, driven by a MACHINE token. Two calls that
+#        differ ONLY in whose row was reached. qa/domain.sh C14b proves the rule as a
+#        business decision; here it is proven as the BOUNDARY between one machine and its
+#        sibling's credential.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S8.2 — principal K was not built, so the machine row rule is UNPROVEN this run"
+else
+  S8_ROT_ROLE=$(new_role "$(role_key s8rot)" "$QA_TENANT_SCOPED" \
+    "$(permission_id_of client read)" "$(permission_id_of client rotate-secret)") || S8_ROT_ROLE=""
+  S8_MA_TOK=""; S8_MB_ID=""
+  if [ -n "$S8_ROT_ROLE" ]; then
+    api POST /clients "$(jq -nc --arg n "$(client_label s8ma)" --arg t "$QA_TENANT_SCOPED" --arg r "$S8_ROT_ROLE" \
+      '{name:$n, description:"Machine A of the S8.2 boundary: it holds client:rotate-secret and must still be prisoner of its own row.", status:"active", tenantID:$t, roles:[{roleID:$r}]}')"
+    S8_MA_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+    S8_MA_SECRET=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret // empty')
+    new_client "$(client_label s8mb)" "$QA_TENANT_SCOPED" && S8_MB_ID="$CLIENT_ID"
+    [ -n "$S8_MA_ID" ] && S8_MA_TOK=$(mint_client_token "$S8_MA_ID" "$S8_MA_SECRET")
+  fi
+
+  if [ -z "$S8_MA_TOK" ] || [ -z "$S8_MB_ID" ]; then
+    skip_ "S8.2 — the machine principals could not be provisioned, so the row rule boundary is UNPROVEN this run"
+  else
+    case_ "S8.2a THE ROTATION on the machine's own row" "200 — the caller holds client:rotate-secret AND is the row"
+    rotate_secret "$S8_MA_ID" '{}' "$S8_MA_TOK"
+    assert_status 200
+
+    case_ "S8.2b THE SAME CALL against the sibling's row" "403 ClientMayOnlyRotateItsOwnSecretNotification — identical permission, identical body, different id: a machine that can rotate another machine's secret can lock it out and take its place. The gate on the route says who may attempt the verb; this says whose row they reached"
+    rotate_secret "$S8_MB_ID" '{}' "$S8_MA_TOK"
+    assert_rest 403 ClientMayOnlyRotateItsOwnSecretNotification
+
+    case_ "S8.2c THE ROW RULE IS NOT THE PERMISSION" "the refusal names the row rule alone — a suite using a machine that lacked the permission would have watched Layer 1 fire and called it Layer 2"
+    K_S8=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+    if [ "$K_S8" = "ClientMayOnlyRotateItsOwnSecretNotification" ]; then pass_; else HTTP_BODY="$K_S8"; fail_ "keys = $K_S8"; fi
+
+    case_ "S8.2d the rule STANDS DOWN for a person" "200 — principal K's USER token rotates the sibling: the boundary narrows only when identity_kind positively says client"
+    rotate_secret "$S8_MB_ID" '{}' "$QA_TOKEN_CLIENTOP"
+    assert_status 200
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S8.3 — LAYER 3: tenant scoping. The leak here is a 200, which is why it needs its own case
+#        — a client listing is the customer's INTEGRATION INVENTORY, and each row is a
+#        credential's identity half.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S8.3 — principal K was not built, so Client's row scoping is UNPROVEN this run"
+else
+  S8_FOREIGN_TEN=$(new_tenant active "$(ws s8for)") || true
+  S8_FOREIGN_CLIENT=""
+  if [ -n "${S8_FOREIGN_TEN:-}" ]; then
+    new_client "$(client_label s8for)" "$S8_FOREIGN_TEN" && S8_FOREIGN_CLIENT="$CLIENT_ID"
+  fi
+
+  case_ "S8.3a principal K's listing carries only its OWN tenant's clients" "every row's tenantID is K's own — asserted over the VALUES, not over a count"
+  api GET "/clients?first=100" "" "$QA_TOKEN_CLIENTOP"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S8.3b THE LEAK ITSELF: K reads another tenant's client by id" "404 and NOT 403 — a 403 would confirm the id exists, and a client id is the sub every one of its tokens presents"
+  if [ -n "$S8_FOREIGN_CLIENT" ]; then
+    api GET "/clients/$S8_FOREIGN_CLIENT" "" "$QA_TOKEN_CLIENTOP"
+    assert_status 404
+  else skip_ "S8.3b — the foreign client could not be created"; fi
+
+  case_ "S8.3c THE COMPLEMENT: the admin crosses the same scope" "200 on the very id K was refused — a scope that refuses everyone is also broken"
+  if [ -n "$S8_FOREIGN_CLIENT" ]; then
+    api GET "/clients/$S8_FOREIGN_CLIENT"
+    assert_json_at 200 '.data.id' "$S8_FOREIGN_CLIENT"
+  else skip_ "S8.3c — the foreign client could not be created"; fi
+
+  case_ "S8.3d THE CROSS-TENANT WRITE: K creates a client naming another tenant" "403 TenantMismatchNotification — refused rather than silently overridden, so the caller learns what happened"
+  if [ -n "${S8_FOREIGN_TEN:-}" ]; then
+    api POST /clients "$(client_body "$(client_label s8x)" "$S8_FOREIGN_TEN")" "$QA_TOKEN_CLIENTOP"
+    assert_rest 403 TenantMismatchNotification
+  else skip_ "S8.3d — the foreign tenant could not be created"; fi
+
+  case_ "S8.3e K ARCHIVES a client of another tenant" "refused — the row is not K's to revoke, whichever shape the refusal takes (403 from the rule or 404 from the scope, and never a 204)"
+  if [ -n "$S8_FOREIGN_CLIENT" ]; then
+    api PATCH "/clients/$S8_FOREIGN_CLIENT/archive" "" "$QA_TOKEN_CLIENTOP"
+    if [ "$HTTP_STATUS" = "403" ] || [ "$HTTP_STATUS" = "404" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
+  else skip_ "S8.3e — the foreign client could not be created"; fi
+
+  case_ "S8.3f THE BYPASS ACTS INSIDE ANOTHER TENANT, NEVER ACROSS TWO" "the admin creates a client in the foreign tenant and may then grant it only THAT tenant's roles — the anchor is the CLIENT's tenant, not the caller's"
+  if [ -n "${S8_FOREIGN_TEN:-}" ]; then
+    new_client "$(client_label s8mix)" "$S8_FOREIGN_TEN" || true
+    S8_MIX_ID="$CLIENT_ID"
+    S8_SCOPED_ROLE=$(new_role "$(role_key s8mix)" "$QA_TENANT_SCOPED" "$(permission_id_of tenant read)") || true
+    if [ -n "${S8_MIX_ID:-}" ] && [ -n "${S8_SCOPED_ROLE:-}" ]; then
+      api POST "/clients/$S8_MIX_ID/roles" "$(jq -nc --arg r "$S8_SCOPED_ROLE" '{roleID:$r}')"
+      assert_rest 422 RoleNotAvailableInTenantNotification
+    else skip_ "S8.3f — the mixed-tenant fixtures could not be provisioned"; fi
+  else skip_ "S8.3f — the foreign tenant could not be created"; fi
+
+  case_ "S8.3g the scope holds on GRAPHQL too" "every node carries K's own tenantID — ToCriteria is shared, but a surface that skipped it would look exactly like a passing REST case"
+  gql "query { clients(first: 100) { edges { node { tenantID } } } }" "" "$QA_TOKEN_CLIENTOP"
+  assert_gql_ok '[.data.clients.edges[].node.tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S8.3h the admin's GraphQL connection is NOT narrowed" "more than one distinct tenant — the bypass reaches this surface as well"
+  gql "query { clients(first: 100) { edges { node { tenantID } } } }"
+  assert_gql_ok '([.data.clients.edges[].node.tenantID] | unique | length) > 1' "true"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S8.4 — field-level read authz: NONE, and the posture is asserted rather than skipped.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "S8.4a no ReadCriteria.Restrict on Client — the credential is unreachable for EVERYONE" "the oracle requests answer 400 for the ADMIN too: both hash columns and the rules-only tenantStatus are off every surface for every caller by construction, which is STRONGER than restricting them — a restricted field is present for somebody"
+S8_ORACLE_FAIL=""
+for q in "secretHash.eq=9f86" "previousSecretHash.startswith=9f" "orderBy=secretHash" "fields=secretHash" "fields=previousSecretHash" "fields=secret" "tenantStatus.eq=active" "fields=tenantStatus"; do
+  api GET "/clients?$q"
+  [ "$HTTP_STATUS" = "400" ] || S8_ORACLE_FAIL="$S8_ORACLE_FAIL $q→$HTTP_STATUS"
+done
+if [ -z "$S8_ORACLE_FAIL" ]; then pass_; else HTTP_BODY="$S8_ORACLE_FAIL"; fail_ "an oracle request did not answer 400 for the admin"; fi
+
+case_ "S8.4b there is therefore no FieldAccessForbiddenNotification to assert" "recorded as a DECISION and not a gap"
+skip_ "spec.md §9 declares no ReadCriteria.Restrict for Client: the hashes are off the wire because no Response DTO declares them (and RedactedField keeps them out of the framework's own copies — qa/audit.sh A69+ proves that half), and tenantStatus is hidden at the join. S8.4a proves the boundary holds for the most privileged principal in the service"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S8.5 — the MINT GATE gives one generic answer, whatever failed. The route is public by
+#        design, so its refusals must confirm nothing — not which half of the credential was
+#        wrong, not whether the address was the problem, not whether the client is suspended.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S8_MINT_TEN=$(new_tenant active "$(ws s8mnt)") || true
+if [ -z "${S8_MINT_TEN:-}" ]; then
+  skip_ "S8.5 — the mint-gate tenant could not be provisioned"
+else
+  new_client "$(client_label s8mint)" "$S8_MINT_TEN" || true
+  S8_MINT_ID="$CLIENT_ID"; S8_MINT_SECRET="$CLIENT_SECRET"
+  if [ -z "${S8_MINT_ID:-}" ]; then
+    skip_ "S8.5 — the mint-gate client could not be provisioned"
+  else
+    case_ "S8.5a a WRONG secret and a SUSPENDED client answer IDENTICALLY" "the same 401 and the same notification keys — an attacker probing the mint route learns nothing about WHICH check refused them"
+    api POST /auth/client/token "$(jq -nc --arg i "$S8_MINT_ID" '{clientId:$i, clientSecret:"acs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}')" -
+    S_WRONG="$HTTP_STATUS"; K_WRONG=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")' 2>/dev/null)
+    api PATCH "/clients/$S8_MINT_ID" '{"status":"suspended"}'
+    api POST /auth/client/token "$(jq -nc --arg i "$S8_MINT_ID" --arg s "$S8_MINT_SECRET" '{clientId:$i, clientSecret:$s}')" -
+    S_SUSP="$HTTP_STATUS"; K_SUSP=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")' 2>/dev/null)
+    if [ "$S_WRONG" = "401" ] && [ "$S_SUSP" = "401" ] && [ "$K_WRONG" = "$K_SUSP" ]; then pass_; else HTTP_BODY="wrong-secret=$S_WRONG[$K_WRONG] suspended=$S_SUSP[$K_SUSP]"; fail_ "the two refusals are distinguishable"; fi
+
+    case_ "S8.5b an UNKNOWN client id answers the same way" "the same pair again — the mint route is not an existence oracle over client ids either"
+    api POST /auth/client/token "$(jq -nc '{clientId:"01990000-dead-7000-8000-000000000000", clientSecret:"acs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}')" -
+    S_GHOST="$HTTP_STATUS"; K_GHOST=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")' 2>/dev/null)
+    if [ "$S_GHOST" = "401" ] && [ "$K_GHOST" = "$K_WRONG" ]; then pass_; else HTTP_BODY="ghost=$S_GHOST[$K_GHOST] vs wrong-secret=[$K_WRONG]"; fail_ "an unknown id is distinguishable from a wrong secret"; fi
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S8.6 — what this round leaves UNPROVEN, printed rather than only written in the plan.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "S8.6a the trusted-proxy half of the allow-list" "unproven, and named"
+skip_ "No profile configures a trusted proxy, so the mint judges the SOCKET address — which is what made C-MINT provable from localhost. Whether a spoofed X-Forwarded-For could walk through a REAL deployment behind a load balancer is /omnicore:configure territory (spec.md §F prerequisite 1), and until it is configured the allow-list constrains local semantics only. Prerequisite 2 stands with it: the list constrains where a token is OBTAINED, never where it is USED"
+
+case_ "S8.6b the client token's own contract" "unproven here, and deferred by decision"
+skip_ "The claim vocabulary (identity_kind, name, permissions, x_* values reaching the token), the deliberate absence of a lockout on this route, and the absent /refresh companion belong to the token route's own round (plan §0b, maintainer 2026-09-08: exercised, not owned). C-SEC1 proves the one bit this round cannot avoid: a minted secret signs in and its token says client"
+
 qa_finish
