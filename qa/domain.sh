@@ -757,7 +757,12 @@ assert_json_at 200 '.data.tenantID' "$RL_TEN"
 case_ "RL7- the immutability notification is UNREACHABLE from the wire" "recorded, and deliberately not asserted"
 skip_ "RoleTenantIsImmutableNotification is declared and enforced in BuildRules, and no mounted request can provoke it: PatchRoleRequest carries key, name and description alone, on REST and on GraphQL both, so the declarative rule is a belt-and-braces layer behind a structural cut. The suite asserts the EFFECT above and does not assert a notification no request can reach"
 
-# ── RL8 — the 200-permission cap, in the cheap form approved at the gate ──────────────────
+# ── RL8 — the 250-permission cap, in the cheap form approved at the gate ──────────────────
+#
+# RAISED FROM 200 TO 250 on 2026-09-08 (specs/implement/role-permission-cap-250/plan.md). The
+# figures below moved with it: the over-cap fixture is 251 ids rather than 201, and the
+# envelope's echoed value moves with the fixture because it is the COUNT SENT, never the limit.
+# What proves the limit ITSELF moved is the interpolated message, asserted in RL8-3.
 
 case_ "RL8+ a role carrying the whole LIVE catalog, minus every wildcard row" "201 — the cap admits an ordinary bundle without argument"
 api GET "/permissions?first=100"
@@ -770,14 +775,17 @@ assert_status 201
 case_ "RL8+ and it really carried them all" "$RL_N entries — the fixture excludes every row whose rendered token contains a '*', not only the seeded *:*, because no-wildcard-grant refuses a wildcard in EITHER half"
 assert_json '.data.permissions | length' "$RL_N"
 
-RL_201=$(for i in $(seq 1 201); do printf '00000000-0000-4000-8000-%012d\n' "$i"; done | jq -R . | jq -sc 'map({permissionID: .})')
-case_ "RL8- an insert carrying 201 distinct ids" "422 with TooManyPermissionsInRoleNotification PRESENT in the envelope — 201 PermissionNotInCatalogNotification keys ride with it, because the invented ids are in no catalog, so the assertion reads the WHOLE envelope and never only the first message"
-api POST /roles "$(jq -nc --arg k "$(role_key rl8x)" --arg d "$RL_D" --arg t "$RL_TEN" --argjson p "$RL_201" \
+RL_251=$(for i in $(seq 1 251); do printf '00000000-0000-4000-8000-%012d\n' "$i"; done | jq -R . | jq -sc 'map({permissionID: .})')
+case_ "RL8- an insert carrying 251 distinct ids" "422 with TooManyPermissionsInRoleNotification PRESENT in the envelope — 251 PermissionNotInCatalogNotification keys ride with it, because the invented ids are in no catalog, so the assertion reads the WHOLE envelope and never only the first message"
+api POST /roles "$(jq -nc --arg k "$(role_key rl8x)" --arg d "$RL_D" --arg t "$RL_TEN" --argjson p "$RL_251" \
   '{key:$k, name:"QA Over Cap Role", description:$d, tenantID:$t, permissions:$p}')"
 assert_rest 422 TooManyPermissionsInRoleNotification
 
-case_ "RL8- the cap notification hands back the limit itself" "200 — the cap is sized to this platform rather than to GCP's 3000 or Azure's 2000"
-assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyPermissionsInRoleNotification") | .value] | join(",")' "201"
+case_ "RL8- the echoed value is the COUNT SENT" "251 — the rule exposes len(items), so this number follows the request and would not have moved when the cap did. CORRECTED 2026-09-08: this case used to be titled 'hands back the limit itself', which is what RL8-3 actually asserts"
+assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyPermissionsInRoleNotification") | .value] | join(",")' "251"
+
+case_ "RL8-3 the LIMIT rides in the interpolated message" "250 — the catalogs interpolate {max}, so this is the only place the cap's own number reaches a caller, and the only assertion here that would have failed before it was raised"
+assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyPermissionsInRoleNotification") | .message] | join(" ") | test("250") | tostring' "true"
 
 # ── RL9 / RL10 — the three grant rules judge what a write ADDS, never what is stored ──────
 
@@ -1280,6 +1288,84 @@ if gr12_chain c; then
   assert_rest 403 MissingPermissionNotification
 else
   skip_ "GR12c — the role-archive revocation chain could not be provisioned, so the third of the three switches is UNPROVEN this run"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GR14 — ONE PERMISSION, ONE ENTRY, whichever path reached it.
+#
+#   "usar uma coleção set ou algo do tipo para NUNCA duplicar. Uma permission deve sair uma
+#    vez só na coleção do jwt, seja de client ou de user."
+#   source: asked 2026-09-08 — specs/implement/role-permission-cap-250/plan.md, D2
+#
+# THE ONE ARRANGEMENT THAT CAN PRODUCE A REPEAT, and no other case in this suite builds it: a
+# principal reaching the SAME catalog row twice, once through a role held directly and once
+# through a role conferred by a group. The walk returns two rows; the claim must carry one
+# entry. internal/infra/permission_set_manual.go is what collapses them, and it is the same
+# collector the client path uses — which is why proving it here proves it for both.
+#
+# The collapse held before that file existed, in two hand-copied implementations. What was
+# missing was any assertion at all on the WIRE: the suite reads the permissions claim in a
+# dozen places and had never asked whether anything in it appears twice.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+GR14_EMAIL="qa-permset-${QA_RUN_ID}@authcore.local"
+GR14_P1='Qa!PermSet2026'
+GR14_P2='Qa!PermSet2026b'
+GR14_TOKEN=""
+
+# TWO roles conferring the SAME permission. Nothing about them differs except how the user
+# reaches them, which is the whole point of the fixture.
+#
+# The keys are CAPTURED rather than re-derived: role_key is a sequence generator, so calling
+# it a second time answers a different key and GR14.1 would assert against a role that was
+# never created.
+GR14_KD=$(role_key g14d)
+GR14_KG=$(role_key g14g)
+GR14_DIRECT=$(new_role "$GR14_KD" "$GR_TEN" "$GR_P_TENANT_READ") || GR14_DIRECT=""
+GR14_VIA_GROUP=$(new_role "$GR14_KG" "$GR_TEN" "$GR_P_TENANT_READ") || GR14_VIA_GROUP=""
+if [ -n "$GR14_DIRECT" ] && [ -n "$GR14_VIA_GROUP" ]; then
+  GR14_GROUP=$(new_group "$(group_key g14)" "$GR_TEN" "$GR14_VIA_GROUP") || GR14_GROUP=""
+fi
+
+if [ -n "${GR14_GROUP:-}" ]; then
+  api POST /users "$(jq -nc --arg e "$GR14_EMAIL" --arg p "$GR14_P1" --arg g "$GR14_GROUP" \
+    --arg r "$GR14_DIRECT" --arg t "$GR_TEN" \
+    '{givenName:"Qa", familyName:"PermissionSet", email:$e, status:"active", tenantID:$t,
+      password:$p, passwordConfirmation:$p, groups:[{groupID:$g}], roles:[{roleID:$r}]}')"
+  GR14_USER=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+  if [ -n "$GR14_USER" ]; then
+    GR14_BOOT=$(qa_login "$GR14_EMAIL" "$GR14_P1")
+    api PATCH "/users/$GR14_USER/password" \
+      "$(jq -nc --arg cp "$GR14_P1" --arg np "$GR14_P2" \
+        '{currentPassword:$cp, password:$np, passwordConfirmation:$np}')" "$GR14_BOOT"
+    GR14_TOKEN=$(qa_login "$GR14_EMAIL" "$GR14_P2")
+  fi
+fi
+
+if [ -z "$GR14_TOKEN" ]; then
+  skip_ "GR14 — the two-path fixture could not be provisioned, so the no-duplicate guarantee is UNPROVEN this run"
+else
+  case_ "GR14.1 the user really does reach the permission BOTH ways" "one direct role and one inherited role, both conferring tenant:read — without this the assertion below would pass on a principal that never had a duplicate to collapse"
+  GR14_ROLES=$(jwt_claim "$GR14_TOKEN" roles | jq -c 'sort' 2>/dev/null)
+  GR14_WANT=$(jq -nc --arg a "$GR14_KD" --arg b "$GR14_KG" '[$a,$b] | sort')
+  if [ "$GR14_ROLES" = "$GR14_WANT" ]; then pass_; else HTTP_BODY="$GR14_ROLES"; fail_ "roles claim = $GR14_ROLES, want $GR14_WANT"; fi
+
+  case_ "GR14.2 and tenant:read appears EXACTLY ONCE" "1 — two rows reached the walk, one entry left it"
+  GR14_N=$(jwt_claim "$GR14_TOKEN" permissions | jq '[.[] | select(. == "tenant:read")] | length' 2>/dev/null)
+  if [ "$GR14_N" = "1" ]; then pass_; else HTTP_BODY="$(jwt_claim "$GR14_TOKEN" permissions)"; fail_ "tenant:read occurrences = $GR14_N"; fi
+
+  case_ "GR14.3 no entry in the WHOLE claim repeats" "the claim equals its own unique set — asserted over everything the token carries rather than over the one pair the fixture aimed at, so a duplicate arriving by some other path is caught here too"
+  GR14_DUP=$(jwt_claim "$GR14_TOKEN" permissions | jq -r '(length) == (unique | length) | tostring' 2>/dev/null)
+  if [ "$GR14_DUP" = "true" ]; then pass_; else HTTP_BODY="$(jwt_claim "$GR14_TOKEN" permissions)"; fail_ "the claim carries a repeat: $(jwt_claim "$GR14_TOKEN" permissions)"; fi
+
+  case_ "GR14.4 the RESPONSE BODY carries no repeat either" "the body and the token read the same resolution, so a collapse that held in one and not the other would be a client offering an action twice"
+  api POST /auth/user/token "$(jq -nc --arg e "$GR14_EMAIL" --arg p "$GR14_P2" '{email:$e, password:$p}')" "-"
+  assert_json '(.data.user.permissions // .data.permissions) | (length) == (unique | length) | tostring' "true"
+
+  case_ "GR14.5 the collapse did not COST the permission" "200 on the route tenant:read gates — a set that dropped both copies would satisfy every assertion above and authorize nothing"
+  api GET "/tenants?first=1" "" "$GR14_TOKEN"
+  assert_status 200
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════════════════

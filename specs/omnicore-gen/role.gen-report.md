@@ -251,20 +251,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the add command for one role_permissions entry | `internal/application/commands/add_role_permission_command.go` |
-| tests for add_role_permission_command.go | `internal/application/commands/add_role_permission_command_test.go` |
-| the archive command and result | `internal/application/commands/archive_role_command.go` |
-| tests for archive_role_command.go | `internal/application/commands/archive_role_command_test.go` |
-| the archive command for one role_permissions entry | `internal/application/commands/archive_role_permission_command.go` |
-| tests for archive_role_permission_command.go | `internal/application/commands/archive_role_permission_command_test.go` |
-| the insert command and result | `internal/application/commands/insert_role_command.go` |
-| tests for insert_role_command.go | `internal/application/commands/insert_role_command_test.go` |
-| the patch command and result | `internal/application/commands/patch_role_command.go` |
-| the by-id query and its result | `internal/application/queries/find_role_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_roles_by_params_query.go` |
-| the read tests for find_roles_by_params_query.go | `internal/application/queries/find_roles_by_params_query_test.go` |
 | the Role aggregate root, its modes and its rules | `internal/domain/role.go` |
-| tests for Role's rules | `internal/domain/role_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -274,7 +261,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0003_role_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0003_role_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+47 file(s) were already up to date.
 
 ## What was NOT generated
 

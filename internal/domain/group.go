@@ -5,8 +5,8 @@
 // entity:     Group
 // spec:       specs/omnicore-gen/group.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-07
-// checksum:   sha256:41053258e75840e588cf2c79625e8c0c3d74fc0279f59025486ffdf46be5a522
+// generated:  2026-09-08
+// checksum:   sha256:bff8a2da0200e692d14c4cacd234f5f6e591dfeed3192bc3dd6ffaa2fff4c649
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -152,7 +152,7 @@ func (e *Group) BuildRules(actionName string, service domain.Service, r *domain.
 		// At most 50 roles in one group. Sized to this platform, and it
 		// doubles as a claim-size budget — a member inherits every
 		// permission of every role in the bundle, so this cap multiplies
-		// against Role's own 200.
+		// against Role's own 250.
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.GroupRole](e.GetAggregateRoot())
 			if len(items) > 50 {

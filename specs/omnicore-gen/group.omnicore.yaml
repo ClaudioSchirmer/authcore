@@ -650,7 +650,7 @@ rules:
       description: >-
         At most 50 roles in one group. Sized to this platform, and it doubles as a
         claim-size budget — a member inherits every permission of every role in the bundle,
-        so this cap multiplies against Role's own 200.
+        so this cap multiplies against Role's own 250.
 
     - id: duplicate-attachment
       kind: childDuplicate

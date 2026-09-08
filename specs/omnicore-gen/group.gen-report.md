@@ -32,7 +32,7 @@ This file already exists and is YOURS — the generator did not open it and cann
 
 **`no-wildcard-role-attach`**
 
-> A role granting a permission with a wildcard in either part cannot be attached to any group. Runs AFTER the availability rule and BEFORE the escalation rule, and both halves of that order are load-bearing — see the block comment above. Over the ADDED entries only; ask RoleGrantsWildcard per entry, which answers TRUE for an unresolvable role id so an unknown id never falls through to the escalation question. What it costs, stated plainly: the platform's own superadmin group cannot be created through this API, and is seeded by migration beside the reserved platform tenant and the *:* role.
+> A role granting a permission with a wildcard in either part cannot be attached to any group. Runs AFTER the availability rule and BEFORE the escalation rule, and both halves of that order are load-bearing — see the block comment above. Over the ADDED entries only; ask RoleGrantsWildcard per entry, which answers TRUE for an unresolvable role id so an unknown id never falls through to the escalation question. What it costs, stated plainly: no superadmin group can be created through this API at all. CORRECTED 2026-09-07 — this used to add "and is seeded by migration beside the reserved platform tenant"; no such group is seeded. The platform operator holds *:* through user_roles and the master role, so the cost is total rather than worked around.
 
 - fires under `IfInsertOrUpdate` · raise `CannotGrantWildcardRoleNotification{}` · attach it to `Roles`
 
@@ -231,20 +231,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 
 | What | File |
 |---|---|
-| the add command for one group_roles entry | `internal/application/commands/add_group_role_command.go` |
-| tests for add_group_role_command.go | `internal/application/commands/add_group_role_command_test.go` |
-| the archive command and result | `internal/application/commands/archive_group_command.go` |
-| tests for archive_group_command.go | `internal/application/commands/archive_group_command_test.go` |
-| the archive command for one group_roles entry | `internal/application/commands/archive_group_role_command.go` |
-| tests for archive_group_role_command.go | `internal/application/commands/archive_group_role_command_test.go` |
-| the insert command and result | `internal/application/commands/insert_group_command.go` |
-| tests for insert_group_command.go | `internal/application/commands/insert_group_command_test.go` |
-| the patch command and result | `internal/application/commands/patch_group_command.go` |
-| the by-id query and its result | `internal/application/queries/find_group_by_id_query.go` |
-| the listing query and its result | `internal/application/queries/find_groups_by_params_query.go` |
-| the read tests for find_groups_by_params_query.go | `internal/application/queries/find_groups_by_params_query_test.go` |
 | the Group aggregate root, its modes and its rules | `internal/domain/group.go` |
-| tests for Group's rules | `internal/domain/group_test.go` |
 
 **Left untouched** (yours, by design):
 
@@ -253,7 +240,7 @@ Surfaces enabled: **REST · GraphQL**. The three are independent, and every endp
 - `migrations/postgres/0004_group_manual.down.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 - `migrations/postgres/0004_group_manual.up.sql` — created once and never rewritten — a migration that ran cannot be taken back by editing it
 
-34 file(s) were already up to date.
+47 file(s) were already up to date.
 
 ## What was NOT generated
 

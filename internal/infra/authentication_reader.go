@@ -38,7 +38,6 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/ClaudioSchirmer/authcore/internal/domain/vos"
 	"github.com/ClaudioSchirmer/authcore/internal/infra/schemas"
@@ -320,34 +319,16 @@ func assemble(
 	var (
 		roles      = map[string]NamedGrant{}
 		groups     = map[string]NamedGrant{}
-		perms      []vos.PermissionKey
-		seenPerm   = map[string]struct{}{}
-		addPerm    func(res, act *string, grantArch, permArch *time.Time)
+		perms      permissionSet
 		claimValue = make(map[domain.ID]string, len(values))
 	)
-	addPerm = func(res, act *string, grantArch, permArch *time.Time) {
-		switch {
-		case res == nil || act == nil: // the role confers nothing
-			return
-		case grantArch != nil: // the grant was revoked
-			return
-		case permArch != nil: // the catalog entry was retired
-			return
-		}
-		key := *res + ":" + *act
-		if _, dup := seenPerm[key]; dup {
-			return
-		}
-		seenPerm[key] = struct{}{}
-		perms = append(perms, vos.PermissionKey{Resource: *res, Action: *act})
-	}
 
 	for _, row := range direct {
 		if row.RoleArchivedAt != nil { // a retired role confers nothing and is not held
 			continue
 		}
 		roles[row.RoleKey] = NamedGrant{Key: row.RoleKey, Name: row.RoleName}
-		addPerm(row.Resource, row.Action, row.GrantArchivedAt, row.PermissionArchivedAt)
+		perms.add(row.Resource, row.Action, row.GrantArchivedAt, row.PermissionArchivedAt)
 	}
 
 	for _, row := range inherited {
@@ -362,27 +343,17 @@ func assemble(
 			continue
 		}
 		roles[*row.RoleKey] = NamedGrant{Key: *row.RoleKey, Name: derefName(row.RoleName)}
-		addPerm(row.Resource, row.Action, row.GrantArchivedAt, row.PermissionArchivedAt)
+		perms.add(row.Resource, row.Action, row.GrantArchivedAt, row.PermissionArchivedAt)
 	}
 
 	for _, row := range values {
 		claimValue[row.ClaimID] = row.Value
 	}
 
-	// Stable order, so two tokens minted from the same grants are byte-identical in
-	// these claims — which is what makes a diff between two tokens readable when
-	// somebody is working out why a permission disappeared.
-	sort.Slice(perms, func(i, j int) bool {
-		a, b := perms[i], perms[j]
-		if a.Resource != b.Resource {
-			return a.Resource < b.Resource
-		}
-		return a.Action < b.Action
-	})
 	return SignInBundle{
 		Groups:      sortedGrants(groups),
 		Roles:       sortedGrants(roles),
-		Permissions: perms,
+		Permissions: perms.sorted(),
 		ClaimValues: claimValue,
 		Definitions: definitions,
 	}

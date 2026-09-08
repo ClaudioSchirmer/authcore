@@ -160,19 +160,19 @@ func uuidForIndex(i int) string {
 }
 
 func TestARoleAtTheCapIsAccepted(t *testing.T) {
-	e := roleWithGrants(200)
+	e := roleWithGrants(250)
 
 	if _, err := domain.GetInsertable(e, &probingRoleService{}, "GetInsertable"); err != nil {
-		t.Fatalf("a role holding exactly 200 permissions was refused: %v", roleRejectedFields(err))
+		t.Fatalf("a role holding exactly 250 permissions was refused: %v", roleRejectedFields(err))
 	}
 }
 
 func TestARoleOnePastTheCapIsRefused(t *testing.T) {
-	e := roleWithGrants(201)
+	e := roleWithGrants(251)
 
 	_, err := domain.GetInsertable(e, &probingRoleService{}, "GetInsertable")
 	if err == nil {
-		t.Fatal("a role holding 201 permissions was accepted — the cap does not bind")
+		t.Fatal("a role holding 251 permissions was accepted — the cap does not bind")
 	}
 	if !roleBlames(err, "Permissions") {
 		t.Errorf("the refusal blamed %v, want Permissions", roleRejectedFields(err))
