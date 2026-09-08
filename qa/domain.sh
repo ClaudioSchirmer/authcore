@@ -867,4 +867,419 @@ case_ "RL11h and the reach is GONE" "403 — the same call that answered 200 bef
 api GET "/tenants?first=1" "" "$RL11_TOKEN2"
 assert_rest 403 MissingPermissionNotification
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GR1-GR13 — Group. specs/qa/group-contract/plan.md §1b.
+#
+# The rows the framework never had an opinion about. What makes this entity's set different
+# from Role's, one level down:
+#   · G6 asks a THIRD question — same tenant (GR3), which is a cross-tenant leak wearing the
+#     clothes of ordinary group editing;
+#   · G10a is TRANSITIVE (GR5) — a SET of permissions, not one key;
+#   · and the power itself is transitive (GR12), so archiving a group de-authorizes a whole
+#     team at once. That is the family this round exists for.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+GR_TEN=$(new_tenant active "$(ws grten)")   || exit 1
+GR_TEN_B=$(new_tenant active "$(ws grtenb)") || exit 1
+GR_P_TENANT_READ=$(permission_id_of tenant read)
+GR_P_GROUP_READ=$(permission_id_of group read)
+GR_P_ROLE_READ=$(permission_id_of role read)
+GR_P_PERM_ARCHIVE=$(permission_id_of permission archive)
+GR_D="A group description long enough to satisfy the shared anti-junk floor this service applies."
+
+GR_R1=$(new_role "$(role_key gr1)" "$GR_TEN" "$GR_P_TENANT_READ") || exit 1
+GR_R2=$(new_role "$(role_key gr2)" "$GR_TEN" "$GR_P_GROUP_READ")  || exit 1
+GR_RB=$(new_role "$(role_key grb)" "$GR_TEN_B" "$GR_P_TENANT_READ") || exit 1
+
+# ── GR1 / GR2 / GR3 — the three questions G6 asks, and the ONE message it answers with ────
+
+GR_G1=$(new_group "$(group_key gr1)" "$GR_TEN") || exit 1
+
+case_ "GR1+ a live role of the group's own tenant can be attached" "201 — the positive half, without which every refusal below could pass for a rule that refuses everything"
+api POST "/groups/$GR_G1/roles" "$(jq -nc --arg r "$GR_R1" '{roleID:$r}')"
+assert_status 201
+
+case_ "GR1- a role id no row carries" "422 RoleNotAvailableInTenantNotification on field roles"
+api POST "/groups/$GR_G1/roles" '{"roleID":"00000000-0000-7000-8000-0000000000aa"}'
+assert_rest_field 422 RoleNotAvailableInTenantNotification roles
+
+GR_RDEAD=$(new_role "$(role_key grdead)" "$GR_TEN" "$GR_P_TENANT_READ") || exit 1
+api PATCH "/roles/$GR_RDEAD/archive"
+case_ "GR2- a role that exists but was ARCHIVED" "422, the SAME key — this is the whole reason the entry stores the id and not the handle: a retired-and-recreated role must need an explicit re-attach"
+api POST "/groups/$GR_G1/roles" "$(jq -nc --arg r "$GR_RDEAD" '{roleID:$r}')"
+assert_rest_field 422 RoleNotAvailableInTenantNotification roles
+
+case_ "GR3- a LIVE, ACTIVE role that belongs to ANOTHER TENANT" "422, the SAME key again — the first thing in this entity Role did not need. Permission is a global catalog; Role is tenant-scoped, so a group in tenant A attaching tenant B's role would confer another customer's permissions on A's members"
+api POST "/groups/$GR_G1/roles" "$(jq -nc --arg r "$GR_RB" '{roleID:$r}')"
+assert_rest_field 422 RoleNotAvailableInTenantNotification roles
+
+case_ "GR3-b the three questions collapse into ONE message, deliberately" "one distinct notificationKey across GR1-, GR2- and GR3- — a separate 'that role belongs to another tenant' reply would confirm to a caller in tenant A that a specific UUID is a live role in some OTHER tenant: an existence oracle over a competitor's org chart"
+assert_json '[.errors[].messages[].notificationKey] | unique | join(",")' "RoleNotAvailableInTenantNotification"
+
+# ── GR4 — the wildcard interlock, and NOBODY is exempt ────────────────────────────────────
+#
+# The group has to live in the MASTER tenant for this case to reach the rule it is about:
+# the availability rule runs FIRST, so a group in the lane's tenant attaching the master role
+# would answer 422 (another tenant) and never reach the wildcard refusal at all. Nothing is
+# archived here — the master tenant and the master role are only READ.
+GR_GM=$(new_group "$(group_key grm)" "$QA_MASTER_TENANT_ID") || exit 1
+
+case_ "GR4- the *:* SUPER-ADMIN attaches the seeded master role" "403 CannotGrantWildcardRoleNotification on field roles. The strongest possible negative: if anyone were exempt it would be them"
+api POST "/groups/$GR_GM/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{roleID:$r}')"
+assert_rest_field 403 CannotGrantWildcardRoleNotification roles
+
+case_ "GR4b the wildcard rule runs BEFORE the escalation rule" "403, NEVER 500 — Identity.HasPermission PANICS on any argument containing '*', so the wildcard refusal is what removes the input that would crash the request, on exactly the case the pair exists to stop. A plain status comparison: a 500 body is not JSON"
+if [ "$HTTP_STATUS" = "403" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
+
+case_ "GR4c no wildcard-bearing group exists by any other path either" "0 groups in the master tenant carry the *:* role — the platform operator holds it through user_roles, never through a group (plan §0c finding 4)"
+GOT=$(sql "SELECT count(*) FROM group_roles WHERE role_id = '$QA_MASTER_ROLE_ID' AND archived_at IS NULL;" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else fail_ "group_roles rows conferring the wildcard role = '$GOT'"; fi
+
+# ── GR5 — TRANSITIVE no-escalation: a SET, not one key ────────────────────────────────────
+
+if [ -z "${QA_TOKEN_GROUP:-}" ]; then
+  case_ "GR5 the transitive escalation rule" "principal G, which holds group:grant and NOT permission:archive"
+  skip_ "principal G was not built by qa/run.sh — the whole GR5/GR6 block needs an authenticated, non-superadmin caller bound to a tenant of the suite's own, and inventing one is not available to this suite"
+else
+  # Both target roles are created by the ADMIN, not by G: Role's own escalation rule would
+  # refuse G the creation of a role granting permission:archive (role-contract RL2), and the
+  # question this row asks is whether G may ATTACH it.
+  GR_R_OK=$(new_role "$(role_key grok)" "$QA_TENANT_SCOPED" "$GR_P_TENANT_READ" "$GR_P_GROUP_READ") || exit 1
+  GR_R_ESC=$(new_role "$(role_key gresc)" "$QA_TENANT_SCOPED" "$GR_P_TENANT_READ" "$GR_P_GROUP_READ" "$GR_P_PERM_ARCHIVE") || exit 1
+
+  case_ "GR5+ principal G creates a group in its OWN tenant, omitting tenantID entirely" "201 — absent means 'mine', which is what assignedFrom: identity-claim with bypassMaySet buys an ordinary caller"
+  api POST /groups "$(jq -nc --arg k "$(group_key gresc)" --arg d "$GR_D" '{key:$k, name:"QA Escalation Group", description:$d, roles:[]}')" "$QA_TOKEN_GROUP"
+  assert_status 201
+  GR_GE=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+  case_ "GR5+b G attaches a role granting ONLY permissions it holds" "201 — tenant:read and group:read are both in G's own bundle"
+  api POST "/groups/$GR_GE/roles" "$(jq -nc --arg r "$GR_R_OK" '{roleID:$r}')" "$QA_TOKEN_GROUP"
+  assert_status 201
+
+  case_ "GR5- G attaches a role granting ONE permission it lacks" "403 CannotGrantRoleWithUnheldPermissionsNotification on field roles. THE SET IS THE POINT: this role grants three permissions, two of which G holds — a rule asking 'any' instead of 'every' would let it straight through"
+  api POST "/groups/$GR_GE/roles" "$(jq -nc --arg r "$GR_R_ESC" '{roleID:$r}')" "$QA_TOKEN_GROUP"
+  assert_rest_field 403 CannotGrantRoleWithUnheldPermissionsNotification roles
+
+  case_ "GR5-b the value names the role that was refused" "the role id, so a caller can tell WHICH attachment in a batch was the problem"
+  assert_json '[.errors[].messages[] | select(.notificationKey=="CannotGrantRoleWithUnheldPermissionsNotification") | .value] | join(",")' "$GR_R_ESC"
+
+  case_ "GR5b THE COMPLEMENT: the admin attaches that same role" "201 — the *:* exemption is FREE rather than special-cased: HasPermission answers true for any CONCRETE permission when the claim set holds *:*. Without this the rule could pass for a service that refuses EVERY attach"
+  api POST "/groups/$GR_GE/roles" "$(jq -nc --arg r "$GR_R_ESC" '{roleID:$r}')"
+  assert_status 201
+
+  case_ "GR5c THE INTERLOCK ORDER: an UNKNOWN role id answers 422, never 403" "RoleGrantsWildcard deliberately answers TRUE for an id it cannot resolve, so a service that ran the wildcard rule first would report an unknown role as an ESCALATION ATTEMPT — a 403 blaming the caller where the honest answer is 'the role is not there'. This is the only case that sees the order"
+  api POST "/groups/$GR_GE/roles" '{"roleID":"00000000-0000-7000-8000-0000000000bb"}' "$QA_TOKEN_GROUP"
+  assert_rest 422 RoleNotAvailableInTenantNotification
+
+  # ── GR6 — tenant isolation, both sides ─────────────────────────────────────────────────
+  case_ "GR6- G names the MASTER tenant on an insert" "403 TenantMismatchNotification on field tenantID — the claim decides what a caller MAY write, and the guard is what answers"
+  api POST /groups "$(jq -nc --arg k "$(group_key grmis)" --arg d "$GR_D" --arg t "$QA_MASTER_TENANT_ID" '{key:$k, name:"QA Foreign Group", description:$d, tenantID:$t, roles:[]}')" "$QA_TOKEN_GROUP"
+  assert_rest_field 403 TenantMismatchNotification tenantID
+
+  case_ "GR6-b G ARCHIVES a group belonging to another tenant" "403 TenantMismatchNotification — refuseForeignTenant runs under IfArchive too, and the WRITE side is not filtered by ToCriteria, so the row loads and the RULE is what refuses. This is the seam that would be invisible if only reads were tested"
+  api PATCH "/groups/$GR_G1/archive" "" "$QA_TOKEN_GROUP"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "GR6b- G READS another tenant's group by id" "404, NOT 403 — it does not exist for this caller, which leaks nothing about who else exists. A 403 would confirm the row is there"
+  api GET "/groups/$GR_G1" "" "$QA_TOKEN_GROUP"
+  assert_rest 404 RecordNotFoundNotification
+
+  case_ "GR6b-c and G's listing never contains it" "asserted BY ID, not by count — an isolation leak answers 200, which is exactly why it needs its own case"
+  api GET "/groups?first=100" "" "$QA_TOKEN_GROUP"
+  assert_json_at 200 "[.data[].id] | index(\"$GR_G1\") // \"absent\"" "absent"
+
+  case_ "GR6c THE COMPLEMENT: the admin's listing DOES reach across tenants" "the same group is present — without this, a service that filtered everyone would pass GR6b for the wrong reason and support would be impossible"
+  api GET "/groups?tenantID.eq=$GR_TEN&first=100"
+  assert_json_at 200 "[.data[].id] | index(\"$GR_G1\") != null" "true"
+fi
+
+# ── GR7 — the owner tenant must be AVAILABLE, and 'trial' is not 'not active' ─────────────
+
+GR_TEN_TRIAL=$(new_tenant trial "$(ws grtrial)") || exit 1
+GR_TEN_SUSP=$(new_tenant suspended "$(ws grsusp)") || exit 1
+GR_TEN_ARCH=$(new_tenant active "$(ws grarch)") || exit 1
+api PATCH "/tenants/$GR_TEN_ARCH/archive"
+
+case_ "GR7+ a group inside a TRIAL tenant" "201 — THE PLAUSIBLE-MISTAKE CONTROL: a rule written as 'Status != active' would refuse every trial signup, and only this case sees it. A trial tenant is a live customer, and 'unavailable' is not 'not active'"
+api POST /groups "$(jq -nc --arg k "$(group_key grtr)" --arg d "$GR_D" --arg t "$GR_TEN_TRIAL" '{key:$k, name:"QA Trial Group", description:$d, tenantID:$t, roles:[]}')"
+assert_status 201
+
+case_ "GR7- a group inside a SUSPENDED tenant" "422 GroupTenantDoesNotExistNotification on field tenantID"
+api POST /groups "$(jq -nc --arg k "$(group_key grsu)" --arg d "$GR_D" --arg t "$GR_TEN_SUSP" '{key:$k, name:"QA Suspended Group", description:$d, tenantID:$t, roles:[]}')"
+assert_rest_field 422 GroupTenantDoesNotExistNotification tenantID
+
+case_ "GR7-b a group inside an ARCHIVED tenant" "422, same key"
+api POST /groups "$(jq -nc --arg k "$(group_key grar)" --arg d "$GR_D" --arg t "$GR_TEN_ARCH" '{key:$k, name:"QA Archived Group", description:$d, tenantID:$t, roles:[]}')"
+assert_rest 422 GroupTenantDoesNotExistNotification
+
+case_ "GR7-c a tenant id no row carries" "422, same key — one message for all four states, which is the same non-oracle reasoning GR3 records"
+api POST /groups "$(jq -nc --arg k "$(group_key grno)" --arg d "$GR_D" '{key:$k, name:"QA Ghost Tenant Group", description:$d, tenantID:"00000000-0000-7000-8000-0000000000cc", roles:[]}')"
+assert_rest 422 GroupTenantDoesNotExistNotification
+
+GR_G_LATER=$(new_group "$(group_key grlat)" "$GR_TEN_TRIAL") || exit 1
+api PATCH "/tenants/$GR_TEN_TRIAL/archive"
+case_ "GR7d the rule is a GATE, not a TRAP" "200 — tenant-must-be-available is scoped IfInsert alone, so a group whose tenant was suspended AFTERWARDS is still relabellable. A rule scoped insertOrUpdate would freeze every group of a suspended customer, including the renames an operator makes while sorting the suspension out"
+api PATCH "/groups/$GR_G_LATER" "$(jq -nc '{name:"QA Renamed After Suspension"}')"
+assert_status 200
+
+# ── GR8 / GR8b — immutability, enforced STRUCTURALLY ──────────────────────────────────────
+
+GR_G8=$(new_group "$(group_key gr8)" "$GR_TEN") || exit 1
+api GET "/groups/$GR_G8"; GR_K8=$(printf '%s' "$HTTP_BODY" | jq -r '.data.key')
+
+case_ "GR8+ name and description are patchable" "200, and the key is byte-identical afterwards"
+api PATCH "/groups/$GR_G8" "$(jq -nc --arg d "$GR_D" '{name:"QA Relabelled Group", description:$d}')"
+assert_json_at 200 '.data.key' "$GR_K8"
+
+case_ "GR8- a patch NAMING the key" "200 and the key UNCHANGED — the door does not exist: update.patchExcludes: [Key], so PatchGroupRequest carries name and description alone and there is no value to accept"
+api PATCH "/groups/$GR_G8" "$(jq -nc '{key:"some-other-key", name:"QA Relabelled Twice"}')"
+assert_json_at 200 '.data.key' "$GR_K8"
+
+case_ "GR8-b GroupKeyIsImmutableNotification is UNREACHABLE from the wire" "no case asserts it — the declarative rule is a belt-and-braces layer behind a structural cut, and asserting a notification no request can provoke would be asserting a lie"
+skip_ "update.patchExcludes: [Key] removes the field from the PATCH body on REST and from PatchGroupInput on GraphQL (L1.4c), so no mounted request can provoke GroupKeyIsImmutableNotification. GR8- asserts the EFFECT instead, which is the only honest assertion available"
+
+case_ "GR8b- a patch NAMING another tenant" "200 and tenantID UNCHANGED — a group never moves between tenants, and here too the door does not exist"
+api PATCH "/groups/$GR_G8" "$(jq -nc --arg t "$GR_TEN_B" '{tenantID:$t, name:"QA Relabelled Thrice"}')"
+assert_json_at 200 '.data.tenantID' "$GR_TEN"
+
+case_ "GR8b-b GroupTenantIsImmutableNotification is UNREACHABLE from the wire" "stated, not asserted — the same structural cut, on the other frozen field"
+skip_ "PatchGroupRequest carries name and description alone, so nothing can move tenantID through a PATCH. The rule stands as the backstop that answers if the field ever rejoins the body; GR8b- asserts the effect"
+
+# ── GR9 / GR10 — the rules judge the entries a write ADDS, never the ones already stored ──
+
+GR_R9=$(new_role "$(role_key gr9)" "$GR_TEN" "$GR_P_TENANT_READ") || exit 1
+GR_G9=$(new_group "$(group_key gr9)" "$GR_TEN" "$GR_R9" "$GR_R2") || exit 1
+api PATCH "/roles/$GR_R9/archive"
+
+case_ "GR9+ a group whose STORED entry points at an archived role is still relabellable" "200 — a rule re-judging stored entries would answer 422 on a request whose only change is a label, and would make a group impossible to rename because of somebody else's archive"
+api PATCH "/groups/$GR_G9" "$(jq -nc '{name:"QA Renamed Despite Archived Role"}')"
+assert_status 200
+
+case_ "GR9b and the archived counterpart is still SERVED on the entry" "roleArchivedAt stamped, roleKey still rendered — the read-side view of the same fact (cross-ref K7.2)"
+api GET "/groups/$GR_G9"
+assert_json_at 200 '[.data.roles[] | select(.roleArchivedAt != null)] | length' "1"
+
+api GET "/groups/$GR_G9"
+GR_CHILD9=$(printf '%s' "$HTTP_BODY" | jq -r '.data.roles[] | select(.roleArchivedAt != null) | .id' | head -1)
+case_ "GR10+ a DETACH asks nothing, because it adds nothing" "204 — detaching is the tool for an attachment that stopped being acceptable, and it stays reachable precisely when it is needed"
+api PATCH "/groups/$GR_G9/roles/$GR_CHILD9/archive"
+assert_empty_body 204
+
+# ── GR11 — the cap, in the HYBRID form the maintainer approved: the EDGE, not near it ─────
+
+GR_TEN_CAP=$(new_tenant active "$(ws grcap)") || exit 1
+GR_CAP_IDS=""
+GR_CAP_N=0
+while [ "$GR_CAP_N" -lt 51 ]; do
+  GR_CAP_N=$((GR_CAP_N + 1))
+  rid=$(new_role "$(role_key grc)" "$GR_TEN_CAP" "$GR_P_TENANT_READ") || break
+  GR_CAP_IDS="$GR_CAP_IDS $rid"
+done
+
+case_ "GR11 setup: 51 real, live, same-tenant roles" "51 — the fixture the edge needs; invented UUIDs could never show a CLEAN refusal"
+GR_CAP_HAVE=$(printf '%s' "$GR_CAP_IDS" | wc -w | tr -d ' ')
+if [ "$GR_CAP_HAVE" = "51" ]; then pass_; else fail_ "$GR_CAP_HAVE roles built"; fi
+
+if [ "$GR_CAP_HAVE" = "51" ]; then
+  GR_CAP_50=$(printf '%s' "$GR_CAP_IDS" | tr ' ' '\n' | grep -v '^$' | head -50 | tr '\n' ' ')
+  GR_CAP_51=$(printf '%s' "$GR_CAP_IDS" | tr ' ' '\n' | grep -v '^$' | tail -1)
+
+  case_ "GR11+ a group carrying EXACTLY 50 roles" "201 — the edge itself, not an approximation of it"
+  api POST /groups "$(group_body "$(group_key grcap)" "QA Cap Group" "$GR_D" "$GR_TEN_CAP" $GR_CAP_50)"
+  assert_json_at 201 '.data.roles | length' "50"
+  GR_GCAP=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+  case_ "GR11- the 51st, attached through the COLLECTION route" "422 TooManyRolesInGroupNotification on field roles — the rule counts GetCurrentItemsOf, so the collection verb trips it exactly as an oversized insert body does"
+  api POST "/groups/$GR_GCAP/roles" "$(jq -nc --arg r "$GR_CAP_51" '{roleID:$r}')"
+  assert_rest_field 422 TooManyRolesInGroupNotification roles
+
+  case_ "GR11-b the refusal is CLEAN" "TooManyRolesInGroupNotification and NOTHING ELSE in the envelope — every role in the fixture is real, live, same-tenant and attachable, so the cap is the only thing left to say. A fixture of invented ids would bury this key under 51 availability refusals"
+  assert_json '[.errors[].messages[].notificationKey] | unique | join(",")' "TooManyRolesInGroupNotification"
+
+  case_ "GR11-c and it names the count it refused" "51"
+  assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyRolesInGroupNotification") | .value] | join(",")' "51"
+
+  case_ "GR11-d the same cap on an oversized INSERT body" "422, same key — one rule, both write paths"
+  api POST /groups "$(group_body "$(group_key grcap2)" "QA Cap Group Two" "$GR_D" "$GR_TEN_CAP" $GR_CAP_50 "$GR_CAP_51")"
+  assert_rest 422 TooManyRolesInGroupNotification
+else
+  skip_ "the 51-role fixture could not be built, so the cap edge cannot be addressed — the failure is reported by the setup case above rather than counted twice here"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# GR12 — THE TRANSITIVE REVOCATION, and the three switches only this aggregate has.
+#
+#   "Arquivar o grupo tira o poder — e o poder do Group é transitivo. A linha user_groups
+#    sobrevive apontando para o grupo arquivado, e isso é HISTÓRIA; mas um token reemitido
+#    não carrega mais nenhuma permissão que vinha por ali."
+#   source: asked 2026-09-07 — "os três interruptores"
+#
+# internal/infra/authentication_reader.go walks user_groups -> groups -> group_roles -> roles
+# -> role_permissions -> permissions and carries three kill switches on that walk:
+#   :354  GroupArchivedAt        the group is retired      -> GR12a
+#   :360  GroupGrantArchivedAt   the entry was detached    -> GR12b
+#   :361  RoleArchivedAt         the role was retired      -> GR12c
+#
+# Each switch is IRREVERSIBLE, so each gets a fixture of its own. Every chain is built from
+# nothing seeded, and the member holds NO DIRECT ROLE AT ALL — which is what makes the
+# assertion transitive rather than incidental: everything its token carries came through the
+# group.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+# gr12_chain LABEL → sets GR12_ROLE / GR12_GROUP / GR12_USER / GR12_TOKEN / GR12_EMAIL /
+#                    GR12_PASS2 / GR12_GKEY, or leaves GR12_TOKEN empty on a fixture failure.
+gr12_chain() {
+  local label="$1"
+  GR12_EMAIL="qa-grouprevoke-$label-${QA_RUN_ID}@authcore.local"
+  local p1='Qa!GroupRevoke2026' p2='Qa!GroupRevoke2026b'
+  GR12_PASS2="$p2"
+  GR12_TOKEN=""
+
+  # tenant:read ALONE, so the assertion below is about a REACH that was lost rather than a
+  # claim that merely shrank.
+  GR12_ROLE=$(new_role "$(role_key g12$label)" "$GR_TEN" "$GR_P_TENANT_READ") || return 1
+  GR12_GKEY=$(group_key g12$label)
+  GR12_GROUP=$(new_group "$GR12_GKEY" "$GR_TEN" "$GR12_ROLE") || return 1
+
+  api POST /users "$(jq -nc --arg e "$GR12_EMAIL" --arg p "$p1" --arg g "$GR12_GROUP" --arg t "$GR_TEN" \
+    '{givenName:"Qa", familyName:"GroupRevocation", email:$e, status:"active", tenantID:$t,
+      password:$p, passwordConfirmation:$p, groups:[{groupID:$g}], roles:[]}')"
+  GR12_USER=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+  [ -n "$GR12_USER" ] || return 1
+
+  local boot; boot=$(qa_login "$GR12_EMAIL" "$p1")
+  [ -n "$boot" ] || return 1
+  api PATCH "/users/$GR12_USER/password" \
+    "$(jq -nc --arg cp "$p1" --arg np "$p2" '{currentPassword:$cp, password:$np, passwordConfirmation:$np}')" "$boot"
+  GR12_TOKEN=$(qa_login "$GR12_EMAIL" "$p2")
+  [ -n "$GR12_TOKEN" ]
+}
+
+gr12_prove_reach() { # gr12_prove_reach PREFIX
+  case_ "$1 the member holds NO direct role" "0 rows in user_roles — everything the token carries came through the group, which is what makes this transitive rather than incidental"
+  local got; got=$(sql "SELECT count(*) FROM user_roles WHERE user_id = '$GR12_USER';" | tr -d '[:space:]')
+  if [ "$got" = "0" ]; then pass_; else fail_ "user_roles rows = '$got'"; fi
+
+  case_ "$1b the token names the GROUP in its groups claim" "the group's key — the membership itself, which falls out of the same read that resolves the grants"
+  if printf '%s' "$(jwt_claim "$GR12_TOKEN" groups)" | grep -q "$GR12_GKEY"; then pass_; else fail_ "groups claim: $(jwt_claim "$GR12_TOKEN" groups)"; fi
+
+  case_ "$1c and it carries the INHERITED permission" "tenant:read, reached through group -> role -> permission and through nothing else"
+  if printf '%s' "$(jwt_claim "$GR12_TOKEN" permissions)" | grep -q "tenant:read"; then pass_; else fail_ "permissions claim: $(jwt_claim "$GR12_TOKEN" permissions)"; fi
+
+  case_ "$1d and the reach is REAL" "200 on the route that permission gates — a claim nobody can spend is not a permission"
+  api GET "/tenants?first=1" "" "$GR12_TOKEN"
+  assert_status 200
+}
+
+# ── GR12a — the GROUP is archived ─────────────────────────────────────────────────────────
+if gr12_chain a; then
+  gr12_prove_reach "GR12a1"
+
+  case_ "GR12a2 archiving a group whose members still point at it is ACCEPTED" "204 — no rule refuses it. The membership is history, not an error, and a one-way archive is what §5 of the model chose over an Unarchive that would re-authorize a whole team at once"
+  api PATCH "/groups/$GR12_GROUP/archive"
+  assert_empty_body 204
+
+  case_ "GR12a3 the user_groups row SURVIVES, pointing at the archived group" "1 row — asserted by SQL, since no endpoint exposes the membership from this side"
+  GOT=$(sql "SELECT count(*) FROM user_groups WHERE user_id = '$GR12_USER' AND group_id = '$GR12_GROUP';" | tr -d '[:space:]')
+  if [ "$GOT" = "1" ]; then pass_; else fail_ "user_groups rows = '$GOT'"; fi
+
+  case_ "GR12a4 and the group_roles row SURVIVES, stamped by the cascade" "1 row, archived_at filled — the pin archives an aggregate WITH its children, so the entry is not unpicked and not deleted: it is stamped, which is exactly the history an access review reads (cross-ref K6.11b)"
+  GOT=$(sql "SELECT count(*) FROM group_roles WHERE group_id = '$GR12_GROUP' AND role_id = '$GR12_ROLE' AND archived_at IS NOT NULL;" | tr -d '[:space:]')
+  if [ "$GOT" = "1" ]; then pass_; else fail_ "stamped group_roles rows = '$GOT'"; fi
+
+  case_ "GR12a4b nothing was DELETED" "1 row total for the pair — the distinction between a stamp and a delete is the whole reason the detach verb is PATCH .../archive"
+  GOT=$(sql "SELECT count(*) FROM group_roles WHERE group_id = '$GR12_GROUP' AND role_id = '$GR12_ROLE';" | tr -d '[:space:]')
+  if [ "$GOT" = "1" ]; then pass_; else fail_ "group_roles rows = '$GOT'"; fi
+
+  case_ "GR12a5 THE POINT: a FRESHLY reissued token no longer carries the inherited permission" "tenant:read is gone — a retired group confers nothing (authentication_reader.go:354)"
+  GR12A_T2=$(qa_login "$GR12_EMAIL" "$GR12_PASS2")
+  if [ -z "$GR12A_T2" ]; then fail_ "the member could not sign in again"
+  elif printf '%s' "$(jwt_claim "$GR12A_T2" permissions)" | grep -q "tenant:read"; then fail_ "still claimed: $(jwt_claim "$GR12A_T2" permissions)"
+  else pass_; fi
+
+  case_ "GR12a6 and the groups claim no longer names it" "the membership stops being reported the moment the group is retired — the switch is BEFORE the group is recorded, not after"
+  if printf '%s' "$(jwt_claim "$GR12A_T2" groups)" | grep -q "$GR12_GKEY"; then fail_ "groups claim: $(jwt_claim "$GR12A_T2" groups)"; else pass_; fi
+
+  case_ "GR12a7 and the reach is GONE" "403 — the same call that answered 200 before the archive"
+  api GET "/tenants?first=1" "" "$GR12A_T2"
+  assert_rest 403 MissingPermissionNotification
+
+  # ── GR13, which only exists because GR12a happened ──────────────────────────────────────
+  case_ "GR13 the retired group comes back as a NEW row" "201 with a DIFFERENT id — the way back is a fresh insert, and there is no Unarchive"
+  api POST /groups "$(group_body "$GR12_GKEY" "QA Group Reborn" "$GR_D" "$GR_TEN" "$GR12_ROLE")"
+  GR13_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+  if [ "$HTTP_STATUS" = "201" ] && [ -n "$GR13_ID" ] && [ "$GR13_ID" != "$GR12_GROUP" ]; then pass_; else fail_ "HTTP $HTTP_STATUS, id '$GR13_ID' vs '$GR12_GROUP'"; fi
+
+  case_ "GR13b and the former member is NOT re-authorized by it" "tenant:read still absent — user_groups still points at the OLD id, so the team has to be re-added. This is the cost §5 accepted when it refused Unarchive, made visible"
+  GR13_T=$(qa_login "$GR12_EMAIL" "$GR12_PASS2")
+  if [ -z "$GR13_T" ]; then fail_ "the member could not sign in"
+  elif printf '%s' "$(jwt_claim "$GR13_T" permissions)" | grep -q "tenant:read"; then fail_ "re-authorized by the new row: $(jwt_claim "$GR13_T" permissions)"
+  else pass_; fi
+else
+  skip_ "GR12a — the group-archive revocation chain could not be provisioned (role, group, user or sign-in), so the first of the three switches is UNPROVEN this run"
+  skip_ "GR13 — the one-way-door cost depends on GR12a's chain and is UNPROVEN this run"
+fi
+
+# ── GR12b — the group_role entry is DETACHED ──────────────────────────────────────────────
+if gr12_chain b; then
+  gr12_prove_reach "GR12b1"
+
+  api GET "/groups/$GR12_GROUP"
+  GR12B_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.roles[0].id')
+  case_ "GR12b2 detaching the entry" "204"
+  api PATCH "/groups/$GR12_GROUP/roles/$GR12B_CHILD/archive"
+  assert_empty_body 204
+
+  case_ "GR12b3 the group_roles row survives, STAMPED" "1 archived row — a detach is a soft removal, which is why the verb is PATCH .../archive and not DELETE: an access review needs to read what a past attachment meant"
+  GOT=$(sql "SELECT count(*) FROM group_roles WHERE id = '$GR12B_CHILD' AND archived_at IS NOT NULL;" | tr -d '[:space:]')
+  if [ "$GOT" = "1" ]; then pass_; else fail_ "stamped group_roles rows = '$GOT'"; fi
+
+  case_ "GR12b4 the inherited permission is GONE from a reissued token" "tenant:read absent — the group's grant of the role was revoked (authentication_reader.go:360)"
+  GR12B_T2=$(qa_login "$GR12_EMAIL" "$GR12_PASS2")
+  if [ -z "$GR12B_T2" ]; then fail_ "the member could not sign in again"
+  elif printf '%s' "$(jwt_claim "$GR12B_T2" permissions)" | grep -q "tenant:read"; then fail_ "still claimed: $(jwt_claim "$GR12B_T2" permissions)"
+  else pass_; fi
+
+  case_ "GR12b5 THE DISTINCTION: the groups claim STILL names the group" "the person is still a member; the bundle simply no longer confers that role. This is the case that separates 'you left the team' from 'the team stopped granting this' — two very different things an access review must be able to tell apart"
+  if printf '%s' "$(jwt_claim "$GR12B_T2" groups)" | grep -q "$GR12_GKEY"; then pass_; else fail_ "groups claim: $(jwt_claim "$GR12B_T2" groups)"; fi
+
+  case_ "GR12b6 and the reach is gone" "403"
+  api GET "/tenants?first=1" "" "$GR12B_T2"
+  assert_rest 403 MissingPermissionNotification
+else
+  skip_ "GR12b — the detach revocation chain could not be provisioned, so the second of the three switches is UNPROVEN this run"
+fi
+
+# ── GR12c — the conferred ROLE is archived ────────────────────────────────────────────────
+if gr12_chain c; then
+  gr12_prove_reach "GR12c1"
+
+  case_ "GR12c2 archiving the role the group confers" "204"
+  api PATCH "/roles/$GR12_ROLE/archive"
+  assert_empty_body 204
+
+  case_ "GR12c3 the group_roles row is UNTOUCHED and still ACTIVE" "1 active row — nothing cascaded: the attachment is still there, pointing at a role that no longer confers anything"
+  GOT=$(sql "SELECT count(*) FROM group_roles WHERE group_id = '$GR12_GROUP' AND role_id = '$GR12_ROLE' AND archived_at IS NULL;" | tr -d '[:space:]')
+  if [ "$GOT" = "1" ]; then pass_; else fail_ "active group_roles rows = '$GOT'"; fi
+
+  case_ "GR12c4 and the group still SERVES the entry, with the counterpart stamped" "roleArchivedAt filled — the read-side view of exactly this state (cross-ref K7.2)"
+  api GET "/groups/$GR12_GROUP"
+  assert_json_at 200 '[.data.roles[] | select(.roleArchivedAt != null)] | length' "1"
+
+  case_ "GR12c5 the inherited permission is GONE from a reissued token" "tenant:read absent — a retired role confers nothing (authentication_reader.go:361)"
+  GR12C_T2=$(qa_login "$GR12_EMAIL" "$GR12_PASS2")
+  if [ -z "$GR12C_T2" ]; then fail_ "the member could not sign in again"
+  elif printf '%s' "$(jwt_claim "$GR12C_T2" permissions)" | grep -q "tenant:read"; then fail_ "still claimed: $(jwt_claim "$GR12C_T2" permissions)"
+  else pass_; fi
+
+  case_ "GR12c6 the groups claim still names the group" "membership is untouched by what the bundle stopped conferring"
+  if printf '%s' "$(jwt_claim "$GR12C_T2" groups)" | grep -q "$GR12_GKEY"; then pass_; else fail_ "groups claim: $(jwt_claim "$GR12C_T2" groups)"; fi
+
+  case_ "GR12c7 and the reach is gone" "403"
+  api GET "/tenants?first=1" "" "$GR12C_T2"
+  assert_rest 403 MissingPermissionNotification
+else
+  skip_ "GR12c — the role-archive revocation chain could not be provisioned, so the third of the three switches is UNPROVEN this run"
+fi
+
 qa_finish

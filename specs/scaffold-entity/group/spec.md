@@ -31,7 +31,13 @@
      bench unusable. §7.
   4. **G4 also refuses a SUSPENDED tenant**, not just a missing or archived one — while a
      `trial` tenant passes. §7.
-  5. **The grants no longer carry the conferred role's archive stamp**, matching `Role`. §2.
+  5. ~~**The grants no longer carry the conferred role's archive stamp**, matching `Role`.~~
+     **SUPERSEDED 2026-09-06, corrected here 2026-09-07:** they DO. `RoleArchivedAt` is
+     declared on the child join and served as `roles[].roleArchivedAt`, in the same pass that
+     added `ArchivedAt` to `read.managed` and `archived_at` to the ROOT join. What did not
+     change is that no RULE reads it: G6 decides availability with a probe, never with this
+     field, which is blank on every entry a write adds. §2.
+     (`specs/qa/group-contract/plan.md` §0c; asserted by `K7.2` and `GR9`.)
 
   Two openings the same work created, listed as opportunities rather than corrections: a
   traversal into `Tenant` is now declarable (§2), and `CallerIsSuperAdmin` may be dead
@@ -190,6 +196,11 @@ stop. Same fix as `Role`, same shape: **a role that grants any wildcard permissi
 be attached to a group through the API** (G10b), refused *before* the escalation question
 is asked. Consequence, accepted and consistent: the platform's own superadmin **group** is
 seeded by migration beside the reserved platform tenant, not created through this API.
+**CORRECTED 2026-09-07:** migration `0012` seeds the reserved platform tenant and the `*:*`
+**role**, granted through `user_roles`; it seeds **no group** and no `user_groups` row. So no
+wildcard-bearing group exists by any path this service ships — the stronger form of the same
+claim, and the reason the QA baseline for `groups` is **0**.
+(`specs/qa/group-contract/plan.md` §0c; asserted by `GR4` and `K8`.)
 
 **Both halves are in.** G10a and G10b are live rules with their two `GroupService` facts, and
 the child ops carry `group:grant` rather than riding `group:update` (§10). The two are
@@ -729,7 +740,8 @@ body.
   asked for it — so a service reading through `repo.Loader` sees exactly what the endpoint
   sees.
 - **`?fields=` reaches the joined values under `roles.roleKey`, `roles.roleName` and
-  `roles.archivedAt`** — a child join's fields are addressed as `<segment>.<field>`. A path this read model does not
+  `roles.roleArchivedAt`** *(corrected 2026-09-07: the entry field is `RoleArchivedAt`, so the
+  wire token is `roles.roleArchivedAt`; `roles.archivedAt` resolves to nothing and is a 400)* — a child join's fields are addressed as `<segment>.<field>`. A path this read model does not
   have is a **400** (`SchemaViolationNotification`, `SemanticSchema`) naming the offending
   Go path, never a silent `200 {}`. On this backing the projection prunes after the load, so
   a narrow `?fields=` shapes the answer without buying any I/O.

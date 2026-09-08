@@ -319,12 +319,18 @@ notifications:
       ita: Non è possibile conferire un ruolo che concede permessi che non si possiedono.
       nld: U kunt geen rol verlenen die rechten geeft die u zelf niet heeft.
 
+  # CORRECTED 2026-09-07 — this description used to end "...and the superadmin group
+  # carrying it — are seeded by migration beside the reserved platform tenant". Migration
+  # 0012 seeds the platform tenant and the *:* ROLE, granted through user_roles; it seeds NO
+  # GROUP, and no user_groups row either. The honest statement is the stronger one: no
+  # wildcard-bearing group exists by any path this service ships.
+  # (specs/qa/group-contract/plan.md §0c; asserted by GR4 and by K8's baseline of 0 groups.)
   - name: CannotGrantWildcardRoleNotification
     semantic: forbidden
     description: >-
       A role granting a permission with a wildcard in either part cannot be attached to any
-      group through the API. The platform's own *:* role — and the superadmin group carrying
-      it — are seeded by migration beside the reserved platform tenant.
+      group through the API. The platform's own *:* role is granted directly, through
+      user_roles beside the reserved platform tenant, and never through a group.
     text:
       eng: A role that grants a wildcard permission cannot be conferred by a group.
       ptbr: Um papel que concede uma permissão curinga não pode ser conferido por um grupo.
@@ -491,11 +497,18 @@ joins:
   # group's bundle with the role's key and label on each entry, so a client renders it with
   # no second call to GET /roles.
   #
-  # The role's archived_at is deliberately NOT traversed. Role keeps its archive stamp off
-  # its own grants' reads for a reason, and republishing a column the OWNING aggregate keeps
-  # off its own reads is a back door to a decision already made the other way. So the join
-  # renders the attachment and says nothing about whether the role is retired — G6 decides
-  # that, and it decides it with a probe.
+  # SUPERSEDED 2026-09-06, corrected here 2026-09-07. This paragraph used to read "the
+  # role's archived_at is deliberately NOT traversed", on the reasoning that republishing a
+  # column the owning aggregate keeps off its own reads is a back door to a decision made
+  # the other way. That reasoning covered the FILTER and was read as covering the VALUE too,
+  # and the two are different questions: an archived role was already arriving in this
+  # collection, indexed exactly like a live one, with nothing on the wire saying so.
+  # RoleArchivedAt below is the field that says so, and it IS served.
+  #
+  # What still stands from the old paragraph is its other half: the join RENDERS the
+  # attachment and DECIDES nothing. G6 decides whether a role may be attached, and it
+  # decides it with a probe — never by reading this field, which is blank on every entry a
+  # write adds. (Recorded by specs/qa/group-contract/plan.md §0c; asserted by K7.2 and GR9.)
   - kind: inner
     to: Role
     inChild: GroupRole
@@ -694,9 +707,11 @@ rules:
         halves of that order are load-bearing — see the block comment above. Over the ADDED
         entries only; ask RoleGrantsWildcard per entry, which answers TRUE for an
         unresolvable role id so an unknown id never falls through to the escalation
-        question. What it costs, stated plainly: the platform's own superadmin group cannot
-        be created through this API, and is seeded by migration beside the reserved platform
-        tenant and the *:* role.
+        question. What it costs, stated plainly: no superadmin group can be created through
+        this API at all. CORRECTED 2026-09-07 — this used to add "and is seeded by migration
+        beside the reserved platform tenant"; no such group is seeded. The platform operator
+        holds *:* through user_roles and the master role, so the cost is total rather than
+        worked around.
       scope: [insertOrUpdate]
       notification: CannotGrantWildcardRoleNotification
       attachTo: Roles

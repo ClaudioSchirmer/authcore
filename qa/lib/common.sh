@@ -515,3 +515,87 @@ assert_rfc3339() {
 assert_status_not() {
   if [ "$HTTP_STATUS" != "$1" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
 }
+
+# ── Group fixtures ───────────────────────────────────────────────────────────────────────
+#
+# Plan: specs/qa/group-contract/plan.md §2.
+#
+# vos.GroupKey is stricter than it looks: ^[a-z0-9]+(-[a-z0-9]+)*$, 2-64 runes, at least TWO
+# distinct runes, and no run of 4 identical ones. The run tag therefore goes through
+# qa_slug_runid — the same collapse the permission and role fixtures use — because QA_RUN_ID
+# is built from a timestamp and a pid and CAN carry `0000`. A fixture that 422s on some runs
+# and not on others is worse than one that never works.
+
+# group_key [PREFIX] → a key unique to this run AND to this call.
+#
+# File-backed counter, for the same reason ws(), pair_resource() and role_key() use one: this
+# is almost always called inside $( ), so an in-memory counter would increment a copy the
+# parent never sees and every call in a loop would hand back the same key — which, on a handle
+# that is unique per tenant over ACTIVE rows, turns a fixture into a 409.
+group_key() {
+  local f="${QA_RUN_DIR:-/tmp}/.group-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'qa-%s-%s-%d' "${1:-g}" "$(qa_slug_runid)" "$n"
+}
+
+# role_id_of KEY → the role's id, resolved by its handle.
+#
+# The group lane attaches roles by id and reads them back by key, and no UUID literal is
+# written twice in this suite. A FIXTURE lookup, never an expectation.
+role_id_of() {
+  api GET "/roles?key.eq=$1&first=1"
+  printf '%s' "$HTTP_BODY" | jq -r '.data[0].id // empty'
+}
+
+# group_body KEY NAME DESCRIPTION TENANT_ID_OR_EMPTY [ROLE_ID ...]
+#
+# Exactly four positional arguments, then the roles. An EMPTY tenant omits the key entirely
+# rather than sending "" — `assignedFrom: identity-claim` with `bypassMaySet: true` means
+# ABSENT is "mine", while an empty string is a malformed id the guard barrier refuses (K4.g1).
+# The two are different requests and the suite must be able to send either.
+group_body() {
+  local key="$1" name="$2" desc="$3" tenant="$4"
+  shift 4
+  local roles
+  roles=$(printf '%s\n' "$@" | jq -R . | jq -sc 'map(select(length > 0) | {roleID: .})')
+  jq -nc --arg k "$key" --arg n "$name" --arg d "$desc" --arg t "$tenant" --argjson r "$roles" \
+    '{key:$k, name:$n, description:$d, roles:$r}
+     + (if $t == "" then {} else {tenantID:$t} end)'
+}
+
+# new_group KEY TENANT_ID_OR_EMPTY [ROLE_ID ...] → echoes the created group's id.
+# Fixture creation, not a case: it asserts nothing and aborts the lane loudly if refused.
+new_group() {
+  local key="$1" tenant="$2"
+  shift 2
+  local desc="Fixture group created by the QA suite for run $(qa_slug_runid), bundling tenant roles."
+  api POST /groups "$(group_body "$key" "QA Fixture Group" "$desc" "$tenant" "$@")"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /groups answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.id'
+}
+
+# attach_role GROUP_ID ROLE_ID [TOKEN] → echoes the child id the server minted.
+#
+# That id is how the entry is addressed afterwards, and it is a NEW one on every attach: the
+# child index is active-only and there is no per-entry unarchive, so re-attaching a detached
+# role mints a fresh row rather than reviving the old one (K5).
+attach_role() {
+  api POST "/groups/$1/roles" "$(jq -nc --arg r "$2" '{roleID:$r}')" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /groups/%s/roles answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.groupRole.id'
+}
+
+# detach_role GROUP_ID CHILD_ID [TOKEN] — leaves HTTP_STATUS/HTTP_BODY for the caller to
+# assert. Unlike attach_role this one does NOT abort on a non-2xx: half the cases that call it
+# are asserting a refusal.
+detach_role() {
+  api PATCH "/groups/$1/roles/$2/archive" "" "${3:-${QA_TOKEN_ADMIN:-}}"
+}
