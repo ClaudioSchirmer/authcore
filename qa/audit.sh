@@ -477,4 +477,63 @@ case_ "A75 a GLOBAL sweep finds no credential-shaped string in the entire trail"
 got=$(sql "SELECT count(*) FROM audit_events WHERE payload::text ~ 'acs_[A-Za-z0-9_-]{43}';" | tr -d '[:space:]')
 if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows carrying a credential-shaped string: $got"; fail_ "something credential-shaped reached the trail"; fi
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# A76-A79 — Claim. specs/qa/claim-contract/plan.md §4.
+#
+# The seventh and last entity in this lane, and the simplest shape it has seen: three write
+# verbs, no collection, no state machine. What is worth asserting HERE rather than
+# inheriting is the field the trail exists to police — AppliesTo. Narrowing it is the one
+# edit on this aggregate that can strand a value somebody already holds, so "who changed
+# what this definition admits" is the single line an access review looks for, and A79 is
+# what makes it findable.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_ACL=$(new_tenant active "$(ws audcl)") || exit 1
+N_ACL=$(claim_name audcl)
+ID_ACL=$(new_claim "$N_ACL" string user "$TEN_ACL" "north") || exit 1
+
+case_ "A76a the INSERT wrote exactly one audit row against the definition" "1 row, verb 'insert', entity_type 'Claim', in the same transaction as the write"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Claim' AND aggregate_id='$ID_ACL' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A76b the actor is the acting principal's sub" "the sub of the token that made the call, not a sentinel"
+got=$(sql "SELECT actor FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "$ADMIN_SUB" ]; then pass_; else HTTP_BODY="$got"; fail_ "actor = '$got', expected '$ADMIN_SUB'"; fi
+
+case_ "A76c the UPDATE writes its own row, as a delta" "verb 'update', kind 'delta' — a change records what moved, never the whole record again"
+api PATCH "/claims/$ID_ACL" '{"description":"A description corrected so the trail has a delta to carry."}'
+got=$(sql "SELECT count(*) || '/' || coalesce(min(kind),'-') FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='update';" | tr -d '[:space:]')
+if [ "$got" = "1/delta" ]; then pass_; else HTTP_BODY="$got"; fail_ "update rows/kind = $got"; fi
+
+case_ "A76d the ARCHIVE writes its own row" "verb 'archive' — a retirement is a write like any other, and the one that ends the definition's life"
+api PATCH "/claims/$ID_ACL/archive"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='archive';" | tr -d '[:space:]')
+if [ "$got" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "archive rows = $got"; fi
+
+case_ "A77 no 'unarchive' row can EVER exist for this entity" "0 rows across the WHOLE table — the absence is a contract, not an omission: this service mounts no unarchive for Claim, so a row here would mean one appeared"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Claim' AND verb='unarchive';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows found: $got"; fail_ "an unarchive row exists for Claim"; fi
+
+case_ "A78a the payload carries the declared auditClaims: email" "admin@authcore.local — Actor on its own is a UUID nobody can read"
+got=$(sql "SELECT payload::jsonb -> 'actorClaims' ->> 'email' FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "admin@authcore.local" ]; then pass_; else HTTP_BODY="$got"; fail_ "email = '$got'"; fi
+
+case_ "A78b ...and tenant_workspace and identity_kind ride with it" "both non-empty — the three claims that make a claim-catalog line legible out in the mesh"
+got=$(sql "SELECT (coalesce(payload::jsonb -> 'actorClaims' ->> 'tenant_workspace','') <> '') AND (coalesce(payload::jsonb -> 'actorClaims' ->> 'identity_kind','') <> '') FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload::jsonb -> 'actorClaims' FROM audit_events WHERE aggregate_id='$ID_ACL' AND verb='insert';")"; fail_ "one of the two claims is missing"; fi
+
+N_ACL2=$(claim_name audcl2)
+ID_ACL2=$(new_claim "$N_ACL2" string both "$TEN_ACL") || exit 1
+api PATCH "/claims/$ID_ACL2" '{"appliesTo":"user"}'
+
+case_ "A79 a narrowing of AppliesTo reaches the trail as a from/to pair" "both 'both' and 'user' in the update payload — the ONE edit on this aggregate that can strand a value somebody holds, so it has to be the one an access review can find"
+got=$(sql "SELECT (payload::text LIKE '%both%') AND (payload::text LIKE '%user%') FROM audit_events WHERE aggregate_id='$ID_ACL2' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_ACL2' AND verb='update' ORDER BY created_at DESC LIMIT 1;")"; fail_ "the appliesTo from/to pair is not in the delta"; fi
+
+case_ "A79b the definition's NAME never appears as a from/to pair anywhere" "0 rows carrying a name delta — Name is immutable and has no door (W13), so a rename in this trail would mean one opened"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Claim' AND verb='update' AND payload::text LIKE '%\"Name\"%';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows carrying a Name delta: $got"; fail_ "a claim name was changed somewhere"; fi
+
+
 qa_finish
