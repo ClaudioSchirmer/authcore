@@ -8,6 +8,7 @@
 # Plans:   specs/qa/tenant-contract/plan.md      (tenant, tenant_graphql, and the R/S3/A blocks)
 #          specs/qa/permission-contract/plan.md  (permission, permission_graphql, and the P/S4/A15+ blocks)
 #          specs/qa/role-contract/plan.md        (role, role_graphql, and the RL/S5/A24+ blocks)
+#          specs/qa/group-contract/plan.md       (group, group_graphql, and the GR/S6/A39+ blocks)
 # Verdict: qa/qa-report.md  (rewritten in full after EVERY lane, so a run killed halfway still
 #          leaves what it had proven)
 # Logs:    qa/.logs/<run-id>/
@@ -18,21 +19,24 @@
 #   · the build tags — `postgres` from relational.dialect, and NO transport tag because the
 #     yaml declares no transport: block;
 #   · the boot on :8099 under the suite's own config, and the drain-respecting shutdown;
-#   · the six principals the lanes borrow: the seeded bootstrap admin (*:*), a tenant:read
-#     user, a permission:read user, a permission:read user in a SECOND tenant, and the two
-#     ROLE principals of specs/qa/role-contract/plan.md §2 — one holding the whole role bundle
+#   · the eight principals the lanes borrow: the seeded bootstrap admin (*:*), a tenant:read
+#     user, a permission:read user, a permission:read user in a SECOND tenant, the two ROLE
+#     principals of specs/qa/role-contract/plan.md §2 — one holding the whole role bundle
 #     inside a tenant of the suite's own, one holding role:read + role:update and NOT
-#     role:grant. All but the first are created through the API, and each exists because the
-#     others cannot see what it sees — qa/security.sh S4 and S5 say which is which.
+#     role:grant — and the two GROUP principals of specs/qa/group-contract/plan.md §2, in that
+#     same tenant: one holding the whole group bundle and deliberately NOT permission:archive,
+#     one holding group:read + group:update and NOT group:grant. All but the first are created
+#     through the API, and each exists because the others cannot see what it sees —
+#     qa/security.sh S4, S5 and S6 say which is which.
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 # ── the lane list. This array IS the inventory: a .sh under qa/ that no lane names is a suite
 # ── nobody runs, and a lane naming a missing file breaks the run for everyone.
-LANES=(tenant tenant_graphql permission permission_graphql role role_graphql domain security audit)
+LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql domain security audit)
 
-PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md"
+PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md"
 REPORT="qa/qa-report.md"
 PORT=8099
 QA_BASE="http://localhost:$PORT"
@@ -88,7 +92,7 @@ render_report() {
   # line came to name the wrong suite.
   local lane p f s t verdict
   {
-    printf '# QA report — authcore · tenant-contract + permission-contract + role-contract\n\n'
+    printf '# QA report — authcore · tenant + permission + role + group contracts\n\n'
     printf -- '- **run:** `%s` · %s\n' "$QA_RUN_ID" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
     printf -- '- **plans:** %s\n' "$PLANS"
     printf -- '- **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags '"'"'postgres'"'"'` (no transport tag — the yaml declares no `transport:` block)\n'
@@ -464,6 +468,56 @@ else
 fi
 
 export QA_TENANT_SCOPED QA_TOKEN_SCOPED QA_TOKEN_NOGRANT
+
+# ── principals G and H, for specs/qa/group-contract/plan.md §2 ────────────────────────────
+#
+# They live in the SAME tenant E and F do, and that is deliberate rather than convenient: the
+# group lane needs roles it can attach, a role is tenant-scoped, and a group principal in a
+# tenant of its own could not reach a single one of them.
+#
+#   G holds the whole group bundle plus role:read/role:insert and tenant:read, and
+#     deliberately NOT permission:archive — which is exactly the permission GR5's transitive
+#     escalation negative needs it to lack. The role that GRANTS permission:archive is created
+#     by the ADMIN instead, because Role's own escalation rule would refuse G that creation
+#     (role-contract RL2); the question GR5 asks is whether G may ATTACH it.
+#   H holds group:read + group:update and NOT group:grant. It is the ONLY caller for which the
+#     fifth verb is visible: it may relabel a group and must be refused on both collection
+#     routes. B and G answer the same on all seven either way.
+#
+# A failure to build either is NOT fatal: the lanes skip their blocks loudly and the report
+# prints them in the SKIP column, which is the honest outcome.
+GROUP_INSERT_PERMISSION="01990000-0000-7000-8000-00000000000d"
+GROUP_UPDATE_PERMISSION="01990000-0000-7000-8000-00000000000e"
+GROUP_ARCHIVE_PERMISSION="01990000-0000-7000-8000-00000000000f"
+GROUP_READ_PERMISSION="01990000-0000-7000-8000-000000000010"
+GROUP_GRANT_PERMISSION="01990000-0000-7000-8000-000000000011"
+
+if [ -n "$QA_TENANT_SCOPED" ]; then
+  QA_TOKEN_GROUP=$(make_principal groupscoped "$QA_TENANT_SCOPED" "QA Group Operator" \
+    "Grants the whole group vocabulary inside one tenant, plus the reads a group operator needs, and no catalog write verb at all." \
+    "$GROUP_INSERT_PERMISSION" "$GROUP_UPDATE_PERMISSION" "$GROUP_ARCHIVE_PERMISSION" \
+    "$GROUP_READ_PERMISSION" "$GROUP_GRANT_PERMISSION" \
+    "$ROLE_READ_PERMISSION" "$ROLE_INSERT_PERMISSION" "$TENANT_READ_PERMISSION" || true)
+  QA_TOKEN_GROUPNOGRANT=$(make_principal groupnogrant "$QA_TENANT_SCOPED" "QA Group Labeller" \
+    "Grants reading and relabelling a group, and deliberately not the verb that changes what a group confers." \
+    "$GROUP_READ_PERMISSION" "$GROUP_UPDATE_PERMISSION" || true)
+else
+  QA_TOKEN_GROUP=""
+  QA_TOKEN_GROUPNOGRANT=""
+fi
+
+if [ -n "$QA_TOKEN_GROUP" ]; then
+  echo "   principal G: qa-groupscoped-$QA_RUN_ID@authcore.local (the group bundle + role:read/insert + tenant:read, tenant $QA_TENANT_SCOPED)"
+else
+  echo "   principal G: NOT BUILT — the group rows of qa/domain.sh and qa/security.sh S6 will skip and say so" >&2
+fi
+if [ -n "$QA_TOKEN_GROUPNOGRANT" ]; then
+  echo "   principal H: qa-groupnogrant-$QA_RUN_ID@authcore.local (group:read + group:update, NO group:grant)"
+else
+  echo "   principal H: NOT BUILT — qa/security.sh S6.3d-e will skip and say so" >&2
+fi
+
+export QA_TOKEN_GROUP QA_TOKEN_GROUPNOGRANT
 
 # The lanes need these to exercise the login route itself (§3b).
 QA_ADMIN_EMAIL="admin@authcore.local"

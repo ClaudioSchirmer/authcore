@@ -238,4 +238,94 @@ api POST /roles "$(jq -nc --arg k "$AUD_REJ" --arg t "$AUD_TEN" '{key:$k, name:"
 got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Role' AND payload::text LIKE '%$AUD_REJ%';")
 if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# A39-A50 — Group. specs/qa/group-contract/plan.md §4.
+#
+# Group's audit shape is Role's, one level up the graph, and the same decision applies: the
+# ROOT verbs and the two COLLECTION verbs both. What makes the trail matter more here is what
+# the writes DO — an attach hands every member of a team every permission of a role, so
+# "somebody changed what this group confers" is the single line an access review looks for.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+AUD_G_TEN=$(new_tenant active "$(ws audg)") || exit 1
+AUD_G_R1=$(new_role "$(role_key audg1)" "$AUD_G_TEN" "$(permission_id_of tenant read)") || exit 1
+AUD_G_R2=$(new_role "$(role_key audg2)" "$AUD_G_TEN" "$(permission_id_of group read)")  || exit 1
+
+ID_G=$(new_group "$(group_key aud)" "$AUD_G_TEN") || exit 1
+
+case_ "A39 the INSERT wrote one audit row for Group" "1 row, entity_type 'Group', aggregate_id the group's id"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND entity_type='Group' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A40 the insert row's kind is 'snapshot'" "snapshot — a creation records the whole record, not a delta"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='insert' AND kind='snapshot';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A41 the ACTOR's tenant is stamped, not the ROW's" "master — the group was created inside a tenant of the suite's own, and the audit column records who was ASKING"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='insert' AND tenant_id='$QA_MASTER_TENANT_ID' AND actor IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A42 the declared auditClaims ride the payload" "email, tenant_workspace and identity_kind"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='insert' AND payload::jsonb -> 'actorClaims' ->> 'email' = 'admin@authcore.local' AND payload::jsonb -> 'actorClaims' ->> 'tenant_workspace' = 'master' AND payload::jsonb -> 'actorClaims' ->> 'identity_kind' IS NOT NULL;")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A43 an UNDECLARED claim never reaches the row" "no 'groups' and no 'permissions' key — auditClaims is an allowlist, and the caller's own authorization state is deliberately outside it"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND (payload::jsonb -> 'actorClaims' ? 'permissions' OR payload::jsonb -> 'actorClaims' ? 'groups');")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/groups/$ID_G" '{"name":"QA Audit Group, relabelled so a change block exists"}'
+
+case_ "A44 the PATCH wrote an update row carrying a changes block" "1 row with verb 'update' and a changes payload"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='update' AND payload::jsonb ? 'changes';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+# ── the two collection verbs: the writes that change what a whole TEAM can do ─────────────
+
+api POST "/groups/$ID_G/roles" "$(jq -nc --arg r "$AUD_G_R1" '{roleID:$r}')"
+AUD_G_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.groupRole.id')
+
+case_ "A45 an ATTACH wrote an audit row against the ROOT" "2 update rows now on the group's own aggregate_id — a child op is a command on the root, so this is where its trail belongs"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='update';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "2" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A46 and NOT against the entry's own id" "0 rows carrying the child id as an aggregate — an entry that audited itself would split one group's history across two timelines"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$AUD_G_CHILD';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A47 the ATTACH's row carries a changes block naming the collection" "a changes payload mentioning the roles collection — what a whole TEAM can do changed, and the trail has to say so"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='update' AND payload::text ILIKE '%role%';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" -ge 1 ] 2>/dev/null; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/groups/$ID_G/roles/$AUD_G_CHILD/archive"
+
+case_ "A48 a DETACH wrote its own row, against the ROOT again" "3 update rows — a detach is the write an access review most needs to find, and it is not a DELETE precisely so it can be found"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='update';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "3" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+api PATCH "/groups/$ID_G/archive"
+
+case_ "A49 the ARCHIVE wrote a transition row" "1 row with verb 'archive' and kind 'transition' — the write that de-authorizes a whole team leaves exactly one line"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='archive' AND kind='transition';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A50 there is NO unarchive row, ever" "0 — the verb does not exist on this aggregate, and its absence from the timeline is the contract rather than a gap. A 'restored' line is precisely what §5 of the model refused to make possible"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G' AND verb='unarchive';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A51 the five writes left exactly five rows" "5 — insert, patch, attach, detach, archive: one event per write, never two and never none"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_G';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "5" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A52 a REFUSED group write leaves no audit row at all" "0 — the row is written in the write's own transaction, so a rejected write rolls it back with everything else"
+AUD_G_REJ="qa-audit-grouprejected-$(qa_slug_runid)"
+api POST /groups "$(jq -nc --arg k "$AUD_G_REJ" --arg t "$AUD_G_TEN" '{key:$k, name:"X", description:"short", tenantID:$t, roles:[]}')"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='Group' AND payload::text LIKE '%$AUD_G_REJ%';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A53 a refused ATTACH leaves no row either" "3 update rows still — a wildcard refusal is a DOMAIN refusal, raised after the handler was reached, and it must still roll its audit row back"
+AUD_G_GM=$(new_group "$(group_key audgm)" "$QA_MASTER_TENANT_ID") || exit 1
+api POST "/groups/$AUD_G_GM/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{roleID:$r}')"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$AUD_G_GM' AND verb='update';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
 qa_finish

@@ -729,4 +729,179 @@ fi
 case_ "S5.7 field-level read authz on Role" "recorded as a DECISION, and deliberately not exercised"
 skip_ "spec.md §9 declares no ReadCriteria.Restrict: 'Every field a caller may see the row at all for, they may see entirely. Row-level isolation does the work here.' There is no column to find absent for one caller and present for another, no tabular export whose header could be pruned, and no __typename edge to assert — that edge exists only where a restricted field is in the selection. Asserting one would be inventing a rule"
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S6 — Group. specs/qa/group-contract/plan.md §3.
+#
+# §3a (the whole 401 family) and §3b direction 1 are INHERITED from the tenant round and are
+# not repeated: the middleware does not know which route it is guarding. What is Group-specific
+# is below — and it is where the FIFTH VERB becomes visible, because group:grant is the only
+# literal in this service that one principal can lack while holding everything else.
+#
+# s5_denied / s5_gql_denied are generic helpers the role round introduced (principal B, the
+# literal asserted by value). They are reused rather than copied.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S6_DEAD="00000000-0000-4000-8000-00000000dead"
+
+# ── S6.1 the public-route half, direction 2, for the seven routes this round adds ─────────
+case_ "S6.1a GET /groups tokenless" "401 MissingAuthorizationNotification — auth.publicRoutes names no /groups path, and a route that was never gated at all would pass every 401 case in §3a"
+api GET "/groups" "" -
+assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1b GET /groups/{id} tokenless" "401"
+api GET "/groups/$S6_DEAD" "" -; assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1c POST /groups tokenless" "401 — refused before the body is ever validated"
+api POST "/groups" '{"key":"qa-tokenless","name":"X","description":"Y"}' -; assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1d PATCH /groups/{id} tokenless" "401"
+api PATCH "/groups/$S6_DEAD" '{"name":"X"}' -; assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1e PATCH /groups/{id}/archive tokenless" "401"
+api PATCH "/groups/$S6_DEAD/archive" "" -; assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1f POST /groups/{id}/roles tokenless" "401 — the collection verbs are not a back door"
+api POST "/groups/$S6_DEAD/roles" '{"roleID":"'"$S6_DEAD"'"}' -; assert_rest 401 MissingAuthorizationNotification
+case_ "S6.1g PATCH /groups/{id}/roles/{childId}/archive tokenless" "401"
+api PATCH "/groups/$S6_DEAD/roles/$S6_DEAD/archive" "" -; assert_rest 401 MissingAuthorizationNotification
+
+s6_gql_tokenless() { # s6_gql_tokenless CASE QUERY [VARS]
+  case_ "$1" "401 in the REST envelope — the bearer is checked before the document is parsed, so a GraphQL field is not a way around the gate"
+  gql "$2" "${3:-}" -
+  assert_rest 401 MissingAuthorizationNotification
+}
+s6_gql_tokenless "S6.1h groups(...) tokenless"   "query { groups(first: 1) { totalCount } }"
+s6_gql_tokenless "S6.1i group(id:) tokenless"    "query { group(id: \"$S6_DEAD\") { id } }"
+s6_gql_tokenless "S6.1j createGroup tokenless"   "mutation(\$i: CreateGroupInput!) { createGroup(input: \$i) { id } }" '{"i":{"key":"qa-tokenless-gql","name":"X","description":"Y","roles":[]}}'
+s6_gql_tokenless "S6.1k patchGroup tokenless"    "mutation(\$i: PatchGroupInput!) { patchGroup(id: \"$S6_DEAD\", input: \$i) { id } }" '{"i":{"name":"X"}}'
+s6_gql_tokenless "S6.1l archiveGroup tokenless"  "mutation { archiveGroup(id: \"$S6_DEAD\") { success } }"
+s6_gql_tokenless "S6.1m addGroupRole tokenless"  "mutation(\$i: AddGroupRoleInput!) { addGroupRole(id: \"$S6_DEAD\", input: \$i) { groupId } }" '{"i":{"roleID":"'"$S6_DEAD"'"}}'
+s6_gql_tokenless "S6.1n archiveGroupRole tokenless" "mutation(\$i: ArchiveGroupRoleInput!) { archiveGroupRole(id: \"$S6_DEAD\", input: \$i) { success } }" '{"i":{"groupRoleId":"'"$S6_DEAD"'"}}'
+
+# ── S6.2 Layer 1, the gate: principal B holds tenant:read and nothing else ────────────────
+s6_denied() { s5_denied "$@"; }
+s6_denied "S6.2a principal B on the group LISTING" GET   "/groups"                        ""                                                  "group:read"
+s6_denied "S6.2b principal B on the by-id read"    GET   "/groups/$S6_DEAD"               ""                                                  "group:read"
+s6_denied "S6.2c principal B on insert"            POST  "/groups"                        '{"key":"qa-denied","name":"X","description":"Y"}'  "group:insert"
+s6_denied "S6.2d principal B on patch"             PATCH "/groups/$S6_DEAD"               '{"name":"X"}'                                      "group:update"
+s6_denied "S6.2e principal B on archive"           PATCH "/groups/$S6_DEAD/archive"       ""                                                  "group:archive"
+s6_denied "S6.2f principal B on ATTACH"            POST  "/groups/$S6_DEAD/roles"         '{"roleID":"'"$S6_DEAD"'"}'                         "group:grant"
+s6_denied "S6.2g principal B on DETACH"            PATCH "/groups/$S6_DEAD/roles/$S6_DEAD/archive" ""                                         "group:grant"
+
+# ── S6.3 the complement: a gate that refuses everyone is also broken ──────────────────────
+#
+# For the writes the target id addresses nothing ON PURPOSE: reaching the HANDLER — a 404,
+# never a 403 — is what proves the gate opened rather than that the write happened to be valid.
+
+S6_TEN=$(new_tenant active "$(ws s6)") || exit 1
+S6_ROLE=$(new_role "$(role_key s6)" "$S6_TEN" "$(permission_id_of tenant read)") || exit 1
+S6_GROUP=$(new_group "$(group_key s6)" "$S6_TEN" "$S6_ROLE") || exit 1
+api GET "/groups/$S6_GROUP"; S6_CHILD=$(printf '%s' "$HTTP_BODY" | jq -r '.data.roles[0].id')
+
+case_ "S6.3a the admin reads the listing" "200 — the wildcard grant satisfies every check"
+api GET "/groups?first=1"; assert_status 200
+case_ "S6.3b the admin reads by id"       "200"
+api GET "/groups/$S6_GROUP"; assert_status 200
+case_ "S6.3c the admin inserts"           "201"
+api POST /groups "$(group_body "$(group_key s6b)" "QA Gate Complement" "A group created only to prove the insert gate opens for a caller who holds the literal." "$S6_TEN")"
+assert_status 201
+case_ "S6.3d the admin patches"           "200"
+api PATCH "/groups/$S6_GROUP" "$(jq -nc '{name:"QA Gate Complement Renamed"}')"; assert_status 200
+case_ "S6.3e the admin ATTACHES"          "201 — group:grant is satisfied, and the domain then has its own say (GR4/GR5)"
+S6_ROLE2=$(new_role "$(role_key s6b)" "$S6_TEN" "$(permission_id_of group read)") || exit 1
+api POST "/groups/$S6_GROUP/roles" "$(jq -nc --arg r "$S6_ROLE2" '{roleID:$r}')"; assert_status 201
+case_ "S6.3f the admin DETACHES"          "204"
+api PATCH "/groups/$S6_GROUP/roles/$S6_CHILD/archive"; assert_empty_body 204
+case_ "S6.3g the admin archives an id that addresses nothing" "404, NEVER 403 — reaching the handler is what proves the gate opened"
+api PATCH "/groups/$S6_DEAD/archive"; assert_status 404
+
+# ── S6.4 the FIFTH VERB, visible to exactly one principal ─────────────────────────────────
+if [ -z "${QA_TOKEN_GROUPNOGRANT:-}" ]; then
+  case_ "S6.4 the group:grant split" "principal H — group:read + group:update, and NOT group:grant"
+  skip_ "principal H was not built by qa/run.sh. It is the ONLY caller for which the fifth verb is visible: B is refused on all seven routes and G passes all seven, so neither can see 'may relabel the group, may not change what it confers'. That split is UNPROVEN this run"
+else
+  S6_H_GROUP=$(new_group "$(group_key s6h)" "$QA_TENANT_SCOPED" ) || exit 1
+  case_ "S6.4a principal H lists groups"  "200 — it holds group:read"
+  api GET "/groups?first=1" "" "$QA_TOKEN_GROUPNOGRANT"; assert_status 200
+  case_ "S6.4b principal H reads by id"   "200"
+  api GET "/groups/$S6_H_GROUP" "" "$QA_TOKEN_GROUPNOGRANT"; assert_status 200
+  case_ "S6.4c principal H RELABELS the group" "200 — it holds group:update"
+  api PATCH "/groups/$S6_H_GROUP" "$(jq -nc '{name:"QA Relabelled By H"}')" "$QA_TOKEN_GROUPNOGRANT"; assert_status 200
+
+  s6h_denied() { # s6h_denied CASE METHOD PATH BODY
+    case_ "$1" "403 MissingPermissionNotification, value 'group:grant' — 'may rename the group' and 'may change what the group confers' are different jobs, and the second is the escalation surface"
+    api "$2" "$3" "$4" "$QA_TOKEN_GROUPNOGRANT"
+    local hit
+    hit=$(printf '%s' "$HTTP_BODY" | jq -r \
+      '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .field=="permission" and .value=="group:grant")] | length' 2>/dev/null)
+    if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on 'group:grant'"; fi
+  }
+  s6h_denied "S6.4d principal H on ATTACH" POST  "/groups/$S6_H_GROUP/roles" "$(jq -nc --arg r "$S6_ROLE" '{roleID:$r}')"
+  s6h_denied "S6.4e principal H on DETACH" PATCH "/groups/$S6_H_GROUP/roles/$S6_DEAD/archive" ""
+fi
+
+# ── S6.5 Layer 1 on GRAPHQL. A route gated on REST is not thereby gated here ──────────────
+s6_gql_denied() { s5_gql_denied "$@"; }
+s6_gql_denied "S6.5a principal B on the groups connection" "query { groups(first: 1) { totalCount } }" "" "group:read"
+s6_gql_denied "S6.5b principal B on group(id:)"            "query { group(id: \"$S6_DEAD\") { id } }" "" "group:read"
+s6_gql_denied "S6.5c principal B on createGroup"           "mutation(\$i: CreateGroupInput!) { createGroup(input: \$i) { id } }" '{"i":{"key":"qa-denied-gql","name":"X","description":"Y","roles":[]}}' "group:insert"
+s6_gql_denied "S6.5d principal B on patchGroup"            "mutation(\$i: PatchGroupInput!) { patchGroup(id: \"$S6_DEAD\", input: \$i) { id } }" '{"i":{"name":"X"}}' "group:update"
+s6_gql_denied "S6.5e principal B on archiveGroup"          "mutation { archiveGroup(id: \"$S6_DEAD\") { success } }" "" "group:archive"
+s6_gql_denied "S6.5f principal B on addGroupRole"          "mutation(\$i: AddGroupRoleInput!) { addGroupRole(id: \"$S6_DEAD\", input: \$i) { groupId } }" '{"i":{"roleID":"'"$S6_DEAD"'"}}' "group:grant"
+s6_gql_denied "S6.5g principal B on archiveGroupRole"      "mutation(\$i: ArchiveGroupRoleInput!) { archiveGroupRole(id: \"$S6_DEAD\", input: \$i) { success } }" '{"i":{"groupRoleId":"'"$S6_DEAD"'"}}' "group:grant"
+
+case_ "S6.5h the admin's GraphQL connection is served" "200 with no errors — the per-surface complement"
+gql "query { groups(first: 1) { totalCount edges { node { id } } } }"
+assert_gql_ok '(.data.groups.totalCount >= 0)' "true"
+
+# ── S6.6 / S6.7 Layers 2 and 3, which need principal G ────────────────────────────────────
+if [ -z "${QA_TOKEN_GROUP:-}" ]; then
+  case_ "S6.6 identity-derived rules and row scoping on Group" "principal G, authenticated, not a super-admin, bound to a tenant of the suite's own"
+  skip_ "principal G was not built by qa/run.sh, so Layer 2 (the tenant guard in BuildRules, the escalation and wildcard refusals) and Layer 3 (the ToCriteria row scope) are UNPROVEN this run. No token can be invented to stand in for it"
+else
+  case_ "S6.6a G creates a group naming the MASTER tenant" "403 TenantMismatchNotification on field tenantID — the row's tenant must equal the caller's claim"
+  api POST /groups "$(jq -nc --arg k "$(group_key s6m)" --arg t "$QA_MASTER_TENANT_ID" \
+    '{key:$k, name:"QA Foreign", description:"A group aimed at a tenant the caller does not belong to, to prove the write guard.", tenantID:$t, roles:[]}')" "$QA_TOKEN_GROUP"
+  assert_rest_field 403 TenantMismatchNotification tenantID
+
+  case_ "S6.6b THE SAME BODY sent by the admin" "201 — the *:* bypass, which is what lets a platform operator support a customer. Two calls that differ ONLY in who is asking"
+  api POST /groups "$(jq -nc --arg k "$(group_key s6m2)" --arg t "$QA_MASTER_TENANT_ID" \
+    '{key:$k, name:"QA Foreign", description:"A group aimed at a tenant the caller does not belong to, to prove the write guard.", tenantID:$t, roles:[]}')"
+  assert_status 201
+
+  case_ "S6.6c G ARCHIVES a group of another tenant" "403 TenantMismatchNotification — refuseForeignTenant runs under IfArchive too, and the write side is NOT filtered by ToCriteria, so the row LOADS and the rule is what refuses. Invisible if only reads were tested"
+  api PATCH "/groups/$S6_GROUP/archive" "" "$QA_TOKEN_GROUP"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "S6.6d G attaches a role granting a permission it does not hold" "403 CannotGrantRoleWithUnheldPermissionsNotification — the TRANSITIVE second Layer-2 rule, cross-referenced to GR5"
+  S6_G_GROUP=$(new_group "$(group_key s6g)" "$QA_TENANT_SCOPED") || exit 1
+  S6_ESC_ROLE=$(new_role "$(role_key s6esc)" "$QA_TENANT_SCOPED" "$(permission_id_of permission archive)") || exit 1
+  api POST "/groups/$S6_G_GROUP/roles" "$(jq -nc --arg r "$S6_ESC_ROLE" '{roleID:$r}')" "$QA_TOKEN_GROUP"
+  assert_rest 403 CannotGrantRoleWithUnheldPermissionsNotification
+
+  case_ "S6.6e and G is refused a WILDCARD-bearing role for everyone's reasons, not its own" "403 — G holds group:grant, so Layer 1 opened; the domain is what closes. Layer 1 asks 'may this principal touch the edge at all', G10a/G10b ask 'may this principal confer THIS role'"
+  S6_GM=$(new_group "$(group_key s6gm)" "$QA_MASTER_TENANT_ID") || exit 1
+  api POST "/groups/$S6_GM/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{roleID:$r}')"
+  assert_rest 403 CannotGrantWildcardRoleNotification
+
+  # ── Layer 3, where a leak answers 200 ───────────────────────────────────────────────────
+  case_ "S6.7a G's listing carries only its OWN tenant's rows" "every row's tenantID is G's own — asserted over the values, not over a count"
+  api GET "/groups?first=100" "" "$QA_TOKEN_GROUP"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S6.7b THE LEAK ITSELF: G reads another tenant's group by id" "404 RecordNotFoundNotification — NOT 403. A 403 would confirm the row exists to a caller who may not see it, and a group listing IS the customer's org chart"
+  api GET "/groups/$S6_GROUP" "" "$QA_TOKEN_GROUP"
+  assert_rest 404 RecordNotFoundNotification
+
+  case_ "S6.7c THE COMPLEMENT: the admin crosses the same scope" "200 on the very id G was refused — a scope that refuses everyone is also broken"
+  api GET "/groups/$S6_GROUP"
+  assert_status 200
+
+  case_ "S6.7d and the scope holds on GRAPHQL too" "every edge carries G's own tenantID — ToCriteria is shared, but a surface that skipped it would look exactly like a passing REST case"
+  gql "query { groups(first: 100) { edges { node { tenantID } } } }" "" "$QA_TOKEN_GROUP"
+  assert_gql_ok '[.data.groups.edges[].node.tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S6.7e the admin's GraphQL connection is NOT narrowed" "more than one distinct tenant — the bypass reaches this surface as well"
+  gql "query { groups(first: 100) { edges { node { tenantID } } } }"
+  assert_gql_ok '([.data.groups.edges[].node.tenantID] | unique | length) > 1' "true"
+fi
+
+case_ "S6.8 field-level read authz on Group" "recorded as a DECISION, and deliberately not exercised"
+skip_ "spec.md §9 declares no ReadCriteria.Restrict for Group: 'Every field a caller may see the row at all for, they may see entirely. Row-level isolation does the work.' There is no column to find absent for one caller and present for another, no tabular export whose header could be pruned, and no __typename edge to assert — that edge exists only where a restricted field is in the selection. S6.7 proves the row-level boundary that does the work instead"
+
 qa_finish
