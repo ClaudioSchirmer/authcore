@@ -29,8 +29,8 @@
 //     PermissionIsWildcard and CallerDoesNotHoldPermission all ask about the
 //     same catalog row. They funnel through catalogRow, memoised on the
 //     REQUEST-scoped AppContext, so three questions about one id cost one
-//     query. A role at the 200-permission cap therefore pays 200 round trips
-//     inside the write transaction rather than 600.
+//     query. A role at the 250-permission cap therefore pays 250 round trips
+//     inside the write transaction rather than 750.
 
 package infra
 

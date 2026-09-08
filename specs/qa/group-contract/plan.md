@@ -437,8 +437,10 @@ is visible rather than merely absent from a count.
 
 The only rows in this plan the framework never had an opinion about. Source named per row;
 `asked` means the maintainer answered on **2026-09-07** and the answer is recorded verbatim.
-They live in the existing `qa/domain.sh` as `GR1`–`GR13`, appended after the role rows
-(`RL1`–`RL11`).
+They live in the existing `qa/domain.sh` as `GR1`–`GR14`, appended after the role rows
+(`RL1`–`RL11`). `GR14` was added on **2026-09-08**
+(`specs/implement/role-permission-cap-250/plan.md`, D2); every other row was settled on
+2026-09-07.
 
 **Every negative case below needs a caller who is NOT a super-admin**, which the suite
 provisions through the service's own documented flow and nothing else (§2).
@@ -464,6 +466,17 @@ provisions through the service's own documented flow and nothing else (§2).
 | **GR11** | "At most **50** roles in one group." | `rules.list.role-cap` · §7 G9 · **asked — the HYBRID form** | a group carrying **exactly 50** real, live, same-tenant roles → **201**. The edge, not an approximation of it | the **51st** role attached through `POST /groups/{id}/roles` → **422** `TooManyRolesInGroupNotification`, field `roles`, value `51`, and **CLEAN** — no other notification key in the envelope, which is what a fixture of invented ids could never show. The rule counts `GetCurrentItemsOf`, so the collection route trips it exactly as an oversized insert body does — both are asserted | medium |
 | **GR12** | **"Arquivar o grupo tira o poder — e o poder do Group é transitivo. A linha `user_groups` sobrevive apontando para o grupo arquivado, e isso é HISTÓRIA; mas um token reemitido não carrega mais nenhuma permissão que vinha por ali."** | **asked 2026-09-07** — *"Os três interruptores"* · `authentication_reader.go:354-361` | the member reaches the route its inherited permission gates → **2xx**; its token carries the pair **and** a `groups` claim naming the group | the three switches, each on its own fixture — see below | **critical** |
 | **GR13** | "A retired group comes back as a NEW row whose members must be re-added — which is why §5 refused `Unarchive`: one call would re-authorize a whole team with an audit line reading 'restored'." | `spec.md` §5 | — | after `GR12a`, insert the same key again → **201 with a NEW id**; reissue the former member's token → the inherited permission is **still gone**, because `user_groups` still points at the OLD id. The cost the model accepted, made visible | high |
+
+| **GR14** | **"usar uma coleção set ou algo do tipo para NUNCA duplicar. Uma permission deve sair uma vez só na coleção do jwt, seja de client ou de user."** | **asked 2026-09-08** · `internal/infra/permission_set_manual.go` | a member reaching the SAME catalog row through a role held **directly** and a role conferred by a **group** — the `roles` claim names both, so the duplicate genuinely existed to be collapsed | the `permissions` claim carries the pair **exactly once**; **no** entry in the whole claim repeats; the response **body** carries no repeat either; and the gated route still answers **200** — a set that dropped both copies would satisfy every other assertion and authorize nothing | high |
+
+### `GR14` — why it lives in the GROUP family
+
+It is a claim-level guarantee, not a group rule, and the collapse it proves is shared with the
+client path. It sits here because **the group is what makes the duplicate reachable**: a
+principal cannot reach one catalog row twice without a second path, and the second path is
+inheritance. The client half of the same collector is covered by
+`internal/infra/client_authentication_reader_test.go` and by the collector's own unit tests;
+what no test asserted before this row is the guarantee **on the wire**, in a minted token.
 
 ### `GR12` — the three switches, and why each needs its own fixture
 

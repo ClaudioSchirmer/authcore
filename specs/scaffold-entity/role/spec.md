@@ -80,7 +80,7 @@ with it, so nothing here is decoration.
 | 3 | **The display name is never unique.** Nobody makes it so | §2 — `name` not unique, mirroring `Tenant.name` |
 | 4 | **Predefined vs custom roles.** GCP predefined / Azure built-in are platform-owned and immutable; customers create their own beside them | **Already settled by the README, not re-asked.** No nullable scope and no `is_builtin` flag: platform roles are ordinary rows owned by the **reserved platform tenant**. The README rejects `OR tenant_id IS NULL` explicitly |
 | 5 | **The permission set is validated against a catalog.** Azure validates actions against the resource provider's operation list; GCP against the published permission list. You cannot invent a permission inside a role | §7 R6 — a domain-service probe against `permissions`, exactly like `PermissionKeyTaken` |
-| 6 | **A role definition caps its permission count.** GCP: 3 000 per custom role. Azure: 2 000 actions | §7 R8 — a cap, proposed at 200. Also a claim-size budget: the permission spec sizes one rendered entry at 129 runes |
+| 6 | **A role definition caps its permission count.** GCP: 3 000 per custom role. Azure: 2 000 actions | §7 R8 — a cap, **250** (proposed at 200; RAISED 2026-09-08, see §7 R8). Also a claim-size budget: the permission spec sizes one rendered entry at 129 runes |
 | 7 | **Deleting a role in use is guarded.** Azure refuses to delete a role definition while assignments exist; GCP soft-deletes with a recovery window and then makes the id unusable for 37 days, precisely so a new role cannot inherit old bindings | §5/§6 — soft archive only, and the one-way question. The README already made this exact argument for `Permission` |
 | 8 | **Role hierarchy / composite roles exist but are the minority.** Keycloak has composite roles and NIST RBAC1 has inheritance; AWS, GCP and Azure deliberately have **none** — a role is a flat set | **Rejected, recorded.** Flat set. Inheritance turns "what can this user do?" into a graph walk with cycle detection, and the union-of-two-paths model the README draws already gives the composition |
 | 9 | **No deny rules.** GCP added deny policies only in 2022, as a separate object; Azure `NotActions` is a subtraction inside one definition | **Rejected, recorded.** The README states it: "There is no precedence and no deny rule: a permission is held or it is not" |
@@ -466,7 +466,7 @@ still holds it, with no re-approval and an audit line that reads "restored". A r
 should come back as a **new row that must be granted again**.
 
 Named honestly, because it is the cost: **GCP goes the other way** — `roles.undelete` exists,
-with a recovery window, precisely because rebuilding a 200-permission role by hand after a
+with a recovery window, precisely because rebuilding a 250-permission role by hand after a
 fat-finger is brutal. If that operator-error case matters more here than the
 silent-reauthorization one, the answer is `Unarchive` plus a rule that refuses it when the
 key has since been retaken. Say the word and it is one mode and one rule.
@@ -490,7 +490,7 @@ exactly what an access review needs to read. Per-child revocation is
 | R5 | `TenantID` | **Tenant isolation.** The row's tenant must equal the caller's `tenant_id` claim, unless the caller is a `*:*` superadmin | `IfInsertOrUpdate` + `IfArchive` | `domain.TenantMismatchNotification` (framework-owned, already translated) | 403 |
 | R6 | `Permissions[].PermissionID` | Every granted permission must exist in the catalog **and be active** | `IfInsertOrUpdate`, over the entries this write ADDS | `PermissionNotInCatalogNotification` | 422 |
 | R7 | `Permissions[]` | No duplicate permission within one role — `IsSameBusinessIdentity` on the GRANT path, plus the explicit guard on the by-id path, plus the partial unique index as backstop | `IfInsertOrUpdate` | `RoleAlreadyGrantsPermissionNotification` | 409 |
-| R8 | `Permissions[]` | At most **200** permissions in one role (proposed; GCP caps at 3 000, Azure at 2 000 — 200 is sized to this platform, not to theirs) | `IfInsertOrUpdate` | `TooManyPermissionsInRoleNotification` | 422 |
+| R8 | `Permissions[]` | At most **250** permissions in one role (GCP caps at 3 000, Azure at 2 000 — 250 is sized to this platform, not to theirs). **SUPERSEDED 2026-09-08: this row read 200 until that date.** Raised on the maintainer's instruction — `specs/implement/role-permission-cap-250/plan.md`. The figure lives in one place, `rules.list[permission-cap].cap` of the entity spec, and is generated from there; the seven catalogs interpolate `{max}` and never carried it | `IfInsertOrUpdate` | `TooManyPermissionsInRoleNotification` | 422 |
 | **R9a** | `Permissions[]` | **No privilege escalation** — a caller may only grant a permission they themselves hold. A `*:*` superadmin passes for everything, by construction | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantUnheldPermissionNotification` | 403 |
 | **R9b** | `Permissions[]` | **No wildcard grant through the API** — a permission with `*` in either part cannot be granted on any role | `IfInsertOrUpdate`, over the entries this write ADDS | `CannotGrantWildcardPermissionNotification` | 403 |
 | — | `Key`, `Name`, `Description` | format, length, substance, anti-junk | — | **not declared here** — `vos.RoleKey`, `vos.DisplayName` and `vos.Description` validate by type on every write. Declaring `required` beside a VO makes the caller read the same complaint twice | 422 |
@@ -682,13 +682,13 @@ RoleService (internal/domain/role_service.go) — plain values, no error, per th
 ```
 
 **The cost this shape carries, stated rather than discovered.** The happy path asks three
-questions per granted entry instead of one per collection, bounded by the 200-permission
+questions per granted entry instead of one per collection, bounded by the 250-permission
 cap; the refusing paths short-circuit. Two mitigations belong in the build and not in a
 later optimization pass: the domain walks the collection **once** (a single
 `refuseUngrantablePermissions` pass, not three), and the implementation funnels all three
 facts through **one** cached catalog lookup per entry, memoised on the request-scoped store
-so three questions about one id cost one query. A role at the cap then pays 200 round trips
-inside the write transaction rather than 600.
+so three questions about one id cost one query. A role at the cap then pays 250 round trips
+inside the write transaction rather than 750.
 
 `CallerDoesNotHoldPermission` is where the ctx-bound seam pays off: `ScopedService(ctx)`
 binds the request to the service in this project, so the impl reads `s.ctx.Identity()`

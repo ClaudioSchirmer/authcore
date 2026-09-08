@@ -44,9 +44,9 @@ func TestAGroupAtTheCapIsAccepted(t *testing.T) {
 	}
 }
 
-// The cap is lower than Role's 200 on purpose, and it MULTIPLIES against it: a
+// The cap is lower than Role's 250 on purpose, and it MULTIPLIES against it: a
 // member inherits every permission of every role in the bundle, so 50 roles is
-// already a 10,000-permission ceiling on what one group can confer.
+// already a 12,500-permission ceiling on what one group can confer.
 func TestAGroupOnePastTheCapIsRefused(t *testing.T) {
 	e := groupWithRoles(51)
 

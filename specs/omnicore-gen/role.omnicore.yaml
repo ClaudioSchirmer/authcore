@@ -629,10 +629,10 @@ rules:
       kind: groupCap
       scope: [insertOrUpdate]
       fields: [RolePermission]
-      cap: 200
+      cap: 250
       notification: TooManyPermissionsInRoleNotification
       description: >-
-        At most 200 permissions in one role. Sized to this platform rather than to GCP's
+        At most 250 permissions in one role. Sized to this platform rather than to GCP's
         3000 or Azure's 2000, and it doubles as a claim-size budget.
 
     - id: duplicate-grant
@@ -728,7 +728,7 @@ service:
     #
     # The implementation funnels all three through ONE cached catalog lookup per entry,
     # memoised on the request-scoped store, so three questions about one id cost one query:
-    # a role at the cap pays 200 round trips inside the write transaction, not 600.
+    # a role at the cap pays 250 round trips inside the write transaction, not 750.
     - name: PermissionIsNotInCatalog
       kind: manual
       returns: bool

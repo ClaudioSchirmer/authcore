@@ -5,8 +5,8 @@
 // entity:     Role
 // spec:       specs/omnicore-gen/role.omnicore.yaml
 // generator:  omnicore-gen
-// generated:  2026-09-07
-// checksum:   sha256:bcf9ad41be586f63ab4e0f36f492b76a5a533896ac77801f599e6b7b4fb86373
+// generated:  2026-09-08
+// checksum:   sha256:0247ceeefe156b6d8146a7be40fdbedcf579ef62610ee367c71f82881d15f32d
 //
 // The line above is the Go convention that tells linters to skip this file.
 // It is NOT a rule that the code may not change: this file is yours, in your
@@ -144,13 +144,13 @@ func (e *Role) BuildRules(actionName string, service domain.Service, r *domain.R
 		// guard (tenant-is-a-usable-id): the rules below depend on these having passed.
 		r.StopIfInvalid()
 
-		// At most 200 permissions in one role. Sized to this platform rather
+		// At most 250 permissions in one role. Sized to this platform rather
 		// than to GCP's 3000 or Azure's 2000, and it doubles as a claim-size
 		// budget.
 		{
 			items := domain.GetCurrentItemsOf[aggregatevos.RolePermission](e.GetAggregateRoot())
-			if len(items) > 200 {
-				r.AddNotificationNamed("Permissions", TooManyPermissionsInRoleNotification{Max: "200"}, len(items))
+			if len(items) > 250 {
+				r.AddNotificationNamed("Permissions", TooManyPermissionsInRoleNotification{Max: "250"}, len(items))
 			}
 		}
 		// No duplicate permission within one role. The business identity is

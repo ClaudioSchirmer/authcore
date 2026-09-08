@@ -1,6 +1,6 @@
 # QA report — authcore · the seven entity contracts (tenant, permission, role, group, user, client, claim)
 
-- **run:** `20260908-121820-99193` · 2026-09-08 12:19:36 EDT
+- **run:** `20260908-124311-39992` · 2026-09-08 12:44:26 EDT
 - **plans:** specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md · specs/qa/claim-contract/plan.md
 - **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags 'postgres'` (no transport tag — the yaml declares no `transport:` block)
 - **omnicore pin:** `v0.74.0`
@@ -10,22 +10,22 @@
 | Suite | Pass | Fail | Skip | Verdict | Time |
 |---|---:|---:|---:|---|---:|
 | tenant | 111 | 0 | 0 | ✅ GREEN | 2s |
-| tenant_graphql | 36 | 0 | 0 | ✅ GREEN | 0s |
+| tenant_graphql | 36 | 0 | 0 | ✅ GREEN | 1s |
 | permission | 131 | 0 | 0 | ✅ GREEN | 2s |
 | permission_graphql | 37 | 0 | 0 | ✅ GREEN | 1s |
 | role | 208 | 0 | 4 | ✅ GREEN | 4s |
-| role_graphql | 44 | 0 | 0 | ✅ GREEN | 0s |
-| group | 214 | 0 | 4 | ✅ GREEN | 4s |
-| group_graphql | 51 | 0 | 0 | ✅ GREEN | 1s |
-| user | 152 | 0 | 0 | ✅ GREEN | 5s |
+| role_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
+| group | 214 | 0 | 4 | ✅ GREEN | 3s |
+| group_graphql | 51 | 0 | 0 | ✅ GREEN | 2s |
+| user | 152 | 0 | 0 | ✅ GREEN | 4s |
 | user_graphql | 46 | 0 | 0 | ✅ GREEN | 1s |
 | client | 139 | 0 | 0 | ✅ GREEN | 3s |
 | client_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
 | claim | 99 | 0 | 4 | ✅ GREEN | 2s |
 | claim_graphql | 43 | 0 | 0 | ✅ GREEN | 1s |
-| domain | 447 | 0 | 8 | ✅ GREEN | 30s |
+| domain | 453 | 0 | 8 | ✅ GREEN | 30s |
 | security | 329 | 0 | 13 | ✅ GREEN | 8s |
-| audit | 87 | 0 | 0 | ✅ GREEN | 5s |
+| audit | 87 | 0 | 0 | ✅ GREEN | 4s |
 
 ## Skipped — coverage this run did NOT prove
 
@@ -147,4 +147,4 @@ A security or domain family that never executed is the one place where "no failu
 
 ---
 
-✅ ALL GREEN — 17/17 suites · 2218 cases · 76s
+✅ ALL GREEN — 17/17 suites · 2224 cases · 75s

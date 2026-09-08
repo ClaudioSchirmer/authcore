@@ -261,8 +261,7 @@ func assembleClient(
 ) ClientSignInBundle {
 	var (
 		roles      = map[string]NamedGrant{}
-		perms      []vos.PermissionKey
-		seenPerm   = map[string]struct{}{}
+		perms      permissionSet
 		claimValue = make(map[domain.ID]string, len(values))
 		allowed    = make([]string, 0, len(ranges))
 	)
@@ -273,20 +272,10 @@ func assembleClient(
 		}
 		roles[row.RoleKey] = NamedGrant{Key: row.RoleKey, Name: row.RoleName}
 
-		switch {
-		case row.Resource == nil || row.Action == nil: // the role confers nothing
-			continue
-		case row.GrantArchivedAt != nil: // the grant was revoked
-			continue
-		case row.PermissionArchivedAt != nil: // the catalog entry was retired
-			continue
-		}
-		key := *row.Resource + ":" + *row.Action
-		if _, dup := seenPerm[key]; dup {
-			continue
-		}
-		seenPerm[key] = struct{}{}
-		perms = append(perms, vos.PermissionKey{Resource: *row.Resource, Action: *row.Action})
+		// The three gates this row still has to pass, and the collapse, are
+		// permissionSet's — the same ones the user path applies, because the
+		// answer must not depend on which kind of principal signed in.
+		perms.add(row.Resource, row.Action, row.GrantArchivedAt, row.PermissionArchivedAt)
 	}
 
 	for _, row := range values {
@@ -297,21 +286,11 @@ func assembleClient(
 		allowed = append(allowed, row.CIDR)
 	}
 
-	// Stable order, so two tokens minted from the same grants are byte-identical in
-	// these claims — which is what makes a diff between two tokens readable when
-	// somebody is working out why a permission disappeared.
-	sort.Slice(perms, func(i, j int) bool {
-		a, b := perms[i], perms[j]
-		if a.Resource != b.Resource {
-			return a.Resource < b.Resource
-		}
-		return a.Action < b.Action
-	})
 	sort.Strings(allowed)
 
 	return ClientSignInBundle{
 		Roles:        sortedGrants(roles),
-		Permissions:  perms,
+		Permissions:  perms.sorted(),
 		ClaimValues:  claimValue,
 		Definitions:  definitions,
 		AllowedCIDRs: allowed,

@@ -66,7 +66,7 @@ func (e *Role) customRules(actionName string, service domain.Service, r *domain.
 //
 // ONE pass, not three. The three rules ask about the same entries and the same
 // catalog rows, so walking the collection once is what keeps a role at the
-// 200-permission cap from paying three traversals for one write; the service
+// 250-permission cap from paying three traversals for one write; the service
 // funnels their questions through a single memoised read per entry.
 //
 // WHY ONLY THE ADDED ENTRIES. All three ask about the ACT of granting, and a
