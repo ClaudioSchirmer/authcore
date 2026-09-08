@@ -1282,4 +1282,961 @@ else
   skip_ "GR12c — the role-archive revocation chain could not be provisioned, so the third of the three switches is UNPROVEN this run"
 fi
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#  USER — §1b of specs/qa/user-contract/plan.md. Family U.
+#
+#  Ranked by the cost the maintainer named on 2026-09-07. U23, U24, U17 and U19 lead because
+#  they are the rows where a regression is silent: none of them changes a status code on a
+#  happy path, and three of them decide who can hold a session at all.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_U=$(new_tenant active "$(ws du)") || exit 1
+P_TENANT_READ_U=$(permission_id_of tenant read)
+P_USER_READ_U=$(permission_id_of user read)
+P_PERM_ARCHIVE_U=$(permission_id_of permission archive)
+for p in "$P_TENANT_READ_U" "$P_USER_READ_U" "$P_PERM_ARCHIVE_U"; do
+  [ -n "$p" ] || { echo "domain.sh: a seeded catalog id could not be resolved for the U family" >&2; exit 1; }
+done
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U23 [CRITICAL] — "A token minted for a must_change_password account carries EXACTLY
+# user:change-password and nothing else. The grant is EMBEDDED, not filtered, and `*:*` is
+# dropped."
+#   source: internal/application/commands/handlers/utils/authentication.go —
+#           EffectivePermissions / restrictToPasswordChange / BuildClaims · asked 2026-09-07
+#
+# This rule appears in NO entity spec and NO route declaration. It is the sharpest invariant
+# in the service and the one a regression would expose silently: losing it hands a session
+# that exists only to rotate an expired credential the account's whole bundle.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U23_EMAIL=$(user_email u23)
+U23_ROLE=$(new_role "$(role_key u23)" "$TEN_U" "$P_TENANT_READ_U" "$P_USER_READ_U") || exit 1
+api POST /users "$(jq -nc --arg e "$U23_EMAIL" --arg t "$TEN_U" --arg p "$QA_USER_PASS1" --arg r "$U23_ROLE" \
+  '{givenName:"Qa", familyName:"Fixture", email:$e, status:"active", tenantID:$t,
+    password:$p, passwordConfirmation:$p, roles:[{roleID:$r}]}')"
+U23_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+
+if [ -z "$U23_ID" ]; then
+  skip_ "U23 — the must-change principal could not be provisioned, so the token restriction is UNPROVEN this run"
+else
+  U23_T1=$(qa_login "$U23_EMAIL" "$QA_USER_PASS1")
+
+  case_ "U23.1 the account is born must_change_password" "true — an admin-set initial password has to be replaced by its owner"
+  api GET "/users/$U23_ID"
+  assert_json_at 200 '.data.mustChangePassword' "true"
+
+  case_ "U23.2- the FIRST token carries exactly ONE permission" "[\"user:change-password\"] and nothing else — the bundle's tenant:read and user:read are both dropped"
+  GOT=$(jwt_claim "$U23_T1" permissions | tr -d ' \n')
+  if [ "$GOT" = '["user:change-password"]' ]; then pass_; else HTTP_BODY="$GOT"; fail_ "permissions = $GOT"; fi
+
+  case_ "U23.3- ...so a permission the bundle genuinely confers is refused" "403 MissingPermissionNotification on a route the account's own role opens"
+  api GET "/tenants?first=1" "" "$U23_T1"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "U23.4- ...and so is the entity's own read" "403 — the session can do one thing and nothing else"
+  api GET "/users?first=1" "" "$U23_T1"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "U23.5 the one permission it DOES carry actually opens its route" "204 — the flow must not deadlock: a session that cannot even rotate the credential it exists to rotate would be a dead end"
+  rotate_password "$U23_ID" "$U23_T1" "$QA_USER_PASS1" "$QA_USER_PASS2"
+  assert_empty_body 204
+
+  case_ "U23.6+ the NEXT token carries the whole bundle" "tenant:read and user:read both back — the restriction was a state, not a revocation"
+  U23_T2=$(qa_login "$U23_EMAIL" "$QA_USER_PASS2")
+  GOT=$(jwt_claim "$U23_T2" permissions | tr -d ' \n')
+  if printf '%s' "$GOT" | grep -q 'tenant:read' && printf '%s' "$GOT" | grep -q 'user:read'; then pass_; else HTTP_BODY="$GOT"; fail_ "permissions = $GOT"; fi
+
+  case_ "U23.7+ ...and the reach is back" "200 on the route that answered 403 four cases ago"
+  api GET "/tenants?first=1" "" "$U23_T2"
+  assert_status 200
+
+  case_ "U23.8 the RESPONSE BODY and the TOKEN agree" "the body advertises exactly what the token carries — the first version of this file had them disagreeing, and a client offering actions every request then refuses is what that bug looked like"
+  BODY_PERMS=$(curl -s -X POST "$QA_BASE/auth/user/token" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg e "$U23_EMAIL" --arg p "$QA_USER_PASS2" '{email:$e, password:$p}')" \
+    | jq -c '.data.user.permissions // .data.permissions // empty' | tr -d ' \n')
+  TOK_PERMS=$(jwt_claim "$U23_T2" permissions | jq -c 'sort' 2>/dev/null | tr -d ' \n')
+  if [ -n "$BODY_PERMS" ] && [ "$(printf '%s' "$BODY_PERMS" | jq -c 'sort' | tr -d ' \n')" = "$TOK_PERMS" ]; then pass_
+  else HTTP_BODY="body=$BODY_PERMS token=$TOK_PERMS"; fail_ "body and token disagree"; fi
+fi
+
+# ── U23's superadmin half: the cut applies to `*:*` too ──────────────────────────────────
+#
+# The one case that proves the grant is EMBEDDED rather than FILTERED. A wildcard bundle
+# contains no literal `user:change-password`, so a filtering implementation would hand this
+# account an EMPTY claim and a session that can do nothing at all — including the one thing it
+# exists to do.
+#
+# IT CANNOT BE BUILT THROUGH THE API, and that is itself a rule this suite asserts: no role may
+# be created carrying the wildcard (role_rules_manual.go no-wildcard-grant) and no user may be
+# granted a wildcard-bearing role (U14.3). The ONLY such account is the one migration 0012
+# seeds — born must_change_password=TRUE, holding *:* through the master role — so run.sh
+# publishes its pre-rotation token rather than spending it silently.
+if [ -z "${QA_BOOT_ADMIN_TOKEN:-}" ]; then
+  skip_ "U23.9-12 — the seeded admin's pre-rotation token was not published, so the *:* half of the token restriction is UNPROVEN this run"
+else
+  case_ "U23.9- a MUST-CHANGE account holding *:* carries the single permission too" "[\"user:change-password\"] — the wildcard is DROPPED, which is the whole difference between an embedded grant and a filtered one. A filtering implementation would answer [] here, because a wildcard bundle contains no such literal"
+  GOT=$(jwt_claim "$QA_BOOT_ADMIN_TOKEN" permissions | tr -d ' \n')
+  if [ "$GOT" = '["user:change-password"]' ]; then pass_; else HTTP_BODY="$GOT"; fail_ "permissions = $GOT"; fi
+
+  case_ "U23.10- ...and it is refused everywhere its wildcard would otherwise reach" "403 — a *:* session in this state is not a platform operator"
+  api GET "/permissions?first=1" "" "$QA_BOOT_ADMIN_TOKEN"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "U23.11 the account itself really does hold the wildcard" "the ROTATED token of the same account reaches the route the restricted one could not — proving U23.9 measured a RESTRICTION and not an account that simply held nothing"
+  api GET "/permissions?first=1" "" "$QA_TOKEN_ADMIN"
+  assert_status 200
+
+  case_ "U23.12 the must_change flag is what separated them" "false now — one account, two tokens, and the only thing that changed between them is the flag the rotation cleared"
+  api GET "/users/$QA_BOOT_ADMIN_ID"
+  assert_json_at 200 '.data.mustChangePassword' "false"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U24 [CRITICAL] — "Who may hold a session: the account must be active AND its owning tenant
+# must not be commercially suspended. Trial passes. One generic answer for every refusal."
+#   source: AccountIsUsable · spec.md §7 U15 · asked 2026-09-07 (three doors, both ways)
+#
+# The bridge no other aggregate has: a WRITE to this entity decides who can authenticate.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U24_EMAIL=$(user_email u24)
+U24_ID=$(new_user "$U24_EMAIL" "$TEN_U") || exit 1
+
+case_ "U24.1+ an active user in an active tenant signs in" "a token — the positive half every door below is measured against"
+U24_T=$(qa_login "$U24_EMAIL" "$QA_USER_PASS1")
+if [ -n "$U24_T" ]; then pass_; else fail_ "no token"; fi
+
+case_ "U24.2- DOOR ONE: a SUSPENDED user is refused" "no token — status is the account's own gate, and it is orthogonal to archiving"
+api PATCH "/users/$U24_ID" '{"status":"suspended"}'
+U24_T2=$(qa_login "$U24_EMAIL" "$QA_USER_PASS1")
+if [ -z "$U24_T2" ]; then pass_; else HTTP_BODY="$(jwt_claim "$U24_T2" permissions)"; fail_ "a suspended user signed in"; fi
+
+case_ "U24.3+ ...and reactivating restores the session" "a token again — suspension is reversible, which is the whole reason it exists beside archive"
+api PATCH "/users/$U24_ID" '{"status":"active"}'
+U24_T3=$(qa_login "$U24_EMAIL" "$QA_USER_PASS1")
+if [ -n "$U24_T3" ]; then pass_; else fail_ "no token after reactivation"; fi
+
+# ── DOOR TWO: the archive, and U17's mutation on the way through ─────────────────────────
+U24A_EMAIL=$(user_email u24a)
+U24A_ID=$(new_user "$U24A_EMAIL" "$TEN_U") || exit 1
+
+case_ "U17.1 ARCHIVING FORCES suspended — and it reaches the ROW" "status 'suspended' on a user archived while ACTIVE. A mutation, not a validation: it raises nothing and makes archived+active unrepresentable rather than merely refused"
+api PATCH "/users/$U24A_ID/archive"
+api GET "/users/$U24A_ID?includeArchived=true"
+assert_json_at 200 '.data.status' "suspended"
+
+case_ "U17.2 ...and the row itself says so, not merely the read model" "the users row carries status='suspended' AND archived_at — archive is an ordinary full-field write at this pin, which is what lets the rule live in IfArchive at all"
+GOT=$(sql "SELECT status || '/' || (archived_at IS NOT NULL) FROM users WHERE id = '$U24A_ID';" | tr -d '[:space:]')
+if [ "$GOT" = "suspended/true" ]; then pass_; else fail_ "status/archived = '$GOT'"; fi
+
+case_ "U24.4- DOOR TWO: an ARCHIVED user is refused" "no token — the loader's default scope refuses the row before AccountIsUsable is even reached"
+U24A_T=$(qa_login "$U24A_EMAIL" "$QA_USER_PASS1")
+if [ -z "$U24A_T" ]; then pass_; else fail_ "an archived user signed in"; fi
+
+# ── DOOR THREE: the tenant's commercial state ────────────────────────────────────────────
+TEN_U3=$(new_tenant active "$(ws du3)") || exit 1
+U24T_EMAIL=$(user_email u24t)
+U24T_ID=$(new_user "$U24T_EMAIL" "$TEN_U3") || exit 1
+
+case_ "U24.5+ the user signs in while its tenant is active" "a token"
+U24T_T=$(qa_login "$U24T_EMAIL" "$QA_USER_PASS1")
+if [ -n "$U24T_T" ]; then pass_; else fail_ "no token"; fi
+
+case_ "U24.6- DOOR THREE: suspending the TENANT stops the session" "no token — the user row is untouched and still active; a customer who stopped paying should not be issuing credentials"
+api PATCH "/tenants/$TEN_U3" '{"status":"suspended"}'
+U24T_T2=$(qa_login "$U24T_EMAIL" "$QA_USER_PASS1")
+if [ -z "$U24T_T2" ]; then pass_; else fail_ "a suspended tenant's user signed in"; fi
+
+case_ "U24.7 ...and the user itself was NOT touched" "status still 'active' — the refusal came from the joined tenant column, not from a cascade nobody declared"
+api GET "/users/$U24T_ID"
+assert_json_at 200 '.data.status' "active"
+
+case_ "U24.8+ reactivating the tenant restores the session" "a token again"
+api PATCH "/tenants/$TEN_U3" '{"status":"active"}'
+U24T_T3=$(qa_login "$U24T_EMAIL" "$QA_USER_PASS1")
+if [ -n "$U24T_T3" ]; then pass_; else fail_ "no token after the tenant came back"; fi
+
+case_ "U24.9+ a TRIAL tenant signs in" "a token — a trial is a live customer being onboarded, and reading the gate as 'status != active' would break every trial signup"
+TEN_TRIAL=$(new_tenant trial "$(ws dut)") || true
+if [ -z "${TEN_TRIAL:-}" ]; then
+  skip_ "U24.9 — a trial tenant could not be created, so the trial-passes half is UNPROVEN this run"
+else
+  U24TR_EMAIL=$(user_email u24tr)
+  U24TR_ID=$(new_user "$U24TR_EMAIL" "$TEN_TRIAL") || true
+  U24TR_T=$(qa_login "$U24TR_EMAIL" "$QA_USER_PASS1")
+  if [ -n "$U24TR_T" ]; then pass_; else fail_ "a trial tenant's user could not sign in"; fi
+fi
+
+case_ "U24.10 THE THREE REFUSALS ARE INDISTINGUISHABLE" "one key for all of them — a caller learns 'no', never WHICH half failed. Telling them apart would say whether an address exists, whether it is suspended, or whether its tenant stopped paying"
+K_SUSP=$(curl -s -X POST "$QA_BASE/auth/user/token" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+  -d "$(jq -nc --arg e "$U24A_EMAIL" --arg p "$QA_USER_PASS1" '{email:$e,password:$p}')" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+K_NOBODY=$(curl -s -X POST "$QA_BASE/auth/user/token" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+  -d "$(jq -nc --arg e "$(user_email ghost)" --arg p "$QA_USER_PASS1" '{email:$e,password:$p}')" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+K_WRONGPW=$(curl -s -X POST "$QA_BASE/auth/user/token" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+  -d "$(jq -nc --arg e "$U24_EMAIL" '{email:$e,password:"Wrong!Pass2026"}')" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+if [ -n "$K_SUSP" ] && [ "$K_SUSP" = "$K_NOBODY" ] && [ "$K_SUSP" = "$K_WRONGPW" ]; then pass_
+else HTTP_BODY="archived='$K_SUSP' absent='$K_NOBODY' wrong-password='$K_WRONGPW'"; fail_ "the three refusals differ"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U19/U20/U21/U22 [CRITICAL] — the credential pair: two routes that refuse each other's rows,
+# the flag they disagree about, and the two proofs of possession.
+#   source: user_credential_manual.go · spec.md §10 · asked 2026-09-07 (all four families)
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U19_A_EMAIL=$(user_email u19a); U19_A_ID=$(new_user "$U19_A_EMAIL" "$TEN_U") || exit 1
+U19_B_EMAIL=$(user_email u19b); U19_B_ID=$(new_user "$U19_B_EMAIL" "$TEN_U") || exit 1
+# A holds the whole user vocabulary INCLUDING reset-password, so its refusals below are row
+# decisions and never a missing permission — which is the distinction these cases exist for.
+U19_ROLE=$(new_role "$(role_key u19)" "$TEN_U" \
+  "$(permission_id_of user read)" "$(permission_id_of user update)" \
+  "$(permission_id_of user reset-password)" "$(permission_id_of user change-password)") || exit 1
+grant_role_to_user "$U19_A_ID" "$U19_ROLE" >/dev/null
+U19_A_T=$(usable_token "$U19_A_EMAIL" "$U19_A_ID") || true
+
+if [ -z "${U19_A_T:-}" ]; then
+  skip_ "U19-U22 — the credential principal could not be provisioned, so the two row decisions are UNPROVEN this run"
+else
+  case_ "U19.1+ the CHANGE on one's own row" "204 — the everyday case: the caller proves what they hold and chooses what replaces it"
+  rotate_password "$U19_A_ID" "$U19_A_T" "$QA_USER_PASS2" 'Qa!Own2026xy'
+  assert_empty_body 204
+
+  case_ "U19.2- the CHANGE pointed at SOMEBODY ELSE" "403 PasswordChangeRequiresSelfNotification — the route says who may attempt the verb; this says whose row they reached"
+  api PATCH "/users/$U19_B_ID/password" \
+    "$(jq -nc '{currentPassword:"Qa!Own2026xy", password:"Qa!Steal2026x", passwordConfirmation:"Qa!Steal2026x"}')" "$U19_A_T"
+  assert_rest 403 PasswordChangeRequiresSelfNotification
+
+  case_ "U19.3+ the RESET on somebody else's row" "204 — the helpdesk operation, carrying no current password because not knowing it is the point"
+  api PATCH "/users/$U19_B_ID/password-reset" \
+    '{"password":"Qa!Helpdesk26","passwordConfirmation":"Qa!Helpdesk26"}' "$U19_A_T"
+  assert_empty_body 204
+
+  case_ "U19.4- the RESET pointed at ONE'S OWN row" "403 PasswordResetRequiresAnotherUserNotification — WITHOUT this half, a holder of user:reset-password replaces their own credential without proving the previous one, defeating the change endpoint by choosing the other URL"
+  api PATCH "/users/$U19_A_ID/password-reset" \
+    '{"password":"Qa!Launder26x","passwordConfirmation":"Qa!Launder26x"}' "$U19_A_T"
+  assert_rest 403 PasswordResetRequiresAnotherUserNotification
+
+  case_ "U19.5 the two operations are DISJOINT BY CONSTRUCTION" "same id is always the change, a different id is always the reset — there is no row either verb can reach that the other can"
+  api PATCH "/users/$U19_A_ID/password-reset" '{"password":"Qa!Nope2026xx","passwordConfirmation":"Qa!Nope2026xx"}' "$U19_A_T"
+  S1="$HTTP_STATUS"
+  api PATCH "/users/$U19_B_ID/password" '{"currentPassword":"Qa!Helpdesk26","password":"Qa!Nope2026xx","passwordConfirmation":"Qa!Nope2026xx"}' "$U19_A_T"
+  S2="$HTTP_STATUS"
+  if [ "$S1" = "403" ] && [ "$S2" = "403" ]; then pass_; else HTTP_BODY="self-reset=$S1 other-change=$S2"; fail_ "one of the two doors was open"; fi
+
+  # ── U20: the flag the two operations disagree about ────────────────────────────────────
+  case_ "U20.1 the CHANGE clears mustChangePassword" "false — the password it leaves is the caller's own choice, so there is nothing for the next sign-in to rotate"
+  api GET "/users/$U19_A_ID" "" "$U19_A_T"
+  assert_json_at 200 '.data.mustChangePassword' "false"
+
+  case_ "U20.2 the RESET sets it" "true — the password a reset leaves is somebody else's choice"
+  api GET "/users/$U19_B_ID" "" "$U19_A_T"
+  assert_json_at 200 '.data.mustChangePassword' "true"
+
+  case_ "U20.3 ...and that flag is what U23 reads" "B's next token carries the single permission — the two families are one mechanism seen from two sides"
+  U20_T=$(qa_login "$U19_B_EMAIL" 'Qa!Helpdesk26')
+  GOT=$(jwt_claim "$U20_T" permissions | tr -d ' \n')
+  if [ "$GOT" = '["user:change-password"]' ]; then pass_; else HTTP_BODY="$GOT"; fail_ "permissions = $GOT"; fi
+
+  # ── U21/U22: the two proofs of possession ──────────────────────────────────────────────
+  case_ "U21.1- the CHANGE refuses a password equal to the current one" "422 PasswordUnchangedNotification — answered from the two PLAINTEXTS, for free, because the line above already established the current one verifies"
+  api PATCH "/users/$U19_A_ID/password" \
+    '{"currentPassword":"Qa!Own2026xy","password":"Qa!Own2026xy","passwordConfirmation":"Qa!Own2026xy"}' "$U19_A_T"
+  assert_rest 422 PasswordUnchangedNotification
+
+  case_ "U21.2- the RESET refuses one too" "422 PasswordUnchangedNotification — the SAME key by a different route: this operation never learns the current password, so the stored hash is the only thing to ask"
+  api PATCH "/users/$U19_B_ID/password-reset" \
+    '{"password":"Qa!Helpdesk26","passwordConfirmation":"Qa!Helpdesk26"}' "$U19_A_T"
+  assert_rest 422 PasswordUnchangedNotification
+
+  case_ "U22.1- a WRONG current password" "422 InvalidCurrentPasswordNotification"
+  api PATCH "/users/$U19_A_ID/password" \
+    '{"currentPassword":"Qa!Wrong2026","password":"Qa!Fresh2026x","passwordConfirmation":"Qa!Fresh2026x"}' "$U19_A_T"
+  assert_rest 422 InvalidCurrentPasswordNotification
+
+  case_ "U22.2- an EMPTY current password" "422 InvalidCurrentPasswordNotification — the SAME answer, ~100ms cheaper: it is refused without hashing anything, and it says no more than the wrong-password case does"
+  api PATCH "/users/$U19_A_ID/password" \
+    '{"currentPassword":"","password":"Qa!Fresh2026x","passwordConfirmation":"Qa!Fresh2026x"}' "$U19_A_T"
+  assert_rest 422 InvalidCurrentPasswordNotification
+
+  case_ "U22.3 a refused change leaves the STORED credential untouched" "the old password still signs in — StageNewPassword writes nothing that survives a refusal, and applyNewCredential is reached only once every check has passed"
+  U22_T=$(qa_login "$U19_A_EMAIL" 'Qa!Own2026xy')
+  if [ -n "$U22_T" ]; then pass_; else fail_ "the original password stopped working after a refused change"; fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U5/U6/U6b/U7 — the password policy at all THREE doors.
+#   source: credentialValueRules — and the comment recording that the obvious repair
+#           (r.ValidateValueObject) loses to the generated IgnoreValueObject IN SILENCE, which
+#           once let a five-character password through both credential operations while every
+#           test of the INSERT path stayed green. That is the regression these rows exist for.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U5_EMAIL=$(user_email u5); U5_ID=$(new_user "$U5_EMAIL" "$TEN_U") || exit 1
+U5_ROLE=$(new_role "$(role_key u5)" "$TEN_U" "$(permission_id_of user change-password)") || exit 1
+grant_role_to_user "$U5_ID" "$U5_ROLE" >/dev/null
+U5_T=$(usable_token "$U5_EMAIL" "$U5_ID") || true
+U5_VICTIM=$(user_email u5v); U5_VICTIM_ID=$(new_user "$U5_VICTIM" "$TEN_U") || exit 1
+
+case_ "U5.1- DOOR ONE (insert): a weak password" "422 WeakPasswordNotification"
+api POST /users "$(jq -nc --arg e "$(user_email u5a)" --arg t "$TEN_U" '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:"abc",passwordConfirmation:"abc"}')"
+assert_rest 422 WeakPasswordNotification
+
+case_ "U5.2- DOOR TWO (change): the SAME weak password" "422 WeakPasswordNotification — the door where the silent failure lived"
+if [ -n "${U5_T:-}" ]; then
+  api PATCH "/users/$U5_ID/password" "$(jq -nc --arg c "$QA_USER_PASS2" '{currentPassword:$c, password:"abc", passwordConfirmation:"abc"}')" "$U5_T"
+  assert_rest 422 WeakPasswordNotification
+else skip_ "U5.2 — the change principal could not be provisioned"; fi
+
+case_ "U5.3- DOOR THREE (reset): the same" "422 WeakPasswordNotification"
+api PATCH "/users/$U5_VICTIM_ID/password-reset" '{"password":"abc","passwordConfirmation":"abc"}'
+assert_rest 422 WeakPasswordNotification
+
+case_ "U7.1- the confirmation must match, at the insert" "422 PasswordConfirmationMismatchNotification"
+api POST /users "$(jq -nc --arg e "$(user_email u7a)" --arg t "$TEN_U" --arg p "$QA_USER_PASS1" '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:"Other!Pass2026"}')"
+assert_rest 422 PasswordConfirmationMismatchNotification
+
+case_ "U7.2- ...at the change" "422 — restated in credentialValueRules because a declarative rule is scoped to a verb and these operations share ModeUpdate with the ordinary patch"
+if [ -n "${U5_T:-}" ]; then
+  api PATCH "/users/$U5_ID/password" "$(jq -nc --arg c "$QA_USER_PASS2" '{currentPassword:$c, password:"Qa!Match2026x", passwordConfirmation:"Qa!Other2026x"}')" "$U5_T"
+  assert_rest 422 PasswordConfirmationMismatchNotification
+else skip_ "U7.2 — the change principal could not be provisioned"; fi
+
+case_ "U7.3- ...at the reset" "422"
+api PATCH "/users/$U5_VICTIM_ID/password-reset" '{"password":"Qa!Match2026x","passwordConfirmation":"Qa!Other2026x"}'
+assert_rest 422 PasswordConfirmationMismatchNotification
+
+# ── U6: the context rule, at all three doors ─────────────────────────────────────────────
+U6_EMAIL="qa-u6-$(qa_slug_runid)@authcore.local"
+
+case_ "U6.1- a password containing the email's LOCAL PART" "422 PasswordEchoesIdentityNotification — the single most guessable credential this service could issue"
+api POST /users "$(jq -nc --arg e "$U6_EMAIL" --arg t "$TEN_U" --arg p "Qa!${U6_EMAIL%%@*}9" \
+  '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:$p}')"
+assert_rest 422 PasswordEchoesIdentityNotification
+
+case_ "U6.2- a password containing a NAME word" "422 PasswordEchoesIdentityNotification — case-insensitive and over RUNES, so it holds in all seven catalogs"
+api POST /users "$(jq -nc --arg e "$(user_email u6b)" --arg t "$TEN_U" \
+  '{givenName:"Maria",familyName:"Souza",email:$e,status:"active",tenantID:$t,password:"Maria2026!x",passwordConfirmation:"Maria2026!x"}')"
+assert_rest 422 PasswordEchoesIdentityNotification
+
+case_ "U6.3 the refused PLAINTEXT is NOT echoed back" "no message payload carries the password — every other rule in this service passes the offending input so a caller can see what was refused; here that would put the plaintext in the 422 and in any log rendering one"
+if printf '%s' "$HTTP_BODY" | grep -q 'Maria2026!x'; then fail_ "the plaintext is in the response body"; else pass_; fi
+
+case_ "U6b.1+ THE 4-RUNE FLOOR — a short family name does not ban its letters" "201 — without the floor, a name like 'Ng' would refuse every password containing 'ng', which is most of them: a rule that reads sensible and locks a population out"
+api POST /users "$(jq -nc --arg e "$(user_email u6c)" --arg t "$TEN_U" \
+  '{givenName:"Li",familyName:"Ng",email:$e,status:"active",tenantID:$t,password:"Strong2026!ng",passwordConfirmation:"Strong2026!ng"}')"
+assert_status 201
+
+case_ "U6b.2- ...while a 5-rune one does" "422 — the floor is 4 runes, so 'Souza' is judged and 'Ng' is not"
+api POST /users "$(jq -nc --arg e "$(user_email u6d)" --arg t "$TEN_U" \
+  '{givenName:"Li",familyName:"Souza",email:$e,status:"active",tenantID:$t,password:"Strong2026!souza",passwordConfirmation:"Strong2026!souza"}')"
+assert_rest 422 PasswordEchoesIdentityNotification
+
+case_ "U6.4- the context rule holds at the CHANGE door too" "422 — shared method, so the three entry points cannot drift apart about what 'echoes the identity' means"
+if [ -n "${U5_T:-}" ]; then
+  api PATCH "/users/$U5_ID/password" "$(jq -nc --arg c "$QA_USER_PASS2" --arg p "Qa!${U5_EMAIL%%@*}9" '{currentPassword:$c, password:$p, passwordConfirmation:$p}')" "$U5_T"
+  assert_rest 422 PasswordEchoesIdentityNotification
+else skip_ "U6.4 — the change principal could not be provisioned"; fi
+
+case_ "U6.5- ...and at the RESET door" "422"
+api PATCH "/users/$U5_VICTIM_ID/password-reset" "$(jq -nc --arg p "Qa!${U5_VICTIM%%@*}9" '{password:$p, passwordConfirmation:$p}')"
+assert_rest 422 PasswordEchoesIdentityNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U3 — the owning tenant must be available, and TRIAL PASSES. IfInsert only.
+#   source: spec.md §7 U3 · refuseUnavailableTenant
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "U3.1+ a user in an ACTIVE tenant" "201"
+api POST /users "$(user_body "$(user_email u3a)" active "$TEN_U")"
+assert_status 201
+
+case_ "U3.2+ a user in a TRIAL tenant" "201 — 'unavailable' is not 'not active'. Reading this as Status != active would break every trial signup, and users are the first thing a customer being onboarded needs"
+TEN_U3T=$(new_tenant trial "$(ws du3t)") || true
+if [ -n "${TEN_U3T:-}" ]; then
+  api POST /users "$(user_body "$(user_email u3b)" active "$TEN_U3T")"
+  assert_status 201
+else skip_ "U3.2 — a trial tenant could not be created"; fi
+
+case_ "U3.3- a user in a SUSPENDED tenant" "422 UserTenantDoesNotExistNotification"
+TEN_U3S=$(new_tenant active "$(ws du3s)") || exit 1
+api PATCH "/tenants/$TEN_U3S" '{"status":"suspended"}'
+api POST /users "$(user_body "$(user_email u3c)" active "$TEN_U3S")"
+assert_rest 422 UserTenantDoesNotExistNotification
+
+case_ "U3.4- a user in an ARCHIVED tenant" "422 UserTenantDoesNotExistNotification — the same key for a third cause"
+TEN_U3A=$(new_tenant active "$(ws du3a)") || exit 1
+api PATCH "/tenants/$TEN_U3A/archive"
+api POST /users "$(user_body "$(user_email u3d)" active "$TEN_U3A")"
+assert_rest 422 UserTenantDoesNotExistNotification
+
+case_ "U3.5- a user in a tenant that never existed" "422 — a fourth cause, one answer"
+api POST /users "$(user_body "$(user_email u3e)" active "01990000-dead-7000-8000-000000000000")"
+assert_rest 422 UserTenantDoesNotExistNotification
+
+case_ "U3.6 THE ASYMMETRY: a PATCH still succeeds on a user whose tenant has SINCE been suspended" "200 — IfInsert only. Suspension withholds NEW users; it does not freeze the ones already there, and re-asking on every update would make a user impossible to RENAME the day their tenant is suspended"
+TEN_U3P=$(new_tenant active "$(ws du3p)") || exit 1
+U3P_ID=$(new_user "$(user_email u3f)" "$TEN_U3P") || exit 1
+api PATCH "/tenants/$TEN_U3P" '{"status":"suspended"}'
+api PATCH "/users/$U3P_ID" '{"givenName":"Renamed"}'
+assert_json_at 200 '.data.givenName' "Renamed"
+
+case_ "U3.7 ...and so does the ARCHIVE" "204 — a suspended tenant's rows still have to be administrable"
+api PATCH "/users/$U3P_ID/archive"
+assert_empty_body 204
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U4 — TENANT ISOLATION ON WRITES, including the archive.
+#   source: spec.md §7 U4 · refuseForeignTenant, under IfInsertOrUpdate AND IfArchive
+#
+# qa/security.sh S7.3d-e proves the same refusals as a BOUNDARY — "is this what stands between
+# a principal and another tenant's rows". These two rows prove them as the RULE the entity
+# declares, which is the question §1b asks, and they are here because a reader auditing the
+# business rules of User reads this file and not that one.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_USEROP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "U4 — principal I was not built, so write-side tenant isolation is UNPROVEN in this lane (qa/security.sh S7.3 asserts the same refusals as a boundary)"
+else
+  U4_FOREIGN=$(new_tenant active "$(ws du4)") || true
+
+  case_ "U4.1+ a scoped caller writes inside its OWN tenant" "201 — the rule refuses foreign rows, not the caller"
+  api POST /users "$(user_body "$(user_email u4a)" active "$QA_TENANT_SCOPED")" "$QA_TOKEN_USEROP"
+  assert_json_at 201 '.data.tenantID' "$QA_TENANT_SCOPED"
+
+  case_ "U4.2- ...and naming ANOTHER tenant is refused" "403 TenantMismatchNotification — U1b refuses rather than silently overriding, so a caller who supplies the wrong tenant learns it instead of quietly writing somewhere else"
+  if [ -n "${U4_FOREIGN:-}" ]; then
+    api POST /users "$(user_body "$(user_email u4b)" active "$U4_FOREIGN")" "$QA_TOKEN_USEROP"
+    assert_rest 403 TenantMismatchNotification
+  else skip_ "U4.2 — the foreign tenant could not be created"; fi
+
+  case_ "U4.3- THE ARCHIVE IS GUARDED TOO" "403 TenantMismatchNotification — refuseForeignTenant runs under IfArchive as well. The write side is not filtered by ToCriteria, so the foreign row LOADS and the rule is what refuses: a suite that tested only inserts would never see this gate"
+  if [ -n "${U4_FOREIGN:-}" ]; then
+    U4_VICTIM=$(new_user "$(user_email u4c)" "$U4_FOREIGN") || true
+    if [ -n "${U4_VICTIM:-}" ]; then
+      api PATCH "/users/$U4_VICTIM/archive" "" "$QA_TOKEN_USEROP"
+      assert_rest 403 TenantMismatchNotification
+    else skip_ "U4.3 — the foreign user could not be created"; fi
+  else skip_ "U4.3 — the foreign tenant could not be created"; fi
+
+  case_ "U4.4 the check stands down for a *:* caller" "204 — the operator supporting a customer has to be able to repair a row that is not theirs, and that bypass is the whole reason the rule asks about the CLAIM rather than about the row alone"
+  if [ -n "${U4_VICTIM:-}" ]; then
+    api PATCH "/users/$U4_VICTIM/archive"
+    assert_empty_body 204
+  else skip_ "U4.4 — the foreign user could not be created"; fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U18 — THE READ SCOPE, and the leak that is a 200.
+#   source: spec.md §7 U16 · both ToCriteria implementations
+#
+# spec.md is explicit about the cost of getting this wrong: "a user listing is the customer's
+# staff directory INCLUDING E-MAIL ADDRESSES — leaking it across tenants is strictly worse than
+# leaking the org chart, which Group already refused."
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_USEROP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "U18 — principal I was not built, so the read scope is UNPROVEN in this lane"
+else
+  U18_FOREIGN_TEN=$(new_tenant active "$(ws du18)") || true
+  U18_FOREIGN=$([ -n "${U18_FOREIGN_TEN:-}" ] && new_user "$(user_email u18)" "$U18_FOREIGN_TEN" || true)
+
+  case_ "U18.1+ the caller sees its own tenant's users" "at least one row, and every row is its own — asserted over the VALUES, because a count passes while one foreign row rides along"
+  api GET "/users?first=100" "" "$QA_TOKEN_USEROP"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "U18.2- THE LEAK ITSELF: another tenant's user is simply NOT THERE" "the foreign id appears in no row of the listing. This is the one protection in the entity that is not a refusal — nothing is rejected, rows just are not there — which is exactly what makes it invisible to a suite that only asserts status codes"
+  if [ -n "${U18_FOREIGN:-}" ]; then
+    assert_json "[.data[].id] | index(\"$U18_FOREIGN\") | . == null" "true"
+  else skip_ "U18.2 — the foreign user could not be created"; fi
+
+  case_ "U18.3- and the by-id read answers 404, NOT 403" "a 403 confirms the id exists to a caller who may not see it; a 404 says nothing about who else is on the platform. This service answers 'you may not' and 'it is not there' identically wherever telling them apart would leak"
+  if [ -n "${U18_FOREIGN:-}" ]; then
+    api GET "/users/$U18_FOREIGN" "" "$QA_TOKEN_USEROP"
+    assert_status 404
+  else skip_ "U18.3 — the foreign user could not be created"; fi
+
+  case_ "U18.4+ a *:* holder skips the filter" "200 on the very id the scoped caller was refused — a scope that hides rows from everyone is broken in the other direction"
+  if [ -n "${U18_FOREIGN:-}" ]; then
+    api GET "/users/$U18_FOREIGN"
+    assert_json_at 200 '.data.id' "$U18_FOREIGN"
+  else skip_ "U18.4 — the foreign user could not be created"; fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U8/U9/U10 — a group / role / claim must exist, be ACTIVE, and belong to THIS USER's tenant.
+# One answer for all three causes, per collection.
+#   source: spec.md §7 U8/U9 · evolve spec §4d.1 · refuseUnjoinableGroups / …Roles / …Claims
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_FOREIGN=$(new_tenant active "$(ws dufor)") || exit 1
+R_MINE=$(new_role "$(role_key umine)" "$TEN_U" "$P_TENANT_READ_U") || exit 1
+G_MINE=$(new_group "$(group_key umine)" "$TEN_U" "$R_MINE") || exit 1
+C_MINE=$(new_claim "$(claim_name umine)" string both "$TEN_U") || exit 1
+R_FOREIGN=$(new_role "$(role_key ufor)" "$TEN_FOREIGN" "$P_TENANT_READ_U") || exit 1
+G_FOREIGN=$(new_group "$(group_key ufor)" "$TEN_FOREIGN" "$R_FOREIGN") || exit 1
+C_FOREIGN=$(new_claim "$(claim_name ufor)" string both "$TEN_FOREIGN") || exit 1
+R_DEAD=$(new_role "$(role_key udead)" "$TEN_U" "$P_TENANT_READ_U") || exit 1
+G_DEAD=$(new_group "$(group_key udead)" "$TEN_U" "$R_MINE") || exit 1
+C_DEAD=$(new_claim "$(claim_name udead)" string both "$TEN_U") || exit 1
+api PATCH "/roles/$R_DEAD/archive"; api PATCH "/groups/$G_DEAD/archive"; api PATCH "/claims/$C_DEAD/archive"
+
+U8_ID=$(new_user "$(user_email u8)" "$TEN_U") || exit 1
+
+case_ "U8.1+ a group from the user's OWN tenant" "201"
+api POST "/users/$U8_ID/groups" "$(jq -nc --arg g "$G_MINE" '{groupID:$g}')"
+assert_status 201
+
+case_ "U8.2- a group from ANOTHER tenant" "422 GroupNotAvailableInTenantNotification"
+api POST "/users/$U8_ID/groups" "$(jq -nc --arg g "$G_FOREIGN" '{groupID:$g}')"
+assert_rest 422 GroupNotAvailableInTenantNotification
+
+case_ "U8.3- an ARCHIVED group in the right tenant" "422 — the SAME key"
+api POST "/users/$U8_ID/groups" "$(jq -nc --arg g "$G_DEAD" '{groupID:$g}')"
+assert_rest 422 GroupNotAvailableInTenantNotification
+
+case_ "U8.4- a group id that never existed" "422 — the same key, third cause. A distinct 'belongs to another tenant' reply would confirm to a caller in tenant A that a specific UUID is a live group in some other tenant: an existence oracle over a competitor's org chart"
+api POST "/users/$U8_ID/groups" '{"groupID":"01990000-dead-7000-8000-000000000000"}'
+assert_rest 422 GroupNotAvailableInTenantNotification
+
+case_ "U9.1+ a role from the user's own tenant" "201"
+api POST "/users/$U8_ID/roles" "$(jq -nc --arg r "$R_MINE" '{roleID:$r}')"
+assert_status 201
+
+case_ "U9.2- a role from another tenant" "422 RoleNotAvailableInTenantNotification"
+api POST "/users/$U8_ID/roles" "$(jq -nc --arg r "$R_FOREIGN" '{roleID:$r}')"
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+case_ "U9.3- an archived role" "422, same key"
+api POST "/users/$U8_ID/roles" "$(jq -nc --arg r "$R_DEAD" '{roleID:$r}')"
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+case_ "U9.4- a role id that never existed" "422, same key"
+api POST "/users/$U8_ID/roles" '{"roleID":"01990000-dead-7000-8000-000000000000"}'
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+case_ "U10.1+ a claim definition from the user's own tenant" "201"
+api POST "/users/$U8_ID/claims" "$(jq -nc --arg c "$C_MINE" '{claimID:$c, value:"ok"}')"
+assert_status 201
+
+case_ "U10.2- a definition from another tenant" "422 ClaimNotAvailableInTenantNotification — an existence oracle over a competitor's claim vocabulary is what the single key refuses to be"
+api POST "/users/$U8_ID/claims" "$(jq -nc --arg c "$C_FOREIGN" '{claimID:$c, value:"x"}')"
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+case_ "U10.3- an archived definition" "422, same key"
+api POST "/users/$U8_ID/claims" "$(jq -nc --arg c "$C_DEAD" '{claimID:$c, value:"x"}')"
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+case_ "U10.4- a definition id that never existed" "422, same key"
+api POST "/users/$U8_ID/claims" '{"claimID":"01990000-dead-7000-8000-000000000000","value":"x"}'
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+case_ "U12b THE INTERLOCK: one bad id gets ONE answer" "ClaimNotAvailableInTenantNotification ALONE — the loop continues after the availability refusal, because nothing below can say anything true about a definition that is not there and every probe answers 'the problem is present' for an id it cannot resolve"
+api POST "/users/$U8_ID/claims" '{"claimID":"01990000-dead-7000-8000-000000000000","value":"legit"}'
+assert_json_at 422 '[.errors[]?.messages[]?.notificationKey] | unique | join(",")' "ClaimNotAvailableInTenantNotification"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U11 — a claim whose appliesTo is `client` cannot be set on a USER. `user` and `both` pass.
+#   source: evolve spec §4d.2 — "what finally makes AppliesTo mean something"
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+C_USER=$(new_claim "$(claim_name uu)" string user "$TEN_U") || exit 1
+C_BOTH=$(new_claim "$(claim_name ub)" string both "$TEN_U") || exit 1
+C_CLIENT=$(new_claim "$(claim_name uc)" string client "$TEN_U") || exit 1
+U11_ID=$(new_user "$(user_email u11)" "$TEN_U") || exit 1
+
+case_ "U11.1+ appliesTo: user" "201"
+api POST "/users/$U11_ID/claims" "$(jq -nc --arg c "$C_USER" '{claimID:$c, value:"v"}')"
+assert_status 201
+
+case_ "U11.2+ appliesTo: both" "201"
+api POST "/users/$U11_ID/claims" "$(jq -nc --arg c "$C_BOTH" '{claimID:$c, value:"v"}')"
+assert_status 201
+
+case_ "U11.3- appliesTo: client" "422 ClaimDoesNotApplyToUserNotification — the column stops merely stating something as data and starts being enforced"
+api POST "/users/$U11_ID/claims" "$(jq -nc --arg c "$C_CLIENT" '{claimID:$c, value:"v"}')"
+assert_rest 422 ClaimDoesNotApplyToUserNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U12 — a claim value must parse as the definition's declared valueType. ADDED **and**
+# CHANGED, because the PATCH carries a value nothing has judged yet.
+#   source: evolve spec §4d.3
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+C_NUMBER=$(new_claim "$(claim_name un)" number both "$TEN_U") || exit 1
+C_BOOL=$(new_claim "$(claim_name ubl)" bool both "$TEN_U") || exit 1
+C_STRING=$(new_claim "$(claim_name ust)" string both "$TEN_U") || exit 1
+U12_ID=$(new_user "$(user_email u12)" "$TEN_U") || exit 1
+
+case_ "U12.1+ number ← a valid decimal" "201"
+api POST "/users/$U12_ID/claims" "$(jq -nc --arg c "$C_NUMBER" '{claimID:$c, value:"1000.5"}')"
+assert_status 201
+
+# A FRESH USER PER NEGATIVE. Reusing the one its positive just wrote to would meet the
+# duplicate rule first — a 409 that says nothing about the value type.
+U12_BAD1=$(new_user "$(user_email u12a)" "$TEN_U") || exit 1
+case_ "U12.2- number ← 'abc'" "422 ClaimValueDoesNotMatchValueTypeNotification"
+api POST "/users/$U12_BAD1/claims" "$(jq -nc --arg c "$C_NUMBER" '{claimID:$c, value:"abc"}')"
+assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+
+case_ "U12.3 the refusal echoes the VALUE, not the id" "'abc' in the payload — the caller knows which entry they sent; what they need told back is the string that did not parse"
+if printf '%s' "$HTTP_BODY" | grep -q 'abc'; then pass_; else fail_ "the offending value is not in the body"; fi
+
+case_ "U12.4+ bool ← 'true'" "201"
+api POST "/users/$U12_ID/claims" "$(jq -nc --arg c "$C_BOOL" '{claimID:$c, value:"true"}')"
+assert_status 201
+
+U12_BAD2=$(new_user "$(user_email u12b)" "$TEN_U") || exit 1
+case_ "U12.5- bool ← 'yes'" "422 — exactly 'true' or 'false', the same reading the catalog's own default-value check uses. Two levels of one chain must not disagree about what a bool is"
+api POST "/users/$U12_BAD2/claims" "$(jq -nc --arg c "$C_BOOL" '{claimID:$c, value:"yes"}')"
+assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+
+case_ "U12.6+ string ← any non-empty value" "201"
+api POST "/users/$U12_ID/claims" "$(jq -nc --arg c "$C_STRING" '{claimID:$c, value:"anything"}')"
+U12_CH=$(printf '%s' "$HTTP_BODY" | jq -r '.data.userClaim.id // empty')
+assert_status 201
+
+case_ "U12.7- THE PATCH IS JUDGED TOO" "422 — refuseUnsettableClaims walks ADDED and CHANGED, because a correction arrives with a value nothing has judged yet: exactly as unjudged as a new one. Judging only the additions would let 'correct this cost center' write anything at all"
+U12N_CH=$(printf '%s' "$(api POST "/users/$U12_ID/claims" "$(jq -nc --arg c "$C_NUMBER" '{claimID:$c, value:"1"}')"; printf '%s' "$HTTP_BODY")" | jq -r '.data.userClaim.id // empty' 2>/dev/null)
+U12P_ID=$(new_user "$(user_email u12p)" "$TEN_U") || exit 1
+U12P_CH=$(set_claim "$U12P_ID" "$C_NUMBER" "1") || true
+if [ -n "${U12P_CH:-}" ]; then
+  api PATCH "/users/$U12P_ID/claims/$U12P_CH" '{"value":"abc"}'
+  assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+else skip_ "U12.7 — the entry to correct could not be provisioned"; fi
+
+case_ "U12.8+ ...and a VALID correction passes" "200 — the rule judges the value, it does not forbid the verb"
+if [ -n "${U12P_CH:-}" ]; then
+  api PATCH "/users/$U12P_ID/claims/$U12P_CH" '{"value":"2000"}'
+  assert_json_at 200 '.data.userClaim.value' "2000"
+else skip_ "U12.8 — the entry to correct could not be provisioned"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U13/U14 — NO PRIVILEGE ESCALATION, at three hops and at two, plus the two wildcard guards.
+#   source: spec.md §7 U12a/U12b/U13a/U13b · refuseUnjoinableGroups / refuseUngrantableRoles
+#           · asked 2026-09-07 (all six rows)
+#
+# PRINCIPAL I is the caller these rows need: it holds the whole user vocabulary and
+# deliberately NOT permission:archive. The role that CONFERS permission:archive is created by
+# the ADMIN, because Role's own escalation rule would refuse I that creation (role-contract
+# RL2); the question here is whether I may ATTACH it.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_USEROP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "U13/U14 — principal I was not built, so all six escalation rows are UNPROVEN this run"
+else
+  # Built by the ADMIN, inside principal I's tenant: a role conferring a permission I lacks,
+  # and a group conferring that role. Plus a harmless pair I does hold, for the positives.
+  ESC_ROLE=$(new_role "$(role_key uesc)" "$QA_TENANT_SCOPED" "$P_PERM_ARCHIVE_U") || true
+  ESC_GROUP=$(new_group "$(group_key uesc)" "$QA_TENANT_SCOPED" "${ESC_ROLE:-}") || true
+  OK_ROLE=$(new_role "$(role_key uok)" "$QA_TENANT_SCOPED" "$P_TENANT_READ_U") || true
+  OK_GROUP=$(new_group "$(group_key uok)" "$QA_TENANT_SCOPED" "${OK_ROLE:-}") || true
+  WILD_ROLE=$(role_id_of master)
+  ESC_TARGET=$(new_user "$(user_email uesc)" "$QA_TENANT_SCOPED") || true
+
+  if [ -z "${ESC_GROUP:-}" ] || [ -z "${ESC_TARGET:-}" ] || [ -z "${OK_GROUP:-}" ]; then
+    skip_ "U13/U14 — the escalation fixtures could not be provisioned, so all six rows are UNPROVEN this run"
+  else
+    case_ "U14.1+ TWO HOPS: I grants a role conferring only what I holds" "201 — the gate refuses escalation, not delegation"
+    api POST "/users/$ESC_TARGET/roles" "$(jq -nc --arg r "$OK_ROLE" '{roleID:$r}')" "$QA_TOKEN_USEROP"
+    assert_status 201
+
+    case_ "U14.2- ...and refuses one conferring a permission I LACK" "403 CannotGrantRoleWithUnheldPermissionsNotification — a caller may grant a role only if they hold EVERY permission it grants"
+    api POST "/users/$ESC_TARGET/roles" "$(jq -nc --arg r "$ESC_ROLE" '{roleID:$r}')" "$QA_TOKEN_USEROP"
+    assert_rest 403 CannotGrantRoleWithUnheldPermissionsNotification
+
+    # ── THE WILDCARD ROLE, and why it takes a whole fixture of its own ──────────────────
+    #
+    # Two facts have to hold at once for CannotGrantWildcardRole to be reachable, and getting
+    # either wrong makes the case pass for the wrong reason or skip forever:
+    #
+    #   1. NO WILDCARD-BEARING ROLE CAN BE CREATED. role_rules_manual.go's no-wildcard-grant
+    #      refuses the wildcard permission on any role through this API — deliberately, since
+    #      Identity.HasPermission PANICS on an argument containing '*'. So the ONLY such role
+    #      is the seeded `master` one.
+    #   2. `master` lives in the MASTER tenant, and role-available-in-tenant runs FIRST. From
+    #      any other tenant the answer is RoleNotAvailableInTenant and the wildcard probe is
+    #      never reached — the interlock working exactly as designed.
+    #
+    # So the case needs a user in the master tenant AND a caller who is not a super-admin.
+    # The admin builds both; the caller is what makes the refusal meaningful, because a *:*
+    # principal would pass the escalation probe and never reach this one either.
+    MASTER_TEN=$(jwt_claim "$QA_TOKEN_ADMIN" tenant_id)
+    WILD_ROLE_SEEDED=$(role_id_of master)
+    WILD_TARGET=$([ -n "$MASTER_TEN" ] && new_user "$(user_email uwild)" "$MASTER_TEN" || true)
+    WILD_CALLER_EMAIL=$(user_email uwildc)
+    WILD_CALLER_ROLE=$([ -n "$MASTER_TEN" ] && new_role "$(role_key uwildc)" "$MASTER_TEN" \
+      "$(permission_id_of user read)" "$(permission_id_of user grant)" || true)
+    WILD_CALLER_ID=""
+    if [ -n "${WILD_CALLER_ROLE:-}" ]; then
+      WILD_CALLER_ID=$(new_user "$WILD_CALLER_EMAIL" "$MASTER_TEN") || true
+      [ -n "$WILD_CALLER_ID" ] && grant_role_to_user "$WILD_CALLER_ID" "$WILD_CALLER_ROLE" >/dev/null
+    fi
+    WILD_CALLER_T=$([ -n "${WILD_CALLER_ID:-}" ] && usable_token "$WILD_CALLER_EMAIL" "$WILD_CALLER_ID" || true)
+
+    case_ "U14.3- a WILDCARD-bearing role" "403 CannotGrantWildcardRoleNotification — and it fires BEFORE the escalation probe, which is load-bearing: Identity.HasPermission PANICS on any argument containing '*', so this is what removes the input that would crash the request into a 500 on exactly the case the escalation rule exists to stop"
+    if [ -n "${WILD_CALLER_T:-}" ] && [ -n "${WILD_TARGET:-}" ] && [ -n "${WILD_ROLE_SEEDED:-}" ]; then
+      api POST "/users/$WILD_TARGET/roles" "$(jq -nc --arg r "$WILD_ROLE_SEEDED" '{roleID:$r}')" "$WILD_CALLER_T"
+      assert_rest 403 CannotGrantWildcardRoleNotification
+    else skip_ "U14.3 — the master-tenant fixtures for the wildcard rule could not be provisioned, so CannotGrantWildcardRole is UNPROVEN this run"; fi
+
+    case_ "U14.3b THE ORDER IS LOAD-BEARING: availability answers FIRST" "422 RoleNotAvailableInTenantNotification, not the wildcard key — the same seeded role, pointed at a user in ANOTHER tenant. This is why U14.3 needs the master tenant at all, and it pins the interlock rather than assuming it"
+    api POST "/users/$ESC_TARGET/roles" "$(jq -nc --arg r "$WILD_ROLE_SEEDED" '{roleID:$r}')" "$QA_TOKEN_USEROP"
+    assert_rest 422 RoleNotAvailableInTenantNotification
+
+    case_ "U13.1+ THREE HOPS: I joins a group whose roles confer only what I holds" "201"
+    api POST "/users/$ESC_TARGET/groups" "$(jq -nc --arg g "$OK_GROUP" '{groupID:$g}')" "$QA_TOKEN_USEROP"
+    assert_status 201
+
+    case_ "U13.2- ...and is refused on one whose roles confer a permission I LACK" "403 CannotJoinGroupWithUnheldPermissionsNotification — group → roles → permissions, a SET and not one key"
+    api POST "/users/$ESC_TARGET/groups" "$(jq -nc --arg g "$ESC_GROUP" '{groupID:$g}')" "$QA_TOKEN_USEROP"
+    assert_rest 403 CannotJoinGroupWithUnheldPermissionsNotification
+
+    case_ "U13.3 THE KEYS DIFFER BY DEPTH" "the group refusal and the role refusal carry different notification keys — folding them together would hide which hop a refusal came from, which is why refuseUnjoinableGroups and refuseUngrantableRoles are separate methods rather than one generic walk"
+    api POST "/users/$ESC_TARGET/roles" "$(jq -nc --arg r "$ESC_ROLE" '{roleID:$r}')" "$QA_TOKEN_USEROP"
+    K_ROLE_ESC=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+    api POST "/users/$ESC_TARGET/groups" "$(jq -nc --arg g "$ESC_GROUP" '{groupID:$g}')" "$QA_TOKEN_USEROP"
+    K_GROUP_ESC=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+    if [ -n "$K_ROLE_ESC" ] && [ -n "$K_GROUP_ESC" ] && [ "$K_ROLE_ESC" != "$K_GROUP_ESC" ]; then pass_
+    else HTTP_BODY="role='$K_ROLE_ESC' group='$K_GROUP_ESC'"; fail_ "the two depths answer the same key"; fi
+
+    case_ "U13.4- a group carrying a WILDCARD-bearing role" "UNREACHABLE from the wire, and the reason is a rule rather than a gap"
+    # Two guards close every door into this state, and neither can be opened by any caller:
+    #   · Group's own CannotGrantWildcardRole refuses attaching the seeded `master` role to any
+    #     group (group-contract GR10a), so no group can come to carry a wildcard; and
+    #   · no wildcard-bearing role can be CREATED either (role_rules_manual.go
+    #     no-wildcard-grant), so there is no second role to build such a group out of.
+    # Migration 0012 seeds the wildcard onto a ROLE and onto no group. The notification is
+    # therefore defence-in-depth behind a state the service cannot reach — the same shape
+    # P3e, RL7- and GR8-b record for their own unreachable guards. Asserting it would mean
+    # writing a row straight into the database, which is not a contract this suite may test.
+    WILD_GROUP_TRY=$(new_group "$(group_key uwildg)" "$MASTER_TEN" "$WILD_ROLE_SEEDED" 2>/dev/null) || true
+    if [ -n "${WILD_GROUP_TRY:-}" ]; then
+      api POST "/users/$WILD_TARGET/groups" "$(jq -nc --arg g "$WILD_GROUP_TRY" '{groupID:$g}')" "$WILD_CALLER_T"
+      assert_rest 403 CannotJoinWildcardGroupNotification
+    else
+      skip_ "U13.4 — CannotJoinWildcardGroupNotification is UNREACHABLE from the wire: Group's own rule refuses attaching the wildcard-bearing seeded role to any group, no other wildcard-bearing role can be created, and migration 0012 seeds the wildcard onto a role and onto no group. The guard is defence-in-depth behind a state no request can produce"
+    fi
+
+    case_ "U13.5+ the ADMIN crosses all of it" "201 — a *:* superadmin passes by construction: HasPermission answers true for any concrete permission when the claim set carries the wildcard"
+    ESC_TARGET2=$(new_user "$(user_email uesc2)" "$QA_TENANT_SCOPED") || true
+    if [ -n "${ESC_TARGET2:-}" ]; then
+      api POST "/users/$ESC_TARGET2/groups" "$(jq -nc --arg g "$ESC_GROUP" '{groupID:$g}')"
+      assert_status 201
+    else skip_ "U13.5 — the second escalation target could not be created"; fi
+
+    case_ "U13.6 THE RULES JUDGE ONLY WHAT THIS WRITE ADDS" "200 — with the escalating group already attached by the admin, principal I can still RENAME the user. Re-judging stored memberships would make unrelated writes hostages of the past, and would stop the operator who has to fix exactly this situation from doing anything at all"
+    if [ -n "${ESC_TARGET2:-}" ]; then
+      api PATCH "/users/$ESC_TARGET2" '{"givenName":"Renamed"}' "$QA_TOKEN_USEROP"
+      assert_json_at 200 '.data.givenName' "Renamed"
+    else skip_ "U13.6 — the second escalation target could not be created"; fi
+
+    case_ "U13.7+ ...and I can still REMOVE the membership it may not have added" "204 — the tool for fixing the situation must not be the thing the rule takes away"
+    if [ -n "${ESC_TARGET2:-}" ]; then
+      CH_ESC=$(sql "SELECT id FROM user_groups WHERE user_id='$ESC_TARGET2' AND group_id='$ESC_GROUP' AND archived_at IS NULL LIMIT 1;" | tr -d '[:space:]')
+      if [ -n "$CH_ESC" ]; then
+        api PATCH "/users/$ESC_TARGET2/groups/$CH_ESC/archive" "" "$QA_TOKEN_USEROP"
+        assert_empty_body 204
+      else skip_ "U13.7 — the membership row could not be located"; fi
+    else skip_ "U13.7 — the second escalation target could not be created"; fi
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U15 — the three caps. HYBRID, decided by the maintainer 2026-09-07: the CLAIMS cap (20) is
+# proven end to end because it is the cap this round adds; the two 50-caps are proven at the
+# BOUNDARY only, and this file records that the passing side at exactly 50 is NOT exercised.
+#   source: spec.md §7 U11a/U11b · evolve spec §4d claims-cap
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_CAP=$(new_tenant active "$(ws ducap)") || exit 1
+U15_ID=$(new_user "$(user_email u15)" "$TEN_CAP") || exit 1
+CAP_OK=1
+CAP_IDS=""
+for i in $(seq 1 20); do
+  cid=$(new_claim "$(claim_name cap)" string both "$TEN_CAP") || { CAP_OK=0; break; }
+  CAP_IDS="$CAP_IDS $cid"
+  set_claim "$U15_ID" "$cid" "v$i" >/dev/null || { CAP_OK=0; break; }
+done
+
+case_ "U15.1+ TWENTY claim values attach, and the twentieth succeeds" "20 entries on the read-back — the cap counts the whole collection, so the passing side has to be reached for real"
+if [ "$CAP_OK" = "1" ]; then
+  api GET "/users/$U15_ID"
+  assert_json_at 200 '.data.claims | length' "20"
+else
+  skip_ "U15.1 — the twenty definitions could not be provisioned, so the claims cap is UNPROVEN this run"
+fi
+
+case_ "U15.2- the TWENTY-FIRST claim value" "the User cap is UNREACHABLE from the wire, and what refuses first is worth asserting instead"
+# TWO CAPS OF TWENTY, ONE BEHIND THE OTHER. User's claims-cap allows 20 values; Claim's own
+# claims-per-tenant-cap-users allows 20 DEFINITIONS per tenant applying to users
+# (claim_rules_manual.go refuseCatalogBudgetExceeded, bounded at 20 for the same token-size
+# reason). Every value a user holds must point at a definition in the user's own tenant (U10),
+# so a user can never be offered a twenty-first — the catalog runs out first.
+# TooManyClaimsForUserNotification is therefore a backstop behind a boundary the caller meets
+# one level earlier, and the honest assertion is the one that DOES fire.
+if [ "$CAP_OK" = "1" ]; then
+  api POST /claims "$(jq -nc --arg n "$(claim_name cap21)" --arg t "$TEN_CAP" \
+    '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t,
+      description:"The twenty-first definition in one tenant, which the catalog budget is what refuses."}')"
+  assert_rest 422 TooManyUserClaimsInTenantNotification
+else
+  skip_ "U15.2 — the twenty definitions could not be provisioned, so neither cap was reached"
+fi
+
+case_ "U15.2b and the User cap is recorded as UNREACHABLE rather than claimed" "named, not asserted"
+skip_ "TooManyClaimsForUserNotification cannot be provoked through this API: a user's values must point at definitions in its own tenant, and Claim's catalog budget stops the twentieth-first definition from existing (U15.2). The guard is a backstop behind a boundary the caller meets one level earlier — the same shape P3e, RL7- and GR8-b record for their own unreachable rules. U15.1 proves the passing side at exactly 20"
+
+# THE BOUNDARY FORM THE PLAN APPROVED DOES NOT REACH THIS RULE, and the run proved it: 51
+# copies of one id is a DUPLICATE, so UserAlreadyInGroup answers before the cap ever counts.
+# The two 50-caps are therefore proven with 51 DISTINCT counterparts — more coverage than §1b
+# U15 approved, not less, and the only shape that reaches the rule at all.
+G_CAP_IDS=""
+G_CAP_OK=1
+for i in $(seq 1 51); do
+  gid=$(new_group "$(group_key ucap)" "$TEN_CAP") || { G_CAP_OK=0; break; }
+  G_CAP_IDS="$G_CAP_IDS $gid"
+done
+
+case_ "U15.3- the GROUPS cap" "422 TooManyGroupsForUserNotification on an insert carrying 51 DISTINCT memberships — the cap counts the whole collection, so it is reached before any per-entry probe has a verdict"
+if [ "$G_CAP_OK" = "1" ]; then
+  ENTRIES=$(printf '%s\n' $G_CAP_IDS | jq -R . | jq -sc 'map(select(length>0) | {groupID: .})')
+  api POST /users "$(jq -nc --arg e "$(user_email u15g)" --arg t "$TEN_CAP" --arg p "$QA_USER_PASS1" --argjson g "$ENTRIES" \
+    '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:$p,groups:$g}')"
+  assert_rest 422 TooManyGroupsForUserNotification
+else skip_ "U15.3 — the fifty-one distinct groups could not be provisioned, so the groups cap is UNPROVEN this run"; fi
+
+case_ "U15.3b+ ...and FIFTY of the same memberships pass" "201 — the passing side, which the approved hybrid form did not reach and which is what makes the cap a boundary rather than a refusal"
+if [ "$G_CAP_OK" = "1" ]; then
+  ENTRIES50=$(printf '%s\n' $G_CAP_IDS | jq -R . | jq -sc 'map(select(length>0) | {groupID: .}) | .[0:50]')
+  api POST /users "$(jq -nc --arg e "$(user_email u15g5)" --arg t "$TEN_CAP" --arg p "$QA_USER_PASS1" --argjson g "$ENTRIES50" \
+    '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:$p,groups:$g}')"
+  assert_json_at 201 '.data.groups | length' "50"
+else skip_ "U15.3b — the fifty-one distinct groups could not be provisioned"; fi
+
+R_CAP_IDS=""
+R_CAP_OK=1
+for i in $(seq 1 51); do
+  rid=$(new_role "$(role_key ucap)" "$TEN_CAP" "$P_TENANT_READ_U") || { R_CAP_OK=0; break; }
+  R_CAP_IDS="$R_CAP_IDS $rid"
+done
+
+case_ "U15.4- the ROLES cap" "422 TooManyRolesForUserNotification on an insert carrying 51 DISTINCT grants"
+if [ "$R_CAP_OK" = "1" ]; then
+  ENTRIES=$(printf '%s\n' $R_CAP_IDS | jq -R . | jq -sc 'map(select(length>0) | {roleID: .})')
+  api POST /users "$(jq -nc --arg e "$(user_email u15r)" --arg t "$TEN_CAP" --arg p "$QA_USER_PASS1" --argjson r "$ENTRIES" \
+    '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:$p,roles:$r}')"
+  assert_rest 422 TooManyRolesForUserNotification
+else skip_ "U15.4 — the fifty-one distinct roles could not be provisioned, so the roles cap is UNPROVEN this run"; fi
+
+case_ "U15.4b+ ...and FIFTY of the same grants pass" "201 — the passing side"
+if [ "$R_CAP_OK" = "1" ]; then
+  ENTRIES50=$(printf '%s\n' $R_CAP_IDS | jq -R . | jq -sc 'map(select(length>0) | {roleID: .}) | .[0:50]')
+  api POST /users "$(jq -nc --arg e "$(user_email u15r5)" --arg t "$TEN_CAP" --arg p "$QA_USER_PASS1" --argjson r "$ENTRIES50" \
+    '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:$p,passwordConfirmation:$p,roles:$r}')"
+  assert_json_at 201 '.data.roles | length' "50"
+else skip_ "U15.4b — the fifty-one distinct roles could not be provisioned"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U16 — the status machine. active↔suspended and no-ops only.
+#   source: spec.md §7 U14
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U16_ID=$(new_user "$(user_email u16)" "$TEN_U") || exit 1
+
+case_ "U16.1+ active → suspended" "200"
+api PATCH "/users/$U16_ID" '{"status":"suspended"}'
+assert_json_at 200 '.data.status' "suspended"
+
+case_ "U16.2+ suspended → active" "200"
+api PATCH "/users/$U16_ID" '{"status":"active"}'
+assert_json_at 200 '.data.status' "active"
+
+case_ "U16.3+ a no-op" "200 — staying is always allowed, so a PATCH whose only change is a rename is never hostage to the state machine"
+api PATCH "/users/$U16_ID" '{"givenName":"Same","status":"active"}'
+assert_json_at 200 '.data.givenName' "Same"
+
+case_ "U16.4- a value outside the closed set" "409 carrying BOTH keys — the value object reports the unknown member and the transition rule reports the illegal move, and SemanticStateConflict outranks the validation for the status. Cross-referenced to M5.10, which pins the same pair from the framework side"
+api PATCH "/users/$U16_ID" '{"status":"deleted"}'
+assert_json_at 409 '[.errors[]?.messages[]?.notificationKey] | unique | sort | join(",")' \
+  "InvalidUserStatusTransitionNotification,UnknownUserStatusNotification"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U1/U2 — the two immutability rules, and the DISJUNCTION the plan declared BEFORE the first
+# request. PatchUserRequest declares only givenName, familyName and status, so a PATCH carries
+# no email and no tenantID for the notifications to fire on. What is asserted is THE DTO GATE:
+# a field the write DTO does not declare must not reach the aggregate — either the framework
+# rejects the unknown key, or it drops it and the stored value is untouched. Both are the
+# contract; a CHANGED value is not.
+#   source: spec.md §7 U1/U2b · plan §1b, the row whose expected status is stated as a
+#           disjunction precisely so it could not be filled in from an answer.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U1_EMAIL=$(user_email u1); U1_ID=$(new_user "$U1_EMAIL" "$TEN_U") || exit 1
+
+case_ "U1.1 a PATCH carrying an email the DTO does not declare" "either a typed refusal, or the key is dropped — never a changed address. The email is the login handle: silently moving it is the one outcome that is not the contract"
+api PATCH "/users/$U1_ID" "$(jq -nc --arg e "$(user_email u1x)" '{givenName:"Kept", email:$e}')"
+S_U1="$HTTP_STATUS"
+api GET "/users/$U1_ID"
+GOT_EMAIL=$(printf '%s' "$HTTP_BODY" | jq -r '.data.email')
+if [ "$GOT_EMAIL" = "$U1_EMAIL" ]; then
+  pass_
+  printf '      %snote: the write answered HTTP %s and the address is unchanged%s\n' "$C_DIM" "$S_U1" "$C_RESET"
+else
+  HTTP_BODY="write answered $S_U1; stored email is now '$GOT_EMAIL', was '$U1_EMAIL'"
+  fail_ "the email MOVED"
+fi
+
+case_ "U2.1 a PATCH carrying a tenantID the DTO does not declare" "the same disjunction, and the same one forbidden outcome: a user never moves between tenants"
+TEN_U2=$(new_tenant active "$(ws du2)") || exit 1
+api PATCH "/users/$U1_ID" "$(jq -nc --arg t "$TEN_U2" '{givenName:"Kept", tenantID:$t}')"
+S_U2="$HTTP_STATUS"
+api GET "/users/$U1_ID"
+GOT_TEN=$(printf '%s' "$HTTP_BODY" | jq -r '.data.tenantID')
+if [ "$GOT_TEN" = "$TEN_U" ]; then
+  pass_
+  printf '      %snote: the write answered HTTP %s and the tenant is unchanged%s\n' "$C_DIM" "$S_U2" "$C_RESET"
+else
+  HTTP_BODY="write answered $S_U2; stored tenantID is now '$GOT_TEN', was '$TEN_U'"
+  fail_ "the user MOVED tenant"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# U25 — the password hash reaches no surface, no filter, no ordering, no projection and no
+# audit payload. The wire faces live in qa/user.sh (M3, M8.23-27) and qa/user_graphql.sh
+# (N2.4-5); this row is the one nobody can see through the API.
+#   source: user_schema.go RedactedField(InSync ***, InAudit ***) · spec.md §9 · asked
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+U25_EMAIL=$(user_email u25)
+U25_ID=$(new_user "$U25_EMAIL" "$TEN_U") || exit 1
+
+case_ "U25.1 the hash IS stored — the column is not empty" "a PHC-encoded Argon2id string, because the credential has to verify a login"
+GOT=$(sql "SELECT left(password_hash, 9) FROM users WHERE id = '$U25_ID';" | tr -d '[:space:]')
+if [ "$GOT" = '$argon2id' ]; then pass_; else HTTP_BODY="$GOT"; fail_ "password_hash starts with '$GOT'"; fi
+
+case_ "U25.2 the INSERT's audit payload carries *** and not the hash" "InAudit(RedactWith(\"***\")) — the only redacted field in this service"
+GOT=$(sql "SELECT payload::jsonb #>> '{snapshot,PasswordHash}' FROM audit_events WHERE entity_type='User' AND aggregate_id='$U25_ID' AND verb='insert' LIMIT 1;" | tr -d '[:space:]')
+if [ "$GOT" = "***" ]; then pass_; else HTTP_BODY="$GOT"; fail_ "audit PasswordHash = '$GOT'"; fi
+
+case_ "U25.2b the redaction is SCOPED to the one column" "the snapshot still carries Status and MustChangePassword in the clear — a redaction that blanked the record would destroy the trail it exists to protect"
+GOT=$(sql "SELECT (payload::jsonb #>> '{snapshot,Status}') || '/' || (payload::jsonb #>> '{snapshot,MustChangePassword}') FROM audit_events WHERE entity_type='User' AND aggregate_id='$U25_ID' AND verb='insert' LIMIT 1;" | tr -d '[:space:]')
+if [ "$GOT" = "active/true" ]; then pass_; else HTTP_BODY="$GOT"; fail_ "snapshot status/mustChange = '$GOT'"; fi
+
+case_ "U25.3 the real hash appears NOWHERE in the audit row" "not under another key, not in a nested snapshot, not in a diff — the whole row is searched, because a redaction that covers one path and misses another is not a redaction"
+REAL=$(sql "SELECT password_hash FROM users WHERE id = '$U25_ID';" | tr -d '[:space:]')
+GOT=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$U25_ID' AND payload::text LIKE '%' || substring('$REAL' from 20 for 20) || '%';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows containing a 20-char slice of the real hash: $GOT"; fail_ "the hash leaked into audit_events"; fi
+
+case_ "U25.4 a RESET's audit payload is redacted too" "*** after the credential was replaced — the operation that writes a NEW hash is the one most likely to log it"
+api PATCH "/users/$U25_ID/password-reset" '{"password":"Qa!Audit2026x","passwordConfirmation":"Qa!Audit2026x"}'
+REAL2=$(sql "SELECT password_hash FROM users WHERE id = '$U25_ID';" | tr -d '[:space:]')
+GOT=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$U25_ID' AND payload::text LIKE '%' || substring('$REAL2' from 20 for 20) || '%';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows containing a slice of the post-reset hash: $GOT"; fail_ "the new hash leaked into audit_events"; fi
+
+case_ "U25.5 the plaintext never reaches the audit trail either" "no row of this user's trail contains the password the caller sent — it arrives on a field with no column and goes into the hasher, and nothing copies it on the way"
+GOT=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$U25_ID' AND payload::text LIKE '%Qa!Audit2026x%';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows containing the plaintext: $GOT"; fail_ "the PLAINTEXT leaked into audit_events"; fi
+
 qa_finish

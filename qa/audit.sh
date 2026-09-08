@@ -328,4 +328,97 @@ api POST "/groups/$AUD_G_GM/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{role
 got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$AUD_G_GM' AND verb='update';")
 if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# A54+ — §4 of specs/qa/user-contract/plan.md. The User trail.
+#
+# Five operations write here — insert, patch, archive and the two credential verbs — and one
+# of them is the reason this round extended the lane at all: User carries the ONLY
+# RedactedField in the service, and a redaction is invisible from every endpoint. The wire
+# faces of that rule live in qa/user.sh (M3, M8.23-27) and qa/user_graphql.sh (N2.4-5);
+# qa/domain.sh U25 owns the payload half. What is here is the trail's own shape.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_AU=$(new_tenant active "$(ws audu)") || exit 1
+E_AU=$(user_email aud)
+ID_AU=$(new_user "$E_AU" "$TEN_AU") || exit 1
+
+case_ "A54 the user INSERT wrote exactly one audit row" "1 row, verb 'insert', entity_type 'User', in the same transaction as the write"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='User' AND aggregate_id='$ID_AU' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "count = $got"; fi
+
+case_ "A55 the insert row's kind is 'snapshot'" "a creation records the whole record, not a delta"
+got=$(sql "SELECT kind FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "snapshot" ]; then pass_; else HTTP_BODY="$got"; fail_ "kind = $got"; fi
+
+case_ "A56 the actor is the acting principal's sub" "the admin's own sub, not a sentinel"
+got=$(sql "SELECT actor FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='insert';")
+if [ "$(printf '%s' "$got" | tr -d '[:space:]')" = "$ADMIN_SUB" ]; then pass_; else HTTP_BODY="$got"; fail_ "actor = '$got'"; fi
+
+case_ "A57 the tenant scope stamped on the row is the ACTOR's, not the record's" "the master tenant — the admin acted, and the row it created lives elsewhere. The column answers 'who did this, under which tenant', which is what per-tenant retention and forensic filters read"
+got=$(sql "SELECT tenant_id FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "$MASTER_TENANT" ]; then pass_; else HTTP_BODY="$got"; fail_ "tenant_id = '$got' (record's tenant is $TEN_AU)"; fi
+
+case_ "A58 the PATCH is recorded as a DELTA and not a snapshot" "kind 'delta' — the verb that changes one field must not rewrite the whole record into the trail"
+api PATCH "/users/$ID_AU" '{"givenName":"Audited"}'
+got=$(sql "SELECT kind FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "delta" ]; then pass_; else HTTP_BODY="$got"; fail_ "kind = '$got'"; fi
+
+case_ "A59 the delta names the field that moved" "GivenName in the payload — a trail that records that something changed without saying what is not a trail"
+got=$(sql "SELECT (payload::jsonb::text LIKE '%GivenName%') FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='update' ORDER BY created_at DESC LIMIT 1;")"; fail_ "GivenName not in the delta"; fi
+
+case_ "A60 the ARCHIVE writes its own row" "verb 'archive' — a lifecycle transition is a fact of its own, distinct from the update that carries archived_at"
+api PATCH "/users/$ID_AU/archive"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='archive';" | tr -d '[:space:]')
+if [ "$got" = "1" ]; then pass_; else HTTP_BODY="$got"; fail_ "archive rows = $got"; fi
+
+case_ "A61 the archive's row records the STATUS the rule forced" "Status suspended in the payload — U15 is a mutation inside IfArchive, and because archive is an ordinary full-field write at this pin it reaches the row AND the event. If it ever stopped reaching the event, the trail would show an archive that silently left the account active"
+got=$(sql "SELECT (payload::jsonb::text LIKE '%suspended%') FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='archive';" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AU' AND verb='archive';")"; fail_ "the forced status is not in the archive event"; fi
+
+# ── the two credential operations ────────────────────────────────────────────────────────
+# THE FIXTURE ROTATES BEFORE THE RESET, and that is not ceremony: every API-created account is
+# born must_change_password=TRUE, so a reset on a fresh one moves nothing and the delta has no
+# transition to carry. The change is what clears the flag (U20.1); the reset below is what sets
+# it again, and A63 is the assertion that the trail says so.
+E_AUC=$(user_email audc)
+ID_AUC=$(new_user "$E_AUC" "$TEN_AU") || exit 1
+R_AUC=$(new_role "$(role_key audc)" "$TEN_AU" "$(permission_id_of user change-password)") || exit 1
+grant_role_to_user "$ID_AUC" "$R_AUC" >/dev/null
+T_AUC=$(usable_token "$E_AUC" "$ID_AUC") || true
+
+case_ "A62 a RESET writes an audit row" "verb 'update' — the credential verbs dispatch ModeUpdate, so the trail records them as updates and the ACTION is what tells them apart in the payload"
+api PATCH "/users/$ID_AUC/password-reset" '{"password":"Qa!Audited26","passwordConfirmation":"Qa!Audited26"}'
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_AUC' AND verb='update';" | tr -d '[:space:]')
+if [ "$got" -ge 1 ] 2>/dev/null; then pass_; else HTTP_BODY="$got"; fail_ "update rows = $got"; fi
+
+case_ "A63 the reset's row records the FLAG it set and not the credential" "MustChangePassword in the delta — what a reviewer needs to see is that somebody's password was replaced and that they must rotate it, never what it was replaced with"
+got=$(sql "SELECT (payload::jsonb::text LIKE '%MustChangePassword%') FROM audit_events WHERE aggregate_id='$ID_AUC' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AUC' AND verb='update' ORDER BY created_at DESC LIMIT 1;")"; fail_ "MustChangePassword not in the payload"; fi
+
+case_ "A63b the delta names PasswordHash as changed, with BOTH sides redacted" "from '***' to '***' — the trail records THAT the credential moved without recording either value, which is exactly what an access review needs and all it may have"
+got=$(sql "SELECT (payload::jsonb::text LIKE '%\"to\": \"***\"%' AND payload::jsonb::text LIKE '%\"from\": \"***\"%') FROM audit_events WHERE aggregate_id='$ID_AUC' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AUC' AND verb='update' ORDER BY created_at DESC LIMIT 1;")"; fail_ "the redacted from/to pair is not in the delta"; fi
+
+case_ "A64 NEITHER the plaintext NOR the new hash is anywhere in that row" "0 matches for either — the plaintext arrives on a field with no column and the hash is redacted, so the two most sensitive values in this service meet the trail by two different mechanisms and both hold"
+REAL_AUC=$(sql "SELECT password_hash FROM users WHERE id = '$ID_AUC';" | tr -d '[:space:]')
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_AUC' AND (payload::text LIKE '%Qa!Audited26%' OR payload::text LIKE '%' || substring('$REAL_AUC' from 20 for 20) || '%');" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="offending rows: $got"; fail_ "a credential value reached the trail"; fi
+
+case_ "A65 the COLLECTION writes are recorded against the OWNER" "aggregate_id is the user's id, never the entry's — an entry has no identity outside its collection, and a trail keyed on the child would be unreadable as 'what happened to this person'"
+ID_AUG=$(new_user "$(user_email audg)" "$TEN_AU") || exit 1
+R_AUG=$(new_role "$(role_key audg)" "$TEN_AU" "$(permission_id_of tenant read)") || exit 1
+CH_AUG=$(grant_role_to_user "$ID_AUG" "$R_AUG") || exit 1
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_AUG' AND entity_type='User';" | tr -d '[:space:]')
+if [ "$got" -ge 2 ] 2>/dev/null; then pass_; else HTTP_BODY="$got"; fail_ "rows against the owner = $got"; fi
+
+case_ "A66 no audit row is keyed on the CHILD id" "0 — the collection entry is part of the aggregate's write, not a write of its own"
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$CH_AUG';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "rows keyed on the child = $got"; fi
+
+case_ "A67 a REFUSED write leaves NO audit row" "0 rows for a user the service never created — the trail records what happened, and a 422 is not something that happened"
+api POST /users "$(jq -nc --arg e "$(user_email audx)" --arg t "$TEN_AU" '{givenName:"Qa",familyName:"Fixture",email:$e,status:"active",tenantID:$t,password:"abc",passwordConfirmation:"abc"}')"
+got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='User' AND payload::text LIKE '%$(printf '%s' "$(user_email audx)" | cut -d@ -f1 | sed 's/-[0-9]*$//')%';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "rows for a refused insert = $got"; fi
+
 qa_finish
