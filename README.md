@@ -17,7 +17,7 @@ What it answers, in one line each:
 
 ## Framework
 
-> ### [omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.72.0**
+> ### [omnicore](https://github.com/ClaudioSchirmer/omnicore) **v0.74.0**
 >
 > A DDD + CQRS framework for Go. It supplies the composition root, the request pipeline, the
 > repositories and view readers, the OpenAPI and GraphQL surfaces, the authorization
@@ -26,19 +26,36 @@ What it answers, in one line each:
 > everything structural above comes from the pin.
 >
 > **Repository:** https://github.com/ClaudioSchirmer/omnicore
-> **Pinned in:** [`go.mod`](go.mod) — `github.com/ClaudioSchirmer/omnicore v0.72.0`
+> **Pinned in:** [`go.mod`](go.mod) — `github.com/ClaudioSchirmer/omnicore v0.74.0`
 > **Upgrading:** `/omnicore:upgrade` (never a hand-edited pin)
 
-Most of `internal/` is generated from the specs in `specs/omnicore-gen/` by **omnicore-gen**,
-the framework's spec-driven generator. Files named `*_manual.go` are hand-written and the
-generator never touches them again.
+## Tooling
+
+> ### [omnicore-plugin](https://github.com/ClaudioSchirmer/omnicore-plugin) **v0.67.0**
+>
+> The Claude Code plugin this repository is maintained with. It ships **omnicore-gen** — the
+> spec-driven generator that writes most of `internal/` from `specs/omnicore-gen/` — and the
+> `/omnicore:*` skills that scaffold, evolve, configure, run, QA and upgrade a service built on
+> the framework. It is tooling and nothing else: no artifact it installs is compiled into this
+> service, and no file here imports it.
+>
+> **Repository:** https://github.com/ClaudioSchirmer/omnicore-plugin
+> **Installed as:** marketplace `omnicore` → plugin `omnicore` **v0.67.0** (`/plugin`)
+
+The two versions move independently: the pin above is what this service **runs on**, the plugin
+is what **wrote** it. Which framework release each entity was last generated against is recorded
+per entity in [`specs/omnicore-gen/lock.json`](specs/omnicore-gen/lock.json) — all seven read
+`v0.74.0` today, so no entity is drifting behind the pin.
+
+Files named `*_manual.go` are hand-written and the generator never touches them again.
 
 ## Technologies
 
 | Layer | Choice |
 |---|---|
 | Language | Go **1.26.5** — module `github.com/ClaudioSchirmer/authcore` |
-| Framework | **omnicore v0.72.0** (DDD, CQRS, features, pipeline, audit, i18n) |
+| Framework | **omnicore v0.74.0** (DDD, CQRS, features, pipeline, audit, i18n) |
+| Tooling | **omnicore-plugin v0.67.0** — the `/omnicore:*` skills and the `omnicore-gen` generator |
 | HTTP | Fiber **v3.3.0** |
 | Source of truth | PostgreSQL 17 (`pgx/v5`), build tag `postgres` |
 | Migrations | `golang-migrate/v4`, numbered up/down pairs under `migrations/postgres/` |
@@ -88,10 +105,10 @@ Client ────────────────────────�
 | Aggregate | What it is |
 |---|---|
 | **Tenant** | The isolation partition. `id` (UUID v7) is the `tenant_id` claim, the FK target of every scoped row and the by-id URL; `workspace` is the human handle. Commercial `status`: `trial` → `active` → `suspended`, never back to `trial`. |
-| **User** | A person inside exactly one tenant. `email` is unique across the whole platform; the same person in two tenants is two users. Holds password state, group memberships, direct roles and claim values. |
-| **Client** | A machine identity: a client id, a hashed secret with a rotation grace window, an optional CIDR allow-list, direct roles and claim values. Never gets a refresh token. |
-| **Group** | A bundle of roles. Attaching a user to a group confers every role the group carries. |
-| **Role** | A bundle of catalog permissions, scoped to one tenant. `*:*` can never be granted through the API. |
+| **User** | A person inside exactly one tenant. `email` is unique across the whole platform; the same person in two tenants is two users. Holds password state, group memberships, direct roles and claim values. Capped at **50 groups, 50 direct roles and 20 claim values**. |
+| **Client** | A machine identity: a client id, a hashed secret with a rotation grace window, an optional CIDR allow-list, direct roles and claim values. Never gets a refresh token. Capped at **50 roles, 20 CIDR ranges and 20 claim values**. |
+| **Group** | A bundle of roles. Attaching a user to a group confers every role the group carries. Capped at **50 roles** — a cap that multiplies against Role's own, since a member inherits every permission of every role in the bundle. |
+| **Role** | A bundle of catalog permissions, scoped to one tenant. Capped at **250 permissions**. `*:*` can never be granted through the API. |
 | **Permission** | The platform-wide catalog of enforceable `resource:action` pairs. Not tenant-scoped. |
 | **Claim** | The catalog of tenant-defined claims a token may carry: a name (reserved prefix `x_`), a `valueType` (`string` · `number` · `bool`), an `appliesTo` (`user` · `client` · `both`) and an optional tenant-wide default. Capped at **20 active definitions per tenant per identity kind**. |
 
@@ -200,8 +217,8 @@ record on the log stream; the attempted password enters neither the table nor th
 | `PATCH /tenants/{id}` | `patchTenant` | `tenant:update` | Partial update: only the fields present in the body change. Cannot set a value back to null. |
 | `PATCH /tenants/{id}/archive` | `archiveTenant` | `tenant:archive` | Archives the tenant and forces its commercial status to `suspended`. Reversible. |
 | `PATCH /tenants/{id}/unarchive` | `unarchiveTenant` | `tenant:archive` | Restores a previously archived tenant. |
-| `GET /tenants` | `tenants` | `tenant:read` | Paged listing, with filters and sorts over the view's fields. |
-| `GET /tenants/{id}` | `tenant` | `tenant:read` | Reads one tenant by its identifier. |
+| `GET /tenants` | `tenants` | `tenant:read` | Paged listing, with filters and sorts over the view's fields. **Row-scoped:** a caller who is not a `*:*` operator sees their own tenant and no other. |
+| `GET /tenants/{id}` | `tenant` | `tenant:read` | Reads one tenant by its identifier. Same scope: any id but the caller's own answers **404**, unless the caller holds `*:*`. |
 
 ## Users
 
@@ -323,6 +340,30 @@ the fixed set is assigned last so not even a row written by migration could.
 
 ---
 
+## Proving it
+
+The contract suite lives in `qa/`. It boots this service for real, against a throwaway database
+it drops and recreates first, and asserts what the answers are supposed to be:
+
+```bash
+./qa/run.sh                  # every lane, fail-fast — the first RED stops the run
+./qa/run.sh --all            # every lane, exhaustive sweep
+./qa/run.sh user domain      # a subset, on that same runner — never a rival script
+```
+
+Seventeen lanes: a REST lane and a GraphQL lane for each of the seven aggregates, plus `domain`
+(the rules this service's own specs promise), `security` (what it *refuses* — 401 per token rule,
+the public-route split in both directions, 403 per authorization layer) and `audit` (what the
+trail records, and what it redacts). The last full run — 2026-09-08, pin `v0.74.0` — was
+**2224 cases green across 17/17 lanes**, with 33 families named as *not proven* in a column of
+their own rather than folded into the pass count.
+
+The verdict is rewritten in full after every lane into [`qa/qa-report.md`](qa/qa-report.md), so a
+run killed halfway still leaves what it had proven. What each lane is meant to prove, and why, is
+in `specs/qa/<entity>-contract/plan.md`.
+
+---
+
 ## Repository layout
 
 ```
@@ -380,6 +421,9 @@ The reasoning lives in the repository rather than in chat history:
 - `ACCESS_MATRIX.md` — who reaches which rows, per endpoint.
 
 ## Changing things
+
+Every command below is a skill of [omnicore-plugin](https://github.com/ClaudioSchirmer/omnicore-plugin)
+**v0.67.0**, not something this repository carries.
 
 | Goal | Tool |
 |---|---|
