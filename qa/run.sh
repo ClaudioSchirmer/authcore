@@ -9,6 +9,8 @@
 #          specs/qa/permission-contract/plan.md  (permission, permission_graphql, and the P/S4/A15+ blocks)
 #          specs/qa/role-contract/plan.md        (role, role_graphql, and the RL/S5/A24+ blocks)
 #          specs/qa/group-contract/plan.md       (group, group_graphql, and the GR/S6/A39+ blocks)
+#          specs/qa/user-contract/plan.md        (user, user_graphql, and the U/S7/A54+ blocks)
+#          specs/qa/client-contract/plan.md      (client, client_graphql, and the C/S8/A68+ blocks)
 # Verdict: qa/qa-report.md  (rewritten in full after EVERY lane, so a run killed halfway still
 #          leaves what it had proven)
 # Logs:    qa/.logs/<run-id>/
@@ -44,9 +46,9 @@ cd "$(dirname "$0")/.." || exit 1
 
 # ── the lane list. This array IS the inventory: a .sh under qa/ that no lane names is a suite
 # ── nobody runs, and a lane naming a missing file breaks the run for everyone.
-LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql user user_graphql domain security audit)
+LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql user user_graphql client client_graphql domain security audit)
 
-PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md"
+PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md"
 REPORT="qa/qa-report.md"
 PORT=8099
 QA_BASE="http://localhost:$PORT"
@@ -102,7 +104,7 @@ render_report() {
   # line came to name the wrong suite.
   local lane p f s t verdict
   {
-    printf '# QA report — authcore · tenant + permission + role + group + user contracts\n\n'
+    printf '# QA report — authcore · tenant + permission + role + group + user + client contracts\n\n'
     printf -- '- **run:** `%s` · %s\n' "$QA_RUN_ID" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
     printf -- '- **plans:** %s\n' "$PLANS"
     printf -- '- **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags '"'"'postgres'"'"'` (no transport tag — the yaml declares no `transport:` block)\n'
@@ -614,6 +616,62 @@ fi
 
 export QA_TOKEN_USEROP QA_TOKEN_USERNOGRANT
 
+# ── principals K and L, for specs/qa/client-contract/plan.md §2 ───────────────────────────
+#
+# Same tenant as E-J, for the same reason: the client lane grants roles and claims, both are
+# tenant-scoped, and a client principal in a tenant of its own could not reach any of them.
+#
+#   K holds the WHOLE client vocabulary — all EIGHT verbs, the widest split in the service —
+#     plus the reads and inserts a client operator needs to build what it attaches, and
+#     deliberately NOT permission:archive: exactly the permission C9's escalation negative
+#     needs it to lack. The role CONFERRING permission:archive is created by the ADMIN
+#     (Role's own escalation rule would refuse K that creation); the question C9 asks is
+#     whether K may ATTACH it to a machine.
+#   L holds client:read + client:update and NONE of the other six. It is the ONLY caller for
+#     which the eight-way verb split is visible: it may relabel an integration and must be
+#     refused on the seven collection routes and on the rotation. A and B answer the same on
+#     all thirteen either way.
+#
+# A failure to build either is NOT fatal: the lanes skip their blocks loudly and the report
+# prints them in the SKIP column, which is the honest outcome.
+CLIENT_INSERT_PERMISSION="01990000-0000-7000-8000-000000000005"
+CLIENT_UPDATE_PERMISSION="01990000-0000-7000-8000-000000000006"
+CLIENT_ARCHIVE_PERMISSION="01990000-0000-7000-8000-000000000007"
+CLIENT_READ_PERMISSION="01990000-0000-7000-8000-000000000008"
+CLIENT_GRANT_PERMISSION="01990000-0000-7000-8000-000000000009"
+CLIENT_SETCLAIM_PERMISSION="01990000-0000-7000-8000-00000000000a"
+CLIENT_MANAGENETWORK_PERMISSION="01990000-0000-7000-8000-00000000000b"
+CLIENT_ROTATESECRET_PERMISSION="01990000-0000-7000-8000-00000000000c"
+
+if [ -n "$QA_TENANT_SCOPED" ]; then
+  QA_TOKEN_CLIENTOP=$(make_principal clientop "$QA_TENANT_SCOPED" "QA Client Operator" \
+    "Grants the whole client vocabulary inside one tenant, plus the reads and inserts a client operator needs, and no catalog write verb at all." \
+    "$CLIENT_INSERT_PERMISSION" "$CLIENT_UPDATE_PERMISSION" "$CLIENT_ARCHIVE_PERMISSION" \
+    "$CLIENT_READ_PERMISSION" "$CLIENT_GRANT_PERMISSION" "$CLIENT_SETCLAIM_PERMISSION" \
+    "$CLIENT_MANAGENETWORK_PERMISSION" "$CLIENT_ROTATESECRET_PERMISSION" \
+    "$ROLE_READ_PERMISSION" "$ROLE_INSERT_PERMISSION" \
+    "$CLAIM_READ_PERMISSION" "$CLAIM_INSERT_PERMISSION" "$TENANT_READ_PERMISSION" || true)
+  QA_TOKEN_CLIENTLIM=$(make_principal clientlim "$QA_TENANT_SCOPED" "QA Client Labeller" \
+    "Grants reading and relabelling a machine client, and deliberately none of the six verbs that confer privilege, touch the network boundary, or hand out credentials." \
+    "$CLIENT_READ_PERMISSION" "$CLIENT_UPDATE_PERMISSION" || true)
+else
+  QA_TOKEN_CLIENTOP=""
+  QA_TOKEN_CLIENTLIM=""
+fi
+
+if [ -n "$QA_TOKEN_CLIENTOP" ]; then
+  echo "   principal K: qa-clientop-$QA_RUN_ID@authcore.local (the eight client verbs + role/claim read+insert + tenant:read, tenant $QA_TENANT_SCOPED)"
+else
+  echo "   principal K: NOT BUILT — the client rows of qa/domain.sh and qa/security.sh S8 will skip and say so" >&2
+fi
+if [ -n "$QA_TOKEN_CLIENTLIM" ]; then
+  echo "   principal L: qa-clientlim-$QA_RUN_ID@authcore.local (client:read + client:update, NONE of the other six)"
+else
+  echo "   principal L: NOT BUILT — qa/security.sh S8.1v-y will skip and say so" >&2
+fi
+
+export QA_TOKEN_CLIENTOP QA_TOKEN_CLIENTLIM
+
 # The lanes need these to exercise the login route itself (§3b).
 QA_ADMIN_EMAIL="admin@authcore.local"
 QA_ADMIN_PASSWORD="$ADMIN_PASS"
@@ -648,7 +706,10 @@ done
 # ═════════════════════════════════════════════════════════════════════════════════════════
 ELAPSED=$(( $(date +%s) - STARTED ))
 render_report "placeholder"
-if [ "$REPORT_FAIL" -gt 0 ]; then
+# RED_LANES is part of the verdict alongside REPORT_FAIL: a lane that dies in its FIXTURES
+# exits non-zero before qa_finish ever writes a .result, so it has no failure COUNT — and a
+# footer that read only the counts once printed ALL GREEN over a lane that never ran a case.
+if [ "$REPORT_FAIL" -gt 0 ] || [ "$RED_LANES" -gt 0 ]; then
   FOOTER="❌ RED — $RED_LANES of ${#RUN_LANES[@]} suites — logs: $QA_LOG_DIR/"
 else
   FOOTER="✅ ALL GREEN — ${#RUN_LANES[@]}/${#RUN_LANES[@]} suites · $REPORT_PASS cases · ${ELAPSED}s"
@@ -663,4 +724,4 @@ printf '%s\n' "$FOOTER"
 printf 'report: %s\n' "$REPORT"
 [ "$REPORT_SKIP" -gt 0 ] && printf 'skipped: %d case(s) — named in the report, never folded into the pass count\n' "$REPORT_SKIP"
 
-[ "$REPORT_FAIL" -eq 0 ]
+[ "$REPORT_FAIL" -eq 0 ] && [ "$RED_LANES" -eq 0 ]

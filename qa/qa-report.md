@@ -1,27 +1,29 @@
-# QA report — authcore · tenant + permission + role + group + user contracts
+# QA report — authcore · tenant + permission + role + group + user + client contracts
 
-- **run:** `20260907-224905-39984` · 2026-09-07 22:49:54 EDT
-- **plans:** specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md
+- **run:** `20260908-113123-17151` · 2026-09-08 11:32:30 EDT
+- **plans:** specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md
 - **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags 'postgres'` (no transport tag — the yaml declares no `transport:` block)
 - **omnicore pin:** `v0.74.0`
 - **hygiene:** throwaway database `authcore_qa`, dropped and recreated before this run
-- **lanes:** 13 declared, 13 selected
+- **lanes:** 15 declared, 15 selected
 
 | Suite | Pass | Fail | Skip | Verdict | Time |
 |---|---:|---:|---:|---|---:|
 | tenant | 111 | 0 | 0 | ✅ GREEN | 2s |
-| tenant_graphql | 36 | 0 | 0 | ✅ GREEN | 1s |
-| permission | 131 | 0 | 0 | ✅ GREEN | 1s |
+| tenant_graphql | 36 | 0 | 0 | ✅ GREEN | 0s |
+| permission | 131 | 0 | 0 | ✅ GREEN | 2s |
 | permission_graphql | 37 | 0 | 0 | ✅ GREEN | 1s |
 | role | 208 | 0 | 4 | ✅ GREEN | 4s |
-| role_graphql | 44 | 0 | 0 | ✅ GREEN | 0s |
+| role_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
 | group | 214 | 0 | 4 | ✅ GREEN | 4s |
 | group_graphql | 51 | 0 | 0 | ✅ GREEN | 1s |
 | user | 152 | 0 | 0 | ✅ GREEN | 4s |
 | user_graphql | 46 | 0 | 0 | ✅ GREEN | 2s |
-| domain | 319 | 0 | 7 | ✅ GREEN | 16s |
-| security | 228 | 0 | 6 | ✅ GREEN | 5s |
-| audit | 68 | 0 | 0 | ✅ GREEN | 4s |
+| client | 139 | 0 | 0 | ✅ GREEN | 3s |
+| client_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
+| domain | 386 | 0 | 7 | ✅ GREEN | 26s |
+| security | 290 | 0 | 9 | ✅ GREEN | 7s |
+| audit | 78 | 0 | 0 | ✅ GREEN | 4s |
 
 ## Skipped — coverage this run did NOT prove
 
@@ -101,7 +103,16 @@ A security or domain family that never executed is the one place where "no failu
 - **S7.5b the externalValidator path**
   auth.externalValidator is configured in no profile, so a locally-valid token is never refused by a second opinion. There is nothing to assert and nothing is claimed
 
+- **S8.4b there is therefore no FieldAccessForbiddenNotification to assert**
+  spec.md §9 declares no ReadCriteria.Restrict for Client: the hashes are off the wire because no Response DTO declares them (and RedactedField keeps them out of the framework's own copies — qa/audit.sh A69+ proves that half), and tenantStatus is hidden at the join. S8.4a proves the boundary holds for the most privileged principal in the service
+
+- **S8.6a the trusted-proxy half of the allow-list**
+  No profile configures a trusted proxy, so the mint judges the SOCKET address — which is what made C-MINT provable from localhost. Whether a spoofed X-Forwarded-For could walk through a REAL deployment behind a load balancer is /omnicore:configure territory (spec.md §F prerequisite 1), and until it is configured the allow-list constrains local semantics only. Prerequisite 2 stands with it: the list constrains where a token is OBTAINED, never where it is USED
+
+- **S8.6b the client token's own contract**
+  The claim vocabulary (identity_kind, name, permissions, x_* values reaching the token), the deliberate absence of a lockout on this route, and the absent /refresh companion belong to the token route's own round (plan §0b, maintainer 2026-09-08: exercised, not owned). C-SEC1 proves the one bit this round cannot avoid: a minted secret signs in and its token says client
+
 
 ---
 
-✅ ALL GREEN — 13/13 suites · 1645 cases · 49s
+✅ ALL GREEN — 15/15 suites · 1967 cases · 67s

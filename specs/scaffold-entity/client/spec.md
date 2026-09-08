@@ -34,8 +34,11 @@
   **no `SecretHasher` port** (§D — nothing in the domain calls it, so it would have been a
   name placed by import convenience). The maintainer then had `PasswordHasher` removed from
   the domain for the same reason, which is a change to `User`'s tree authorised in chat.
-  **One promise is not met and is OPEN**: `POST /clients` does not hand back a secret — see
-  `tasks.md`'s open item and its three ways out.
+  ~~**One promise is not met and is OPEN**: `POST /clients` does not hand back a secret — see
+  `tasks.md`'s open item and its three ways out.~~ **Superseded 2026-09-08** (QA round
+  `client-contract` §0c-a): the item was CLOSED on 2026-09-01 — `tasks.md` § *Closed
+  (2026-09-01)* records it — and `InsertClientResponse` carries `secret`, filled from the
+  entity after the write. No promise remains open.
 
 ## ✅ Decisions taken at the model gate (2026-08-26)
 
@@ -545,7 +548,9 @@ what exists.
 
 Verbatim `user_roles`: `POST /clients/{id}/roles` grants,
 `PATCH /clients/{id}/roles/{childId}/archive` revokes; and the same pair under
-`/clients/{id}/allowed-cidrs`. **No replace-all PUT on either** — an omitted entry must
+`/clients/{id}/allowedCIDRs` *(spelling corrected 2026-09-08, QA round `client-contract`
+§0c-b — the mounted segment is camelCase like every other collection)*. **No replace-all
+PUT on either** — an omitted entry must
 never silently revoke a grant, and on the allow-list it must never silently widen access.
 
 **Verb truth:** both removals are soft, so both are `PATCH …/archive` and never `DELETE`
@@ -660,8 +665,8 @@ reaches them — the rotate operation is the only writer), `id`.
 | **rotate secret** | `POST /clients/{id}/secret` | **`client:rotate-secret`** |
 | grant role | `POST /clients/{id}/roles` | `client:grant` |
 | revoke role | `PATCH /clients/{id}/roles/{childId}/archive` | `client:grant` |
-| allow a range | `POST /clients/{id}/allowed-cidrs` | **`client:manage-network`** |
-| remove a range | `PATCH /clients/{id}/allowed-cidrs/{childId}/archive` | **`client:manage-network`** |
+| allow a range | `POST /clients/{id}/allowedCIDRs` | **`client:manage-network`** |
+| remove a range | `PATCH /clients/{id}/allowedCIDRs/{childId}/archive` | **`client:manage-network`** |
 
 - **Reserved read controls:** pagination + `orderBy` (defaults) · `?fields=` **yes** ·
   `?search=` **no** (no text index will serve it; `name` filtering covers the need) ·
@@ -693,9 +698,13 @@ reaches them — the rotate operation is the only writer), `id`.
 - **Filters/sorts** (low-risk, decided): `name` — `eq`, `contains`, `startsWith`, sortable ·
   `status` — `eq`, `in` · `tenantId` — `eq` (injected by the isolation filter, never
   caller-supplied except for `*:*`) · `createdAt` / `secretChangedAt` — `gte`, `lte`,
-  sortable. **`secretHash`, `previousSecretHash` and `previousSecretExpiresAt` appear in no
-  filter, no sort and no `?fields=` vocabulary** — the hand-made decision property 5 above
-  names.
+  sortable. **`secretHash` and `previousSecretHash` appear in no filter, no sort and no
+  `?fields=` vocabulary** — the hand-made decision property 5 above names.
+  **`previousSecretExpiresAt` stays out of every filter and every sort, but IS in the
+  `?fields=` vocabulary** *(corrected 2026-09-08, QA round `client-contract` §0c-c —
+  `tasks.md` deviation 5 records the reasoning: keeping it out needed `hidden: true`, which
+  would also have removed it from every response, and an operator asking "until when does
+  the old secret work?" should not have to derive it; it is a timestamp and leaks nothing)*.
 
 ## 10. Authorization                          [required]
 

@@ -421,4 +421,60 @@ api POST /users "$(jq -nc --arg e "$(user_email audx)" --arg t "$TEN_AU" '{given
 got=$(sql "SELECT count(*) FROM audit_events WHERE entity_type='User' AND payload::text LIKE '%$(printf '%s' "$(user_email audx)" | cut -d@ -f1 | sed 's/-[0-9]*$//')%';" | tr -d '[:space:]')
 if [ "$got" = "0" ]; then pass_; else HTTP_BODY="$got"; fail_ "rows for a refused insert = $got"; fi
 
+# ── Client — specs/qa/client-contract/plan.md §4, from A68. THE SECRET SWEEP is the point:
+# ── two hash columns redacted on BOTH axes, and a plaintext that must appear NOWHERE — the
+# ── fourth face of C-SEC1, and the only one no API call can see.
+TEN_AC=$(new_tenant active "$(ws audc)") || exit 1
+new_client "$(client_label aud)" "$TEN_AC" || exit 1
+ID_AC="$CLIENT_ID"; SECRET_AC="$CLIENT_SECRET"
+
+case_ "A68 the client INSERT wrote exactly one audit row" "1 row, verb 'insert', entity_type 'Client', kind 'snapshot', in the same transaction as the write"
+got=$(sql "SELECT count(*) || '/' || min(kind) FROM audit_events WHERE entity_type='Client' AND aggregate_id='$ID_AC' AND verb='insert';" | tr -d '[:space:]')
+if [ "$got" = "1/snapshot" ]; then pass_; else HTTP_BODY="$got"; fail_ "count/kind = $got"; fi
+
+case_ "A69 the snapshot carries *** where the hash would be" "SecretHash redacted — RedactedField(InAudit) on the credential column, the same mechanism users.password_hash rides"
+got=$(sql "SELECT payload::jsonb #>> '{snapshot,SecretHash}' FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='insert' LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "***" ]; then pass_; else HTTP_BODY="$got"; fail_ "audit SecretHash = '$got'"; fi
+
+case_ "A69b the redaction is SCOPED to the credential columns" "the snapshot still carries Status in the clear — a redaction that blanked the record would destroy the trail it exists to protect"
+got=$(sql "SELECT payload::jsonb #>> '{snapshot,Status}' FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='insert' LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "active" ]; then pass_; else HTTP_BODY="$got"; fail_ "snapshot Status = '$got'"; fi
+
+case_ "A70 the REAL hash appears nowhere in this client's trail" "0 rows containing a slice of the stored SHA-256 — a redaction that covers one path and misses another is not a redaction"
+REAL_AC=$(sql "SELECT secret_hash FROM clients WHERE id = '$ID_AC';" | tr -d '[:space:]')
+got=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_AC' AND payload::text LIKE '%' || substring('$REAL_AC' from 10 for 20) || '%';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows containing a slice of the hash: $got"; fail_ "the hash leaked into audit_events"; fi
+
+case_ "A71 the PLAINTEXT appears nowhere in the WHOLE TABLE" "0 rows anywhere in audit_events containing the secret the create revealed — the plaintext lives on a field with no column, so no mechanism should ever have carried it here, and this is the case that notices if one grows"
+got=$(sql "SELECT count(*) FROM audit_events WHERE payload::text LIKE '%$SECRET_AC%';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows containing the plaintext: $got"; fail_ "the PLAINTEXT leaked into audit_events"; fi
+
+case_ "A72 the ROTATION writes a delta with BOTH sides of the hash redacted" "from '***' to '***' on SecretHash — the trail records THAT the credential moved without recording either value, which is what an access review needs and all it may have"
+rotate_secret "$ID_AC" '{}'
+SECRET_AC2=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret // empty')
+got=$(sql "SELECT (payload::jsonb::text LIKE '%\"to\": \"***\"%' AND payload::jsonb::text LIKE '%\"from\": \"***\"%') FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='update' ORDER BY created_at DESC LIMIT 1;" | tr -d '[:space:]')
+if [ "$got" = "t" ]; then pass_; else HTTP_BODY="$(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='update' ORDER BY created_at DESC LIMIT 1;")"; fail_ "the redacted from/to pair is not in the rotation's delta"; fi
+
+case_ "A72b ...and the ROTATED plaintext is absent from the whole table too" "0 rows — the second reveal seat leaks no more than the first"
+got=$(sql "SELECT count(*) FROM audit_events WHERE payload::text LIKE '%${SECRET_AC2:-never-matches-anything}%';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows containing the rotated plaintext: $got"; fail_ "the rotated PLAINTEXT leaked into audit_events"; fi
+
+case_ "A73 the ARCHIVE writes its own row, recording the STATUS the rule forced" "verb 'archive' with 'suspended' in the payload — archive-forces-suspended reaches the trail as well as the row"
+api PATCH "/clients/$ID_AC/archive"
+got=$(sql "SELECT count(*) || '/' || (min(payload::text) LIKE '%suspended%')::text FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='archive';" | tr -d '[:space:]')
+if [ "$got" = "1/true" ]; then pass_; else HTTP_BODY="$got — $(sql "SELECT payload FROM audit_events WHERE aggregate_id='$ID_AC' AND verb='archive';")"; fail_ "archive rows/status = $got"; fi
+
+case_ "A74 the COLLECTION writes are recorded against the OWNER" "aggregate_id is the client's id, never the entry's"
+new_client "$(client_label audg)" "$TEN_AC" || exit 1
+ID_ACG="$CLIENT_ID"
+R_ACG=$(new_role "$(role_key audcg)" "$TEN_AC" "$(permission_id_of tenant read)") || exit 1
+CH_ACG=$(grant_role_to_client "$ID_ACG" "$R_ACG") || exit 1
+got=$(sql "SELECT (SELECT count(*) FROM audit_events WHERE aggregate_id='$ID_ACG' AND entity_type='Client') || '/' || (SELECT count(*) FROM audit_events WHERE aggregate_id='$CH_ACG');" | tr -d '[:space:]')
+GOT_OWNER="${got%%/*}"; GOT_CHILD="${got##*/}"
+if [ "${GOT_OWNER:-0}" -ge 2 ] 2>/dev/null && [ "$GOT_CHILD" = "0" ]; then pass_; else HTTP_BODY="owner/child rows = $got"; fail_ "the trail is not keyed on the owner"; fi
+
+case_ "A75 a GLOBAL sweep finds no credential-shaped string in the entire trail" "0 rows matching acs_ + 43 base64url runes, over every entity's every event — the one query that would catch a leak through a path nobody thought to assert"
+got=$(sql "SELECT count(*) FROM audit_events WHERE payload::text ~ 'acs_[A-Za-z0-9_-]{43}';" | tr -d '[:space:]')
+if [ "$got" = "0" ]; then pass_; else HTTP_BODY="rows carrying a credential-shaped string: $got"; fail_ "something credential-shaped reached the trail"; fi
+
 qa_finish

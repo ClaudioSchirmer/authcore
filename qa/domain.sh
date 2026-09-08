@@ -2239,4 +2239,564 @@ case_ "U25.5 the plaintext never reaches the audit trail either" "no row of this
 GOT=$(sql "SELECT count(*) FROM audit_events WHERE aggregate_id='$U25_ID' AND payload::text LIKE '%Qa!Audit2026x%';" | tr -d '[:space:]')
 if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows containing the plaintext: $GOT"; fail_ "the PLAINTEXT leaked into audit_events"; fi
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#  C — §1b of specs/qa/client-contract/plan.md. The Client aggregate's business rules.
+#
+#  Ranked by the cost the spec itself names: the credential discipline first (§E-1/§E-3),
+#  then the rotation's temporal contract, then C14b (the ONE identity_kind-reading rule in
+#  the service, live since the token run), then the CIDR mint gate, then the escalation
+#  pair the spec calls "the rules that matter most and the easiest to skip".
+#
+#  POST /auth/client/token is EXERCISED, NOT OWNED (plan §0b): it is the only instrument
+#  that can observe which secret verifies and from where — every assertion below is about
+#  what the AGGREGATE and its stored rows decide, never about the token's own contract.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_C=$(new_tenant active "$(ws dcli)") || exit 1
+P_TENANT_READ_C=$(permission_id_of tenant read)
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C-SEC1 [CRITICAL] — the secret is revealed once, and it is REAL.
+#   source: spec.md §2 "the secret, end to end" · §E check 1 · rules.manual credential-minting
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label csec)" "$TEN_C" || exit 1
+CSEC_ID="$CLIENT_ID"; CSEC_SECRET="$CLIENT_SECRET"
+
+case_ "C-SEC1+ the minted secret AUTHENTICATES — the credential is real, not decorative" "a token comes back from /auth/client/token for the id+secret the create answered, and its identity_kind claim says 'client'"
+CSEC_TOK=$(mint_client_token "$CSEC_ID" "$CSEC_SECRET")
+if [ -n "$CSEC_TOK" ] && [ "$(jwt_claim "$CSEC_TOK" identity_kind)" = "client" ]; then pass_; else HTTP_BODY="token empty=$([ -z "$CSEC_TOK" ] && echo yes || echo no), identity_kind='$(jwt_claim "${CSEC_TOK:-x.e30.x}" identity_kind)'"; fail_ "the minted credential did not sign in as a machine"; fi
+
+case_ "C-SEC1- the plaintext never reached the SERVER LOG" "0 occurrences of this exact secret in the server's own output — 'the plaintext must never be logged, on any path' is the credential-minting rule's last clause"
+GOT=$(grep -c -F "$CSEC_SECRET" "${QA_LOG_DIR:-/nonexistent}/server.log" 2>/dev/null || true)
+if [ "${GOT:-0}" = "0" ]; then pass_; else HTTP_BODY="occurrences in server.log: $GOT"; fail_ "the plaintext secret was LOGGED"; fi
+
+case_ "C-SEC1- a WRONG secret is refused with a generic 401" "401 and no oracle — the mint route confirms nothing about which check failed (the same-answer assertion is qa/security.sh S8.5)"
+api POST /auth/client/token "$(jq -nc --arg i "$CSEC_ID" '{clientId:$i, clientSecret:"acs_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}')" -
+assert_status 401
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C13 [CRITICAL] — the rotation as a TEMPORAL contract: overlap, kill, expiry, bounds.
+#   source: spec.md §B-Q3/Q3b · §7 C13 · §E check 3 · asked — all three ways approved
+#   2026-09-08 (overlap + zero-kill + a short window with a BOUNDED wait; the one legitimate
+#   wait in this suite — a clock is the contract here, not a projection to poll)
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label crot)" "$TEN_C" || exit 1
+CROT_ID="$CLIENT_ID"; CROT_S1="$CLIENT_SECRET"
+
+case_ "C13a+ rotation OVERLAPS — during the window BOTH secrets sign in" "rotate with the default window: the response's NEW secret mints a token AND the old one still does — consumers get redeployed without an outage, which is the model's whole argument"
+rotate_secret "$CROT_ID" '{}'
+CROT_S2=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret')
+CROT_EXP=$(printf '%s' "$HTTP_BODY" | jq -r '.data.previousSecretExpiresAt')
+T_NEW=$(mint_client_token "$CROT_ID" "$CROT_S2")
+T_OLD=$(mint_client_token "$CROT_ID" "$CROT_S1")
+if [ -n "$T_NEW" ] && [ -n "$T_OLD" ]; then pass_; else HTTP_BODY="new mints=$([ -n "$T_NEW" ] && echo yes || echo no), old mints=$([ -n "$T_OLD" ] && echo yes || echo no), expiry='$CROT_EXP'"; fail_ "the overlap did not hold"; fi
+
+case_ "C13e+ the omitted window is a DAY" "previousSecretExpiresAt lands within [now+86000, now+86800] — the 86400 default, asserted as arithmetic and not as presence"
+NOW_E=$(now_epoch); EXP_E=$(iso_epoch "$CROT_EXP")
+if [ -n "$EXP_E" ] && [ "$EXP_E" -ge $((NOW_E + 86000)) ] && [ "$EXP_E" -le $((NOW_E + 86800)) ]; then pass_; else HTTP_BODY="expiry='$CROT_EXP' (epoch $EXP_E), now=$NOW_E"; fail_ "the default window is not ~86400s"; fi
+
+case_ "C13b+ a ZERO window is an immediate kill, not a zero-length overlap" "200 with NO previousSecretExpiresAt — the retiring slot is CLEARED rather than stamped (spec.md §E check 3)"
+rotate_secret "$CROT_ID" '{"gracePeriodSeconds":0}'
+CROT_S3=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret')
+assert_json_at 200 '.data | has("previousSecretExpiresAt")' "false"
+
+case_ "C13b+ ...and the SQL agrees: both previous_* columns are NULL" "cleared, not stamped with a past instant — the difference between 'nothing is retiring' and 'something retired'"
+GOT=$(sql "SELECT (previous_secret_hash IS NULL) || '/' || (previous_secret_expires_at IS NULL) FROM clients WHERE id='$CROT_ID';" | tr -d '[:space:]')
+if [ "$GOT" = "true/true" ]; then pass_; else HTTP_BODY="null/null = '$GOT'"; fail_ "the retiring slot was not cleared"; fi
+
+case_ "C13b- the killed secret is refused IMMEDIATELY" "401 for the secret that was current a moment ago — 'send 0 when the old secret leaked' means it stops working with the call, and the long-retired first secret stays dead too"
+T_KILLED=$(mint_client_token "$CROT_ID" "$CROT_S2")
+T_ANCIENT=$(mint_client_token "$CROT_ID" "$CROT_S1")
+T_LIVE=$(mint_client_token "$CROT_ID" "$CROT_S3")
+if [ -z "$T_KILLED" ] && [ -z "$T_ANCIENT" ] && [ -n "$T_LIVE" ]; then pass_; else HTTP_BODY="killed mints=$([ -n "$T_KILLED" ] && echo yes || echo no), ancient mints=$([ -n "$T_ANCIENT" ] && echo yes || echo no), live mints=$([ -n "$T_LIVE" ] && echo yes || echo no)"; fail_ "a dead secret still signs in"; fi
+
+case_ "C13c+ a SHORT window is honoured while it is open" "the old secret still mints inside a 2-second window — rotated and asked within the same second"
+rotate_secret "$CROT_ID" '{"gracePeriodSeconds":2}'
+CROT_S4=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret')
+T_GRACE=$(mint_client_token "$CROT_ID" "$CROT_S3")
+if [ -n "$T_GRACE" ]; then pass_; else HTTP_BODY="the retiring secret was refused inside its own window"; fail_ "the window did not open"; fi
+
+case_ "C13c- ...and the expiry CLOSES for real" "after a bounded 3-second wait the old secret is refused and the new one still mints — the old secret retires ITSELF; nothing sweeps it (spec.md §B-Q3)"
+sleep 3
+T_EXPIRED=$(mint_client_token "$CROT_ID" "$CROT_S3")
+T_STILL=$(mint_client_token "$CROT_ID" "$CROT_S4")
+if [ -z "$T_EXPIRED" ] && [ -n "$T_STILL" ]; then pass_; else HTTP_BODY="expired mints=$([ -n "$T_EXPIRED" ] && echo yes || echo no), current mints=$([ -n "$T_STILL" ] && echo yes || echo no)"; fail_ "the expiry did not close"; fi
+
+case_ "C13d- a window above the ceiling" "422 InvalidGracePeriodNotification — 604800 is the roof, and 604801 must not round down to it"
+rotate_secret "$CROT_ID" '{"gracePeriodSeconds":604801}'
+assert_rest 422 InvalidGracePeriodNotification
+
+case_ "C13d- a negative window" "422 InvalidGracePeriodNotification"
+rotate_secret "$CROT_ID" '{"gracePeriodSeconds":-1}'
+assert_rest 422 InvalidGracePeriodNotification
+
+case_ "C13d+ the ceiling itself is accepted" "200 at exactly 604800 — a bound is inclusive or it is a different bound"
+rotate_secret "$CROT_ID" '{"gracePeriodSeconds":604800}'
+assert_status 200
+
+case_ "C13f- only an ACTIVE client rotates" "409 ClientMustBeActiveToRotateNotification, semantic StateConflict — a suspended integration was switched off deliberately, and handing it a fresh credential is the opposite of what that meant. The service's SECOND StateConflict notification, and the first time any lane exercises it"
+new_client "$(client_label csusp)" "$TEN_C" || exit 1
+CSUSP_ID="$CLIENT_ID"
+api PATCH "/clients/$CSUSP_ID" '{"status":"suspended"}'
+rotate_secret "$CSUSP_ID" '{}'
+assert_rest 409 ClientMustBeActiveToRotateNotification
+
+case_ "C13f- ...and the envelope says which flavor" "semantic 'StateConflict' — the flavor Client's TRANSITION rule deliberately does NOT use (Q5.10's 422)"
+assert_json '[.errors[]?.messages[]?.semantic] | unique | join(",")' "StateConflict"
+
+case_ "C13f+ reactivated, it rotates again" "200 — the refusal was about the STATE, not the row"
+api PATCH "/clients/$CSUSP_ID" '{"status":"active"}'
+rotate_secret "$CSUSP_ID" '{}'
+assert_status 200
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C14b [CRITICAL] — a CLIENT token rotates only ITS OWN secret; everything else on sibling
+# clients is an ordinary permission-gated write. The 2026-08-28 NARROWING gets a sentinel.
+#   source: spec.md §7 C14b · §10 layer 2/3 case 3 · client_rules_manual.go · asked —
+#   negative + positive approved 2026-09-08. The identity_kind claim is MINTED since the
+#   token run, so this rule is LIVE — the first round able to prove it.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "C14b — principal K was not built, so the machine-caller row rule is UNPROVEN this run"
+else
+  # The machines hold a role conferring the client verbs a machine administrator needs.
+  # The ADMIN builds it (new_role speaks as the admin; K's authorship is S8's subject) —
+  # what matters HERE is the machines' own bundle.
+  R_MACH=$(new_role "$(role_key cmach)" "$QA_TENANT_SCOPED" \
+    "$(permission_id_of client read)" "$(permission_id_of client update)" \
+    "$(permission_id_of client archive)" "$(permission_id_of client rotate-secret)") || R_MACH=""
+
+  MACH_A_TOK=""; MACH_B_ID=""
+  if [ -n "$R_MACH" ]; then
+    api POST /clients "$(jq -nc --arg n "$(client_label macha)" --arg t "$QA_TENANT_SCOPED" --arg r "$R_MACH" \
+      '{name:$n, description:"Machine A of the C14b family: it holds the client verbs and must still be prisoner of its own row on the rotation alone.", status:"active", tenantID:$t, roles:[{roleID:$r}]}')"
+    MACH_A_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+    MACH_A_SECRET=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret // empty')
+    new_client "$(client_label machb)" "$QA_TENANT_SCOPED" && MACH_B_ID="$CLIENT_ID"
+    [ -n "$MACH_A_ID" ] && MACH_A_TOK=$(mint_client_token "$MACH_A_ID" "$MACH_A_SECRET")
+  fi
+
+  if [ -z "$MACH_A_TOK" ] || [ -z "$MACH_B_ID" ]; then
+    skip_ "C14b — the machine principals could not be provisioned, so the row rule is UNPROVEN this run"
+  else
+    case_ "C14b+ machine A rotates ITS OWN secret" "200 — rotate-your-own is the legitimate self-service of an integration, and the caller holds client:rotate-secret"
+    rotate_secret "$MACH_A_ID" '{}' "$MACH_A_TOK"
+    assert_status 200
+    MACH_A_SECRET2=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret // empty')
+    [ -n "$MACH_A_SECRET2" ] && MACH_A_TOK=$(mint_client_token "$MACH_A_ID" "$MACH_A_SECRET2")
+
+    case_ "C14b- machine A rotates MACHINE B's secret" "403 ClientMayOnlyRotateItsOwnSecretNotification — a machine that can rotate another machine's secret can lock it out and take its place. Identical permission, identical body, different row: the rule reads sub == id"
+    rotate_secret "$MACH_B_ID" '{}' "$MACH_A_TOK"
+    assert_rest 403 ClientMayOnlyRotateItsOwnSecretNotification
+
+    case_ "C14b+ THE NARROWING'S SENTINEL: machine A PATCHes sibling B" "200 — creating, editing, archiving and granting became ordinary tenant-scoped writes on 2026-08-28; this case fails the day the pre-narrowing breadth comes back and machines stop being able to administer their tenant at all"
+    api PATCH "/clients/$MACH_B_ID" '{"description":"Sibling B, relabelled by machine A to prove ordinary writes stayed open after the narrowing."}' "$MACH_A_TOK"
+    assert_status 200
+
+    case_ "C14b+ ...and ARCHIVES a sibling" "204 — the archive was also released by the narrowing; only the rotation stayed bound to the caller's own row"
+    new_client "$(client_label machc)" "$QA_TENANT_SCOPED" || true
+    MACH_C_ID="$CLIENT_ID"
+    if [ -n "$MACH_C_ID" ]; then
+      api PATCH "/clients/$MACH_C_ID/archive" "" "$MACH_A_TOK"
+      assert_empty_body 204
+    else skip_ "C14b sibling-archive — the third machine could not be provisioned"; fi
+
+    case_ "C14b+ the rule STANDS DOWN for a person" "200 — principal K's USER token rotates machine B's secret: the rule narrows only when the token positively says identity_kind=client (spec.md §B-Q8e)"
+    rotate_secret "$MACH_B_ID" '{}' "$QA_TOKEN_CLIENTOP"
+    assert_status 200
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C-MINT [CRITICAL] — the allow-list gates WHERE a token is minted. Fail-open when empty,
+# and the RELAX DOOR is real: archiving the last entry reopens the credential to everywhere.
+#   source: spec.md §C-3/§C-3a · the token plan §1 · asked — both directions + the relax
+#   door approved 2026-09-08. The suite calls from localhost, so the socket address the
+#   handler judges is 127.0.0.1 — which is what makes both directions provable.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label cmint)" "$TEN_C" || exit 1
+CMINT_ID="$CLIENT_ID"; CMINT_SECRET="$CLIENT_SECRET"
+
+case_ "C-MINT1+ an EMPTY allow-list means any address" "a token mints with no ranges declared — fail-open is the decision that keeps a newly created client able to sign in at all (spec.md §C-3a)"
+T_M=$(mint_client_token "$CMINT_ID" "$CMINT_SECRET")
+if [ -n "$T_M" ]; then pass_; else HTTP_BODY="the mint was refused with an empty allow-list"; fail_ "fail-open did not hold"; fi
+
+case_ "C-MINT2+ a range COVERING the caller admits it" "127.0.0.1/32 on the list → the mint passes — the suite's socket address is inside the declared range"
+CH_LOCAL=$(allow_cidr "$CMINT_ID" "127.0.0.1/32" "QA loopback, the suite itself") || CH_LOCAL=""
+T_M=$(mint_client_token "$CMINT_ID" "$CMINT_SECRET")
+if [ -n "$CH_LOCAL" ] && [ -n "$T_M" ]; then pass_; else HTTP_BODY="entry=$CH_LOCAL, minted=$([ -n "$T_M" ] && echo yes || echo no)"; fail_ "an allowed address was refused"; fi
+
+case_ "C-MINT2- a list WITHOUT the caller refuses it" "401 — only 203.0.113.0/24 remains, the caller is 127.0.0.1, and the refusal is the same generic answer a wrong secret gets: no oracle says WHICH check failed"
+[ -n "$CH_LOCAL" ] && api PATCH "/clients/$CMINT_ID/allowedCIDRs/$CH_LOCAL/archive"
+CH_FOREIGN=$(allow_cidr "$CMINT_ID" "203.0.113.0/24" "QA foreign egress, nowhere near this suite") || CH_FOREIGN=""
+api POST /auth/client/token "$(jq -nc --arg i "$CMINT_ID" --arg s "$CMINT_SECRET" '{clientId:$i, clientSecret:$s}')" -
+assert_status 401
+
+case_ "C-MINT3+ THE RELAX DOOR: archiving the LAST entry reopens the mint" "200 — an empty collection is the single spelling of 'no restriction' (C16 refuses 0.0.0.0/0 so there is exactly one), which makes THIS archive the act that opens the credential to every address on the internet. That is why the pair rides client:manage-network and not client:update"
+[ -n "$CH_FOREIGN" ] && api PATCH "/clients/$CMINT_ID/allowedCIDRs/$CH_FOREIGN/archive"
+T_M=$(mint_client_token "$CMINT_ID" "$CMINT_SECRET")
+if [ -n "$T_M" ]; then pass_; else HTTP_BODY="the mint stayed closed after the list emptied"; fail_ "the relax door did not open"; fi
+
+case_ "C-MINT4- an ARCHIVED client's secret no longer mints" "401 — the other half of what a trustworthy revocation means (Q6.12 proved the rotation refuses; this proves the sign-in does)"
+api PATCH "/clients/$CMINT_ID/archive"
+T_M=$(mint_client_token "$CMINT_ID" "$CMINT_SECRET")
+if [ -z "$T_M" ]; then pass_; else HTTP_BODY="an archived client's credential still minted a token"; fail_ "the revocation is not trustworthy"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C15/C16 — the CIDR value object: canonical only, and ONE spelling for "no restriction".
+#   source: spec.md §2 (amended: the VO REFUSES rather than normalising — the generated
+#   mapper converts straight to the type, so there is no seat to rewrite in)
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label ccidr)" "$TEN_C" || exit 1
+CCIDR_ID="$CLIENT_ID"
+
+case_ "C15+ canonical forms are accepted and stored AS SENT" "a /24 network, a /32 exact host and an IPv6 /32 — three 201s, read back verbatim"
+allow_cidr "$CCIDR_ID" "203.0.113.0/24" "QA canonical v4 network" >/dev/null || true; S_1="$HTTP_STATUS"
+allow_cidr "$CCIDR_ID" "203.0.113.5/32" "QA exact host" >/dev/null || true; S_2="$HTTP_STATUS"
+allow_cidr "$CCIDR_ID" "2001:db8::/32" "QA canonical v6 range" >/dev/null || true; S_3="$HTTP_STATUS"
+if [ "$S_1" = "201" ] && [ "$S_2" = "201" ] && [ "$S_3" = "201" ]; then pass_; else HTTP_BODY="v4net=$S_1 host=$S_2 v6=$S_3"; fail_ "a canonical range was refused"; fi
+
+case_ "C15- a well-formed range with HOST BITS SET" "422 CIDRHasHostBitsSetNotification — 203.0.113.5/24 and 203.0.113.0/24 are one range written two ways, and a collection storing both has a unique index that cannot see the duplicate. Refusing beats normalising silently: the caller learns the canonical spelling"
+api POST "/clients/$CCIDR_ID/allowedCIDRs" '{"cidr":"203.0.113.5/24","label":"QA host bits probe"}'
+assert_rest 422 CIDRHasHostBitsSetNotification
+
+case_ "C15- a value that does not parse at all" "422 InvalidCIDRBlockNotification"
+api POST "/clients/$CCIDR_ID/allowedCIDRs" '{"cidr":"lixo","label":"QA garbage probe"}'
+assert_rest 422 InvalidCIDRBlockNotification
+
+case_ "C15- a bare address with no mask" "422 InvalidCIDRBlockNotification — CIDR notation is the contract, and /32 is how an exact host is spelled"
+api POST "/clients/$CCIDR_ID/allowedCIDRs" '{"cidr":"203.0.113.9","label":"QA bare address probe"}'
+assert_rest 422 InvalidCIDRBlockNotification
+
+case_ "C16- the universal IPv4 prefix" "422 UniversalCIDRNotAllowedNotification — an empty collection is how 'no restriction' is spelled, and two spellings for it is how a reviewer comes to believe a client is restricted when it is not"
+api POST "/clients/$CCIDR_ID/allowedCIDRs" '{"cidr":"0.0.0.0/0","label":"QA universal v4 probe"}'
+assert_rest 422 UniversalCIDRNotAllowedNotification
+
+case_ "C16- the universal IPv6 prefix" "422 UniversalCIDRNotAllowedNotification — both address families, one refusal"
+api POST "/clients/$CCIDR_ID/allowedCIDRs" '{"cidr":"::/0","label":"QA universal v6 probe"}'
+assert_rest 422 UniversalCIDRNotAllowedNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C8 — a granted role must exist, be active, and belong to THIS client's tenant — ONE
+# answer for all three causes: no existence oracle over a competitor's catalogue.
+#   source: spec.md §7 C8 · service.facts RoleIsUnavailableInTenant
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label cavail)" "$TEN_C" || exit 1
+CAVAIL_ID="$CLIENT_ID"
+TEN_C2=$(new_tenant active "$(ws dcli2)") || exit 1
+R_FOREIGN=$(new_role "$(role_key cfor)" "$TEN_C2" "$P_TENANT_READ_C") || exit 1
+R_DOOMED_C=$(new_role "$(role_key cdead)" "$TEN_C" "$P_TENANT_READ_C") || exit 1
+api PATCH "/roles/$R_DOOMED_C/archive"
+
+case_ "C8- a role of ANOTHER tenant" "422 RoleNotAvailableInTenantNotification"
+api POST "/clients/$CAVAIL_ID/roles" "$(jq -nc --arg r "$R_FOREIGN" '{roleID:$r}')"
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+case_ "C8- an ARCHIVED role of the right tenant" "the SAME key — the message must not distinguish the causes"
+api POST "/clients/$CAVAIL_ID/roles" "$(jq -nc --arg r "$R_DOOMED_C" '{roleID:$r}')"
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+case_ "C8- an absent-but-well-formed uuid" "the SAME key — three causes, one answer"
+api POST "/clients/$CAVAIL_ID/roles" '{"roleID":"01990000-dead-7000-8000-000000000000"}'
+assert_rest 422 RoleNotAvailableInTenantNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C9/C10 [CRITICAL] — no escalation and no wildcard ONTO A MACHINE, and the wildcard check
+# fires FIRST. "The rules that matter most here and the easiest to skip" — spec.md §7's own
+# words: without them, anyone holding client:grant mints a non-expiring, non-interactive
+# credential carrying privileges they do not hold.
+#   source: spec.md §7 C9/C10 · the panic-ordering note on no-wildcard-role · asked
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "C9/C10 — principal K was not built, so the escalation pair is UNPROVEN this run"
+else
+  new_client "$(client_label cesc)" "$QA_TENANT_SCOPED" "$QA_TOKEN_CLIENTOP" || true
+  CESC_ID="$CLIENT_ID"
+  R_HELD=$(new_role "$(role_key cheld)" "$QA_TENANT_SCOPED" "$P_TENANT_READ_C") || R_HELD=""
+  # The role conferring what K LACKS is created by the ADMIN: Role's own escalation rule
+  # would refuse K that creation. The question here is whether K may ATTACH it.
+  R_UNHELD=$(new_role "$(role_key cunheld)" "$QA_TENANT_SCOPED" "$(permission_id_of permission archive)") || R_UNHELD=""
+
+  if [ -z "${CESC_ID:-}" ] || [ -z "$R_HELD" ] || [ -z "$R_UNHELD" ]; then
+    skip_ "C9/C10 — the escalation fixtures could not be provisioned"
+  else
+    case_ "C9+ K grants a role conferring only what K holds" "201 — the escalation rule permits what it exists to permit"
+    api POST "/clients/$CESC_ID/roles" "$(jq -nc --arg r "$R_HELD" '{roleID:$r}')" "$QA_TOKEN_CLIENTOP"
+    assert_status 201
+
+    case_ "C9- K grants a role conferring permission:archive, which K lacks" "403 CannotGrantRoleWithUnheldPermissionsNotification — without this, client:grant mints a machine credential with privileges its granter does not have"
+    api POST "/clients/$CESC_ID/roles" "$(jq -nc --arg r "$R_UNHELD" '{roleID:$r}')" "$QA_TOKEN_CLIENTOP"
+    assert_rest 403 CannotGrantRoleWithUnheldPermissionsNotification
+
+    # ── the wildcard interlock, and NOBODY is exempt. The client has to live in the MASTER
+    # tenant for these to reach the rule they are about: the availability rule runs FIRST
+    # (and its interlock skips the rest of the walk for an unavailable entry), so a scoped
+    # client attaching the master role answers 422 (another tenant) and never reaches the
+    # wildcard refusal — the same geometry GR4 and U14.3 document. Nothing is archived here;
+    # the master tenant and the master role are only read.
+    new_client "$(client_label cwild)" "" || true
+    CWILD_ID="$CLIENT_ID"
+
+    case_ "C10- the *:* SUPER-ADMIN grants the seeded master role to a machine" "403 CannotGrantWildcardRoleNotification on field roles — the strongest possible negative: a *:* caller passes the ESCALATION by construction, so the wildcard rule is the one thing standing between the master role and a machine credential, and if anyone were exempt it would be them"
+    if [ -n "${CWILD_ID:-}" ]; then
+      api POST "/clients/$CWILD_ID/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{roleID:$r}')"
+      assert_rest_field 403 CannotGrantWildcardRoleNotification roles
+    else skip_ "C10 — the master-tenant client could not be provisioned"; fi
+
+    case_ "C10- ...and it fires BEFORE the escalation probe" "403 CannotGrantWildcardRoleNotification for a NON-wildcard caller too — the order is load-bearing: Identity.HasPermission PANICS on any argument containing '*', so this rule is what removes the input that would crash the request into a 500 on exactly the case the escalation rule exists to stop"
+    CWGRANT_EMAIL=$(user_email cwg)
+    CWGRANT_ROLE=$(new_role "$(role_key cwg)" "$QA_MASTER_TENANT_ID" \
+      "$(permission_id_of client grant)" "$(permission_id_of client read)") || CWGRANT_ROLE=""
+    CWGRANT_ID=""
+    if [ -n "$CWGRANT_ROLE" ]; then
+      CWGRANT_ID=$(new_user "$CWGRANT_EMAIL" "$QA_MASTER_TENANT_ID") || true
+      [ -n "$CWGRANT_ID" ] && grant_role_to_user "$CWGRANT_ID" "$CWGRANT_ROLE" >/dev/null
+    fi
+    CWGRANT_T=$([ -n "${CWGRANT_ID:-}" ] && usable_token "$CWGRANT_EMAIL" "$CWGRANT_ID" || true)
+    if [ -n "${CWGRANT_T:-}" ] && [ -n "${CWILD_ID:-}" ]; then
+      api POST "/clients/$CWILD_ID/roles" "$(jq -nc --arg r "$QA_MASTER_ROLE_ID" '{roleID:$r}')" "$CWGRANT_T"
+      assert_rest 403 CannotGrantWildcardRoleNotification
+    else skip_ "C10 ordering — the master-tenant granter could not be provisioned"; fi
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C-CL — the claim triple: available in tenant · applies to CLIENTS · value parses as the
+# declared type — and the interlock gives ONE answer for an unresolvable id.
+#   source: specs/evolve-entity/client/spec.md · the three per-entry facts · asked
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label cclm)" "$TEN_C" || exit 1
+CCLM_ID="$CLIENT_ID"
+D_CLIENT=$(new_claim "$(claim_name dc)" string client "$TEN_C") || exit 1
+D_BOTH=$(new_claim "$(claim_name db)" string both "$TEN_C") || exit 1
+D_USER=$(new_claim "$(claim_name du)" string user "$TEN_C") || exit 1
+D_NUM=$(new_claim "$(claim_name dn)" number client "$TEN_C") || exit 1
+D_BOOL=$(new_claim "$(claim_name dbo)" bool both "$TEN_C") || exit 1
+
+case_ "C-CL2+ appliesTo client and both BOTH attach" "two 201s — the two kinds a machine may hold"
+set_client_claim "$CCLM_ID" "$D_CLIENT" "machine-only" >/dev/null || true; S_1="$HTTP_STATUS"
+set_client_claim "$CCLM_ID" "$D_BOTH" "either-kind" >/dev/null || true; S_2="$HTTP_STATUS"
+if [ "$S_1" = "201" ] && [ "$S_2" = "201" ]; then pass_; else HTTP_BODY="client=$S_1 both=$S_2"; fail_ "an applicable kind was refused"; fi
+
+case_ "C-CL2- appliesTo USER is refused on a machine" "422 ClaimDoesNotApplyToClientNotification — the twin of User's rule, and the pair is what makes appliesTo mean something at all"
+api POST "/clients/$CCLM_ID/claims" "$(jq -nc --arg c "$D_USER" '{claimID:$c, value:"person-only"}')"
+assert_rest 422 ClaimDoesNotApplyToClientNotification
+
+case_ "C-CL3+ values that parse as the declared types" "number ← '1000', bool ← 'true' — two 201s, the same three readings the catalog's own default-value check uses"
+set_client_claim "$CCLM_ID" "$D_NUM" "1000" >/dev/null || true; S_1="$HTTP_STATUS"
+set_client_claim "$CCLM_ID" "$D_BOOL" "true" >/dev/null || true; S_2="$HTTP_STATUS"
+CH_BOOL=$(printf '%s' "$HTTP_BODY" | jq -r '.data.clientClaim.id // empty')
+if [ "$S_1" = "201" ] && [ "$S_2" = "201" ]; then pass_; else HTTP_BODY="number=$S_1 bool=$S_2"; fail_ "a well-typed value was refused"; fi
+
+case_ "C-CL3- a number that is not one" "422 ClaimValueDoesNotMatchValueTypeNotification"
+D_NUM2=$(new_claim "$(claim_name dn2)" number client "$TEN_C") || exit 1
+api POST "/clients/$CCLM_ID/claims" "$(jq -nc --arg c "$D_NUM2" '{claimID:$c, value:"abc"}')"
+assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+
+case_ "C-CL3- a bool that is 'yes'" "422 — bool accepts exactly 'true' or 'false', nothing folksier"
+D_BOOL2=$(new_claim "$(claim_name dbo2)" bool both "$TEN_C") || exit 1
+api POST "/clients/$CCLM_ID/claims" "$(jq -nc --arg c "$D_BOOL2" '{claimID:$c, value:"yes"}')"
+assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+
+case_ "C-CL3- THE PATCH IS JUDGED TOO" "422 — correcting a stored 'true' to 'yes' is refused exactly as adding it would be: the rule walks ADDED and CHANGED entries"
+if [ -n "$CH_BOOL" ]; then
+  api PATCH "/clients/$CCLM_ID/claims/$CH_BOOL" '{"value":"yes"}'
+  assert_rest 422 ClaimValueDoesNotMatchValueTypeNotification
+else skip_ "C-CL3 patch — the bool entry could not be provisioned"; fi
+
+case_ "C-CL1- an unresolvable claim id gets ONE answer" "422 ClaimNotAvailableInTenantNotification ALONE — the no-guard one-pass design must not stack three notifications onto one unknown id; a caller told three things about an id that resolves to nothing learns nothing three times"
+api POST "/clients/$CCLM_ID/claims" '{"claimID":"01990000-dead-7000-8000-000000000000","value":"x"}'
+assert_json_at 422 '[.errors[]?.messages[]?.notificationKey] | unique | join(",")' "ClaimNotAvailableInTenantNotification"
+
+case_ "C-CL1- a definition of ANOTHER tenant" "the SAME key — no existence oracle over a competitor's claim vocabulary"
+D_FOREIGN=$(new_claim "$(claim_name df)" string both "$TEN_C2") || exit 1
+api POST "/clients/$CCLM_ID/claims" "$(jq -nc --arg c "$D_FOREIGN" '{claimID:$c, value:"x"}')"
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+case_ "C-CL1- an ARCHIVED definition" "the SAME key — three causes, one answer, mirroring C8"
+D_DOOMED=$(new_claim "$(claim_name dd)" string both "$TEN_C") || exit 1
+api PATCH "/claims/$D_DOOMED/archive"
+api POST "/clients/$CCLM_ID/claims" "$(jq -nc --arg c "$D_DOOMED" '{claimID:$c, value:"x"}')"
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C2 — the owning tenant must be AVAILABLE: archived and suspended refuse, trial PASSES.
+#   source: rules.manual tenant-available · service.facts TenantIsUnavailable
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "C2+ a client in a TRIAL tenant" "201 — a trial tenant is a live customer; 'unavailable' is not 'not active', and reading it that way would break every trial onboarding"
+TEN_TRIAL=$(new_tenant trial "$(ws dctr)") || exit 1
+api POST /clients "$(client_body "$(client_label ctrial)" "$TEN_TRIAL")"
+assert_status 201
+
+case_ "C2- a client in a SUSPENDED tenant" "422 ClientTenantDoesNotExistNotification — a suspended customer must not be issuing machine credentials"
+TEN_SUSP=$(new_tenant active "$(ws dcsu)") || exit 1
+api PATCH "/tenants/$TEN_SUSP" '{"status":"suspended"}'
+api POST /clients "$(client_body "$(client_label csuspt)" "$TEN_SUSP")"
+assert_rest 422 ClientTenantDoesNotExistNotification
+
+case_ "C2- a client in an ARCHIVED tenant" "the SAME key — one answer for the three causes, so nothing distinguishes 'gone' from 'punished'"
+TEN_ARCH=$(new_tenant active "$(ws dcar)") || exit 1
+api PATCH "/tenants/$TEN_ARCH/archive"
+api POST /clients "$(client_body "$(client_label carcht)" "$TEN_ARCH")"
+assert_rest 422 ClientTenantDoesNotExistNotification
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C3 — tenant immutability, and the claim entry's definition-immutability: the DISJUNCTION
+# declared in the plan BEFORE the first request. Neither DTO declares the field, so what is
+# asserted is the DTO GATE: either the unknown key is refused, or it is dropped and the
+# stored value is untouched. A CHANGED value is the one outcome that is not the contract.
+#   source: spec.md §7 C3 · client.omnicore.yaml change.patchExcludes · plan §1b UNPROVEN
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label cimm)" "$TEN_C" || exit 1
+CIMM_ID="$CLIENT_ID"
+
+case_ "C3.1 a PATCH carrying a tenantID the DTO does not declare" "either a typed refusal, or the key is dropped — never a MOVED client: a client never changes tenants"
+api PATCH "/clients/$CIMM_ID" "$(jq -nc --arg t "$TEN_C2" '{description:"A patch smuggling a tenant move beside an honest field, which must not land.", tenantID:$t}')"
+S_C3="$HTTP_STATUS"
+api GET "/clients/$CIMM_ID"
+GOT_TEN=$(printf '%s' "$HTTP_BODY" | jq -r '.data.tenantID')
+if [ "$GOT_TEN" = "$TEN_C" ]; then
+  pass_
+  printf '      %snote: the write answered HTTP %s and the tenant is unchanged%s\n' "$C_DIM" "$S_C3" "$C_RESET"
+else
+  HTTP_BODY="write answered $S_C3; stored tenantID is now '$GOT_TEN', was '$TEN_C'"
+  fail_ "the client MOVED tenant"
+fi
+
+case_ "C3.2 a claim PATCH carrying a claimID the DTO excludes" "the same disjunction — patchExcludes: [ClaimID] means the entry never changes which definition it is for"
+CH_IMM=$(set_client_claim "$CIMM_ID" "$D_BOTH" "original") || CH_IMM=""
+if [ -n "$CH_IMM" ]; then
+  api PATCH "/clients/$CIMM_ID/claims/$CH_IMM" "$(jq -nc --arg c "$D_CLIENT" '{value:"corrected", claimID:$c}')"
+  S_C3B="$HTTP_STATUS"
+  api GET "/clients/$CIMM_ID"
+  GOT_DEF=$(printf '%s' "$HTTP_BODY" | jq -r --arg id "$CH_IMM" '.data.claims[] | select(.id==$id) | .claimID')
+  if [ "$GOT_DEF" = "$D_BOTH" ]; then
+    pass_
+    printf '      %snote: the write answered HTTP %s and the definition is unchanged%s\n' "$C_DIM" "$S_C3B" "$C_RESET"
+  else
+    HTTP_BODY="write answered $S_C3B; the entry now points at '$GOT_DEF', was '$D_BOTH'"
+    fail_ "the entry MOVED to another definition"
+  fi
+else skip_ "C3.2 — the claim entry could not be provisioned"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C11/C17/C-CLcap — the three caps, HYBRID form (maintainer, 2026-09-08): the 20-cap on
+# CIDRs end-to-end; the 20-cap on claims AS FAR AS THE API ALLOWS (see the honest skip);
+# the 50-cap on roles at the boundary.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+new_client "$(client_label ccap)" "$TEN_C" || exit 1
+CCAP_ID="$CLIENT_ID"
+
+case_ "C17+ the TWENTIETH range attaches" "20 entries land one by one and the last one answers 201 — the cap counts the whole collection, so the passing side has to be walked, not assumed"
+CAP_OK=1
+for i in $(seq 1 20); do
+  allow_cidr "$CCAP_ID" "203.0.113.$i/32" "QA cap range $i" >/dev/null || { CAP_OK=0; break; }
+done
+if [ "$CAP_OK" = "1" ]; then pass_; else fail_ "entry $i was refused before the cap"; fi
+
+case_ "C17- the TWENTY-FIRST is refused" "422 TooManyAllowedCIDRsForClientNotification — 20 entries is ~5 KB of level-1 values in a token path that rides every request; the cap is a header budget before it is a count"
+api POST "/clients/$CCAP_ID/allowedCIDRs" '{"cidr":"203.0.113.21/32","label":"QA cap range 21"}'
+assert_rest 422 TooManyAllowedCIDRsForClientNotification
+
+case_ "C-CLcap the claims cap is SHIELDED by the catalog cap — asserted as far as the API reaches" "the per-client cap (20) equals the catalog's own cap of 20 ACTIVE definitions per tenant per kind (claim-catalog-cap, 2026-09-05), so a 21st DISTINCT attachable definition cannot exist and TooManyClaimsForClientNotification is unreachable through the API — defense in depth, not dead code. What IS assertable: the catalog refuses the definition that would be needed to overflow the client"
+CLCAP_OK=1
+# 6 active client-applying definitions already live in TEN_C (D_CLIENT, D_BOTH, D_NUM,
+# D_BOOL, D_NUM2, D_BOOL2 — D_USER counts on the user side, D_DOOMED is archived), so 14
+# more land the client-side count at exactly the catalog's 20.
+for i in $(seq 1 14); do
+  new_claim "$(claim_name cap$i)" string both "$TEN_C" >/dev/null || { CLCAP_OK=0; break; }
+done
+api POST /claims "$(jq -nc --arg n "$(claim_name cap21)" --arg t "$TEN_C" \
+  '{name:$n, valueType:"string", appliesTo:"both", description:"The twenty-first client-applying definition, which the catalog cap must refuse.", tenantID:$t}')"
+if [ "$CLCAP_OK" = "1" ] && [ "$HTTP_STATUS" = "422" ]; then pass_; else HTTP_BODY="provisioning ok=$CLCAP_OK, 21st definition answered $HTTP_STATUS — $HTTP_BODY"; fail_ "the catalog cap did not close where the plan said it would"; fi
+
+case_ "C11- FIFTY-ONE role entries in one body" "422 TooManyRolesForClientNotification — the boundary form: the cap fires on the insert that would exceed it. The plan records that the passing side at exactly 50 was not exercised"
+C11_IDS=""
+C11_OK=1
+for i in $(seq 1 51); do
+  RID=$(new_role "$(role_key ccap$i)" "$TEN_C" "$P_TENANT_READ_C") || { C11_OK=0; break; }
+  C11_IDS="$C11_IDS $RID"
+done
+if [ "$C11_OK" = "1" ]; then
+  ENTRIES51=$(printf '%s\n' $C11_IDS | jq -R . | jq -sc 'map(select(length>0) | {roleID: .})')
+  api POST /clients "$(jq -nc --arg n "$(client_label ccap51)" --arg t "$TEN_C" --argjson r "$ENTRIES51" \
+    '{name:$n, description:"A client whose body carries fifty-one grants, one past what the model allows.", status:"active", tenantID:$t, roles:$r}')"
+  assert_rest 422 TooManyRolesForClientNotification
+else skip_ "C11 — the fifty-one distinct roles could not be provisioned, so the roles cap is UNPROVEN this run"; fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C1/C1b + C-READ1 — tenant isolation, both directions, and the bypass. The boundary faces
+# live in qa/security.sh S8.3; these are the DOMAIN halves the reconcile requires here.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_CLIENTOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "C1/C-READ1 — principal K was not built, so the isolation rows are UNPROVEN this run"
+else
+  case_ "C1b+ K omits the tenant and the row lands in K's own" "201 with K's tenantID — assignedFrom: identity-claim means ABSENT is 'mine'"
+  api POST /clients "$(client_body "$(client_label cown)" "")" "$QA_TOKEN_CLIENTOP"
+  assert_json_at 201 '.data.tenantID' "$QA_TENANT_SCOPED"
+
+  case_ "C1- K names ANOTHER tenant" "403 TenantMismatchNotification — the value is not ignored: it reaches the aggregate, where the row-scope guard refuses it, so the caller LEARNS what happened"
+  api POST /clients "$(client_body "$(client_label cfor)" "$TEN_C")" "$QA_TOKEN_CLIENTOP"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "C1b+ the ADMIN names a tenant explicitly" "201 in the NAMED tenant — bypassMaySet: the one caller authz.bypass admits may state which tenant a new row belongs to"
+  api POST /clients "$(client_body "$(client_label cbyp)" "$QA_TENANT_SCOPED")"
+  assert_json_at 201 '.data.tenantID' "$QA_TENANT_SCOPED"
+
+  case_ "C-READ1+ K's listing carries only its OWN tenant's clients" "every row's tenantID is K's own — asserted over the VALUES, because a count passes while a single foreign row rides along"
+  api GET "/clients?first=100" "" "$QA_TOKEN_CLIENTOP"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "C-READ1- K reads a foreign client by id" "404 and NOT 403 — a 403 confirms the id exists; this service answers 'you may not' and 'it is not there' identically wherever telling them apart would leak"
+  api GET "/clients/$CSEC_ID" "" "$QA_TOKEN_CLIENTOP"
+  assert_status 404
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# C4/C5/C6 — the label, the two-state machine, and the archive that forces suspended.
+# Compact here because Q5/Q6 carry the wire faces; the reconcile wants the ROWS in this
+# lane, and C6's SQL face is the half the wire cannot show.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+N_C4=$(client_label c4)
+api POST /clients "$(client_body "$N_C4" "$TEN_C")"
+ID_C4=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+
+case_ "C4+ the same label in TWO tenants" "201 — uniqueness is per tenant; two tenants calling their integration the same thing are not in conflict"
+api POST /clients "$(client_body "$N_C4" "$TEN_C2")"
+assert_status 201
+
+case_ "C4- the same label twice in ONE tenant" "409 ClientNameAlreadyExistsNotification — two clients called 'Billing' in one tenant is how somebody revokes the wrong one"
+api POST /clients "$(client_body "$N_C4" "$TEN_C")"
+assert_rest 409 ClientNameAlreadyExistsNotification
+
+case_ "C5+ both edges and a no-op pass" "active→suspended→active, then a stay — three 200s"
+api PATCH "/clients/$ID_C4" '{"status":"suspended"}'; S_1="$HTTP_STATUS"
+api PATCH "/clients/$ID_C4" '{"status":"active"}'; S_2="$HTTP_STATUS"
+api PATCH "/clients/$ID_C4" '{"status":"active"}'; S_3="$HTTP_STATUS"
+if [ "$S_1" = "200" ] && [ "$S_2" = "200" ] && [ "$S_3" = "200" ]; then pass_; else HTTP_BODY="edges=$S_1/$S_2 noop=$S_3"; fail_ "a legal move was refused"; fi
+
+case_ "C5- a value outside the closed set" "422 carrying UnknownClientStatus — and NOT a 409: Client's transition rule declares SemanticValidation, the deliberate asymmetry with User's state machine"
+api PATCH "/clients/$ID_C4" '{"status":"deleted"}'
+assert_rest 422 UnknownClientStatusNotification
+
+case_ "C6+ archiving an ACTIVE client lands it SUSPENDED — on the ROW" "status 'suspended' straight out of SQL: a row that is gone must not read as active anywhere it is still listed, and there is no unarchive to bring it back (a one-way door by construction)"
+api PATCH "/clients/$ID_C4/archive"
+GOT=$(sql "SELECT status FROM clients WHERE id='$ID_C4';" | tr -d '[:space:]')
+if [ "$GOT" = "suspended" ]; then pass_; else HTTP_BODY="stored status = '$GOT'"; fail_ "the mutation did not reach the row"; fi
+
 qa_finish

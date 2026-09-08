@@ -283,7 +283,10 @@ ws() {
 # that never works. The collapse below turns any run of 3+ into 2, which makes the rule
 # unreachable by construction rather than by luck.
 qa_slug_runid() {
-  printf '%s' "${QA_RUN_ID:-local}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed -E 's/(.)\1{2,}/\1\1/g'
+  # BRE, not ERE: BSD sed treats \1 inside an -E PATTERN as a literal "1", so the ERE form
+  # of this collapse ate the substring "-11…" out of any morning run id (…-112520-… became
+  # …--2520-…, a double hyphen every key VO refuses). Backreferences in a BRE are POSIX.
+  printf '%s' "${QA_RUN_ID:-local}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed 's/\(.\)\1\1*/\1\1/g'
 }
 
 # pair_resource [PREFIX] → a resource unique to this run AND this call, like `ws` for tenants.
@@ -762,4 +765,123 @@ new_claim() {
     return 1
   fi
   printf '%s' "$HTTP_BODY" | jq -r '.data.id'
+}
+
+# ── Client fixtures ──────────────────────────────────────────────────────────────────────
+#
+# Plan: specs/qa/client-contract/plan.md §2.
+#
+# The Client fixtures differ from every other entity's in one way that shapes all of them:
+# the create RESPONSE carries the plaintext secret, exactly once, and nothing can ever show
+# it again. A fixture that returned only the id would throw the credential away — and the
+# credential is what half the domain rows are ABOUT. So new_client sets TWO globals instead
+# of echoing one value: it must not be called in a $( ) subshell, where the assignment would
+# die with the subshell (the same reason run.sh publishes QA_BOOT_TOKEN through a global).
+
+# client_label [PREFIX] → a display name unique to this run AND to this call.
+#
+# vos.DisplayName refuses an untrimmed or letterless value; uniqueness is per tenant over
+# ACTIVE rows, so the file-backed counter discipline of ws()/role_key() applies for the same
+# reason: a loop calling this in $( ) must never mint the same label twice.
+client_label() {
+  local f="${QA_RUN_DIR:-/tmp}/.client-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'QA Client %s %d' "${1:-c}" "$n"
+}
+
+# client_body NAME TENANT_ID_OR_EMPTY [STATUS]
+#
+# An EMPTY tenant omits the key entirely rather than sending "" — `assignedFrom:
+# identity-claim` with `bypassMaySet: true` means ABSENT is "mine", while an empty string is
+# a malformed id the tenant-valid guard refuses. The three collections are deliberately NOT
+# parameters: an insert carrying entries is its own case family and each one builds its own
+# body.
+client_body() {
+  local name="$1" tenant="$2" status="${3:-active}"
+  jq -nc --arg n "$name" --arg t "$tenant" --arg s "$status" \
+    '{name:$n, description:"Fixture integration created by the QA suite; it posts nothing anywhere and exists to be asserted about.", status:$s,
+      roles:[], allowedCIDRs:[], claims:[]}
+     + (if $t == "" then {} else {tenantID:$t} end)'
+}
+
+# new_client NAME TENANT_ID_OR_EMPTY [TOKEN] → sets CLIENT_ID and CLIENT_SECRET.
+#
+# NOT echoed, NOT subshell-safe — see the section header. Fixture creation, not a case: it
+# asserts nothing and returns 1 loudly if the service refuses.
+CLIENT_ID=""
+CLIENT_SECRET=""
+new_client() {
+  CLIENT_ID=""; CLIENT_SECRET=""
+  api POST /clients "$(client_body "$1" "$2")" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /clients answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  CLIENT_ID=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+  CLIENT_SECRET=$(printf '%s' "$HTTP_BODY" | jq -r '.data.secret')
+  [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]
+}
+
+# mint_client_token CLIENT_ID SECRET → accessToken on stdout, empty on refusal.
+#
+# The machine twin of qa_login, against the declared public route. Nothing is invented: the
+# secret came out of the service's own create/rotate response. Subshell-safe (it only reads).
+mint_client_token() {
+  curl -s -X POST "$QA_BASE/auth/client/token" \
+    -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
+    -d "$(jq -nc --arg i "$1" --arg s "$2" '{clientId:$i, clientSecret:$s}')" \
+  | jq -r '.data.accessToken // empty'
+}
+
+# grant_role_to_client CLIENT_ID ROLE_ID [TOKEN] → echoes the child id the server minted.
+grant_role_to_client() {
+  api POST "/clients/$1/roles" "$(jq -nc --arg r "$2" '{roleID:$r}')" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /clients/%s/roles answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.clientRole.id'
+}
+
+# allow_cidr CLIENT_ID CIDR LABEL [TOKEN] → echoes the child id the server minted.
+allow_cidr() {
+  api POST "/clients/$1/allowedCIDRs" "$(jq -nc --arg c "$2" --arg l "$3" '{cidr:$c, label:$l}')" "${4:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /clients/%s/allowedCIDRs answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.clientAllowedCIDR.id'
+}
+
+# set_client_claim CLIENT_ID CLAIM_ID VALUE [TOKEN] → echoes the child id.
+set_client_claim() {
+  api POST "/clients/$1/claims" "$(jq -nc --arg c "$2" --arg v "$3" '{claimID:$c, value:$v}')" "${4:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /clients/%s/claims answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.clientClaim.id'
+}
+
+# rotate_secret CLIENT_ID BODY_JSON [TOKEN] — the rotation, leaving HTTP_STATUS/HTTP_BODY for
+# the caller to assert. It aborts nothing: half its callers are asserting a refusal.
+rotate_secret() {
+  api POST "/clients/$1/secret" "$2" "${3:-${QA_TOKEN_ADMIN:-}}"
+}
+
+# iso_epoch RFC3339 → seconds since the epoch, for the grace-window arithmetic. python3 is
+# already a dependency of qa/audit.sh; jq's fromdateiso8601 refuses the fractional,
+# offset-carrying instants this service stamps (see assert_rfc3339's header).
+iso_epoch() {
+  python3 -c "
+import sys, datetime
+s = sys.argv[1]
+if s.endswith('Z'):
+    s = s[:-1] + '+00:00'  # fromisoformat learns 'Z' only at 3.11
+print(int(datetime.datetime.fromisoformat(s).timestamp()))
+" "$1" 2>/dev/null
 }
