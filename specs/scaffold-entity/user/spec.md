@@ -1267,9 +1267,29 @@ body. `Groups` and `Roles` move through the §3 child ops.
 
 ## 9. Surfaces & reads                       [required]
 
-- **REST: yes** (OpenAPI documented) · **GraphQL: yes**, root verbs only (`users`, `user`,
-  `createUser`, `patchUser`, `archiveUser`) — the four child operations and both password
-  operations are **REST-only**, exactly as `Role` and `Group` ship their collection verbs.
+- **REST: yes** (OpenAPI documented) · **GraphQL: yes** — **full parity, 14 operations on
+  each surface.**
+
+  > **⚠️ SUPERSEDED 2026-09-07** *(found while writing `specs/qa/user-contract/plan.md` §0c;
+  > correction approved by the maintainer the same day).* This bullet read: *"GraphQL: yes,
+  > root verbs only (`users`, `user`, `createUser`, `patchUser`, `archiveUser`) — the four
+  > child operations and both password operations are **REST-only**, exactly as `Role` and
+  > `Group` ship their collection verbs."* **That is not what shipped, on either count.**
+  > `MountUsersGraphQL` registers **12** fields — the five root verbs plus all seven
+  > collection operations (`addUserGroup`, `archiveUserGroup`, `addUserRole`,
+  > `archiveUserRole`, `addUserClaim`, `patchUserClaim`, `archiveUserClaim`) — and
+  > `MountUserCredentialsGraphQL` registers **2** more (`changeUserPassword`,
+  > `resetUserPassword`), for 14 against REST's 14. Every field reuses its REST twin's
+  > handler with the same permission, so the two surfaces cannot drift about who may do
+  > what. The comparison with `Role` and `Group` was wrong in the same direction: both of
+  > them mount their collection verbs on GraphQL too — `specs/qa/group-contract/plan.md`
+  > §0c recorded exactly this for `Group` on 2026-09-07.
+  >
+  > **The row rules travel unchanged, which is what makes the parity safe** and is written
+  > out in `user_credential_routes_manual.go`: "must be self" and "must not be self" live in
+  > the aggregate, fed from the identity on the `AppContext`, not by anything the transport
+  > does. A caller reaching `changeUserPassword` with somebody else's id meets the same
+  > refusal it meets on REST. The §10 sentence that repeated this claim is corrected there.
 - **gRPC: no** — available later through `/omnicore:implement`, no rework.
 - **Exports (CSV/XLSX): no** — the call all four existing entities made. An
   access-review export is the plausible reason to want one; it is one flag. **If taken, note
@@ -1286,19 +1306,50 @@ body. `Groups` and `Roles` move through the §3 child ops.
   server refuses. Named because a user listing is the one place an operator most wants to
   type a name fragment; `contains`/`icontains` on `name` and `email` is what serves that
   need here.
-- **Computed read fields: one — `name`.** `givenName + " " + familyName`, derived per row,
-  **no column**. It exists because dropping the standalone `name` must not force every client
-  to concatenate: the display string is served ready, from the same place on every surface
-  (`FromQueryResult`, so REST, GraphQL and any future export agree). Its three properties are
-  the framework's: `?fields=name` fetches the two sources, **`?orderBy=name` is a typed 400**
-  (nothing to sort on), and **a filter over it is impossible** — which is exactly why
-  `givenName` and `familyName` are both filterable in their own right.
+- **Computed read fields: one — `fullName`.** `givenName + " " + familyName`, derived per
+  row, **no column**. It exists because dropping the standalone `name` must not force every
+  client to concatenate: the display string is served ready, from the same place on every
+  surface (`FromQueryResult`, so REST, GraphQL and any future export agree). Its three
+  properties are the framework's: `?fields=fullName` fetches the two sources,
+  **`?orderBy=fullName` is a typed 400** (nothing to sort on), and **a filter over it is
+  impossible** — which is exactly why `givenName` and `familyName` are both filterable in
+  their own right.
+
+  > **⚠️ SUPERSEDED 2026-09-07** *(same review, same approval).* This bullet called the field
+  > **`name`** and wrote its two control examples as `?fields=name` and `?orderBy=name`. The
+  > field that shipped is **`fullName`** — `FindUsersResponse.FullName` /
+  > `FindUserByIDResponse.FullName`, `json:"fullName" computed:"GivenName,FamilyName"` — and
+  > `name` resolves to nothing on this read model, so `?fields=name` is a 400 for the
+  > different and less interesting reason that no such field exists. The distinction is
+  > load-bearing for anyone writing a client or a test: the 400 worth asserting is
+  > `orderBy[fullName]`, a real path with no column behind it.
   *(The other obvious candidate — the user's effective permissions, the union of both paths —
   is deliberately NOT a computed field: it is a per-row fan-out of two joins the read side
   cannot express, and it is the token issuer's job. §C-9.)*
-- **Field-level read authz (`ReadCriteria.Restrict`): none.** `hidden` already
-  removes the hash from every surface for every caller, which is stronger than restricting
-  it, and every remaining field a caller may see the row for at all, they may see entirely.
+- **Field-level read authz (`ReadCriteria.Restrict`): none.** The hash is off every surface
+  for every caller by construction, which is stronger than restricting it, and every
+  remaining field a caller may see the row for at all, they may see entirely.
+
+  > **⚠️ CORRECTED 2026-09-07** *(same review, same approval — a wording fix, not a reversal:
+  > the conclusion above and the filter-policy warning below are unchanged and still right.)*
+  > This bullet, and the export bullet further up, credited **`hidden`** with keeping the hash
+  > out of every response. What shipped is **two distinct mechanisms**, and knowing which is
+  > which is what tells you where a leak could come from:
+  >
+  > 1. **Off the wire:** no Response DTO declares the field at all. `FindUsersResponse`,
+  >    `FindUserByIDResponse`, `InsertUserResponse` and `PatchUserResponse` have no
+  >    `PasswordHash` member — while `FindUsersByParamsResult` and `FindUserByIDResult`
+  >    both DO, so the projection reads the column and the web layer is what drops it. That
+  >    is also why `?fields=passwordHash` is a **400** rather than a `200` with the key
+  >    quietly missing: a stored field that no Response declares is not selectable.
+  > 2. **Out of the framework's own copies:** `RedactedField("PasswordHash", "password_hash",
+  >    InSync(RedactWith("***")), InAudit(RedactWith("***")))` in `user_schema.go` — the only
+  >    redacted field in this service. It is what puts `***` in the audit payload and in the
+  >    outbox, neither of which any Response DTO governs.
+  >
+  > Neither mechanism touches the read side's query surface, which is exactly the point the
+  > paragraph below makes and the reason the empty `filter:`/`sort:` cells are a POLICY
+  > somebody has to keep.
 - **View backing: relational** — `query.RelationalView("users", repo.Loader)`, contributed
   through the feature's `RelationalViews()` opt-in. The project posture, and the only option
   without Mongo. It takes its schema from the loader, carries no `Version`, no registry row,
@@ -1427,9 +1478,23 @@ gate is the decision made at the model gate:
 - **`user:update` explicitly does NOT reach either.** Whoever can fix a typo in a name must
   not be able to take over an account; that is the escalation this model refuses everywhere
   else, arriving through the least-guarded door.
-- **Neither is on GraphQL.** REST only, like every other non-root verb here — and the public
-  one especially: `auth.publicRoutes` matches an exact `METHOD /path`, and a single GraphQL
-  endpoint cannot be made selectively public per field.
+- **Both ARE on GraphQL**, as `changeUserPassword` and `resetUserPassword`, reusing their
+  REST twins' handlers and permissions.
+
+  > **⚠️ SUPERSEDED 2026-09-07** *(the §9 correction's other half; same approval.)* This bullet
+  > read: *"**Neither is on GraphQL.** REST only, like every other non-root verb here — and
+  > the public one especially: `auth.publicRoutes` matches an exact `METHOD /path`, and a
+  > single GraphQL endpoint cannot be made selectively public per field."*
+  >
+  > `MountUserCredentialsGraphQL` mounts both. **The reasoning was not wrong, it was
+  > obsoleted by the amendment three paragraphs up**: the argument turned entirely on the
+  > PUBLIC change-password route, which `auth.publicRoutes` genuinely cannot express per
+  > GraphQL field — and that route was removed the same day it was written (2026-08-26). Once
+  > both operations became authenticated and permission-gated, the obstacle was gone:
+  > `RequirePermission` works identically on a GraphQL field, and the row decisions live in
+  > the aggregate rather than in the transport. What remains true, and is the reason no
+  > future public route may be mounted there: a single `/graphql` endpoint still cannot be
+  > made selectively public per field.
 
 ### Layer 2/3 — data access
 
@@ -1460,11 +1525,29 @@ unchanged.
 
 ### The service-wide switch this entity depends on
 
-**Neither profile configures `auth.authorization` today** — `dev` is `auth.mode: disabled`
-and `prd` is `mode: jwt` with no `authorization:` block, which defaults to off. So
-`RequirePermission` currently no-ops across the whole service and everything in this section
-is generated, correct and **inert** until that switch is turned on; the rules fail closed the
-moment it is. Flipping it is a service-wide posture change owned by `/omnicore:configure`.
+**The switch is ON.** `microservice.dev.yaml` carries `auth.mode: jwt` with
+`authorization.enabled: true` and `authorization.tenant.enabled/required: true`, and
+`qa/microservice.qa.yaml` is byte-identical on that block by design. So `RequirePermission`
+gates for real across the whole service, every literal in this section is live, and a
+principal without one meets a 403 rather than passing through. Flipping it back would be a
+service-wide posture change owned by `/omnicore:configure`.
+
+> **⚠️ SUPERSEDED 2026-09-07** *(found while writing `specs/qa/user-contract/plan.md` §0c;
+> correction approved by the maintainer the same day).* This paragraph read: *"**Neither
+> profile configures `auth.authorization` today** — `dev` is `auth.mode: disabled` and `prd`
+> is `mode: jwt` with no `authorization:` block, which defaults to off. So
+> `RequirePermission` currently no-ops across the whole service and everything in this
+> section is generated, correct and **inert** until that switch is turned on."* It was true
+> when written and has not been since the authorization work landed. It is corrected rather
+> than merely dated because a reader taking it at face value would conclude this entity's
+> whole §10 is unenforced — the opposite of what ships, and the opposite of what
+> `specs/qa/user-contract/plan.md` §3 proves case by case.
+>
+> **The paragraph that follows is unchanged and still correct**, and the reason it survives
+> the correction is that it was never about the switch: it is about `auth.mode: disabled`,
+> which the `dev` profile no longer sets but which the framework still permits under
+> `APP_PROFILE=dev`. The stand-down it warns about is a property of the RULES — they ask
+> whether an identity was PRESENT — and it holds wherever that mode is used.
 
 **One consequence specific to this entity, and it is the sharpest one in the service:** with
 authorization off, the self-service password change has no identity to compare `:id`

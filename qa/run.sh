@@ -19,24 +19,34 @@
 #   · the build tags — `postgres` from relational.dialect, and NO transport tag because the
 #     yaml declares no transport: block;
 #   · the boot on :8099 under the suite's own config, and the drain-respecting shutdown;
-#   · the eight principals the lanes borrow: the seeded bootstrap admin (*:*), a tenant:read
+#   · the ten principals the lanes borrow: the seeded bootstrap admin (*:*), a tenant:read
 #     user, a permission:read user, a permission:read user in a SECOND tenant, the two ROLE
 #     principals of specs/qa/role-contract/plan.md §2 — one holding the whole role bundle
 #     inside a tenant of the suite's own, one holding role:read + role:update and NOT
-#     role:grant — and the two GROUP principals of specs/qa/group-contract/plan.md §2, in that
+#     role:grant — the two GROUP principals of specs/qa/group-contract/plan.md §2, in that
 #     same tenant: one holding the whole group bundle and deliberately NOT permission:archive,
-#     one holding group:read + group:update and NOT group:grant. All but the first are created
-#     through the API, and each exists because the others cannot see what it sees —
-#     qa/security.sh S4, S5 and S6 say which is which.
+#     one holding group:read + group:update and NOT group:grant — and the two USER principals
+#     of specs/qa/user-contract/plan.md §2, same tenant again: one holding the whole user
+#     vocabulary and, once more, NOT permission:archive, one holding user:read + user:update
+#     and none of the three verbs that change what a user can do or who they are. All but the
+#     first are created through the API, and each exists because the others cannot see what it
+#     sees — qa/security.sh S4, S5, S6 and S7 say which is which.
+#
+#     ONE PROPERTY OF THIS SERVICE SHAPES EVERY ONE OF THEM, and it is not an obstacle but a
+#     rule worth knowing: an account created through the API is born must_change_password, so
+#     its FIRST token carries user:change-password and nothing else — the wildcard included.
+#     make_principal therefore rotates before handing a token back. It also PUBLISHES the
+#     pre-rotation token in QA_BOOT_TOKEN, because that token is what qa/domain.sh U23 is
+#     built out of and there is no way back to it once the rotation has run.
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 # ── the lane list. This array IS the inventory: a .sh under qa/ that no lane names is a suite
 # ── nobody runs, and a lane naming a missing file breaks the run for everyone.
-LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql domain security audit)
+LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql user user_graphql domain security audit)
 
-PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md"
+PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md"
 REPORT="qa/qa-report.md"
 PORT=8099
 QA_BASE="http://localhost:$PORT"
@@ -92,7 +102,7 @@ render_report() {
   # line came to name the wrong suite.
   local lane p f s t verdict
   {
-    printf '# QA report — authcore · tenant + permission + role + group contracts\n\n'
+    printf '# QA report — authcore · tenant + permission + role + group + user contracts\n\n'
     printf -- '- **run:** `%s` · %s\n' "$QA_RUN_ID" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
     printf -- '- **plans:** %s\n' "$PLANS"
     printf -- '- **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags '"'"'postgres'"'"'` (no transport tag — the yaml declares no `transport:` block)\n'
@@ -118,7 +128,12 @@ render_report() {
       printf '## Failures\n\n'
       for lane in "${LANES[@]}"; do
         [ -s "$QA_RESULT_DIR/$lane.failures" ] || continue
-        read -r _ f _ _ < "$QA_RESULT_DIR/$lane.result" 2>/dev/null || f=0
+        # A lane that died before qa_finish has a .failures file — qa_init created it — and no
+        # .result at all. Guard on the FILE and not on the read: `read` cannot suppress the
+        # shell's own open error, so without this the render prints a stray line per missing
+        # lane into the middle of the report.
+        [ -f "$QA_RESULT_DIR/$lane.result" ] || continue
+        read -r _ f _ _ < "$QA_RESULT_DIR/$lane.result" || f=0
         [ "${f:-0}" -gt 0 ] || continue
         printf '## lane: %s\n\n' "$lane"
         head -c 20000 "$QA_RESULT_DIR/$lane.failures"
@@ -282,6 +297,13 @@ if [ -n "$BOOTSTRAP_TOKEN" ]; then
     -H "Authorization: Bearer $BOOTSTRAP_TOKEN" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
     -d "$(jq -nc --arg np "$ADMIN_PASS" '{currentPassword:"admin", password:$np, passwordConfirmation:$np}')")
   QA_TOKEN_ADMIN=$(login "admin@authcore.local" "$ADMIN_PASS")
+  # PUBLISHED, not discarded: this is the seeded *:* account's must-change token, and
+  # qa/domain.sh U23.9 is the only place in the suite where a wildcard bundle meets the
+  # restriction. It cannot be rebuilt — no API call creates a wildcard-bearing account, which
+  # is itself a rule the suite asserts (U14.3) — so once this run rotates the password the
+  # state is gone until the next drop-and-recreate.
+  QA_BOOT_ADMIN_TOKEN="$BOOTSTRAP_TOKEN"
+  QA_BOOT_ADMIN_ID="$ADMIN_ID"
 else
   ROTATE=""
   QA_TOKEN_ADMIN=""
@@ -376,6 +398,19 @@ make_principal() {
   # permissions it genuinely holds and every case below would pass for the wrong reason.
   boot=$(login "$email" "$p1")
   [ -n "$boot" ] || { echo "run.sh: the $label principal could not sign in" >&2; return 1; }
+
+  # THE PRE-ROTATION TOKEN IS PUBLISHED, not discarded, and that is what
+  # specs/qa/user-contract/plan.md §1b U23 is built out of: the restriction is a property of
+  # THAT token, and once the rotation below has run there is no way back to it. It rides a
+  # global rather than stdout because stdout is the rotated token every caller here wants —
+  # a second return value would change eight call sites to serve one lane.
+  #
+  # The user's id travels with it for the same reason: U23 needs to ask the row whether it was
+  # born must_change_password, and it cannot learn the id from the token it is judging.
+  QA_BOOT_TOKEN="$boot"
+  QA_BOOT_USER_ID="$user_id"
+  QA_BOOT_EMAIL="$email"
+
   curl -s -X PATCH "$QA_BASE/users/$user_id/password" \
     -H "Authorization: Bearer $boot" -H 'Content-Type: application/json' -H 'Accept-Language: en-US' \
     -d "$(jq -nc --arg cp "$p1" --arg np "$p2" '{currentPassword:$cp, password:$np, passwordConfirmation:$np}')" >/dev/null
@@ -519,10 +554,71 @@ fi
 
 export QA_TOKEN_GROUP QA_TOKEN_GROUPNOGRANT
 
+# ── principals I and J, for specs/qa/user-contract/plan.md §2 ─────────────────────────────
+#
+# They live in the SAME tenant E, F, G and H do, and for the same reason: the user lane needs
+# groups, roles and claims it can attach, all three are tenant-scoped, and a user principal in
+# a tenant of its own could not reach a single one of them.
+#
+#   I holds the whole user vocabulary — insert/update/archive/read/grant/set-claim — plus the
+#     reads and inserts a user operator needs to build what it attaches, and deliberately NOT
+#     permission:archive. That absence is exactly what §1b U13's and U14's escalation
+#     negatives need: the role and the group that CONFER permission:archive are created by the
+#     ADMIN, because Role's own escalation rule would refuse I that creation (role-contract
+#     RL2), and the question those rows ask is whether I may ATTACH them.
+#     It also deliberately lacks BOTH credential verbs — S7.2 builds its own principal for
+#     those, because a caller holding them is what makes a refusal a ROW decision rather than
+#     a missing permission.
+#   J holds user:read + user:update and NOT user:grant, user:set-claim or user:reset-password.
+#     It is the ONLY caller for which the four-way verb split is visible: it may relabel a user
+#     and must be refused on all six collection routes and on the reset. A and B answer the
+#     same on all fourteen either way.
+#
+# A failure to build either is NOT fatal: the lanes skip their blocks loudly and the report
+# prints them in the SKIP column, which is the honest outcome.
+USER_INSERT_PERMISSION="01990000-0000-7000-8000-00000000001f"
+USER_UPDATE_PERMISSION="01990000-0000-7000-8000-000000000020"
+USER_ARCHIVE_PERMISSION="01990000-0000-7000-8000-000000000021"
+USER_READ_PERMISSION="01990000-0000-7000-8000-000000000022"
+USER_GRANT_PERMISSION="01990000-0000-7000-8000-000000000023"
+USER_SETCLAIM_PERMISSION="01990000-0000-7000-8000-000000000024"
+CLAIM_INSERT_PERMISSION="01990000-0000-7000-8000-000000000001"
+CLAIM_READ_PERMISSION="01990000-0000-7000-8000-000000000004"
+
+if [ -n "$QA_TENANT_SCOPED" ]; then
+  QA_TOKEN_USEROP=$(make_principal userop "$QA_TENANT_SCOPED" "QA User Operator" \
+    "Grants the whole user vocabulary inside one tenant, plus the reads and inserts a user operator needs to build what it attaches, and no catalog write verb at all." \
+    "$USER_INSERT_PERMISSION" "$USER_UPDATE_PERMISSION" "$USER_ARCHIVE_PERMISSION" \
+    "$USER_READ_PERMISSION" "$USER_GRANT_PERMISSION" "$USER_SETCLAIM_PERMISSION" \
+    "$GROUP_READ_PERMISSION" "$GROUP_INSERT_PERMISSION" \
+    "$ROLE_READ_PERMISSION" "$ROLE_INSERT_PERMISSION" \
+    "$CLAIM_READ_PERMISSION" "$CLAIM_INSERT_PERMISSION" "$TENANT_READ_PERMISSION" || true)
+  QA_TOKEN_USERNOGRANT=$(make_principal usernogrant "$QA_TENANT_SCOPED" "QA User Labeller" \
+    "Grants reading and relabelling a user, and deliberately none of the three verbs that change what a user can do or who they are." \
+    "$USER_READ_PERMISSION" "$USER_UPDATE_PERMISSION" || true)
+else
+  QA_TOKEN_USEROP=""
+  QA_TOKEN_USERNOGRANT=""
+fi
+
+if [ -n "$QA_TOKEN_USEROP" ]; then
+  echo "   principal I: qa-userop-$QA_RUN_ID@authcore.local (the user bundle + group/role/claim read+insert + tenant:read, tenant $QA_TENANT_SCOPED)"
+else
+  echo "   principal I: NOT BUILT — the user rows of qa/domain.sh and qa/security.sh S7 will skip and say so" >&2
+fi
+if [ -n "$QA_TOKEN_USERNOGRANT" ]; then
+  echo "   principal J: qa-usernogrant-$QA_RUN_ID@authcore.local (user:read + user:update, NO grant/set-claim/reset-password)"
+else
+  echo "   principal J: NOT BUILT — qa/security.sh S7.1x-z will skip and say so" >&2
+fi
+
+export QA_TOKEN_USEROP QA_TOKEN_USERNOGRANT
+
 # The lanes need these to exercise the login route itself (§3b).
 QA_ADMIN_EMAIL="admin@authcore.local"
 QA_ADMIN_PASSWORD="$ADMIN_PASS"
 export QA_TOKEN_ADMIN QA_TOKEN_LIMITED QA_ADMIN_EMAIL QA_ADMIN_PASSWORD
+export QA_BOOT_ADMIN_TOKEN QA_BOOT_ADMIN_ID
 export QA_TOKEN_PERMREAD QA_TOKEN_OTHERTENANT
 
 # ═════════════════════════════════════════════════════════════════════════════════════════

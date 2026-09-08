@@ -599,3 +599,167 @@ attach_role() {
 detach_role() {
   api PATCH "/groups/$1/roles/$2/archive" "" "${3:-${QA_TOKEN_ADMIN:-}}"
 }
+
+# ── User fixtures ────────────────────────────────────────────────────────────────────────
+#
+# Plan: specs/qa/user-contract/plan.md §2.
+#
+# The User fixtures differ from every other entity's in one way that shapes all of them: an
+# account created through the API is born must_change_password=TRUE, so its FIRST token
+# carries exactly one permission (§1b U23). A fixture that hands back that token would make
+# every later case fail for the wrong reason, so new_user echoes only the id and the lane asks
+# for a token through usable_token, which does the rotation the account needs first.
+#
+# vos.Email is stricter than most: ^[a-z0-9._%+-]{1,64}@[a-z0-9](...)+$ — LOWERCASE only, so a
+# run tag carrying an uppercase rune would 422. qa_slug_runid already lowercases and collapses
+# runs of identical characters, and it is reused here for the same reason the other fixtures
+# reuse it.
+
+# The password every fixture account is born with, and the one it is rotated to. Both satisfy
+# vos.Password (>=8 runes, the four classes, no edge whitespace) and — the part that is easy to
+# get wrong — neither echoes the fixture identity.
+#
+# THE TRAP, PAID FOR ONCE: the fixture family name is "Fixture", which is SEVEN runes, so
+# refusePasswordEchoingIdentity judges it. A password of `Qa!Fixture2026` is refused by the
+# service for exactly the right reason, and every account in the suite fails to be created.
+# Only the GIVEN name "Qa" is under the 4-rune floor. So these two share no substring with
+# "fixture", with "qa", or with the `qa-…` local part user_email mints.
+QA_USER_PASS1='Zt7#Wandering'
+QA_USER_PASS2='Zt7#Wandering9'
+
+# user_email [PREFIX] → an address unique to this run AND to this call.
+#
+# File-backed counter, for the reason ws(), role_key() and group_key() all use one: this is
+# almost always called inside $( ), so an in-memory counter would increment a copy the parent
+# never sees and every call in a loop would hand back the same address — which, on a column
+# unique across the WHOLE PLATFORM over active rows, turns a fixture into a 409.
+user_email() {
+  local f="${QA_RUN_DIR:-/tmp}/.user-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'qa-%s-%s-%d@authcore.local' "${1:-u}" "$(qa_slug_runid)" "$n"
+}
+
+# user_body EMAIL STATUS TENANT_ID_OR_EMPTY [PASSWORD]
+#
+# Three positional arguments and an optional password. An EMPTY tenant omits the key entirely
+# rather than sending "" — absent means "mine" (spec.md §7 U1b), while an empty string is a
+# malformed id the U0 guard barrier refuses. The two are different requests and the suite has
+# to be able to send either.
+#
+# The three collections are deliberately NOT parameters: an insert carrying entries is a
+# different case family (M1, U8/U9/U10) and each one builds its own body, so folding an
+# arbitrary entry list in here would make the common path unreadable to serve three cases.
+user_body() {
+  local email="$1" status="$2" tenant="$3" pass="${4:-$QA_USER_PASS1}"
+  jq -nc --arg e "$email" --arg s "$status" --arg t "$tenant" --arg p "$pass" \
+    '{givenName:"Qa", familyName:"Fixture", email:$e, status:$s,
+      password:$p, passwordConfirmation:$p}
+     + (if $t == "" then {} else {tenantID:$t} end)'
+}
+
+# new_user EMAIL TENANT_ID_OR_EMPTY [STATUS] [TOKEN] → echoes the created user's id.
+# Fixture creation, not a case: it asserts nothing and aborts the lane loudly if refused.
+new_user() {
+  api POST /users "$(user_body "$1" "${3:-active}" "$2")" "${4:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /users answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.id'
+}
+
+# rotate_password USER_ID TOKEN CURRENT NEW — the change endpoint, called as a FIXTURE step.
+# Leaves HTTP_STATUS/HTTP_BODY for a caller that wants to look; aborts nothing, because half
+# the callers are asserting a refusal.
+rotate_password() {
+  api PATCH "/users/$1/password" \
+    "$(jq -nc --arg c "$3" --arg n "$4" '{currentPassword:$c, password:$n, passwordConfirmation:$n}')" "$2"
+}
+
+# usable_token EMAIL USER_ID → a token carrying the account's REAL bundle, on stdout.
+#
+# The two-step every fixture account needs and the one a suite copied from another entity
+# forgets: sign in with the birth password, rotate it, sign in again. Without the rotation the
+# token carries user:change-password ALONE (§1b U23) and every case using it would answer 403
+# to permissions the principal genuinely holds — passing or failing for the wrong reason.
+usable_token() {
+  local email="$1" uid="$2" boot
+  boot=$(qa_login "$email" "$QA_USER_PASS1")
+  [ -n "$boot" ] || { printf '  %sFIXTURE FAILED%s — %s could not sign in\n' "$C_RED" "$C_RESET" "$email" >&2; return 1; }
+  rotate_password "$uid" "$boot" "$QA_USER_PASS1" "$QA_USER_PASS2"
+  qa_login "$email" "$QA_USER_PASS2"
+}
+
+# attach_group USER_ID GROUP_ID [TOKEN] → echoes the child id the server minted.
+# That id is how the entry is addressed afterwards, and it is a NEW one on every attach: the
+# child index is active-only and there is no per-entry unarchive.
+attach_group() {
+  api POST "/users/$1/groups" "$(jq -nc --arg g "$2" '{groupID:$g}')" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /users/%s/groups answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.userGroup.id'
+}
+
+# grant_role_to_user USER_ID ROLE_ID [TOKEN] → echoes the child id.
+# Named for the DIRECT grant it makes, so a reader never confuses it with attach_role, which
+# puts a permission on a role.
+grant_role_to_user() {
+  api POST "/users/$1/roles" "$(jq -nc --arg r "$2" '{roleID:$r}')" "${3:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /users/%s/roles answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.userRole.id'
+}
+
+# set_claim USER_ID CLAIM_ID VALUE [TOKEN] → echoes the child id.
+set_claim() {
+  api POST "/users/$1/claims" "$(jq -nc --arg c "$2" --arg v "$3" '{claimID:$c, value:$v}')" "${4:-${QA_TOKEN_ADMIN:-}}"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /users/%s/claims answered %s: %s\n' \
+      "$C_RED" "$C_RESET" "$1" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.userClaim.id'
+}
+
+# ── Claim fixtures ───────────────────────────────────────────────────────────────────────
+#
+# Claim has no lane of its own yet (plan §0b). It is here only as the counterpart the user's
+# `claims` collection points at, so this is the minimum the User round needs and not the
+# entity's own fixture surface.
+#
+# vos.ClaimName is a snake-ish identifier; the run tag goes through qa_slug_runid for the same
+# reason every other key fixture does.
+
+# claim_name [PREFIX] → a name unique to this run AND to this call.
+claim_name() {
+  local f="${QA_RUN_DIR:-/tmp}/.claim-seq" n
+  n=$(( $(cat "$f" 2>/dev/null || echo 0) + 1 ))
+  printf '%d' "$n" > "$f"
+  printf 'x_qa_%s_%s_%d' "${1:-c}" "$(printf '%s' "$(qa_slug_runid)" | tr '-' '_')" "$n"
+}
+
+# new_claim NAME VALUE_TYPE APPLIES_TO TENANT_ID_OR_EMPTY [DEFAULT_VALUE] [TOKEN]
+#   → echoes the created definition's id.
+#
+# valueType is one of string|number|bool and appliesTo one of user|client|both — the two
+# closed sets §1b U11 and U12 are built out of.
+new_claim() {
+  local name="$1" vt="$2" applies="$3" tenant="$4" dv="${5:-}" token="${6:-${QA_TOKEN_ADMIN:-}}"
+  local desc="Fixture claim definition created by the QA suite for run $(qa_slug_runid), so the user claims collection has a catalog row to point at."
+  api POST /claims "$(jq -nc --arg n "$name" --arg v "$vt" --arg a "$applies" --arg t "$tenant" --arg d "$desc" --arg dv "$dv" \
+    '{name:$n, valueType:$v, appliesTo:$a, description:$d}
+     + (if $t == "" then {} else {tenantID:$t} end)
+     + (if $dv == "" then {} else {defaultValue:$dv} end)')" "$token"
+  if [ "$HTTP_STATUS" != "201" ]; then
+    printf '  %sFIXTURE FAILED%s — POST /claims answered %s: %s\n' "$C_RED" "$C_RESET" "$HTTP_STATUS" "$HTTP_BODY" >&2
+    return 1
+  fi
+  printf '%s' "$HTTP_BODY" | jq -r '.data.id'
+}

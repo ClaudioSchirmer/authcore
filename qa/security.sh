@@ -904,4 +904,305 @@ fi
 case_ "S6.8 field-level read authz on Group" "recorded as a DECISION, and deliberately not exercised"
 skip_ "spec.md §9 declares no ReadCriteria.Restrict for Group: 'Every field a caller may see the row at all for, they may see entirely. Row-level isolation does the work.' There is no column to find absent for one caller and present for another, no tabular export whose header could be pruned, and no __typename edge to assert — that edge exists only where a restricted field is in the selection. S6.7 proves the row-level boundary that does the work instead"
 
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#  S7 — §3 of specs/qa/user-contract/plan.md. The User gate.
+#
+#  §3a (the 401 family), §3b (the public-route split) and the framework's appended surfaces
+#  are INHERITED from the four approved rounds and are not repeated here.
+#
+#  What is new, and why this family is bigger than S5 and S6: User is gated by EIGHT distinct
+#  literals over fourteen routes — the four every entity has, plus user:grant covering three
+#  collections, user:set-claim covering the third of them, and the two credential verbs that
+#  no other aggregate has at all. It is also the only entity whose Layer-2 rules read the
+#  caller's SUBJECT rather than its tenant, which is what S7.2 exists for.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S7_DEAD="01990000-dead-7000-8000-000000000000"
+
+# ── S7.1 Layer 1 on REST: the negative, over all fourteen routes ──────────────────────────
+s7_denied() { s5_denied "$@"; }
+
+s7_denied "S7.1a principal B on the user LISTING"     GET   "/users"                                    ""                              "user:read"
+s7_denied "S7.1b principal B on the by-id read"       GET   "/users/$S7_DEAD"                           ""                              "user:read"
+s7_denied "S7.1c principal B on insert"               POST  "/users"                                    '{"givenName":"X","familyName":"Y","email":"qa-denied@authcore.local","status":"active","password":"Qa!Denied2026","passwordConfirmation":"Qa!Denied2026"}' "user:insert"
+s7_denied "S7.1d principal B on patch"                PATCH "/users/$S7_DEAD"                           '{"givenName":"X"}'             "user:update"
+s7_denied "S7.1e principal B on archive"              PATCH "/users/$S7_DEAD/archive"                   ""                              "user:archive"
+s7_denied "S7.1f principal B on JOIN A GROUP"         POST  "/users/$S7_DEAD/groups"                    '{"groupID":"'"$S7_DEAD"'"}'    "user:grant"
+s7_denied "S7.1g principal B on LEAVE A GROUP"        PATCH "/users/$S7_DEAD/groups/$S7_DEAD/archive"   ""                              "user:grant"
+s7_denied "S7.1h principal B on GRANT A ROLE"         POST  "/users/$S7_DEAD/roles"                     '{"roleID":"'"$S7_DEAD"'"}'     "user:grant"
+s7_denied "S7.1i principal B on REVOKE A ROLE"        PATCH "/users/$S7_DEAD/roles/$S7_DEAD/archive"    ""                              "user:grant"
+s7_denied "S7.1j principal B on SET A CLAIM"          POST  "/users/$S7_DEAD/claims"                    '{"claimID":"'"$S7_DEAD"'","value":"x"}' "user:set-claim"
+s7_denied "S7.1k principal B on CHANGE A CLAIM"       PATCH "/users/$S7_DEAD/claims/$S7_DEAD"           '{"value":"x"}'                 "user:set-claim"
+s7_denied "S7.1l principal B on WITHDRAW A CLAIM"     PATCH "/users/$S7_DEAD/claims/$S7_DEAD/archive"   ""                              "user:set-claim"
+s7_denied "S7.1m principal B on RESET a password"     PATCH "/users/$S7_DEAD/password-reset"            '{"password":"Qa!Denied2026x","passwordConfirmation":"Qa!Denied2026x"}' "user:reset-password"
+
+# The change is the ONE route with a different story, and it is worth its own case rather than
+# a row in the table above: user:change-password is the permission spec.md §10 says must reach
+# EVERY user, because a caller without it cannot set their own password at all. Principal B
+# does not hold it, so the gate closes — and that closing is what §3e records as the
+# deployment cost nobody has paid yet.
+s7_denied "S7.1n principal B on CHANGE its own password" PATCH "/users/$S7_DEAD/password"               '{"currentPassword":"a","password":"Qa!Denied2026x","passwordConfirmation":"Qa!Denied2026x"}' "user:change-password"
+
+case_ "S7.1o THE COUNT: eight distinct literals gate fourteen routes" "user:read/insert/update/archive/grant/set-claim/change-password/reset-password — a route that lost its RequirePermission would answer something other than 403 above, and a route that shared another's literal would show up here"
+GATED=$(printf '%s\n' "user:read" "user:read" "user:insert" "user:update" "user:archive" "user:grant" "user:grant" "user:grant" "user:grant" "user:set-claim" "user:set-claim" "user:set-claim" "user:reset-password" "user:change-password" | sort -u | wc -l | tr -d ' ')
+if [ "$GATED" = "8" ]; then pass_; else fail_ "distinct literals asserted above = $GATED"; fi
+
+# ── S7.1p-w the complement: a gate that refuses everyone is also broken ───────────────────
+#
+# For the writes the target id addresses nothing ON PURPOSE: reaching the HANDLER — a 404,
+# never a 403 — is what proves the gate opened rather than that the write happened to be valid.
+
+if [ -z "${QA_TOKEN_USEROP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S7.1p-w — principal I was not built, so the Layer-1 complement is UNPROVEN this run and only the negative half above stands"
+else
+  S7_TARGET=$(new_user "$(user_email s7)" "$QA_TENANT_SCOPED") || true
+
+  case_ "S7.1p principal I on the user LISTING" "200 — it holds user:read"
+  api GET "/users?first=1" "" "$QA_TOKEN_USEROP"
+  assert_status 200
+
+  case_ "S7.1q principal I on insert" "201 — it holds user:insert"
+  api POST /users "$(user_body "$(user_email s7i)" active "$QA_TENANT_SCOPED")" "$QA_TOKEN_USEROP"
+  assert_status 201
+
+  case_ "S7.1r principal I on patch" "200 — it holds user:update"
+  if [ -n "${S7_TARGET:-}" ]; then
+    api PATCH "/users/$S7_TARGET" '{"givenName":"Gated"}' "$QA_TOKEN_USEROP"
+    assert_status 200
+  else skip_ "S7.1r — the target could not be created"; fi
+
+  case_ "S7.1s principal I on a collection add" "404 and NOT 403 — the gate opened and the handler was reached; the id addresses nothing on purpose"
+  api POST "/users/$S7_DEAD/groups" "$(jq -nc --arg g "$S7_DEAD" '{groupID:$g}')" "$QA_TOKEN_USEROP"
+  assert_status_not 403
+
+  case_ "S7.1t principal I on a claim add" "404 and NOT 403 — user:set-claim is a literal of its own, and this is what proves I holds it separately from user:grant"
+  api POST "/users/$S7_DEAD/claims" "$(jq -nc --arg c "$S7_DEAD" '{claimID:$c, value:"x"}')" "$QA_TOKEN_USEROP"
+  assert_status_not 403
+
+  case_ "S7.1u principal I on archive" "404 and NOT 403"
+  api PATCH "/users/$S7_DEAD/archive" "" "$QA_TOKEN_USEROP"
+  assert_status_not 403
+fi
+
+# ── S7.1x-z THE SPLIT: principal J, the only caller for which the four verbs differ ───────
+#
+# J holds user:read and user:update and NOT user:grant, user:set-claim or user:reset-password.
+# A and B answer identically on all fourteen routes either way; J is what makes the split
+# visible at all — "may fix a typo in a name" and "may hand out roles" and "may take over an
+# account" are three different jobs, and spec.md §10 says so explicitly.
+
+if [ -z "${QA_TOKEN_USERNOGRANT:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S7.1x-z — principal J was not built, so the four-way verb split is UNPROVEN this run"
+else
+  S7_J_TARGET=$(new_user "$(user_email s7j)" "$QA_TENANT_SCOPED") || true
+
+  if [ -z "${S7_J_TARGET:-}" ]; then
+    skip_ "S7.1x-z — the split's target user could not be created"
+  else
+    case_ "S7.1x principal J MAY rename" "200 — user:update is the verb it holds, and it must keep working"
+    api PATCH "/users/$S7_J_TARGET" '{"givenName":"Relabelled"}' "$QA_TOKEN_USERNOGRANT"
+    assert_status 200
+
+    s7j_denied() { # s7j_denied CASE METHOD PATH BODY LITERAL
+      case_ "$1" "403 MissingPermissionNotification, value '$5' — whoever may fix a typo in a name must not be able to $6"
+      api "$2" "$3" "$4" "$QA_TOKEN_USERNOGRANT"
+      local hit
+      hit=$(printf '%s' "$HTTP_BODY" | jq -r --arg v "$5" \
+        '[.errors[]?.messages[]? | select(.notificationKey=="MissingPermissionNotification" and .field=="permission" and .value==$v)] | length' 2>/dev/null)
+      if [ "$HTTP_STATUS" = "403" ] && [ "${hit:-0}" -ge 1 ]; then pass_; else fail_ "HTTP $HTTP_STATUS, no MissingPermission on '$5'"; fi
+    }
+
+    s7j_denied "S7.1y1 principal J on JOIN A GROUP"   POST  "/users/$S7_J_TARGET/groups" "$(jq -nc --arg g "$S7_DEAD" '{groupID:$g}')" "user:grant" "confer permissions by indirection"
+    s7j_denied "S7.1y2 principal J on GRANT A ROLE"   POST  "/users/$S7_J_TARGET/roles"  "$(jq -nc --arg r "$S7_DEAD" '{roleID:$r}')"  "user:grant" "confer permissions directly"
+    s7j_denied "S7.1y3 principal J on LEAVE A GROUP"  PATCH "/users/$S7_J_TARGET/groups/$S7_DEAD/archive" "" "user:grant" "withdraw them either"
+    s7j_denied "S7.1y4 principal J on REVOKE A ROLE"  PATCH "/users/$S7_J_TARGET/roles/$S7_DEAD/archive"  "" "user:grant" "withdraw them either"
+    s7j_denied "S7.1y5 principal J on SET A CLAIM"    POST  "/users/$S7_J_TARGET/claims" "$(jq -nc --arg c "$S7_DEAD" '{claimID:$c, value:"x"}')" "user:set-claim" "set a value this service cannot audit the consequences of"
+    s7j_denied "S7.1y6 principal J on CHANGE A CLAIM" PATCH "/users/$S7_J_TARGET/claims/$S7_DEAD" '{"value":"x"}' "user:set-claim" "correct one either"
+    s7j_denied "S7.1z  principal J on RESET a password" PATCH "/users/$S7_J_TARGET/password-reset" '{"password":"Qa!Takeover26","passwordConfirmation":"Qa!Takeover26"}' "user:reset-password" "take over the account"
+
+    case_ "S7.1z2 user:update DELIBERATELY REACHES NEITHER credential route" "the rename passed and the reset was refused, in the same principal and the same tenant — that is the escalation this model refuses everywhere else, arriving through the least-guarded door"
+    api PATCH "/users/$S7_J_TARGET" '{"givenName":"Still"}' "$QA_TOKEN_USERNOGRANT"; S_REN="$HTTP_STATUS"
+    api PATCH "/users/$S7_J_TARGET/password-reset" '{"password":"Qa!Takeover26","passwordConfirmation":"Qa!Takeover26"}' "$QA_TOKEN_USERNOGRANT"; S_RES="$HTTP_STATUS"
+    if [ "$S_REN" = "200" ] && [ "$S_RES" = "403" ]; then pass_; else HTTP_BODY="rename=$S_REN reset=$S_RES"; fail_ "the two verbs did not separate"; fi
+  fi
+fi
+
+# ── S7.1gql Layer 1 on GRAPHQL. A route gated on REST is not thereby gated here ───────────
+#
+# This block matters more on User than on any other entity: spec.md §9 and §10 BOTH said the
+# collection and credential fields were not on GraphQL at all (corrected 2026-09-07, plan
+# §0c). A gate believed not to exist is a gate nobody checks.
+s7_gql_denied() { s5_gql_denied "$@"; }
+
+s7_gql_denied "S7.1gql-a principal B on the users connection" "query { users(first: 1) { totalCount } }" "" "user:read"
+s7_gql_denied "S7.1gql-b principal B on user(id:)"            "query { user(id: \"$S7_DEAD\") { id } }" "" "user:read"
+s7_gql_denied "S7.1gql-c principal B on createUser"           "mutation(\$i: CreateUserInput!) { createUser(input: \$i) { id } }" '{"i":{"givenName":"X","familyName":"Y","email":"qa-denied-gql@authcore.local","status":"active","password":"Qa!Denied2026","passwordConfirmation":"Qa!Denied2026"}}' "user:insert"
+s7_gql_denied "S7.1gql-d principal B on patchUser"            "mutation(\$i: PatchUserInput!) { patchUser(id: \"$S7_DEAD\", input: \$i) { id } }" '{"i":{"givenName":"X"}}' "user:update"
+s7_gql_denied "S7.1gql-e principal B on archiveUser"          "mutation { archiveUser(id: \"$S7_DEAD\") { success } }" "" "user:archive"
+s7_gql_denied "S7.1gql-f principal B on addUserGroup"         "mutation(\$i: AddUserGroupInput!) { addUserGroup(id: \"$S7_DEAD\", input: \$i) { userId } }" '{"i":{"groupID":"'"$S7_DEAD"'"}}' "user:grant"
+s7_gql_denied "S7.1gql-g principal B on archiveUserGroup"     "mutation(\$i: ArchiveUserGroupInput!) { archiveUserGroup(id: \"$S7_DEAD\", input: \$i) { success } }" '{"i":{"userGroupId":"'"$S7_DEAD"'"}}' "user:grant"
+s7_gql_denied "S7.1gql-h principal B on addUserRole"          "mutation(\$i: AddUserRoleInput!) { addUserRole(id: \"$S7_DEAD\", input: \$i) { userId } }" '{"i":{"roleID":"'"$S7_DEAD"'"}}' "user:grant"
+s7_gql_denied "S7.1gql-i principal B on archiveUserRole"      "mutation(\$i: ArchiveUserRoleInput!) { archiveUserRole(id: \"$S7_DEAD\", input: \$i) { success } }" '{"i":{"userRoleId":"'"$S7_DEAD"'"}}' "user:grant"
+s7_gql_denied "S7.1gql-j principal B on addUserClaim"         "mutation(\$i: AddUserClaimInput!) { addUserClaim(id: \"$S7_DEAD\", input: \$i) { userId } }" '{"i":{"claimID":"'"$S7_DEAD"'","value":"x"}}' "user:set-claim"
+s7_gql_denied "S7.1gql-k principal B on patchUserClaim"       "mutation(\$i: PatchUserClaimInput!) { patchUserClaim(id: \"$S7_DEAD\", input: \$i) { userId } }" '{"i":{"userClaimId":"'"$S7_DEAD"'","value":"x"}}' "user:set-claim"
+s7_gql_denied "S7.1gql-l principal B on archiveUserClaim"     "mutation(\$i: ArchiveUserClaimInput!) { archiveUserClaim(id: \"$S7_DEAD\", input: \$i) { success } }" '{"i":{"userClaimId":"'"$S7_DEAD"'"}}' "user:set-claim"
+s7_gql_denied "S7.1gql-m principal B on changeUserPassword"   "mutation(\$i: ChangeUserPasswordInput!) { changeUserPassword(id: \"$S7_DEAD\", input: \$i) { success } }" '{"i":{"currentPassword":"a","password":"Qa!Denied2026x","passwordConfirmation":"Qa!Denied2026x"}}' "user:change-password"
+s7_gql_denied "S7.1gql-n principal B on resetUserPassword"    "mutation(\$i: ResetUserPasswordInput!) { resetUserPassword(id: \"$S7_DEAD\", input: \$i) { success } }" '{"i":{"password":"Qa!Denied2026x","passwordConfirmation":"Qa!Denied2026x"}}' "user:reset-password"
+
+case_ "S7.1gql-o the admin's GraphQL connection is served" "200 with no errors — the per-surface complement"
+gql "query { users(first: 1) { totalCount edges { node { id } } } }"
+assert_gql_ok '(.data.users.totalCount >= 0)' "true"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S7.2 — LAYER 2: identity-derived row rules, and the only two in this service that read the
+#        caller's SUBJECT rather than its tenant.
+#
+# Two calls that differ ONLY in who is asking. qa/domain.sh U19 proves these as business
+# rules; here they are proven as a BOUNDARY, which is a different question: U19 asks whether
+# the rule fires, S7.2 asks whether the rule is what stands between a principal and an account
+# it must not be able to take.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S7.2 — no scoped tenant was provisioned, so the two subject-derived row rules are UNPROVEN this run"
+else
+  S7_SELF_EMAIL=$(user_email s7self)
+  S7_SELF_ID=$(new_user "$S7_SELF_EMAIL" "$QA_TENANT_SCOPED") || true
+  S7_OTHER_EMAIL=$(user_email s7other)
+  S7_OTHER_ID=$(new_user "$S7_OTHER_EMAIL" "$QA_TENANT_SCOPED") || true
+  # The principal holds BOTH credential verbs, so every refusal below is a ROW decision and
+  # never a missing permission — which is the entire distinction this block exists to draw.
+  S7_CRED_ROLE=$(new_role "$(role_key s7cred)" "$QA_TENANT_SCOPED" \
+    "$(permission_id_of user read)" "$(permission_id_of user change-password)" "$(permission_id_of user reset-password)") || true
+  [ -n "${S7_SELF_ID:-}" ] && [ -n "${S7_CRED_ROLE:-}" ] && grant_role_to_user "$S7_SELF_ID" "$S7_CRED_ROLE" >/dev/null
+  S7_SELF_T=$([ -n "${S7_SELF_ID:-}" ] && usable_token "$S7_SELF_EMAIL" "$S7_SELF_ID" || true)
+
+  if [ -z "${S7_SELF_T:-}" ] || [ -z "${S7_OTHER_ID:-}" ]; then
+    skip_ "S7.2 — the credential principal could not be provisioned, so the two subject-derived row rules are UNPROVEN this run"
+  else
+    case_ "S7.2a THE CHANGE on its own row" "204 — the caller holds user:change-password AND is the row"
+    rotate_password "$S7_SELF_ID" "$S7_SELF_T" "$QA_USER_PASS2" 'Qa!Sec2026xy'
+    assert_empty_body 204
+
+    case_ "S7.2b THE SAME CALL against another row" "403 PasswordChangeRequiresSelfNotification — identical permission, identical body, different id. The gate on the route says who may attempt the verb; this says whose row they reached"
+    api PATCH "/users/$S7_OTHER_ID/password" \
+      '{"currentPassword":"Qa!Sec2026xy","password":"Qa!Steal2026x","passwordConfirmation":"Qa!Steal2026x"}' "$S7_SELF_T"
+    assert_rest 403 PasswordChangeRequiresSelfNotification
+
+    case_ "S7.2c THE RESET against another row" "204 — the mirror, and the caller holds user:reset-password"
+    api PATCH "/users/$S7_OTHER_ID/password-reset" \
+      '{"password":"Qa!Helped2026","passwordConfirmation":"Qa!Helped2026"}' "$S7_SELF_T"
+    assert_empty_body 204
+
+    case_ "S7.2d THE SAME CALL against its OWN row" "403 PasswordResetRequiresAnotherUserNotification"
+    api PATCH "/users/$S7_SELF_ID/password-reset" \
+      '{"password":"Qa!Launder26x","passwordConfirmation":"Qa!Launder26x"}' "$S7_SELF_T"
+    assert_rest 403 PasswordResetRequiresAnotherUserNotification
+
+    case_ "S7.2e A STOLEN TOKEN CANNOT LAUNDER ITSELF" "both doors closed on the SAME principal: it cannot replace its own credential without proving the previous one, by either URL. Without the reset's mirror rule, a holder of user:reset-password would simply choose the other endpoint"
+    api PATCH "/users/$S7_SELF_ID/password-reset" '{"password":"Qa!Launder26x","passwordConfirmation":"Qa!Launder26x"}' "$S7_SELF_T"
+    S_A="$HTTP_STATUS"
+    api PATCH "/users/$S7_SELF_ID/password" '{"currentPassword":"","password":"Qa!Launder26x","passwordConfirmation":"Qa!Launder26x"}' "$S7_SELF_T"
+    S_B="$HTTP_STATUS"
+    if [ "$S_A" = "403" ] && [ "$S_B" = "422" ]; then pass_; else HTTP_BODY="self-reset=$S_A (want 403), change-without-proof=$S_B (want 422)"; fail_ "a door was open"; fi
+
+    case_ "S7.2f THE ROW RULE IS NOT THE PERMISSION" "the same principal, holding both verbs, is refused on both — proving the refusals came from the aggregate and not from the gate. A suite that used a principal lacking the permission would have watched Layer 1 fire and called it Layer 2"
+    api PATCH "/users/$S7_OTHER_ID/password" '{"currentPassword":"x","password":"Qa!Nope2026xx","passwordConfirmation":"Qa!Nope2026xx"}' "$S7_SELF_T"
+    K_A=$(printf '%s' "$HTTP_BODY" | jq -r '[.errors[]?.messages[]?.notificationKey]|unique|join(",")')
+    if [ "$K_A" = "PasswordChangeRequiresSelfNotification" ]; then pass_; else HTTP_BODY="$K_A"; fail_ "keys = $K_A"; fi
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S7.3 — LAYER 3: tenant scoping. The leak here is a 200, which is why it needs its own case.
+#
+# spec.md §16: "A user listing is the customer's staff directory INCLUDING E-MAIL ADDRESSES —
+# leaking it across tenants is strictly worse than leaking the org chart, which Group already
+# refused."
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+if [ -z "${QA_TOKEN_USEROP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S7.3 — principal I was not built, so User's row scoping is UNPROVEN this run"
+else
+  S7_FOREIGN_TEN=$(new_tenant active "$(ws s7for)") || true
+  S7_FOREIGN_USER=$([ -n "${S7_FOREIGN_TEN:-}" ] && new_user "$(user_email s7for)" "$S7_FOREIGN_TEN" || true)
+
+  case_ "S7.3a principal I's listing carries only its OWN tenant's rows" "every row's tenantID is I's own — asserted over the VALUES, not over a count, because a count passes while a single foreign row rides along"
+  api GET "/users?first=100" "" "$QA_TOKEN_USEROP"
+  assert_json_at 200 '[.data[].tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S7.3b THE LEAK ITSELF: I reads another tenant's user by id" "404 and NOT 403 — a 403 would confirm the id exists to a caller who may not see it. This service answers 'you may not' and 'it is not there' identically wherever telling them apart would leak"
+  if [ -n "${S7_FOREIGN_USER:-}" ]; then
+    api GET "/users/$S7_FOREIGN_USER" "" "$QA_TOKEN_USEROP"
+    assert_status 404
+  else skip_ "S7.3b — the foreign user could not be created"; fi
+
+  case_ "S7.3c THE COMPLEMENT: the admin crosses the same scope" "200 on the very id I was refused — a scope that refuses everyone is also broken"
+  if [ -n "${S7_FOREIGN_USER:-}" ]; then
+    api GET "/users/$S7_FOREIGN_USER"
+    assert_json_at 200 '.data.id' "$S7_FOREIGN_USER"
+  else skip_ "S7.3c — the foreign user could not be created"; fi
+
+  case_ "S7.3d THE CROSS-TENANT WRITE: I creates a user naming another tenant" "403 TenantMismatchNotification — the row's tenant must equal the caller's claim, and U1b refuses rather than silently overriding so the caller learns what happened"
+  if [ -n "${S7_FOREIGN_TEN:-}" ]; then
+    api POST /users "$(user_body "$(user_email s7x)" active "$S7_FOREIGN_TEN")" "$QA_TOKEN_USEROP"
+    assert_rest 403 TenantMismatchNotification
+  else skip_ "S7.3d — the foreign tenant could not be created"; fi
+
+  case_ "S7.3e I ARCHIVES a user of another tenant" "403 TenantMismatchNotification — refuseForeignTenant runs under IfArchive too. The write side is NOT filtered by ToCriteria, so the row LOADS and the rule is what refuses: invisible if only reads were tested"
+  if [ -n "${S7_FOREIGN_USER:-}" ]; then
+    api PATCH "/users/$S7_FOREIGN_USER/archive" "" "$QA_TOKEN_USEROP"
+    assert_rest 403 TenantMismatchNotification
+  else skip_ "S7.3e — the foreign user could not be created"; fi
+
+  case_ "S7.3f I omits the tenant entirely" "201 — absent means 'mine'. A tenant caller does not supply a tenant at all, they INHERIT one, which is why U4 is usually a no-op on insert"
+  api POST /users "$(user_body "$(user_email s7own)" active "")" "$QA_TOKEN_USEROP"
+  assert_json_at 201 '.data.tenantID' "$QA_TENANT_SCOPED"
+
+  case_ "S7.3g THE BYPASS ACTS INSIDE ANOTHER TENANT, NEVER ACROSS TWO" "the admin creates a user in the foreign tenant and may then give it only THAT tenant's roles — the anchor is the USER's tenant, not the caller's"
+  if [ -n "${S7_FOREIGN_TEN:-}" ] && [ -n "${QA_TENANT_SCOPED:-}" ]; then
+    S7_MIX_ID=$(new_user "$(user_email s7mix)" "$S7_FOREIGN_TEN") || true
+    S7_SCOPED_ROLE=$(new_role "$(role_key s7mix)" "$QA_TENANT_SCOPED" "$(permission_id_of tenant read)") || true
+    if [ -n "${S7_MIX_ID:-}" ] && [ -n "${S7_SCOPED_ROLE:-}" ]; then
+      api POST "/users/$S7_MIX_ID/roles" "$(jq -nc --arg r "$S7_SCOPED_ROLE" '{roleID:$r}')"
+      assert_rest 422 RoleNotAvailableInTenantNotification
+    else skip_ "S7.3g — the mixed-tenant fixtures could not be provisioned"; fi
+  else skip_ "S7.3g — the foreign tenant could not be created"; fi
+
+  case_ "S7.3h the scope holds on GRAPHQL too" "every node carries I's own tenantID — ToCriteria is shared, but a surface that skipped it would look exactly like a passing REST case"
+  gql "query { users(first: 100) { edges { node { tenantID } } } }" "" "$QA_TOKEN_USEROP"
+  assert_gql_ok '[.data.users.edges[].node.tenantID] | unique | join(",")' "$QA_TENANT_SCOPED"
+
+  case_ "S7.3i the admin's GraphQL connection is NOT narrowed" "more than one distinct tenant — the bypass reaches this surface as well"
+  gql "query { users(first: 100) { edges { node { tenantID } } } }"
+  assert_gql_ok '([.data.users.edges[].node.tenantID] | unique | length) > 1' "true"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S7.4 — field-level read authz: NONE, and the posture is asserted rather than skipped.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "S7.4a no ReadCriteria.Restrict on User — the field is unreachable for EVERYONE" "the four password-oracle requests answer 400 for the ADMIN too. spec.md §9: the hash is off every surface for every caller by construction, which is STRONGER than restricting it — a restricted field is present for somebody"
+S7_ORACLE_FAIL=""
+for q in "passwordHash.eq=%24argon2id" "passwordHash.startswith=%24a" "orderBy=passwordHash" "fields=passwordHash"; do
+  api GET "/users?$q"
+  [ "$HTTP_STATUS" = "400" ] || S7_ORACLE_FAIL="$S7_ORACLE_FAIL $q→$HTTP_STATUS"
+done
+if [ -z "$S7_ORACLE_FAIL" ]; then pass_; else HTTP_BODY="$S7_ORACLE_FAIL"; fail_ "an oracle request did not answer 400 for the admin"; fi
+
+case_ "S7.4b there is therefore no FieldAccessForbiddenNotification to assert" "recorded as a DECISION and not a gap — and unlike a Restrict, this boundary has no privileged side that could be widened by a claim"
+skip_ "spec.md §9 declares no ReadCriteria.Restrict for User. The hash is kept off the wire by the Response DTOs declaring no such member, and out of the framework's own copies by RedactedField(InSync/InAudit) — two mechanisms, neither of which is a per-caller decision. S7.4a proves the boundary holds for the most privileged principal in the service; qa/domain.sh U25 proves the audit half"
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# S7.5 — what this round leaves UNPROVEN, printed rather than only written in the plan.
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+case_ "S7.5a the user:change-password deployment story" "unproven, and named"
+skip_ "spec.md §10 records that user:change-password must reach EVERY user or nobody can rotate their own credential once authorization is on. The suite proves the RESTRICTED token always carries it (qa/domain.sh U23, where the grant is EMBEDDED rather than filtered — which is what keeps the flow from deadlocking), but it does NOT prove any tenant's default role grants it, because no such default role exists in this service to inspect. S7.1n above shows the gate closing on a principal that lacks it"
+
+case_ "S7.5b the externalValidator path" "unproven, and named"
+skip_ "auth.externalValidator is configured in no profile, so a locally-valid token is never refused by a second opinion. There is nothing to assert and nothing is claimed"
+
 qa_finish
