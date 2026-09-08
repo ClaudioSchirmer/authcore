@@ -49,6 +49,64 @@ per entity in [`specs/omnicore-gen/lock.json`](specs/omnicore-gen/lock.json) —
 
 Files named `*_manual.go` are hand-written and the generator never touches them again.
 
+## The infrastructure is configuration: five relational engines, with or without a MongoDB read side
+
+> ### SQLite · PostgreSQL · MySQL · SQL Server · Oracle hold the source of truth — and a MongoDB projection sits in front of it whenever the read side wants one
+>
+> CQRS on every one of them: what moves is where the read side is *backed*, not what the service does.
+>
+> The command/query split is structural in omnicore: the same `QueryHandler`, the same auto query
+> handlers and the same REST/GraphQL/gRPC read surfaces answer on every posture below. What moves is
+> only what sits *under* them — whether a read is composed from the source of truth at read time or
+> served from a Mongo document a CDC pipeline keeps in sync.
+>
+> Most of the choice is **configuration**: the relational engine, whether a Mongo read side exists,
+> whether a broker carries integration events, whether Docker is needed at all — `relational.dialect`,
+> the presence or absence of a `mongo:` block and of a `transport:` block in `microservice.*.yaml`,
+> plus a build tag.
+>
+> **The rest is one declaration per view, and nothing else.** A read model states its own backing:
+> `query.RelationalView("clients", loader)` in
+> [`internal/infra/views/`](internal/infra/views/) becomes a `query.View("clients")` restating the
+> repository's `Schema` and a mandatory `Version`, and the read-side wiring in `internal/web/` names
+> the definition type it is handed. That swap is the whole edit inside `internal/` — the domain, the
+> invariants, the write side, the handlers and the 57 endpoints with their payloads do not move, in
+> either direction. It is also not an edit anyone makes by hand: `/omnicore:configure` moves the view
+> backings as part of the conversion.
+>
+> Three points along that space — authcore sits on the middle one:
+>
+> | Posture | What declares it | What it gives |
+> |---|---|---|
+> | **Zero-infra MVP** — read side off the SoR | `dialect: sqlite`, no `mongo:`, no `transport:`, built `CGO_ENABLED=0 go build -tags sqlite` | one pure-Go binary and one `app.db` (or `:memory:`) — no Docker, no container, nothing to operate |
+> | **Relational source of truth** — read side off the SoR, *authcore today* | `dialect: postgres` (or `mysql` · `sqlserver` · `oracle`), no `mongo:`, no `transport:` | reads served straight from the tables: a write is visible to the very next read, no projection lag, nothing to rebuild |
+> | **Distributed read side** — Mongo projection fed by CDC | the same engine **plus** a `mongo:` block, a `transport:` block (`kafka` or `nats`) and the Debezium CDC relay | Mongo-projected views kept in sync from the write side, free-text search, ComposedView / SharedBaseView / Embed read models, integration events published to the mesh |
+>
+> The rows are not variants of the project — they are settings of the same project. The framework's
+> recommended path is the bottom row (SQL → CDC → MongoDB); a relational read side is the deliberate
+> exception that trades the projection's vocabulary for read-your-writes freshness and no
+> infrastructure to operate. Going down **expands** what the service can answer, going up
+> **contracts** it — and neither direction is a lock-in, nor loses a line of application code.
+
+**Today authcore runs the middle row:** PostgreSQL 17 as the single source of truth, views composed
+at read time, no Mongo and no broker — see [Architecture posture](#architecture-posture) for exactly
+what that buys and what it costs.
+
+**Switching rows is a plugin run, not a refactor.** The conversion is performed by
+[omnicore-plugin](https://github.com/ClaudioSchirmer/omnicore-plugin), which moves the yaml, the
+devops bench and the view backings — and leaves the domain and the write side untouched:
+
+| Skill | Its part in a posture change |
+|---|---|
+| `/omnicore:configure` | the conversion itself — add or remove Mongo + broker + CDC relay + docker bench, swap the relational engine, switch `kafka` ⇄ `nats`. Reversible in either direction, and every run records its plan under `specs/configure/`. |
+| `/omnicore:scaffold-view` · `/omnicore:evolve-view` | the read models Mongo unlocks once it is there — composed, shared-base and embedded views that a relational-only posture cannot serve. |
+| `/omnicore:run` · `/omnicore:qa` | boot the service on the new posture and prove it answers the same contract it answered on the old one. |
+| `/omnicore:doctor` | when a converted bench misbehaves — writes accepted but projections never arriving, relay or broker trouble. |
+
+Two honest constraints on the move: migrations are written per dialect (this repository ships
+`migrations/postgres/` only, so another engine needs its own set), and Mongo projections require an
+engine Debezium can tail — SQLite is the single-node MVP floor, not a CDC source.
+
 ## Technologies
 
 | Layer | Choice |
