@@ -1,11 +1,11 @@
-# QA report — authcore · tenant + permission + role + group + user + client contracts
+# QA report — authcore · the seven entity contracts (tenant, permission, role, group, user, client, claim)
 
-- **run:** `20260908-113123-17151` · 2026-09-08 11:32:30 EDT
-- **plans:** specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md
+- **run:** `20260908-121820-99193` · 2026-09-08 12:19:36 EDT
+- **plans:** specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md · specs/qa/claim-contract/plan.md
 - **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags 'postgres'` (no transport tag — the yaml declares no `transport:` block)
 - **omnicore pin:** `v0.74.0`
 - **hygiene:** throwaway database `authcore_qa`, dropped and recreated before this run
-- **lanes:** 15 declared, 15 selected
+- **lanes:** 17 declared, 17 selected
 
 | Suite | Pass | Fail | Skip | Verdict | Time |
 |---|---:|---:|---:|---|---:|
@@ -14,16 +14,18 @@
 | permission | 131 | 0 | 0 | ✅ GREEN | 2s |
 | permission_graphql | 37 | 0 | 0 | ✅ GREEN | 1s |
 | role | 208 | 0 | 4 | ✅ GREEN | 4s |
-| role_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
+| role_graphql | 44 | 0 | 0 | ✅ GREEN | 0s |
 | group | 214 | 0 | 4 | ✅ GREEN | 4s |
 | group_graphql | 51 | 0 | 0 | ✅ GREEN | 1s |
-| user | 152 | 0 | 0 | ✅ GREEN | 4s |
-| user_graphql | 46 | 0 | 0 | ✅ GREEN | 2s |
+| user | 152 | 0 | 0 | ✅ GREEN | 5s |
+| user_graphql | 46 | 0 | 0 | ✅ GREEN | 1s |
 | client | 139 | 0 | 0 | ✅ GREEN | 3s |
 | client_graphql | 44 | 0 | 0 | ✅ GREEN | 1s |
-| domain | 386 | 0 | 7 | ✅ GREEN | 26s |
-| security | 290 | 0 | 9 | ✅ GREEN | 7s |
-| audit | 78 | 0 | 0 | ✅ GREEN | 4s |
+| claim | 99 | 0 | 4 | ✅ GREEN | 2s |
+| claim_graphql | 43 | 0 | 0 | ✅ GREEN | 1s |
+| domain | 447 | 0 | 8 | ✅ GREEN | 30s |
+| security | 329 | 0 | 13 | ✅ GREEN | 8s |
+| audit | 87 | 0 | 0 | ✅ GREEN | 5s |
 
 ## Skipped — coverage this run did NOT prove
 
@@ -59,6 +61,21 @@ A security or domain family that never executed is the one place where "no failu
   Group's absent mode (unarchive) has no route at all, so it lands on the 404 arm (K10.1); its absent verb (DELETE) has a registered path, so it lands on 405 (K10.2). No …NotAllowedNotification is reachable on this entity
 
 
+### lane: claim
+
+- **W4.4 the mode-missing-but-mounted 403 is N/A on this entity**
+  Modes() is exactly display/insert/update/archive — the four verbs mounted — so no route can reach a mode the aggregate refuses. The 403 shape needs a mounted route whose mode is absent, and this service mounts none for Claim
+
+- **W10.2 the wrong-state 409 is N/A on this entity**
+  Claim has no state machine, no transition rule and no wire field carrying a revision a caller could send stale. Every wrong-state attempt is intercepted a layer earlier by the LOAD scope, where it lands as 404 — which W10.3 asserts instead. The same derivation the tenant, permission, role and group rounds each recorded
+
+- **W11.3 no child carries an archive column**
+  Claim has no collection and no sibling (spec.md §3, §4), so the stamp-scoped unarchive family — a child archived on its own before the root, staying archived after it returns — has nothing to run against on this aggregate
+
+- **W13.2 the three immutability rules are UNREACHABLE through every mounted surface**
+  ClaimNameIsImmutableNotification, ClaimTenantIsImmutableNotification and ClaimValueTypeIsImmutableNotification cannot be provoked through any route this service mounts: patchExcludes [Name, ValueType] removes two fields from the PATCH body and assignedFrom: identity-claim keeps TenantID out of every update body, so the door is closed one layer before the rule. They are backstops behind a closed door — the same shape P3e, RL7- and U15.2b record for their own unreachable rules. W13.1b pins what the wire DOES promise
+
+
 ### lane: domain
 
 - **R11 the master tenant carries no archive guard**
@@ -81,6 +98,9 @@ A security or domain family that never executed is the one place where "no failu
 
 - **U15.2b and the User cap is recorded as UNREACHABLE rather than claimed**
   TooManyClaimsForUserNotification cannot be provoked through this API: a user's values must point at definitions in its own tenant, and Claim's catalog budget stops the twentieth-first definition from existing (U15.2). The guard is a backstop behind a boundary the caller meets one level earlier — the same shape P3e, RL7- and GR8-b record for their own unreachable rules. U15.1 proves the passing side at exactly 20
+
+- **CL9.3 CONSEQUENCE, recorded rather than filed as a defect**
+  Mounted this way, a defaultValue once set cannot be withdrawn by any route: PATCH cannot express null and no PUT is mounted. Removing it means archiving the definition and recreating it — which CL10 shows costs a new id and an explicit re-set on every edge. Recorded at the maintainer's instruction, 2026-09-08
 
 
 ### lane: security
@@ -112,7 +132,19 @@ A security or domain family that never executed is the one place where "no failu
 - **S8.6b the client token's own contract**
   The claim vocabulary (identity_kind, name, permissions, x_* values reaching the token), the deliberate absence of a lockout on this route, and the absent /refresh companion belong to the token route's own round (plan §0b, maintainer 2026-09-08: exercised, not owned). C-SEC1 proves the one bit this round cannot avoid: a minted secret signs in and its token says client
 
+- **S9.2 Claim declares no identity-derived BuildRules clause**
+  There is no owner-check and no 'unless admin' on this aggregate: a claim definition confers nothing, so there is no escalation surface and spec.md §7 declares no caller-identity fact. The layer that would carry one is empty BY DESIGN. What stands in its place is Layer 3 plus the assignedFrom seat, and S9.3 is where both are proven
+
+- **S9.3e a RESOURCE wildcard does not cross the row scope**
+  authz.bypass is the literal *:*; claim:* is an ordinary permission that opens the four verbs and crosses no tenant. Provoking it needs a principal holding claim:* and nothing else, which no round has provisioned — recorded as UNPROVEN rather than inferred from the yaml
+
+- **S9.3f noIdentity: stand-down is UNPROVABLE in this posture**
+  ctx.Identity() nil is reachable only under auth.mode: disabled, which the framework's own boot guard permits in dev alone — and every profile this suite boots runs jwt. The branch is real (find_claims_by_params_query.go) and it serves EVERY row by design, so a scoped entity is usable on the machine it is first tried on; asserting it would need a third boot on a disabled profile, which this round did not take on
+
+- **S9.4a no field-level read authz exists on this entity**
+  spec.md §9: a definition is vocabulary, not a secret, and defaultValue is the only field carrying a business value at all — any holder of claim:read in the tenant is entitled to it. So no ToCriteria calls Restrict, no FieldAccessForbiddenNotification can be provoked, and the __typename edge of X3 is a parity case rather than a boundary case. S9.4b asserts the posture instead of the absence
+
 
 ---
 
-✅ ALL GREEN — 15/15 suites · 1967 cases · 67s
+✅ ALL GREEN — 17/17 suites · 2218 cases · 76s

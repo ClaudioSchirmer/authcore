@@ -1515,4 +1515,236 @@ skip_ "No profile configures a trusted proxy, so the mint judges the SOCKET addr
 case_ "S8.6b the client token's own contract" "unproven here, and deferred by decision"
 skip_ "The claim vocabulary (identity_kind, name, permissions, x_* values reaching the token), the deliberate absence of a lockout on this route, and the absent /refresh companion belong to the token route's own round (plan §0b, maintainer 2026-09-08: exercised, not owned). C-SEC1 proves the one bit this round cannot avoid: a minted secret signs in and its token says client"
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#
+#  S9 — §3 of specs/qa/claim-contract/plan.md. The Claim gate.
+#
+#  Four literals over five routes and five GraphQL fields — the NARROWEST vocabulary of the
+#  seven entities, and the reason is a decision rather than an omission: Role, Group, User
+#  and Client each carry a :grant because they have a collection whose contents change what
+#  a principal can DO. A claim definition confers nothing, so a claim:grant would gate
+#  nothing (spec.md §10).
+#
+#  What this block is really for is LAYER 3. `TenantID` is server-assigned from the caller's
+#  claim with bypassMaySet, which means the mapper applies a stated value WHOEVER sent it —
+#  so the guard, and not the read filter, is the whole of what stands between a caller and
+#  another tenant's vocabulary. S9.3c is that assertion.
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+S9_DEAD="01990000-dead-7000-8000-000000000000"
+
+# ── S9.1 Layer 1 on REST: the negative, over all five routes ──────────────────────────────
+s9_denied() { s5_denied "$@"; }
+
+s9_denied "S9.1a principal B on the claim LISTING" GET   "/claims"                  ""                                                                                                                              "claim:read"
+s9_denied "S9.1b principal B on the by-id read"    GET   "/claims/$S9_DEAD"         ""                                                                                                                              "claim:read"
+s9_denied "S9.1c principal B on insert"            POST  "/claims"                  '{"name":"x_denied_probe","valueType":"string","appliesTo":"both","description":"A definition principal B must never get to land anywhere."}' "claim:insert"
+s9_denied "S9.1d principal B on patch"             PATCH "/claims/$S9_DEAD"         '{"description":"A correction principal B must never get to land."}'                                                             "claim:update"
+s9_denied "S9.1e principal B on archive"           PATCH "/claims/$S9_DEAD/archive" ""                                                                                                                              "claim:archive"
+
+case_ "S9.1f THE COUNT: four distinct literals gate five routes" "claim:read (twice), insert, update, archive — and NO fifth verb. A route that lost its RequirePermission would answer something other than 403 above, and a write that borrowed the read literal would show up here"
+GATED=$(printf '%s\n' "claim:read" "claim:read" "claim:insert" "claim:update" "claim:archive" | sort -u | wc -l | tr -d ' ')
+if [ "$GATED" = "4" ]; then pass_; else fail_ "distinct literals asserted above = $GATED"; fi
+
+# ── S9.1g-l the complement: a gate that refuses everyone is also broken ────────────────────
+#
+# For the writes aimed at $S9_DEAD the id addresses nothing ON PURPOSE: reaching the HANDLER
+# — a 404, never a 403 — is what proves the gate opened rather than that the write was valid.
+
+if [ -z "${QA_TOKEN_CLAIMOP:-}" ] || [ -z "${QA_TENANT_SCOPED:-}" ]; then
+  skip_ "S9.1g-l — principal M was not built, so the Layer-1 complement is UNPROVEN this run and only the negative half above stands"
+else
+  case_ "S9.1g principal M on the claim LISTING" "200 — it holds claim:read"
+  api GET "/claims?first=1" "" "$QA_TOKEN_CLAIMOP"
+  assert_status 200
+
+  case_ "S9.1h principal M on insert" "201 — it holds claim:insert, and the definition lands in ITS OWN tenant with no tenantID sent at all"
+  api POST /claims "$(jq -nc --arg n "$(claim_name s9m)" '{name:$n, valueType:"string", appliesTo:"both", description:"A definition created by the claim operator inside the tenant its own token names."}')" "$QA_TOKEN_CLAIMOP"
+  S9_OWN=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+  assert_status 201
+
+  case_ "S9.1h2 ...and the server assigned the tenant from the CALLER'S CLAIM" "the tenantID of principal M's own token — assignedFrom: identity-claim, absent meaning 'mine'"
+  assert_json '.data.tenantID' "$(jwt_claim "$QA_TOKEN_CLAIMOP" tenant_id)"
+
+  case_ "S9.1i principal M on patch" "200 — it holds claim:update"
+  if [ -n "${S9_OWN:-}" ]; then
+    api PATCH "/claims/$S9_OWN" '{"description":"A correction by the operator principal, proving the gate opens for the verb it holds."}' "$QA_TOKEN_CLAIMOP"
+    assert_status 200
+  else skip_ "S9.1i — the target could not be created"; fi
+
+  case_ "S9.1j principal M on archive" "204 — it holds claim:archive"
+  if [ -n "${S9_OWN:-}" ]; then
+    api PATCH "/claims/$S9_OWN/archive" "" "$QA_TOKEN_CLAIMOP"
+    assert_empty_body 204
+  else skip_ "S9.1j — the target could not be created"; fi
+fi
+
+# ── S9.1m-q the SPLIT: principal N holds claim:read and nothing else ───────────────────────
+#
+# N is the only caller for which the four-way split is visible. B is refused everywhere and
+# M is admitted everywhere; a write route mounted under the READ literal would be invisible
+# to both and caught only here.
+
+if [ -z "${QA_TOKEN_CLAIMLIM:-}" ]; then
+  skip_ "S9.1m-q — principal N was not built, so the read/write split of the claim vocabulary is UNPROVEN this run"
+else
+  case_ "S9.1m principal N on the LISTING" "200 — it holds claim:read"
+  api GET "/claims?first=1" "" "$QA_TOKEN_CLAIMLIM"
+  assert_status 200
+
+  case_ "S9.1n principal N on the by-id read" "404 and NOT 403 — the gate opened and the handler was reached; the id addresses nothing on purpose"
+  api GET "/claims/$S9_DEAD" "" "$QA_TOKEN_CLAIMLIM"
+  assert_status 404
+
+  case_ "S9.1o principal N on insert" "403 claim:insert — reading a vocabulary is not writing one"
+  api POST /claims "$(jq -nc --arg n "$(claim_name s9n)" '{name:$n, valueType:"string", appliesTo:"both", description:"A definition the read-only principal must never get to land."}')" "$QA_TOKEN_CLAIMLIM"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "S9.1p principal N on patch" "403 claim:update"
+  api PATCH "/claims/$S9_DEAD" '{"description":"A correction the read-only principal must never get to land."}' "$QA_TOKEN_CLAIMLIM"
+  assert_rest 403 MissingPermissionNotification
+
+  case_ "S9.1q principal N on archive" "403 claim:archive"
+  api PATCH "/claims/$S9_DEAD/archive" "" "$QA_TOKEN_CLAIMLIM"
+  assert_rest 403 MissingPermissionNotification
+fi
+
+# ── S9.1r-v PER SURFACE, not by analogy: a route gated on REST is not thereby gated on GraphQL
+
+case_ "S9.1r principal B on the claims connection" "403 MissingPermissionNotification in extensions"
+gql 'query { claims(first: 1) { totalCount } }' '{}' "$QA_TOKEN_LIMITED"
+assert_gql MissingPermissionNotification
+
+case_ "S9.1s principal B on the singular claim field" "403 — the two read fields are gated separately, and both must be"
+gql "query { claim(id: \"$S9_DEAD\") { id } }" '{}' "$QA_TOKEN_LIMITED"
+assert_gql MissingPermissionNotification
+
+case_ "S9.1t principal B on createClaim" "403 — the mutation carries its own literal on this surface"
+gql 'mutation($i: CreateClaimInput!) { createClaim(input: $i) { id } }' \
+    '{"i":{"name":"x_denied_probe_gql","valueType":"string","appliesTo":"both","description":"A definition principal B must never get to land through the other surface either."}}' \
+    "$QA_TOKEN_LIMITED"
+assert_gql MissingPermissionNotification
+
+case_ "S9.1u principal B on patchClaim" "403"
+gql "mutation(\$i: PatchClaimInput!) { patchClaim(id: \"$S9_DEAD\", input: \$i) { id } }" \
+    '{"i":{"description":"A correction principal B must never get to land through the other surface either."}}' \
+    "$QA_TOKEN_LIMITED"
+assert_gql MissingPermissionNotification
+
+case_ "S9.1v principal B on archiveClaim" "403 — five REST routes, five GraphQL fields, one vocabulary"
+gql "mutation { archiveClaim(id: \"$S9_DEAD\") { success } }" '{}' "$QA_TOKEN_LIMITED"
+assert_gql MissingPermissionNotification
+
+# ── S9.2 Layer 2 — none, and the reason is worth writing down ──────────────────────────────
+
+case_ "S9.2 Claim declares no identity-derived BuildRules clause" "named, not asserted"
+skip_ "There is no owner-check and no 'unless admin' on this aggregate: a claim definition confers nothing, so there is no escalation surface and spec.md §7 declares no caller-identity fact. The layer that would carry one is empty BY DESIGN. What stands in its place is Layer 3 plus the assignedFrom seat, and S9.3 is where both are proven"
+
+# ── S9.3 Layer 3 — tenant scoping, on reads AND writes ─────────────────────────────────────
+
+if [ -z "${QA_TOKEN_CLAIMOP:-}" ]; then
+  skip_ "S9.3 — principal M was not built, so the whole row-scope family is UNPROVEN this run"
+else
+  TEN_S9F=$(new_tenant active "$(ws s9f)") || exit 1
+  C_S9F=$(new_claim "$(claim_name s9f)" string both "$TEN_S9F") || exit 1
+  M_TENANT=$(jwt_claim "$QA_TOKEN_CLAIMOP" tenant_id)
+
+  # M's own tenant must hold at least one ACTIVE definition for the rows below to mean
+  # anything: an EMPTY page is exactly the answer a broken scope could hide behind, so a
+  # listing that is empty for want of data proves nothing about isolation. S9.1h's definition
+  # was archived by S9.1j, so this one is created here and left live.
+  C_S9OWN=$(new_claim "$(claim_name s9own)" string both "$M_TENANT") || exit 1
+
+  case_ "S9.3a a foreign tenant's definition is ABSENT from M's listing" "0 rows carrying the foreign id — an isolation leak is a 200, which is exactly why it needs its own case"
+  api GET "/claims?first=100" "" "$QA_TOKEN_CLAIMOP"
+  assert_json '[.data[]? | select(.id=="'"$C_S9F"'")] | length' "0"
+
+  case_ "S9.3a1 M's own tenant DOES hold a visible definition" "at least one row — without this, every assertion below would pass against an empty page for the wrong reason"
+  assert_json_at 200 '[.data[]? | select(.id=="'"$C_S9OWN"'")] | length' "1"
+
+  case_ "S9.3a2 ...and every row M CAN see belongs to M's own tenant" "one tenantID, and it is the caller's"
+  assert_json '[.data[]?.tenantID] | unique | join(",")' "$M_TENANT"
+
+  case_ "S9.3b a by-id read of a foreign definition answers 404, not 403" "it does not exist for this caller, which leaks nothing about who else exists (spec.md §10)"
+  api GET "/claims/$C_S9F" "" "$QA_TOKEN_CLAIMOP"
+  assert_status 404
+
+  case_ "S9.3b2 the FORCED filter overwrites rather than merges" "M asking for the foreign tenant explicitly gets its OWN rows — never the foreign ones, and never an empty page, which is how a merge would masquerade as a scope"
+  api GET "/claims?tenantID.eq=$TEN_S9F&first=100" "" "$QA_TOKEN_CLAIMOP"
+  assert_json '[.data[]?.tenantID] | unique | join(",")' "$M_TENANT"
+
+  case_ "S9.3c a cross-tenant WRITE is refused by the GUARD, not by the read filter" "403 TenantMismatchNotification — bypassMaySet means the mapper APPLIES a stated value whoever sent it, so this refusal is the only thing standing between M and another tenant's vocabulary"
+  api POST /claims "$(jq -nc --arg n "$(claim_name s9c)" --arg t "$TEN_S9F" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition aimed at a tenant the caller has no business writing to."}')" "$QA_TOKEN_CLAIMOP"
+  assert_rest 403 TenantMismatchNotification
+
+  case_ "S9.3c2 ...and nothing was written under that name in the foreign tenant" "0 rows — the guard refused before the row, not after it"
+  GOT=$(sql "SELECT count(*) FROM claims WHERE tenant_id='$TEN_S9F' AND description LIKE '%no business writing to%';" | tr -d '[:space:]')
+  if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows found: $GOT"; fail_ "a cross-tenant write reached the table"; fi
+
+  case_ "S9.3d the *:* bypass crosses the row scope" "200 — the bootstrap admin reads the foreign definition the operator cannot see, which is the operator-supporting-a-customer case the wildcard exists for"
+  api GET "/claims/$C_S9F"
+  assert_json_at 200 '.data.id' "$C_S9F"
+
+  case_ "S9.3d2 ...and it may CREATE inside another tenant, which is what bypassMaySet buys" "201 with the stated tenantID applied"
+  api POST /claims "$(jq -nc --arg n "$(claim_name s9d)" --arg t "$TEN_S9F" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition the platform operator created inside a customer tenant while supporting it."}')"
+  assert_json_at 201 '.data.tenantID' "$TEN_S9F"
+
+  case_ "S9.3e a RESOURCE wildcard does not cross the row scope" "named, not asserted"
+  skip_ "authz.bypass is the literal *:*; claim:* is an ordinary permission that opens the four verbs and crosses no tenant. Provoking it needs a principal holding claim:* and nothing else, which no round has provisioned — recorded as UNPROVEN rather than inferred from the yaml"
+fi
+
+case_ "S9.3f noIdentity: stand-down is UNPROVABLE in this posture" "named, not asserted"
+skip_ "ctx.Identity() nil is reachable only under auth.mode: disabled, which the framework's own boot guard permits in dev alone — and every profile this suite boots runs jwt. The branch is real (find_claims_by_params_query.go) and it serves EVERY row by design, so a scoped entity is usable on the machine it is first tried on; asserting it would need a third boot on a disabled profile, which this round did not take on"
+
+# ── S9.4 Restrict: none, and the posture that replaces it ──────────────────────────────────
+
+case_ "S9.4a no field-level read authz exists on this entity" "named, and then asserted from the weakest caller"
+skip_ "spec.md §9: a definition is vocabulary, not a secret, and defaultValue is the only field carrying a business value at all — any holder of claim:read in the tenant is entitled to it. So no ToCriteria calls Restrict, no FieldAccessForbiddenNotification can be provoked, and the __typename edge of X3 is a parity case rather than a boundary case. S9.4b asserts the posture instead of the absence"
+
+if [ -z "${QA_TOKEN_CLAIMLIM:-}" ]; then
+  skip_ "S9.4b — principal N was not built, so the full-document posture is UNPROVEN this run"
+else
+  case_ "S9.4b the WEAKEST caller that may read at all gets the FULL thirteen-field document" "every key present for principal N — nothing is scrubbed, because nothing here is secret"
+  api POST /claims "$(jq -nc --arg n "$(claim_name s94)" '{name:$n, valueType:"string", appliesTo:"both", defaultValue:"visible-to-any-reader", description:"A definition whose every field a claim:read holder is entitled to see."}')" "${QA_TOKEN_CLAIMOP:-}"
+  S9_FULL=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id // empty')
+  if [ -z "$S9_FULL" ]; then
+    skip_ "S9.4b — the target definition could not be created by principal M"
+  else
+    api GET "/claims/$S9_FULL" "" "$QA_TOKEN_CLAIMLIM"
+    assert_json '[.data | has("id"), has("tenantID"), has("name"), has("valueType"), has("appliesTo"), has("defaultValue"), has("description"), has("createdAt"), has("updatedAt"), has("archivedAt"), has("tenantWorkspace"), has("tenantStatus"), has("tenantArchivedAt")] | all' "true"
+
+    case_ "S9.4b2 ...including defaultValue, the only field carrying a business value" "the value as stored — scrubbing it would be the field-level authz this entity deliberately does not have"
+    assert_json '.data.defaultValue' "visible-to-any-reader"
+  fi
+fi
+
+# ── S9.5 the tokenless direction, applied to this entity's own paths ───────────────────────
+#
+# The second direction of the public-route split: not merely that every DECLARED public
+# route answers tokenless, but that a route which is NOT declared answers 401. This is the
+# direction that catches a publicRoutes entry widened past its intent.
+
+s9_tokenless() { # s9_tokenless CASE METHOD PATH [BODY]
+  case_ "$1" "401 — none of the five claim routes is in publicRoutes, and matching is exact METHOD /path"
+  api "$2" "$3" "${4:-}" "-"
+  assert_status 401
+}
+
+s9_tokenless "S9.5a GET /claims tokenless"                  GET   "/claims"
+s9_tokenless "S9.5b GET /claims/{id} tokenless"             GET   "/claims/$S9_DEAD"
+s9_tokenless "S9.5c POST /claims tokenless"                 POST  "/claims"                  '{"name":"x_tokenless_probe","valueType":"string","appliesTo":"both","description":"A definition offered with no bearer at all."}'
+s9_tokenless "S9.5d PATCH /claims/{id} tokenless"           PATCH "/claims/$S9_DEAD"         '{"description":"A correction offered with no bearer at all."}'
+s9_tokenless "S9.5e PATCH /claims/{id}/archive tokenless"   PATCH "/claims/$S9_DEAD/archive"
+
+case_ "S9.5f the GraphQL twins are behind the same bearer" "401 — a surface is not public because the other one is not"
+gql 'query { claims(first: 1) { totalCount } }' '{}' "-"
+if [ "$HTTP_STATUS" = "401" ]; then pass_; else fail_ "HTTP $HTTP_STATUS"; fi
+
+case_ "S9.5g a sibling path sharing the prefix is not covered by anything" "401 — publicRoutes matching is exact, so no entry can spill onto a neighbour"
+api GET "/claims/$S9_DEAD/archive" "" "-"
+if [ "$HTTP_STATUS" = "401" ] || [ "$HTTP_STATUS" = "404" ] || [ "$HTTP_STATUS" = "405" ]; then pass_; else fail_ "HTTP $HTTP_STATUS — a tokenless caller reached something"; fi
+
+
 qa_finish

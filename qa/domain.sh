@@ -2799,4 +2799,402 @@ api PATCH "/clients/$ID_C4/archive"
 GOT=$(sql "SELECT status FROM clients WHERE id='$ID_C4';" | tr -d '[:space:]')
 if [ "$GOT" = "suspended" ]; then pass_; else HTTP_BODY="stored status = '$GOT'"; fail_ "the mutation did not reach the row"; fi
 
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+#
+#   C L A I M  —  §1b of specs/qa/claim-contract/plan.md
+#
+#   The seventh and last entity round. Three of its rows exist nowhere else in this suite:
+#   the only value object that owns a RESERVED PREFIX, the only rule that reads ANOTHER
+#   field to validate a value, and the only guard whose question is asked of two OTHER
+#   aggregates. Ranked by the cost the maintainer named on 2026-09-08.
+#
+# ═════════════════════════════════════════════════════════════════════════════════════════
+
+TEN_CL=$(new_tenant active "$(ws cl)")   || exit 1
+TEN_CLB=$(new_tenant active "$(ws clb)") || exit 1
+
+# ── CL1 [CRITICAL] — "The prefix is CALLER-OWNED: one string on the wire, in the column and
+#    in the token. Nothing is prepended and nothing is stripped; a name without it is
+#    refused." source: spec.md §2, both model-gate answers (2026-08-28) · vos/claim_name.go
+#    The four negative families: maintainer, asked 2026-09-08.
+
+case_ "CL1+ a well-formed prefixed name is stored VERBATIM" "201 and the exact string back — prefix included, nothing normalised"
+N_CL1=$(claim_name cl1)
+api POST /claims "$(jq -nc --arg n "$N_CL1" --arg t "$TEN_CL" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"The definition whose name proves the caller owns the reserved prefix."}')"
+assert_json_at 201 '.data.name' "$N_CL1"
+
+case_ "CL1+b a name at the EXACT four-rune floor" "201 — x_ab is the shortest legal name; the floor admits rather than refusing by one"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_ab", valueType:"string", appliesTo:"both", tenantID:$t, description:"The shortest name the value object accepts, two runes of prefix and two of remainder."}')"
+assert_status 201
+
+case_ "CL1a- a name with NO prefix" "422 InvalidClaimNameNotification — the row the whole caller-owned decision rests on: nothing prepends x_, so a bare name simply cannot enter the catalog"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"cost_center", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition whose name the server would have to repair to accept."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1a-b ...and the platform's own claim names are unwritable by the same rule" "422 — identity_kind carries no prefix, so the nine the platform mints can never be shadowed through this API (spec.md §0)"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"identity_kind", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition trying to take a name the platform itself mints into every token."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1b- the DOUBLE prefix" "422 — well-formed under the shape alone, and closed explicitly: it is the paste error a caller-owned prefix makes possible"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_x_cost_center", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition whose remainder begins with the prefix all over again."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1c- an uppercase name" "422 — NOTHING IS NORMALISED: the value is immutable, so a caller who believes they registered one string has no second chance"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_Cost_Center", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition the server must refuse rather than quietly lowercase."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1c-b a hyphen where snake_case is required" "422 — the remainder pattern is ^[a-z0-9]+(_[a-z0-9]+)*$, and a hyphen is not a separator it knows"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_cost-center", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition spelled in kebab-case, which no claim in buildClaims ever is."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1d- three runes, one below the floor" "422 — the remainder must carry at least two runes of its own"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_a", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition whose remainder is a single rune."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1d-b a remainder built from ONE distinct rune" "422 — the shared anti-junk floor: a typed name carries at least two different runes"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_aa", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition whose remainder repeats one rune and nothing else."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL1d-c a run of four identical runes" "422 — the predicate that separates a typed name from a mashed keyboard"
+api POST /claims "$(jq -nc --arg t "$TEN_CL" '{name:"x_aaaa", valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition whose remainder is one rune held down."}')"
+assert_rest 422 InvalidClaimNameNotification
+
+case_ "CL2 after every refusal above, NOTHING was written under any casing" "0 rows — the server refused; it did not quietly repair and store"
+GOT=$(sql "SELECT count(*) FROM claims WHERE lower(name) IN ('cost_center','x_x_cost_center','x_cost_center','x_cost-center','identity_kind','x_a','x_aa','x_aaaa') AND tenant_id='$TEN_CL';" | tr -d '[:space:]')
+if [ "$GOT" = "0" ]; then pass_; else HTTP_BODY="rows found: $GOT"; fail_ "a refused name reached the table"; fi
+
+# ── CL3 [CRITICAL] — "The default must parse as the declared type: number → a valid decimal
+#    number; bool → exactly true or false; string → any non-empty value. A null default is
+#    always valid and skips the check." source: rules.manual default-value-matches-value-type
+#    Full matrix incl. the PATCH path: maintainer, asked 2026-09-08.
+
+case_ "CL3.1 number accepts a whole number and a negative decimal" "201 each"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl31a)" --arg t "$TEN_CL" '{name:$n, valueType:"number", appliesTo:"both", tenantID:$t, defaultValue:"1000", description:"A numeric definition whose default is an ordinary whole number."}')"
+S_A="$HTTP_STATUS"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl31b)" --arg t "$TEN_CL" '{name:$n, valueType:"number", appliesTo:"both", tenantID:$t, defaultValue:"-2.5", description:"A numeric definition whose default is a negative decimal."}')"
+if [ "$S_A" = "201" ] && [ "$HTTP_STATUS" = "201" ]; then pass_; else fail_ "whole=$S_A decimal=$HTTP_STATUS"; fi
+
+case_ "CL3.2 number refuses a value that is not a number" "422 DefaultValueDoesNotMatchValueTypeNotification"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl32)" --arg t "$TEN_CL" '{name:$n, valueType:"number", appliesTo:"both", tenantID:$t, defaultValue:"abc", description:"A numeric definition whose default is a word."}')"
+assert_rest 422 DefaultValueDoesNotMatchValueTypeNotification
+
+case_ "CL3.3 number refuses NaN and Inf" "422 each — ParseFloat ACCEPTS both, and the rule closes them explicitly. A claim value has to be a number a consumer can compute with"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl33a)" --arg t "$TEN_CL" '{name:$n, valueType:"number", appliesTo:"both", tenantID:$t, defaultValue:"NaN", description:"A numeric definition whose default is not a number at all."}')"
+S_A="$HTTP_STATUS"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl33b)" --arg t "$TEN_CL" '{name:$n, valueType:"number", appliesTo:"both", tenantID:$t, defaultValue:"Inf", description:"A numeric definition whose default is unbounded."}')"
+if [ "$S_A" = "422" ] && [ "$HTTP_STATUS" = "422" ]; then pass_; else fail_ "NaN=$S_A Inf=$HTTP_STATUS"; fi
+
+case_ "CL3.4 bool accepts exactly true and false" "201 each"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl34a)" --arg t "$TEN_CL" '{name:$n, valueType:"bool", appliesTo:"both", tenantID:$t, defaultValue:"true", description:"A boolean definition defaulting to the affirmative."}')"
+S_A="$HTTP_STATUS"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl34b)" --arg t "$TEN_CL" '{name:$n, valueType:"bool", appliesTo:"both", tenantID:$t, defaultValue:"false", description:"A boolean definition defaulting to the negative."}')"
+if [ "$S_A" = "201" ] && [ "$HTTP_STATUS" = "201" ]; then pass_; else fail_ "true=$S_A false=$HTTP_STATUS"; fi
+
+case_ "CL3.5 bool refuses TRUE and 1" "422 each — the comparison is neither case-insensitive nor numeric, and a token consumer branching on the string would see the difference"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl35a)" --arg t "$TEN_CL" '{name:$n, valueType:"bool", appliesTo:"both", tenantID:$t, defaultValue:"TRUE", description:"A boolean definition whose default is shouted."}')"
+S_A="$HTTP_STATUS"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl35b)" --arg t "$TEN_CL" '{name:$n, valueType:"bool", appliesTo:"both", tenantID:$t, defaultValue:"1", description:"A boolean definition whose default is the integer a C programmer would write for true."}')"
+if [ "$S_A" = "422" ] && [ "$HTTP_STATUS" = "422" ]; then pass_; else fail_ "TRUE=$S_A 1=$HTTP_STATUS"; fi
+
+case_ "CL3.6 string accepts any non-empty value" "201"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl36)" --arg t "$TEN_CL" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, defaultValue:"sao-paulo", description:"A textual definition whose default is an ordinary word."}')"
+assert_status 201
+
+case_ "CL3.7 a NULL default is always valid, whatever the type" "201 on all three — 'no default' is a legitimate state and level 2 of the chain simply does not fire"
+S_ALL=""
+for vt in string number bool; do
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl37$vt)" --arg t "$TEN_CL" --arg v "$vt" '{name:$n, valueType:$v, appliesTo:"both", tenantID:$t, description:"A definition that deliberately declares no default at all, so the resolution chain stops one level short."}')"
+  S_ALL="$S_ALL$HTTP_STATUS "
+done
+if [ "$S_ALL" = "201 201 201 " ]; then pass_; else fail_ "statuses: $S_ALL"; fi
+
+N_CL38=$(claim_name cl38)
+ID_CL38=$(new_claim "$N_CL38" number both "$TEN_CL" "42") || exit 1
+case_ "CL3.8 a PATCH is revalidated against the type ALREADY STORED" "422 — the rule is insertOrUpdate, and valueType is not in the PATCH body, so the stored value is what it reads"
+api PATCH "/claims/$ID_CL38" '{"defaultValue":"abc"}'
+assert_rest 422 DefaultValueDoesNotMatchValueTypeNotification
+
+case_ "CL3.9 ...and a default that DOES match passes on the same path" "200 — the guard is about the value, not about the verb"
+api PATCH "/claims/$ID_CL38" '{"defaultValue":"99"}'
+assert_json_at 200 '.data.defaultValue' "99"
+
+# ── CL4 — "The claim-size budget, enforced before the column width answers it as a 500."
+#    source: rules.list default-value-length (max 256, skipWhen null)
+
+case_ "CL4.1 a default of exactly 256 runes" "201 — the bound admits its own value"
+D256=$(printf 'a%.0s' $(seq 1 256))
+api POST /claims "$(jq -nc --arg n "$(claim_name cl41)" --arg t "$TEN_CL" --arg d "$D256" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, defaultValue:$d, description:"A definition whose default sits exactly on the header budget."}')"
+assert_status 201
+
+case_ "CL4.2 one rune past it" "422 DefaultValueTooLongNotification — a rule, never a column width surfacing as a 500"
+D257=$(printf 'a%.0s' $(seq 1 257))
+api POST /claims "$(jq -nc --arg n "$(claim_name cl42)" --arg t "$TEN_CL" --arg d "$D257" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, defaultValue:$d, description:"A definition whose default overruns the header budget by one rune."}')"
+assert_rest 422 DefaultValueTooLongNotification
+
+case_ "CL4.3 the length rule stands down on a NULL default" "201 — skipWhen null, so the rule never reads through a nil pointer"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl43)" --arg t "$TEN_CL" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition with no default, which the length rule must not even look at."}')"
+assert_status 201
+
+# ── CL5 — "Unique per tenant over ACTIVE rows, exclude-self on update."
+#    source: spec.md §2 · unique.scope active-only, within [TenantID]
+
+N_CL5=$(claim_name cl5)
+ID_CL5=$(new_claim "$N_CL5" string both "$TEN_CL") || exit 1
+
+case_ "CL5.1 the same name twice in ONE tenant" "409 ClaimNameAlreadyExistsNotification — two definitions of x_region in one tenant is undefined precedence reaching a token"
+api POST /claims "$(jq -nc --arg n "$N_CL5" --arg t "$TEN_CL" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A collider reaching for a name this tenant already uses."}')"
+assert_rest 409 ClaimNameAlreadyExistsNotification
+
+case_ "CL5.2 the same name in ANOTHER tenant" "201 — a token carries exactly one tenant, so two customers both naming a claim x_region is harmless"
+api POST /claims "$(jq -nc --arg n "$N_CL5" --arg t "$TEN_CLB" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"The same vocabulary word, owned by a different customer entirely."}')"
+assert_status 201
+
+case_ "CL5.3 archiving frees the name, and the definition comes back with a NEW id" "201 and a different id — active-only uniqueness is what makes a retired definition re-insertable, which matters precisely because no unarchive is mounted"
+api PATCH "/claims/$ID_CL5/archive"
+api POST /claims "$(jq -nc --arg n "$N_CL5" --arg t "$TEN_CL" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"The definition that came back after its predecessor was retired."}')"
+ID_CL5B=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+if [ "$HTTP_STATUS" = "201" ] && [ -n "$ID_CL5B" ] && [ "$ID_CL5B" != "$ID_CL5" ]; then pass_; else fail_ "HTTP $HTTP_STATUS, old=$ID_CL5 new=$ID_CL5B"; fi
+
+case_ "CL5.4 a PATCH that leaves the name alone is never a self-collision" "200 — excludeSelf, so the row does not report itself as the duplicate"
+api PATCH "/claims/$ID_CL5B" '{"description":"The same definition, described again without touching its name."}'
+assert_status 200
+
+# ── CL6 — "The owning tenant must exist, must not be archived and must not be commercially
+#    suspended. A TRIAL tenant is a live customer and passes." source: rules.manual
+#    tenant-must-exist, scope [insert] · claim_rules_manual.go (the fail-closed gate order)
+#    Three refusals + trial + the insert-only positive: maintainer, asked 2026-09-08.
+
+case_ "CL6.1 a tenant id nobody owns" "422 ClaimTenantDoesNotExistNotification"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl61)" '{name:$n, valueType:"string", appliesTo:"both", tenantID:"01990000-dead-7000-8000-000000000000", description:"A definition offered to a tenant that was never created."}')"
+assert_rest 422 ClaimTenantDoesNotExistNotification
+
+TEN_CL_ARC=$(new_tenant active "$(ws clarc)") || exit 1
+api PATCH "/tenants/$TEN_CL_ARC/archive"
+case_ "CL6.2 an ARCHIVED tenant" "422 same key — a retired customer takes no new vocabulary"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl62)" --arg t "$TEN_CL_ARC" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition offered to a customer that has been retired."}')"
+assert_rest 422 ClaimTenantDoesNotExistNotification
+
+TEN_CL_SUS=$(new_tenant suspended "$(ws clsus)") || exit 1
+case_ "CL6.3 a SUSPENDED tenant" "422 same key — commercial suspension stops new vocabulary, which is the point of suspending"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl63)" --arg t "$TEN_CL_SUS" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition offered to a customer whose account is on hold."}')"
+assert_rest 422 ClaimTenantDoesNotExistNotification
+
+TEN_CL_TRI=$(new_tenant trial "$(ws cltri)") || exit 1
+case_ "CL6.4 a TRIAL tenant" "201 — a trial tenant is a live customer, and the rule that lumped it in with suspended would be wrong in the direction that costs a sale"
+api POST /claims "$(jq -nc --arg n "$(claim_name cl64)" --arg t "$TEN_CL_TRI" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition created while the customer is still evaluating the product."}')"
+assert_status 201
+
+TEN_CL_LATER=$(new_tenant active "$(ws cllat)") || exit 1
+ID_CL65=$(new_claim "$(claim_name cl65)" string both "$TEN_CL_LATER") || exit 1
+api PATCH "/tenants/$TEN_CL_LATER" '{"status":"suspended"}'
+case_ "CL6.5 a definition whose tenant is suspended AFTERWARDS is still editable" "200 — the rule is INSERT-only by decision: a suspension must never make an existing definition impossible to correct"
+api PATCH "/claims/$ID_CL65" '{"description":"A description corrected after the customer went on hold, which must still be possible."}'
+assert_status 200
+
+# ── CL7 [CRITICAL] — "Refuse a change to AppliesTo that would stop admitting an identity
+#    kind for which an ACTIVE edge still holds a value. Ask only about the kinds the NEW
+#    value DROPS." source: rules.manual applies-to-narrowing-refused · the only guard in
+#    this service whose question is asked of two OTHER aggregates.
+#    All six transitions, with and without a held value: maintainer, asked 2026-09-08.
+
+TEN_CL7=$(new_tenant active "$(ws cl7)") || exit 1
+U_CL7=$(new_user "$(user_email cl7)" "$TEN_CL7") || exit 1
+new_client "$(client_label cl7)" "$TEN_CL7" || exit 1
+C_CL7="$CLIENT_ID"
+
+# held_by_user DEF_ID / held_by_client DEF_ID — one edge each, on the fixtures above.
+held_by_user()   { set_claim "$U_CL7" "$1" "held-by-a-user" >/dev/null; }
+held_by_client() { set_client_claim "$C_CL7" "$1" "held-by-a-machine" >/dev/null; }
+
+narrow() { api PATCH "/claims/$1" "$(jq -nc --arg a "$2" '{appliesTo:$a}')"; }
+
+D71=$(new_claim "$(claim_name cl71)" string both "$TEN_CL7") || exit 1
+held_by_client "$D71"
+case_ "CL7.1 both→user while a MACHINE still holds a value" "422 ClaimAppliesToCannotExcludeHeldValuesNotification — the dropped kind is client, and a client holds one"
+narrow "$D71" user; assert_rest 422 ClaimAppliesToCannotExcludeHeldValuesNotification
+
+D72=$(new_claim "$(claim_name cl72)" string both "$TEN_CL7") || exit 1
+case_ "CL7.2 both→user with nothing held" "200 — a definition nobody holds narrows freely, and it has to: refusing every narrowing would make the field immutable, which the model gate decided the other way"
+narrow "$D72" user; assert_status 200
+
+D73=$(new_claim "$(claim_name cl73)" string both "$TEN_CL7") || exit 1
+held_by_user "$D73"
+case_ "CL7.3 both→client while a USER still holds a value" "422 — the mirror of CL7.1, on the other edge table"
+narrow "$D73" client; assert_rest 422 ClaimAppliesToCannotExcludeHeldValuesNotification
+
+D74=$(new_claim "$(claim_name cl74)" string both "$TEN_CL7") || exit 1
+case_ "CL7.4 both→client with nothing held" "200"
+narrow "$D74" client; assert_status 200
+
+D75=$(new_claim "$(claim_name cl75)" string user "$TEN_CL7") || exit 1
+held_by_user "$D75"
+case_ "CL7.5 user→client while a USER holds a value" "422 — a swap is a narrowing too: the new value drops 'user', and asking only about the DROPPED kind is the whole subtlety of this rule"
+narrow "$D75" client; assert_rest 422 ClaimAppliesToCannotExcludeHeldValuesNotification
+
+D76=$(new_claim "$(claim_name cl76)" string user "$TEN_CL7") || exit 1
+case_ "CL7.6 user→client with nothing held" "200"
+narrow "$D76" client; assert_status 200
+
+D77=$(new_claim "$(claim_name cl77)" string client "$TEN_CL7") || exit 1
+held_by_client "$D77"
+case_ "CL7.7 client→user while a MACHINE holds a value" "422 — the fourth and last narrowing transition"
+narrow "$D77" user; assert_rest 422 ClaimAppliesToCannotExcludeHeldValuesNotification
+
+D78=$(new_claim "$(claim_name cl78)" string client "$TEN_CL7") || exit 1
+case_ "CL7.8 client→user with nothing held" "200"
+narrow "$D78" user; assert_status 200
+
+D79=$(new_claim "$(claim_name cl79)" string user "$TEN_CL7") || exit 1
+held_by_user "$D79"
+case_ "CL7.9 user→both WITH a value held" "200 — a widening drops no kind, so it must ask NOTHING and always pass. This is the ordinary operational move"
+narrow "$D79" both; assert_status 200
+
+D710=$(new_claim "$(claim_name cl710)" string client "$TEN_CL7") || exit 1
+held_by_client "$D710"
+case_ "CL7.10 client→both WITH a value held" "200 — the other widening, equally unconditional"
+narrow "$D710" both; assert_status 200
+
+D711=$(new_claim "$(claim_name cl711)" string both "$TEN_CL7") || exit 1
+CH_711=$(set_client_claim "$C_CL7" "$D711" "removed-later") || exit 1
+api PATCH "/clients/$C_CL7/claims/$CH_711/archive"
+case_ "CL7.11 both→user while the only client value is ARCHIVED" "200 — a value somebody REMOVED must not freeze the definition's shape. The predicate an implementation reading the table without its archive gate would get wrong"
+narrow "$D711" user; assert_status 200
+
+# ── CL8 — "At most 20 ACTIVE definitions per tenant may admit a user, and at most 20 may
+#    admit a client, counted from ONE grouped query. The guard fires only when a write ADDS
+#    the kind." source: rules.manual claims-per-tenant-cap-* · claimsPerTenantCap = 20
+#    Bucket independence + only-when-it-ADDS: maintainer, asked 2026-09-08. The user-side
+#    ceiling itself is already spent by U15.2 and is not repeated here.
+
+TEN_CL8=$(new_tenant active "$(ws cl8)") || exit 1
+CAP_U_OK=1
+for i in $(seq 1 20); do
+  new_claim "$(claim_name cl8u$i)" string user "$TEN_CL8" >/dev/null || { CAP_U_OK=0; break; }
+done
+
+if [ "$CAP_U_OK" = "1" ]; then
+  case_ "CL8.1 the 21st definition admitting a USER" "422 TooManyUserClaimsInTenantNotification — the catalog budget is what makes the token's own truncation unreachable through the API"
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl81)" --arg t "$TEN_CL8" '{name:$n, valueType:"string", appliesTo:"user", tenantID:$t, description:"The twenty-first user-facing definition in one tenant."}')"
+  assert_rest 422 TooManyUserClaimsInTenantNotification
+
+  case_ "CL8.1b ...and the message carries the bound from its tvar" "20 in the rendered text"
+  assert_json '[.errors[].messages[] | select(.notificationKey=="TooManyUserClaimsInTenantNotification") | .message] | join(" ") | test("20") | tostring' "true"
+
+  case_ "CL8.2 a 21st declaring BOTH" "422 TooManyUserClaimsInTenantNotification — 'both' admits users, so it lands in the full bucket"
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl82)" --arg t "$TEN_CL8" '{name:$n, valueType:"string", appliesTo:"both", tenantID:$t, description:"A definition for everyone, offered to a tenant whose user budget is spent."}')"
+  assert_rest 422 TooManyUserClaimsInTenantNotification
+
+  case_ "CL8.3 a 21st admitting ONLY a client" "201 — THE BUCKETS ARE INDEPENDENT: a full user side must never block a definition that admits only machines"
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl83)" --arg t "$TEN_CL8" '{name:$n, valueType:"string", appliesTo:"client", tenantID:$t, description:"A machine-only definition, created while the user budget is full."}')"
+  ID_CL83=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+  assert_status 201
+
+  case_ "CL8.4 at the cap, an edit that adds NO kind" "200 — the guard fires only when a write ADDS a kind, so an ordinary correction must ask nothing at all"
+  api GET "/claims?tenantID.eq=$TEN_CL8&appliesTo.eq=user&first=1"
+  ID_CL84=$(printf '%s' "$HTTP_BODY" | jq -r '.data[0].id')
+  api PATCH "/claims/$ID_CL84" '{"description":"An ordinary correction made while the tenant sits exactly on its user budget."}'
+  assert_status 200
+
+  case_ "CL8.5 at the cap, a WIDENING that adds the full kind" "422 TooManyUserClaimsInTenantNotification — client→both is exactly when the guard must fire, and the only-when-it-ADDS condition is what tells it apart from CL8.4"
+  api PATCH "/claims/$ID_CL83" '{"appliesTo":"both"}'
+  assert_rest 422 TooManyUserClaimsInTenantNotification
+else
+  skip_ "CL8.1-8.5 — the twenty user-side definitions could not be provisioned, so the cap was never reached"
+fi
+
+TEN_CL8B=$(new_tenant active "$(ws cl8b)") || exit 1
+CAP_C_OK=1
+for i in $(seq 1 20); do
+  new_claim "$(claim_name cl8c$i)" string client "$TEN_CL8B" >/dev/null || { CAP_C_OK=0; break; }
+done
+
+if [ "$CAP_C_OK" = "1" ]; then
+  case_ "CL8.6 the 21st definition admitting a CLIENT" "422 TooManyClientClaimsInTenantNotification — the half U15.2 cannot see, on a budget no token reads yet, so the route arrives already bounded"
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl86)" --arg t "$TEN_CL8B" '{name:$n, valueType:"string", appliesTo:"client", tenantID:$t, description:"The twenty-first machine-facing definition in one tenant."}')"
+  assert_rest 422 TooManyClientClaimsInTenantNotification
+
+  case_ "CL8.7 ...and a USER-only definition still passes in that same tenant" "201 — independence proven from the other side, so neither bucket is secretly the other"
+  api POST /claims "$(jq -nc --arg n "$(claim_name cl87)" --arg t "$TEN_CL8B" '{name:$n, valueType:"string", appliesTo:"user", tenantID:$t, description:"A user-only definition, created while the client budget is full."}')"
+  assert_status 201
+else
+  skip_ "CL8.6-8.7 — the twenty client-side definitions could not be provisioned, so the cap was never reached"
+fi
+
+# ── CL9 — "A partial update cannot tell an absent field from an explicit null, so this verb
+#    cannot set a value back to null." source: the route's own documented contract
+#    (claim_routes.go) · asserted on both surfaces: maintainer, asked 2026-09-08.
+
+ID_CL9=$(new_claim "$(claim_name cl9)" string both "$TEN_CL" "keep-me") || exit 1
+case_ "CL9.1 PATCH {defaultValue: null} over REST" "200 and the PREVIOUS value intact — the pegadinha an operator meets trying to remove a default"
+api PATCH "/claims/$ID_CL9" '{"defaultValue":null}'
+assert_json_at 200 '.data.defaultValue' "keep-me"
+
+case_ "CL9.2 the same request on GraphQL" "the same answer — the limitation is the verb's, not the transport's"
+gql "mutation(\$id: ID!, \$i: PatchClaimInput!) { patchClaim(id: \$id, input: \$i) { defaultValue } }" \
+    "$(jq -nc --arg id "$ID_CL9" '{id:$id, i:{defaultValue:null}}')"
+assert_gql_ok '.data.patchClaim.defaultValue' "keep-me"
+
+case_ "CL9.3 CONSEQUENCE, recorded rather than filed as a defect" "named, not asserted"
+skip_ "Mounted this way, a defaultValue once set cannot be withdrawn by any route: PATCH cannot express null and no PUT is mounted. Removing it means archiving the definition and recreating it — which CL10 shows costs a new id and an explicit re-set on every edge. Recorded at the maintainer's instruction, 2026-09-08"
+
+# ── CL10 — "A retired definition comes back as a NEW row with a NEW id, so an edge holding
+#    the old id does not silently re-attach." source: spec.md §5 — the property that made
+#    role_permissions store the id and not the string. The whole cycle incl. the edge:
+#    maintainer, asked 2026-09-08.
+
+TEN_CL10=$(new_tenant active "$(ws cl10)") || exit 1
+U_CL10=$(new_user "$(user_email cl10)" "$TEN_CL10") || exit 1
+N_CL10=$(claim_name cl10)
+C_OLD=$(new_claim "$N_CL10" string user "$TEN_CL10" ) || exit 1
+CH_OLD=$(set_claim "$U_CL10" "$C_OLD" "written-against-the-old-definition") || exit 1
+
+case_ "CL10.1 archive hides the definition and ?includeArchived is the only way back to it" "absent from the listing, present with a stamp when asked for"
+api PATCH "/claims/$C_OLD/archive"
+api GET "/claims?tenantID.eq=$TEN_CL10"
+HID=$(printf '%s' "$HTTP_BODY" | jq -r '[.data[] | select(.id=="'"$C_OLD"'")] | length')
+api GET "/claims?tenantID.eq=$TEN_CL10&includeArchived=true"
+SHOWN=$(printf '%s' "$HTTP_BODY" | jq -r '[.data[] | select(.id=="'"$C_OLD"'" and .archivedAt != null)] | length')
+if [ "$HID" = "0" ] && [ "$SHOWN" = "1" ]; then pass_; else fail_ "hidden=$HID revealed-with-stamp=$SHOWN"; fi
+
+case_ "CL10.2 there is no unarchive to call" "404 — the path is not mounted, so a retired definition never comes back as itself"
+api PATCH "/claims/$C_OLD/unarchive"
+assert_status 404
+
+case_ "CL10.3 recreating the same name mints a NEW id" "201 with an id different from the retired row's"
+api POST /claims "$(jq -nc --arg n "$N_CL10" --arg t "$TEN_CL10" '{name:$n, valueType:"string", appliesTo:"user", tenantID:$t, description:"The definition brought back into service after its predecessor was retired."}')"
+C_NEW=$(printf '%s' "$HTTP_BODY" | jq -r '.data.id')
+if [ "$HTTP_STATUS" = "201" ] && [ -n "$C_NEW" ] && [ "$C_NEW" != "$C_OLD" ]; then pass_; else fail_ "HTTP $HTTP_STATUS, old=$C_OLD new=$C_NEW"; fi
+
+case_ "CL10.4 the old edge does NOT re-attach to the replacement" "201 for an explicitly re-set value — if the entry had followed the NAME, this write would collide with itself. THE reason the edge stores an id and not a string (spec.md §5)"
+api POST "/users/$U_CL10/claims" "$(jq -nc --arg c "$C_NEW" '{claimID:$c, value:"written-against-the-new-definition"}')"
+assert_status 201
+
+case_ "CL10.4b ...and the two entries carry DIFFERENT definition ids" "the old value did not migrate; it stayed pointed at the row it was written for"
+api GET "/users/$U_CL10"
+assert_json '[.data.claims[]?.claimID] | sort | unique | length' "2"
+
+# A SECOND principal, deliberately: U_CL10 already holds an ACTIVE entry against C_OLD — the
+# one written before the archive — so the duplicate index would answer that write before the
+# availability probe ever ran, and the case would pass for the wrong reason. The question
+# here is what a CLEAN principal is told about a retired definition.
+U_CL10B=$(new_user "$(user_email cl10b)" "$TEN_CL10") || exit 1
+case_ "CL10.4c ...and no NEW value can be written against the RETIRED definition" "422 ClaimNotAvailableInTenantNotification — the same key U10.3- pins in the user round: the old id is history, reachable by nothing but the entry that already names it"
+api POST "/users/$U_CL10B/claims" "$(jq -nc --arg c "$C_OLD" '{claimID:$c, value:"aimed-at-a-retired-definition"}')"
+assert_rest 422 ClaimNotAvailableInTenantNotification
+
+# ── CL11 — the read join is INNER, filled on every load, and read-only.
+#    source: spec.md §9 · joins[] in the yaml
+
+case_ "CL11.1 the three joined fields carry the counterpart's values on every read" "the workspace, the commercial status and the archive stamp of the OWNING tenant"
+api GET "/tenants/$TEN_CL"; WS_CL=$(printf '%s' "$HTTP_BODY" | jq -r '.data.workspace')
+api GET "/claims/$ID_CL9"
+assert_json '[.data.tenantWorkspace, .data.tenantStatus, (.data.tenantArchivedAt|tostring)] | join(",")' "$WS_CL,active,null"
+
+case_ "CL11.2 sending them in a write body changes nothing" "200 and the join still reports the TENANT's values — they are read-only by construction, never written through this aggregate"
+api PATCH "/claims/$ID_CL9" '{"tenantWorkspace":"not-a-real-workspace","tenantStatus":"suspended","description":"An update that also tried to rewrite the owner it merely points at."}'
+api GET "/claims/$ID_CL9"
+assert_json '[.data.tenantWorkspace, .data.tenantStatus] | join(",")' "$WS_CL,active"
+
+
 qa_finish

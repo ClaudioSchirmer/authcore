@@ -11,6 +11,7 @@
 #          specs/qa/group-contract/plan.md       (group, group_graphql, and the GR/S6/A39+ blocks)
 #          specs/qa/user-contract/plan.md        (user, user_graphql, and the U/S7/A54+ blocks)
 #          specs/qa/client-contract/plan.md      (client, client_graphql, and the C/S8/A68+ blocks)
+#          specs/qa/claim-contract/plan.md       (claim, claim_graphql, and the CL/S9/A76+ blocks)
 # Verdict: qa/qa-report.md  (rewritten in full after EVERY lane, so a run killed halfway still
 #          leaves what it had proven)
 # Logs:    qa/.logs/<run-id>/
@@ -46,9 +47,9 @@ cd "$(dirname "$0")/.." || exit 1
 
 # ── the lane list. This array IS the inventory: a .sh under qa/ that no lane names is a suite
 # ── nobody runs, and a lane naming a missing file breaks the run for everyone.
-LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql user user_graphql client client_graphql domain security audit)
+LANES=(tenant tenant_graphql permission permission_graphql role role_graphql group group_graphql user user_graphql client client_graphql claim claim_graphql domain security audit)
 
-PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md"
+PLANS="specs/qa/tenant-contract/plan.md · specs/qa/permission-contract/plan.md · specs/qa/role-contract/plan.md · specs/qa/group-contract/plan.md · specs/qa/user-contract/plan.md · specs/qa/client-contract/plan.md · specs/qa/claim-contract/plan.md"
 REPORT="qa/qa-report.md"
 PORT=8099
 QA_BASE="http://localhost:$PORT"
@@ -104,7 +105,7 @@ render_report() {
   # line came to name the wrong suite.
   local lane p f s t verdict
   {
-    printf '# QA report — authcore · tenant + permission + role + group + user + client contracts\n\n'
+    printf '# QA report — authcore · the seven entity contracts (tenant, permission, role, group, user, client, claim)\n\n'
     printf -- '- **run:** `%s` · %s\n' "$QA_RUN_ID" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
     printf -- '- **plans:** %s\n' "$PLANS"
     printf -- '- **profile:** `APP_PROFILE=qa` · config `qa/microservice.qa.yaml` · built with `-tags '"'"'postgres'"'"'` (no transport tag — the yaml declares no `transport:` block)\n'
@@ -671,6 +672,55 @@ else
 fi
 
 export QA_TOKEN_CLIENTOP QA_TOKEN_CLIENTLIM
+
+# ── principals M and N, for specs/qa/claim-contract/plan.md §2 ────────────────────────────
+#
+# Same tenant as E-L, for the same reason every scoped principal since E has used it: the
+# claim lane writes definitions that other lanes' users and clients point at, and a
+# principal in a tenant of its own could reach none of them.
+#
+#   M holds the WHOLE claim vocabulary — all FOUR verbs, the NARROWEST split in the service,
+#     because a claim definition confers nothing and a claim:grant would gate nothing
+#     (spec.md §10) — plus tenant:read and the two set-claim verbs, which are what the
+#     narrowing guard's fixtures need to put a value on an edge.
+#   N holds claim:read and NOTHING else. It is the only caller for which the read/write
+#     split of this vocabulary is visible: B is refused everywhere and M is admitted
+#     everywhere, so a write route mounted under the READ literal would be invisible to both
+#     and caught only by N (qa/security.sh S9.1m-q).
+#
+# A failure to build either is NOT fatal: the lanes skip their blocks loudly and the report
+# prints them in the SKIP column, which is the honest outcome.
+CLAIM_UPDATE_PERMISSION="01990000-0000-7000-8000-000000000002"
+CLAIM_ARCHIVE_PERMISSION="01990000-0000-7000-8000-000000000003"
+
+if [ -n "$QA_TENANT_SCOPED" ]; then
+  QA_TOKEN_CLAIMOP=$(make_principal claimop "$QA_TENANT_SCOPED" "QA Claim Operator" \
+    "Grants the whole claim vocabulary inside one tenant, plus the reads and the two set-claim verbs the narrowing guard's fixtures need." \
+    "$CLAIM_INSERT_PERMISSION" "$CLAIM_UPDATE_PERMISSION" "$CLAIM_ARCHIVE_PERMISSION" \
+    "$CLAIM_READ_PERMISSION" "$TENANT_READ_PERMISSION" \
+    "$USER_READ_PERMISSION" "$USER_SETCLAIM_PERMISSION" \
+    "$CLIENT_READ_PERMISSION" "$CLIENT_SETCLAIM_PERMISSION" || true)
+  QA_TOKEN_CLAIMLIM=$(make_principal claimlim "$QA_TENANT_SCOPED" "QA Claim Reader" \
+    "Grants reading the claim catalog and nothing else — no verb that adds, edits or retires a definition a token would carry." \
+    "$CLAIM_READ_PERMISSION" || true)
+else
+  QA_TOKEN_CLAIMOP=""
+  QA_TOKEN_CLAIMLIM=""
+fi
+
+if [ -n "$QA_TOKEN_CLAIMOP" ]; then
+  echo "   principal M: qa-claimop-$QA_RUN_ID@authcore.local (the four claim verbs + tenant:read + the two set-claim verbs, tenant $QA_TENANT_SCOPED)"
+else
+  echo "   principal M: NOT BUILT — qa/security.sh S9.1g-l and S9.3 will skip and say so" >&2
+fi
+if [ -n "$QA_TOKEN_CLAIMLIM" ]; then
+  echo "   principal N: qa-claimlim-$QA_RUN_ID@authcore.local (claim:read alone, NONE of the three write verbs)"
+else
+  echo "   principal N: NOT BUILT — qa/security.sh S9.1m-q and S9.4b will skip and say so" >&2
+fi
+
+export QA_TOKEN_CLAIMOP QA_TOKEN_CLAIMLIM
+
 
 # The lanes need these to exercise the login route itself (§3b).
 QA_ADMIN_EMAIL="admin@authcore.local"

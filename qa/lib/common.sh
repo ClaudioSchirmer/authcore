@@ -733,9 +733,11 @@ set_claim() {
 
 # ── Claim fixtures ───────────────────────────────────────────────────────────────────────
 #
-# Claim has no lane of its own yet (plan §0b). It is here only as the counterpart the user's
-# `claims` collection points at, so this is the minimum the User round needs and not the
-# entity's own fixture surface.
+# Claim now has its own round (specs/qa/claim-contract/plan.md, APPROVED 2026-09-08), and
+# these two helpers serve BOTH: the counterpart the user's and client's `claims` collections
+# point at, and the fixture surface qa/claim.sh, qa/claim_graphql.sh and the CL rows of
+# qa/domain.sh build every definition out of. They were written for the User round and
+# needed no change to carry the Claim one — which is the argument for the shape they have.
 #
 # vos.ClaimName is a snake-ish identifier; the run tag goes through qa_slug_runid for the same
 # reason every other key fixture does.

@@ -1,5 +1,14 @@
 # Spec: Claim
 
+> **Superseded 2026-09-08** — the `claim-contract` QA round (`specs/qa/claim-contract/plan.md`,
+> APPROVED) read this spec against the code and found six statements that no longer describe
+> it. All six are corrected in place below, each carrying its own dated note; the DECISIONS
+> this document records are unchanged, and no application code, yaml or migration moved. The
+> six: §0's scope note (the two edge collections were built on 2026-08-28 and this entity's
+> narrowing guard was built with them) · §2's `ClaimName` length and shape · §7's rule table,
+> notification list and fact list (three of each were missing) · §7's note on where the
+> `AppliesTo` guard belongs · §8's `patchExcludes` · §9's read-join field list.
+>
 > **Superseded 2026-09-06** — omnicore v0.74.0 renamed the managed archive slot
 > `DeletedAt` → `ArchivedAt` (builder, logical name and the `deletedAt` wire token),
 > and this service renamed the physical column `deleted_at` → `archived_at` in the same
@@ -53,7 +62,14 @@ backlog draws.
 ## §0 — Scope, and the two dependencies it deliberately does not inherit
 
 **Scope: the `claims` catalog ONLY** *(proposed; alternative: also build the two edge
-collections in the same run)*. The invocation named exactly the six catalog fields, and the
+collections in the same run)*. **[Superseded 2026-09-08 — the scope decision below stands as
+the record of what THIS run did; the two edge collections were built shortly afterwards, by
+`/omnicore:evolve-entity` on `User` and on `Client` (migrations `0010_user_claims_manual` and
+`0011_client_claims_manual`, 2026-08-28), exactly as the next paragraph predicted. A reader
+must not conclude from this section that they do not exist: they do, this entity's
+`applies-to-narrowing-refused` rule asks two facts of them, and §7's rule table now says so.
+The SECOND half of this section still holds — the platform's nine are not seeded, and the
+reserved tenant is still unbuilt.]** The invocation named exactly the six catalog fields, and the
 two owned collections the backlog draws — `user_claims` on `User`, `client_claims` on
 `Client` — are **children of aggregates that already exist**. Adding a collection to a living
 aggregate is `/omnicore:evolve-entity`'s job, not this skill's, and it is two separate runs
@@ -156,10 +172,17 @@ way a retired definition comes back — the same shape `Role.Key` carries.
 constraint-only)* — the duplicate then reports together with the other validation errors
 instead of arriving alone as a 409 after everything else passes.
 
-**`vos.ClaimName` — the new raw VO, and where the reserved prefix lives.** Shape: lowercase
-`[a-z][a-z0-9_]*`, 2..64 runes, snake_case (the convention every claim in `buildClaims`
-already follows), plus this project's shared anti-junk predicates, plus **the reserved
-prefix**. It goes in the VO rather than in a rule for the reason §0 gives: the rule is about
+**`vos.ClaimName` — the new raw VO, and where the reserved prefix lives.** Shape, **as
+built** *(corrected 2026-09-08 against `internal/domain/vos/claim_name.go`; the sentence this
+replaces said "lowercase `[a-z][a-z0-9_]*`, 2..64 runes", which understates the floor by two
+runes and describes the WHOLE string where the implementation splits it)*: **4..64 runes in
+total**, beginning with the reserved prefix `x_`, whose **remainder** must be at least 2
+runes and match `^[a-z0-9]+(_[a-z0-9]+)*$` — snake_case, the convention every claim in
+`buildClaims` already follows. So `x_ab` is the shortest legal name and `x_a` is refused. On
+top of that, the remainder must not itself begin with `x_` (the double prefix, below) and
+must pass this project's shared anti-junk predicates: at least one letter, at least **2
+distinct runes**, and **no run of 4 or more identical runes** — so `x_aa` and `x_aaaa` are
+both refused. It goes in the VO rather than in a rule for the reason §0 gives: the rule is about
 the string alone and applies to every write through the domain, while the platform's own rows
 arrive by migration and never reach it. Precedent: `TenantWorkspace` carries its reserved
 list the same way. Nothing is normalized — `X_Cost_Center` is refused, never quietly
@@ -252,6 +275,9 @@ anywhere. Verb truth holds: nothing soft rides behind `DELETE`. No per-child ops
 | R6 | `TenantID` | **manual** — the owning tenant must exist, must not be archived and must not be commercially `suspended`. A TRIAL tenant is a live customer and passes. Ask `TenantIsUnavailable`; a read join cannot answer it, because on an insert a joined field is blank | insert | `ClaimTenantDoesNotExistNotification` | 422 |
 | R7 | `DefaultValue`, `ValueType` | **manual** — the default must parse as the declared type: `number` → a valid decimal number; `bool` → exactly `true` or `false`; `string` → any non-empty value. A null default is always valid and skips the check — "no default" is a legitimate state, and level 2 of the chain simply does not fire | insertOrUpdate | `DefaultValueDoesNotMatchValueTypeNotification` | 422 |
 | R8 | `DefaultValue` | `length` max 256 — the claim-size budget of §2, nil-safe | insertOrUpdate | `DefaultValueTooLongNotification` | 422 |
+| R9 | `AppliesTo` | **manual** — refuse a change that would stop admitting an identity kind for which an ACTIVE edge still holds a value, asking ONLY about the kinds the new value DROPS. Four of the six transitions narrow; the two widenings ask nothing and always pass, and an ARCHIVED edge does not count. *(added 2026-09-08: built in the same wave as the edges — see the note under this table)* | update | `ClaimAppliesToCannotExcludeHeldValuesNotification` | 422 |
+| R10 | `AppliesTo` | **manual** — at most **20** ACTIVE definitions per tenant may admit a USER (`user` or `both`), counted from ONE grouped fact. Fires only when the write ADDS the user kind. *(added 2026-09-08)* | insertOrUpdate | `TooManyUserClaimsInTenantNotification` | 422 |
+| R11 | `AppliesTo` | **manual** — the client half of the same budget, over the same single grouped answer, with independent buckets: a full user side must never block a definition that admits only clients. *(added 2026-09-08)* | insertOrUpdate | `TooManyClientClaimsInTenantNotification` | 422 |
 
 **Not declared, deliberately.** No `required` rule on `Name`, `ValueType`, `AppliesTo` or
 `Description`: all four are value-object-backed, so the framework validates them on every
@@ -261,30 +287,48 @@ same complaint twice, and `omnicore-gen check` warns about it by name.
 
 **`AppliesTo` stays MUTABLE** *(proposed; alternative: immutable, like R4)*. Widening
 (`user` → `both`) is always safe, and it is the ordinary operational move. Narrowing strands
-values on the kind being dropped — but there are no edges to strand yet, and when they arrive
-the guard belongs beside them, in the run that builds them, where the probe can actually be
-asked. Recorded so that run does not have to rediscover it.
+values on the kind being dropped.
+
+**[Corrected 2026-09-08.]** The rest of this paragraph used to read: *"there are no edges to
+strand yet, and when they arrive the guard belongs beside them, in the run that builds them,
+where the probe can actually be asked."* Both halves have since been overtaken. The edges
+arrived on 2026-08-28, and the guard was built **here, on `Claim`** — as R9 — rather than
+beside them: the question *"does anyone still hold a value for the kind this change drops"*
+is asked by two facts of THIS aggregate's own domain service (`ClaimIsHeldByAUser`,
+`ClaimIsHeldByAClient`), because the write being guarded is a write to this row. The
+prediction that the guard would be needed was right; the prediction about where it would live
+was not.
 
 **Notifications this entity declares** (all seven catalogs, per `CLAUDE.md` rule 3):
 `InvalidClaimNameNotification` · `UnknownClaimValueTypeNotification` ·
 `UnknownClaimAppliesToNotification` · `ClaimNameAlreadyExistsNotification` ·
 `ClaimNameIsImmutableNotification` · `ClaimTenantIsImmutableNotification` ·
 `ClaimValueTypeIsImmutableNotification` · `ClaimTenantDoesNotExistNotification` ·
-`DefaultValueDoesNotMatchValueTypeNotification` · `DefaultValueTooLongNotification`.
+`DefaultValueDoesNotMatchValueTypeNotification` · `DefaultValueTooLongNotification` ·
+**`ClaimAppliesToCannotExcludeHeldValuesNotification` · `TooManyUserClaimsInTenantNotification` ·
+`TooManyClientClaimsInTenantNotification`** *(the last three added 2026-09-08 with R9-R11; the
+list previously stopped at ten and the entity declares thirteen)*.
 `TenantMismatchNotification` and `TenantMissingNotification` are framework-owned and already
 translated — this entity declares neither.
 
 **Domain service — required: true.** Facts, each named for the PROBLEM:
 `ClaimNameTaken` (`exists`, filters `TenantID` + `Name`, excludeSelf, activeOnly) ·
 `TenantIsUnavailable` (`manual`, filters `TenantID` — missing, archived or suspended; trial
-passes). No caller-identity fact: there is no escalation surface here, because a claim
-definition confers nothing.
+passes) · **`ClaimIsHeldByAUser`** (`manual`, filters `ID` — any ACTIVE `user_claims` row
+pointing here) · **`ClaimIsHeldByAClient`** (`manual`, its twin on the other edge) ·
+**`ActiveClaimsByAppliesTo`** (`count`, `groupBy: [AppliesTo]`, filters `TenantID`,
+activeOnly — ONE grouped query both catalog-cap rules fold into their overlapping buckets)
+*(the last three added 2026-09-08 with R9-R11)*. No caller-identity fact: there is no
+escalation surface here, because a claim definition confers nothing.
 
 ## 8. Update shape
 
 **PATCH** *(proposed; alternative: PUT, or both)*. No sibling, so the §4 PUT invariant does not
-apply. `patchExcludes: [TenantID, Name, ValueType]` — the three immutable fields are removed
-from the partial body, so the OpenAPI request schema never advertises them as editable. The
+apply. **`patchExcludes: [Name, ValueType]`** *(corrected 2026-09-08: this line used to name
+`TenantID` as a third entry. The 2026-08-28 amendment recorded in the banner dropped it —
+`assignedFrom: identity-claim` already keeps `TenantID` out of every update body, so there is
+nothing for an exclusion to remove. The banner said so; this line did not.)* — the immutable
+fields are removed from the partial body, so the OpenAPI request schema never advertises them as editable. The
 immutability rules R2–R4 **stay** and are not redundant with it: the exclusion closes the
 PATCH door, the rules guard the value on every update path whatever door it came through. That
 is `Permission`'s reading (`permission.omnicore.yaml:260-266`), and it closes the asymmetry
@@ -292,6 +336,17 @@ is `Permission`'s reading (`permission.omnicore.yaml:260-266`), and it closes th
 then refuses.
 
 PATCH therefore carries: `appliesTo`, `defaultValue`, `description`.
+
+**Consequence, recorded 2026-09-08 by the `claim-contract` QA round.** Because those three
+are the whole update body on BOTH surfaces, **R2, R3 and R4 have no door**: no request this
+service accepts can carry a new `Name`, `TenantID` or `ValueType` to an existing row, so
+their three notifications are unreachable by construction. That is the exclusion working as
+designed, not a defect — but it means the rules are backstops behind a door closed one layer
+earlier, and the suite records them as UNPROVEN rather than claiming coverage it does not
+have (`qa/claim.sh` W13, `qa/claim_graphql.sh` X13). What the wire actually promises is
+asserted instead: REST ignores the unknown keys and answers 200 unchanged; GraphQL refuses
+them as a validation error when they are written into the DOCUMENT, and drops them in silence
+when they arrive through a VARIABLE.
 
 ## 9. Surfaces & reads
 
@@ -313,7 +368,13 @@ PATCH therefore carries: `appliesTo`, `defaultValue`, `description`.
   is the only field that carries a business value at all, and any holder of `claim:read` in the
   tenant is already entitled to it.
 - **Read joins** *(proposed; alternative: none)*: **`inner` → `Tenant` on `tenant_id`**, bringing
-  `TenantWorkspace` (`workspace`) and `TenantStatus` (`status`), both visible on the wire.
+  **three** fields, all visible on the wire *(corrected 2026-09-08: this line named only the
+  first two)*: `TenantWorkspace` (`workspace`), `TenantStatus` (`status`) and
+  **`TenantArchivedAt`** (`archived_at`). The third is served and **projectable through
+  `?fields=`**, and — unlike the other two — it is addressable in **no** criteria: it appears
+  in no filter and in no sort, so `?tenantArchivedAt=` and `?orderBy=tenantArchivedAt` are
+  both a typed 400. The filter and sort tables below are correct as written and are what makes
+  that split intentional rather than an omission.
   `inner` is correct because `tenant_id` is NOT NULL and FK-backed. A ROOT join's fields are
   addressable in a criteria, so both are filterable and sortable like any local column — which
   is what makes *"claims of acme-comercio"* answerable without a second call. Neither carries a
